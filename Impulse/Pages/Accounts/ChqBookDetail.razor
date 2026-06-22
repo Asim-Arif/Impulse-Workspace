@@ -1,0 +1,679 @@
+﻿@page "/accounts/chqbookdetail"
+@attribute [Authorize]
+<PageTitle>Cheque Book Details</PageTitle>
+
+@using System.Collections.ObjectModel
+@using Microsoft.AspNetCore.Components.Web
+@using BlazorContextMenu
+@using Microsoft.Extensions.Options
+@using DataAccessLibrary
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using CIP.Configurations
+@using DataAccessLibrary.Interface.Accounts
+@using Microsoft.Extensions.Options
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject IChqBookDetailDataAccess ChqBookDetailService
+@inject Radzen.NotificationService NotificationService
+@inject Radzen.DialogService DialogService
+
+<RadzenNotification />
+
+<div class="container-fluid mt-0 m-0 p-0" style="font-family: Calibri, sans-serif; ">
+
+    <!-- Header -->
+    <div class="card-header text-white d-flex align-items-center rounded-top-4 px-3 py-2 theme-color"
+         style="position: sticky; top: 0; z-index: 1000;">
+
+        <h5 class="mb-0">
+            <i class="fa-duotone fa-solid fa-money-check"></i>
+            Cheque Book Detail
+        </h5>
+
+        <div class="ms-auto d-flex gap-2 align-items-center">
+
+            <button class="btn btn-light btn-sm fw-semibold" @onclick="@(() => ShowAddModal(0))">
+                <i class="fa-duotone fa-solid fa-vault me-2"></i>
+                New Cheque Book
+            </button>
+
+            <button class="btn btn-light btn-sm fw-semibold" @onclick="@(() => ShowAddModal(1))">
+                <i class="fa-duotone fa-solid fa-vault me-2"></i>
+                New Online Cheque Book
+            </button>
+
+            <button class="btn btn-light btn-sm fw-semibold" @onclick="ShowBankAccountModal">
+                <i class="fa-duotone fa-solid fa-vault me-2"></i>
+                Bank Accounts
+            </button>
+
+            <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
+                <i class="fas fa-xmark me-2"></i>
+                Close
+            </button>
+        </div>
+    </div>
+
+
+    <div class="row">
+        <div class="col-md-12 mt-1">
+            <!-- Filters Section -->
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <div class="col-sm-12">
+                    <label for="cardno" class="form-label mb-0">Bank Accounts</label>
+                    <BlazoredTypeahead SearchMethod="GetTransactionAccounts"
+                                       EnableDropDown="true"
+                                       Data="Accounts"
+                                       TValue="BankAccountInfo"
+                                       TItem="BankAccountInfo"
+                                       Value="SelectedAccount"
+                                       ValueChanged="SelectedResultChanged_Account"
+                                       ValueExpression="@(() => SelectedAccount)"
+                                       Placeholder="Select Bank Account"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="selectedcard">
+                            @SelectedAccount?.AccTitle
+                        </SelectedTemplate>
+                        <ResultTemplate Context="result">
+                            @result.AccTitle
+                            @result.AccTitle
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+            </div>
+
+            @if (IsLoading)
+            {
+                <div class="progress" style="width: 100%">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                         role="progressbar" style="width: 100%">
+                        Loading Ledger Data...
+                    </div>
+                </div>
+            }
+            else if (getDatafromdb?.Any() ?? false)
+            {
+                <div style="width: 100%">
+                    <ContextMenuProvider Id="accountsContext">
+
+                        <table class="table table-bordered table-hover align-middle mb-0" 
+                               style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+
+                            <thead class="theme-color"
+                                   style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                                <tr >
+                                    <th style="width: 20%;" class="text-center">Starting</th>
+                                    <th style="width: 15%;">Chqs</th>
+                                    <th style="width: 35%;">Manual Chq No</th>
+                                    <th style="width: 10%;" class="text-end">Bank Chq Book#</th>
+                                    <th style="width: 15%;" class="text-end">Status</th>
+                                    <th style="width: 15%;" class="text-end">Type</th>
+                                    <th style="width: 5%;"> </th>
+                                </tr>
+                            </thead>
+
+                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">
+                                <Virtualize Items="@getDatafromdb" Context="chqbookdetail">
+                                    <ContextMenuTrigger WrapperTag="tr"
+                                                        MenuId="accountContextMenu"
+                                                        Data="chqbookdetail"
+                                                        MouseButtonTrigger="MouseButtonTrigger.Right"
+                                                        CssClass="@($"key-{chqbookdetail.ChqBookNo}")">
+
+                                        <td>@chqbookdetail.StartingFrom</td>
+                                        <td>@chqbookdetail.Chqs</td>
+                                        <td>@chqbookdetail.ManualNo</td>
+                                        <td class="text-end">@chqbookdetail.ChqBookDetail</td>
+                                        @if (chqbookdetail.ChqsLeft == 0)
+                                        {
+                                            <td class="text-end text-danger fw-semibold">Used Completely</td>
+                                        }
+                                        else
+                                        {
+                                            <td class="text-end text-success fw-semibold">@chqbookdetail.ChqsLeft Chqs Left.</td>
+                                        }
+                                        <td class="text-end fw-semibold">
+                                            @if (chqbookdetail.Chq_Type == 1)
+                                            {
+                                                <span class="text-success">Online</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-warning">Regular</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <ContextMenuTrigger MenuId="accountContextMenu"
+                                                                Data="chqbookdetail"
+                                                                MouseButtonTrigger="MouseButtonTrigger.Both">
+                                                <button class="btn btn-sm btn-primary" style="border:none; background:none;">
+                                                    <i class="fa-solid fa-ellipsis-vertical" style="color:black"></i>
+                                                </button>
+                                            </ContextMenuTrigger>
+                                        </td>
+
+                                    </ContextMenuTrigger>
+                                </Virtualize>
+                            </tbody>
+
+                        </table>
+                    </ContextMenuProvider>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-3 text-muted">No record found.</div>
+            }
+
+                <ContextMenu Id="accountContextMenu"  
+                             UseDefaultEventHandlers="true"
+                             Template="Win11Style">
+
+                    <Item OnClick="@(() => RefreshChqBooks(SelectedAccount?.AccNo))">
+                        <i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh
+                    </Item>
+
+                    <div class="menu-divider "></div>
+                    <Seperator />
+
+                    <Item OnClick="@(() => ShowAddModal(0))">
+                        <i class="fas fa-plus-circle fa-fw win11-icon"></i> New Cheque Book
+                    </Item>
+
+                    <Item OnClick="@(() => ShowAddModal(1))">
+                        <i class="fas fa-plus-circle fa-fw win11-icon"></i> New Online Cheque Book
+                    </Item>
+
+                    <Item OnClick="DeleteChqBook">
+                        <i class="fas fa-edit fa-fw win11-icon"></i> Delete This Cheque Book
+                    </Item>
+
+                    <div class="menu-divider "></div>
+                    <Seperator />
+
+                <Item OnClick="ShowChqModel">
+                    <i class="fas fa-edit fa-fw win11-icon"></i> View Cheques Data
+                </Item>
+                    
+                    @* <Item OnClick="@(() => DeleteChqBook(SelectedChqBook.ChqBookNo))">
+                        <i class="fas fa-trash-alt fa-fw win11-icon"></i> Print This Cheque Book's Detail
+                    </Item> *@
+
+                </ContextMenu>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for New/Edit Cheque Book -->
+@if (ShowModal)
+    {
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" style="font-family: Calibri, sans-serif; display: flex; align-items: center; justify-content: center;">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                
+            <!-- Header -->
+                <div class="modal-header text-white rounded-top-3" style="background-color:rgb(7, 44, 96)">
+
+                    <h5 class="modal-title fw-bold d-flex align-items-center">
+                        <i class="bi bi-bank me-2"></i>
+                          Add New Cheque Book
+                    </h5>
+                </div>
+
+                <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-12 mb-2">
+                            <label class="fw-semibold">Starting From :</label>
+                            <input class="form-control form-control-sm shadow-sm" @bind="ChqBookModel.StartingFrom" />
+                            </div>
+                            
+                            <div class="col-md-6 mb-2">
+                            <label class="fw-semibold">No Of Cheques :</label>
+                            <input class="form-control form-control-sm shadow-sm" @bind="ChqBookModel.Chqs" />
+                            </div>
+
+                            <div class="col-md-6 mb-2">
+                            <label class="fw-semibold">Manual Chq Book # :</label>
+                                <input class="form-control form-control-sm shadow-sm" @bind="ChqBookModel.ManualNo" />
+                            </div>
+
+                            <div class="col-md-4 mb-2">
+                            <label class="fw-semibold">Bank Chq Book # :</label>
+                            <input class="form-control form-control-sm shadow-sm" @bind="ChqBookModel.ChqBookDetail" />
+                            </div>
+
+                        </div>
+
+                        <div class="ml-2 mt-3 text-end">
+                            <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="SaveChqBook">Save</button>
+                            <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="HideModal">Close</button>
+                        </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+                                              @* Bank Account model  *@
+
+@if (ShowBankModal)
+{
+
+    <div class="modal fade show d-block" tabindex="-1" role="dialog"
+        style="font-family: Calibri, sans-serif; display: flex; align-items: center; justify-content: center;">
+        
+        <div class="modal-dialog modal-xl" role="document">
+            <div class="modal-content">
+
+                <!-- Header -->
+                <div class="modal-header text-white rounded-top-3" style="background-color:rgb(7, 44, 96)">
+                    <h5 class="modal-title fw-bold d-flex align-items-center">
+                        <i class="bi bi-bank me-2"></i>
+                        Bank Accounts   
+                    </h5>
+                    <div class="ms-auto d-flex gap-2 align-items-center">
+                        <button class="btn btn-light btn-sm fw-semibold" @onclick="HideBankAccountModal">
+                            <i class="fas fa-xmark me-2"></i>
+                            Close
+                        </button>
+                    </div>
+                </div>
+
+                <div class="modal-body">
+            @if (IsLoading)
+            {
+                <div class="progress" style="width: 100%">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                         role="progressbar" style="width: 100%">
+                        Loading Bank Accounts Data...
+                    </div>
+                </div>
+            }
+            else if (getDatafromdb_bankaccounts?.Any() ?? false)
+            {
+                <div >
+                    <ContextMenuProvider Id="accountsContext">
+
+                           <table class="table table-bordered table-hover align-middle mb-0 shadow-sm"
+                               style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+
+                            <thead class="theme-color"
+                                   style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                                <tr>
+                                    <th style="width: 20%;" class="text-center">Bank</th>
+                                    <th style="width: 20%;">Branch</th>
+                                    <th style="width: 15%;">City</th>
+                                    <th style="width: 20%;" class="text-end">Account No.</th>
+                                    <th style="width: 20%;" class="text-end">Bank Account No.</th>
+                                    <th style="width: 5%;"> </th>
+                                </tr>
+                            </thead>
+
+                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">
+                                    <Virtualize Items="@getDatafromdb_bankaccounts" Context="bankaccounts">
+                                    <ContextMenuTrigger WrapperTag="tr"
+                                            MenuId="bankaccountContextMenu"
+                                            Data="bankaccounts"
+                                            MouseButtonTrigger="MouseButtonTrigger.Right"
+                                            CssClass="@($"key-{bankaccounts.BankID}")">
+
+                                            <td class="@(bankaccounts.DefaultBank == true ? "fw-bold" : "")">
+                                                @bankaccounts.Bank
+                                            </td>
+                                            <td class="@(bankaccounts.DefaultBank == true ? "fw-bold" : "")">
+                                                @bankaccounts.Branch
+                                            </td>
+                                            <td class="@(bankaccounts.DefaultBank == true ? "fw-bold" : "")">
+                                                @bankaccounts.City
+                                            </td>
+                                            <td class="text-end @(bankaccounts.DefaultBank == true ? "fw-bold" : "")">
+                                                @bankaccounts.AccNo @bankaccounts.AccTitle
+                                            </td>
+                                            <td class="text-end text-success @(bankaccounts.DefaultBank == true ? "fw-bold" : "")">
+                                                @bankaccounts.BankAccNo
+                                            </td>
+                                            <td>
+                                                <ContextMenuTrigger MenuId="bankaccountContextMenu"
+                                                    Data="bankaccounts"
+                                                    MouseButtonTrigger="MouseButtonTrigger.Both">
+                                                    <button class="btn btn-sm btn-primary" style="border:none; background:none;">
+                                                        <i class="fa-solid fa-ellipsis-vertical" style="color:black"></i>
+                                                    </button>
+                                                </ContextMenuTrigger>
+                                            </td>
+                                    </ContextMenuTrigger>
+                                </Virtualize>
+                            </tbody>
+
+                        </table>
+                    </ContextMenuProvider>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-3 text-muted">No record found.</div>
+            }
+
+                    <ContextMenu Id="bankaccountContextMenu"  
+                                 UseDefaultEventHandlers="true"
+                                 Template="Win11Style">
+
+                        <Item OnClick="MakeBankAccountDefault">
+                            <i class="fas fa-sync-alt fa-fw win11-icon"></i> Set As Default Bank Account
+                        </Item>
+
+                        <Item OnClick="ShowOverDraftModel">
+                            <i class="fas fa-plus-circle fa-fw win11-icon"></i> Allow Over Draft For This Account
+                        </Item>
+                         
+                        <Item OnClick="PrintChqBooks">
+                            <i class="fas fa-plus-circle fa-fw win11-icon"></i> Print Chq Books
+                        </Item>
+
+                        <div class="menu-divider"></div>
+                        <Seperator />
+
+                        <Item OnClick="OpenLedger">
+                            <i class="fas fa-plus-circle fa-fw win11-icon"></i> View Ledger For Last 30 Days
+                        </Item>
+
+                    </ContextMenu>
+
+                </div>
+            </div>
+        </div>
+    </div>
+}
+<!-- Over Draft Model -->
+@if (ShowODModel)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" style="font-family: Calibri, sans-serif; display: flex; align-items: center; justify-content: center;">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <!-- Header -->
+                <div class="modal-header text-white rounded-top-4" style="background-color:rgb(7, 44, 96)">
+                    <h5 class="modal-title fw-bold d-flex align-items-center">
+                        <i class="bi bi-bank me-2"></i>
+                        Bank Over Draft
+                    </h5>
+                </div>
+
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-12 mb-2">
+                            <label class="fw-semibold">Allow Over Draft</label>
+                            <input type="checkbox" class="form-check-input shadow-sm" @bind="SelectedBankAccount.AllowOD" id="allowod" />
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="fw-semibold">Overdraft Amount :</label>
+                            <input class="form-control form-control-sm shadow-sm" @bind="SelectedBankAccount.ODAmt" />
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="fw-semibold">Overdraft Rate :</label>
+                            <input class="form-control form-control-sm shadow-sm" @bind="SelectedBankAccount.ODRate" />
+                        </div>
+                    </div>
+
+                    <div class="ml-2 mt-3 text-end">
+                        <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="SaveOverDraftData">Ok</button>
+                        <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="HideODModel">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+                            @*             CHEQUES DATA           *@
+@if (ShowChqsData)
+{
+    <div class="modal fade show d-block" tabindex="1" role="dialog"
+         style="z-index: 1040; font-family: Calibri, sans-serif; display: flex; align-items: center; justify-content: center;">
+        
+        <div class="modal-dialog modal-xl" role="document">
+            <div class="modal-content">
+
+                <!-- Header -->
+                <div class="modal-header text-white rounded-top-4" style="background-color:rgb(7, 44, 96)">
+                    <h5 class="modal-title fw-bold d-flex align-items-center">
+                        <i class="bi bi-bank me-2"></i>
+                        Cheque Book Data  
+                    </h5>
+                    <div class="ms-auto d-flex gap-2 align-items-center">
+                        <button class="btn btn-light btn-sm fw-semibold" @onclick="HideChqModel">
+                            <i class="fas fa-xmark me-2"></i>
+                            Close
+                        </button>
+                    </div>
+                </div>
+
+            <div class="modal-body">
+            @if (IsLoading)
+            {
+                <div class="progress" style="width: 100%">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                         role="progressbar" style="width: 100%">
+                        Loading Bank Accounts Data...
+                    </div>
+                </div>
+            }
+            else if (getDatafromdb_chqsdata?.Any() ?? false)
+            {
+                <div >
+                    <ContextMenuProvider Id="accountsContext">
+                        <table class="table table-bordered table-hover align-middle mb-0 shadow-sm" 
+                               style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+
+                            <thead class="theme-color"
+                                   style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                                <tr>
+                                    <th style="width: 10%;" class="text-center">Chq No</th>
+                                    <th style="width: 10%;">Chq Type</th>
+                                    <th style="width: 10%;">Issue Date</th>
+                                    <th style="width: 10%;">Chq Date</th>
+                                    <th style="width: 20%;">Account Title.</th>
+                                    <th style="width: 20%;">Description.</th>
+                                    <th style="width: 10%;" class="text-end">Amount</th>
+                                    <th style="width: 10%;">Payee</th>
+                                    <th style="width: 5%;">Clearance</th>
+                                    <th style="width: 5%;"> </th>
+                                </tr>
+                            </thead>
+
+                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">
+                                   <Virtualize Items="@getDatafromdb_chqsdata" Context="chqs">
+                                     @* <tr @oncontextmenu="@((e) => OnRowRightClick(e, chqs))"> *@
+                                        <ContextMenuTrigger WrapperTag="tr"
+                                                MenuId="ChqContextMenu"
+                                                Data="chqs"
+                                                MouseButtonTrigger="MouseButtonTrigger.Right"
+                                                CssClass="@($"key-{chqs.ChqNo}")">
+
+                                                <td>@chqs.ChqNo</td>
+                                                <td>@chqs.Chqtype</td>
+                                                    <td>
+                                                        @if (@chqs.CDate != DateTime.MinValue)
+                                                        {
+                                                            <span> @chqs.CDate.ToString("dd-MMM-yyyy") </span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span> </span>
+                                                        }
+                                                    </td>
+                                                    <td>
+                                                        @if (@chqs.ChequeDate != DateTime.MinValue)
+                                                        {
+                                                            <span> @chqs.ChequeDate.ToString("dd-MMM-yyyy") </span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span> </span>
+                                                        }
+                                                    </td>
+                                                    <td>@chqs.AccTitle</td>
+
+                                                    <td>
+                                                        @if (chqs.Bounced)
+                                                        {
+                                                            <span>&lt; Bounced &gt;</span>
+                                                            chqs.ChqStatus = "Bounced";
+                                                        }
+                                                        else if (chqs.Chqtype == "Canceled")
+                                                        {
+                                                            <span>@chqs.Description @chqs.DeleteDescription</span>
+                                                            chqs.ChqStatus = "Canceled";
+                                                        }
+                                                        else if (chqs.Issued)
+                                                        {
+                                                            <span>@chqs.Description</span>
+                                                            chqs.ChqStatus = "Issued";
+                                                        }
+                                                        else
+                                                        {
+                                                            <span>&lt; Not Issued &gt;</span>
+                                                            chqs.ChqStatus = "Not Issued";
+                                                        }
+                                                    </td>
+
+                                                    <td class="text-end">@chqs.Amount.ToString("#,##0")</td>
+                                                    <td>@chqs.Payee</td>
+                                                    <td>@chqs.ClearanceDT</td>
+
+                                                <td>
+                                                        <ContextMenuTrigger MenuId="ChqContextMenu"
+                                                        Data="chqs"
+                                                        MouseButtonTrigger="MouseButtonTrigger.Both"
+                                                        >
+                                                        <button class="btn btn-sm btn-primary" style="border:none; background:none;">
+                                                            <i class="fa-solid fa-ellipsis-vertical" style="color:black"></i>
+                                                        </button>
+                                                    </ContextMenuTrigger>
+                                                </td>
+                                        </ContextMenuTrigger>
+                                     @* </tr> *@
+                                </Virtualize>
+                            </tbody>
+
+                        </table>
+                    </ContextMenuProvider>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-3 text-muted">No record found.</div>
+            }
+                    <ContextMenu Id="ChqContextMenu"  
+                                 UseDefaultEventHandlers="true"
+                                 Template="Win11Style" 
+                                 class="win11-context-menu-container"
+                                 Context="itemContext">
+
+                        @{
+                            var selectedChq = itemContext.Data as ChqListModel;
+                            SelectedCheque = selectedChq;
+                        }
+
+                        @if (selectedChq.Amount == 0 && selectedChq.ChqStatus != "Canceled")
+                        {
+                            <Item OnClick="ShowCancelChqModel">
+                                <i class="fas fa-sync-alt fa-fw win11-icon"></i> Cancel This Cheque
+                            </Item>
+                        }
+                        @if (selectedChq.ChqStatus == "Canceled")
+                        {
+                            <Item OnClick="@((e) => ChangeChequeStatus(0, e))">
+                                <i class="fas fa-sync-alt fa-fw win11-icon"></i> Make This Cheque Uncanceled
+                            </Item>
+                        }
+                        @if (selectedChq.Amount >0)
+                        {
+                            @* <Item OnClick="PrintCheque"> *@
+                            <Item OnClick="ShowPrintCheque">
+                                <i class="fas fa-plus-circle fa-fw win11-icon"></i> Print This Cheque
+                            </Item>
+                        }
+                    </ContextMenu>
+
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (bPrintCheque)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" style="z-index: 1050; font-family: Calibri, sans-serif; display: flex; align-items: center; justify-content: center;">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <!-- Header -->
+                <div class="modal-header text-white rounded-top-4" style="background-color:rgb(7, 44, 96)">
+                    <h5 class="modal-title fw-bold d-flex align-items-center">
+                        <i class="bi bi-bank me-2"></i>
+                        Cheque Printing
+                    </h5>
+                </div>
+
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-12 mb-2">
+                            <label class="fw-semibold">Payee</label>
+                            <input class="form-control form-control-sm shadow-sm" @bind="SelectedCheque.chqpayee" />
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="fw-semibold">Designation :</label>
+                            <input class="form-control form-control-sm shadow-sm" @bind="SelectedCheque.chqdesignation" />
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="fw-semibold">Company :</label>
+                            <input class="form-control form-control-sm shadow-sm" @bind="SelectedCheque.chqcompany" />
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="fw-semibold">Cheque Date :</label>
+                            <input class="form-control form-control-sm shadow-sm" type="date" @bind="SelectedCheque.chqprintdate" />
+                        </div>
+                    </div>
+
+                    <div class="ml-2 mt-3 text-end">
+                        <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="PrintCheque">Print Cheque</button>
+                        <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="HidePrintCheque">Cancel</button>
+                    </div>
+                </div>  
+            </div>
+        </div>
+    </div>
+
+}
+<!-- CANCEL CHEQUE MODEL -->
+@if (bShowCancelChqModel)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" style="z-index: 1060; font-family: Calibri, sans-serif; display: flex; align-items: center; justify-content: center;">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <!-- Header -->
+                <div class="modal-header text-white rounded-top-4" style="background-color:rgb(7, 44, 96)">
+                    <h5 class="modal-title fw-bold d-flex align-items-center">
+                        <i class="bi bi-bank me-2"></i>
+                        Enter Description For Cheque To Be Canceled
+                    </h5>
+                </div>
+
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-12 mb-2">
+                            <label class="fw-semibold">Cancel Cheque</label>
+                            <textarea class="form-control form-control-sm shadow-sm" rows="1" @bind="SelectedCheque.CancelReason"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="ml-2 mt-3 text-end">
+                        <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="MakeChequeCancel">Save</button>
+                        <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="HideCancelChqModel">Cancel</button>
+                    </div>
+
+                </div>  
+            </div>
+        </div>
+    </div>
+
+}

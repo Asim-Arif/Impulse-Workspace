@@ -1,0 +1,242 @@
+﻿@page "/accounts/onlinepaymentvoucherlist"
+@attribute [Authorize]
+<PageTitle>Online Payment Voucher List</PageTitle>
+
+@using System.Collections.ObjectModel
+@using Microsoft.AspNetCore.Components.Web
+@using BlazorContextMenu
+@using Microsoft.Extensions.Options
+@using DataAccessLibrary
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using DataAccessLibrary.Models.ViewModels
+@using CIP.Configurations
+@using DataAccessLibrary.Interface.Accounts
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using CIP.Pages.SelectionModals
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+
+<div class="container-fluid mt-0 m-0 p-0" style="font-family: Calibri, sans-serif; ">    
+        
+        <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color"
+             style="position: sticky; top: 0; z-index: 1000;">
+            <h5 class="mb-0"><i class="fas fa-credit-card"></i> Online Payment Voucher List </h5>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
+                <i class="fas fa-xmark me-2"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <div class="card-body">
+
+        <div class="row g-1 mb-1 align-items-end">
+                <div class="col-sm-1">
+                    <label for="Range" class="form-label mb-0 fw-bold">Range</label>
+                    <select id="Range" class="form-select py-2" value="@SelectedRangeValue" @onchange="OnRangeChanged">
+                        <option value="0">Today</option>
+                        <option value="1">Last 15 Days</option>
+                        <option value="2">Last 30 Days</option>
+                        <option value="3">Last 60 Days</option>
+                        <option value="4">Last 90 Days</option>
+                        <option value="5">Last 180 Days</option>
+                        <option value="6">Date Range</option>
+                    </select>
+                </div>
+                <div class="col-sm-2">
+                <label for="fromDate" class="mb-0 fw-bold">From</label>
+                <input type="date" id="fromDate" class="form-control form-control-md py-2" @bind="DTFrom" disabled="@(SelectedRangeValue != "6")" />
+                </div>
+
+                <div class="col-sm-2">
+                    <label for="toDate" class="fw-bold">To</label>
+                <input type="date" id="toDate" class="form-control form-control-md" @bind="DTTo" disabled="@(SelectedRangeValue != "6")" />
+                </div>
+                <div class="col-sm-2">
+                    <label for="Status" class="form-label fw-bold mb-0">Status</label>
+                    <select id="Status" class="form-select py-2" @bind="SelectedStatus">
+                        <option value="0">&lt;All&gt</option>
+                        <option value="1">Pending</option>
+                        <option value="2">Posted</option>                        
+                    </select>
+                </div>
+                <div class="col-sm-2">
+                    <label for="Status" class="form-label fw-bold mb-0">Payment Type</label>
+                    <select id="Status" class="form-select py-2" @bind="SelectedPaymentType">
+                        <option value="0">&lt;All&gt</option>
+                        <option value="1">Corporate Cheque</option>
+                        <option value="2">Online Funds Transfer</option>
+                    </select>
+                </div>
+            
+                <div class="col-sm-2">
+                <label for="Banks" class="form-label fw-bold mb-0">Banks</label>
+                <BlazoredTypeahead SearchMethod="BanksSearch" EnableDropDown="true"
+                                   Data="Banks"
+                                   TValue="GenericDropDownModel"
+                                   TItem="GenericDropDownModel"
+                                   Value="SelectedBank"
+                                   ValueChanged="SelectedResultChanged_Bank"
+                                   ValueExpression="@(() => SelectedBank)"
+                                   Placeholder="Search Bank Account ..."
+                                   MaximumSuggestions="1000">
+                    <SelectedTemplate Context="selectedcard">
+                        @SelectedBank?.DropDownValue_Description
+                    </SelectedTemplate>
+                    <ResultTemplate Context="result">
+                        @result.DropDownValue_Description
+                    </ResultTemplate>
+
+                </BlazoredTypeahead>
+                    
+                </div>
+            
+                
+                <div class="col-sm-1 d-flex align-items-end">
+                    <button class="btn btn-primary btn-sm w-100 text-white" style="background-color:rgb(7, 44, 96);" @onclick="RefreshList">
+                        <i class="fas fa-sync-alt me-1"></i>Refresh
+                    </button>                    
+                </div>
+
+            </div>
+
+            @if (IsLoading)
+            {
+                <div class="progress" style="width: 100%">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                         role="progressbar" style="width: 100%">
+                        Loading Data...
+                    </div>
+                </div>
+            }
+            else if (OVList?.Any() ?? false)
+            {
+                <div style="width: 100%">
+                    <ContextMenuProvider Id="accountsContext">
+
+                        <table class="table table-bordered table-hover align-middle mb-0" 
+                               style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+
+                            <thead class="theme-color"
+                                   style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                                <tr>
+                                    <th class="text-center" style="width: 2%;">
+                                        <input type="checkbox" @onchange="ToggleAll" />
+                                    </th>
+                                    <th style="width: 3%;">S #</th>
+                                    <th style="width: 10%;">Voucher No.</th>
+                                    <th style="width: 20%;">Payee</th>
+                                    <th style="width: 10%;">Cheque No.</th>                                    
+                                    <th style="width: 5%;" class="text-center">Amount</th>
+                                    <th style="width: 10%;">Advising</th>
+                                    <th style="width: 5%;">Status</th>
+                                    <th style="width: 5%;">M1 #</th>
+                                    <th style="width: 20%;">Bank</th>
+                                    <th style="width: 10%;">Branch</th>
+                                    <th style="width: 10%;">Bank Account</th>
+                                    <th style="width: 5%;">Type</th>
+                                    <th style="width: 5%;">Transaction Type</th>
+                                    <th style="width: 2%;"> </th>
+                                </tr>
+                            </thead>
+
+                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">                                
+
+                                <Virtualize Items="@OVList" Context="row">
+                                    <ContextMenuTrigger WrapperTag="tr"
+                                                    MenuId="accountContextMenu"
+                                                    Data="row"
+                                                    MouseButtonTrigger="MouseButtonTrigger.Right"
+                                                    CssClass="@($"{row.RowClass} key-{row.VchrNo}")">
+                                    <td class="text-center">                                        
+                                        <input type="checkbox" @bind="row.IsChecked" />
+                                    </td>
+                                    <td>@(OVList.IndexOf(row) + 1)</td>
+                                    <td>@row.VchrNo</td>
+                                    <td>@row.Payee</td>
+                                    <td>@row.ChequeNo</td>
+                                    <td class="text-end">@row.Amount</td>
+                                    <td>@row.Advising</td>
+                                    <td>@row.strStatus</td>
+                                    <td>@row.M1No</td>
+                                    <td>@row.Bank</td>
+                                    <td>@row.Branch (@row.City)</td>
+                                    <td>@row.AccNo</td>
+                                    <td>@row.strAccType</td>
+                                    <td>@row.strTransaction_Type</td>
+                                    
+                                    <td>
+                                        <span class="badge rounded-pill @row.BadgeClass">
+                                            @row.strStatus
+                                        </span>
+                                    </td>
+                                    <td class="text-end">@row.strTransaction_Type</td>
+                                        
+                                        <td>
+                                        <ContextMenuTrigger MenuId="accountContextMenu"
+                                                            Data="row"
+                                                                MouseButtonTrigger="MouseButtonTrigger.Both">
+                                                <button class="btn btn-sm btn-primary" style="border:none; background:none;">
+                                                    <i class="fa-solid fa-ellipsis-vertical" style="color:black"></i>
+                                                </button>
+                                            </ContextMenuTrigger>
+                                        </td>
+
+                                    </ContextMenuTrigger>
+                                </Virtualize>
+
+                            </tbody>
+
+                        </table>
+                    </ContextMenuProvider>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-3 text-muted">No entries found.</div>
+            }
+
+        <!-- CONTEXT MENU -->
+        <ContextMenu Id="accountContextMenu"
+                     UseDefaultEventHandlers="true"
+                     Template="Win11Style">
+
+            <Item Onclick="@RefreshList">
+                <i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh
+            </Item>
+
+            <div class="menu-divider"></div>
+            <Seperator />
+
+            <Item Onclick="PrintM1">
+                <i class="fas fa-square-arrow-up-right fa-fw win11-icon"></i> Print M1
+            </Item>
+
+            <Item Onclick="DeleteM1">
+                <i class="fas fa-list-alt fa-fw win11-icon"></i> Delete M1
+            </Item>
+
+            <div class="menu-divider"></div>
+            <Seperator />
+            
+            <Item Onclick="@(async () => await PostToBankPortal(context.Data as Online_Payment_Voucher_List_ViewModel))">
+                <i class="fas fa-square-arrow-up-right fa-fw win11-icon"></i> Post To Bank Portal
+            </Item>
+
+            <div class="menu-divider"></div>
+            <Seperator />
+            
+            <Item Onclick="GoToVoucherTransaction">
+                <i class="fas fa-square-arrow-up-right fa-fw win11-icon"></i> Send SMS
+            </Item>
+            <Item Onclick="GoToVoucherTransaction">
+                <i class="fas fa-square-arrow-up-right fa-fw win11-icon"></i> Send Email
+            </Item>
+
+        </ContextMenu>
+                
+        </div>
+    </div>
+
+

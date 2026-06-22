@@ -1,0 +1,316 @@
+﻿@page "/accounts/bodmeetingpayment"
+@attribute [Authorize]
+@using DataAccessLibrary
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using DataAccessLibrary.Models.ViewModels
+@using DataAccessLibrary.Interface.Accounts
+@using CIP.Services
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+@inject ICIPData CIPDataService
+@inject IVoucherService VoucherService
+
+@inject NavigationManager Navigation
+@inject HttpClient Http
+@inject IHttpClientFactory ClientFactory
+
+<PageTitle>BOD Meeting Payment</PageTitle>
+
+<div class="" style="font-family: Calibri, sans-serif;">
+    <div class="card shadow-sm bg-transparent">
+
+        <div class="card-header d-flex">
+            <h6 class="mb-0 fw-bold">BOD Meeting Payment</h6>
+        </div>
+        
+        @* <p>Bank ID: @p_bankId</p> *@
+
+        <form class="card-body">            
+            <div class="row g-1 mb-1 align-items-end">
+                <div class="col-sm-10">
+                    <label for="pname" class="form-label mb-0">Bank Account</label>
+                    <BlazoredTypeahead SearchMethod="SearchBankAccounts"
+                                       EnableDropDown="true"
+                                       Data="bankAccounts"
+                                       TValue="BankAccountInfo"
+                                       TItem="BankAccountInfo"
+                                       Value="SelectedBankAccount"
+                                       ValueChanged="SelectedResultChanged_BankAccount"
+                                       ValueExpression="@(() => SelectedBankAccount)"
+                                       Placeholder="Select Bank Account"
+                                       MaximumSuggestions="1000">
+
+                        <SelectedTemplate Context="selectedcard">
+                            @SelectedBankAccount?.AccTitle
+                        </SelectedTemplate>
+                        <ResultTemplate Context="result">
+                            @result.AccTitle
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-sm-2">
+                    <label for="date" class="form-label mb-0 mb-0">BOD Meeting Date</label>
+                    <input type="date" id="date" class="form-control" @bind="voucherViewModel.DT" @bind:event="oninput" @onchange="OnDTChanged" />
+                </div>
+            </div>
+            <div class="row g-1 mb-1 align-items-end">
+                <div class="col-sm-6">
+                    <label for="pname" class="form-label mb-0">Debit Account</label>
+                    <BlazoredTypeahead SearchMethod="SearchDebitAccount"
+                                       EnableDropDown="true"
+                                       Data="Accounts"
+                                       TValue="ChartOfAccountsModel"
+                                       TItem="ChartOfAccountsModel"
+                                       Value="SelectedDebitAccount"
+                                       ValueChanged="SelectedResultChanged_DebitAccount"
+                                       ValueExpression="@(() => SelectedDebitAccount)"
+                                       Placeholder="Select Debit Account"
+                                       MaximumSuggestions="1000">
+
+                        <SelectedTemplate Context="selectedcard">
+                            @SelectedDebitAccount?.AccTitle
+                        </SelectedTemplate>
+                        <ResultTemplate Context="result">
+                            @result.AccTitle
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-sm-6">
+                    <label for="pname" class="form-label mb-0">Tax Account</label>
+                    <BlazoredTypeahead SearchMethod="SearchTaxAccount"
+                                       EnableDropDown="true"
+                                       Data="Accounts"
+                                       TValue="ChartOfAccountsModel"
+                                       TItem="ChartOfAccountsModel"
+                                       Value="SelectedTaxAccount"
+                                       ValueChanged="SelectedResultChanged_TaxAccount"
+                                       ValueExpression="@(() => SelectedTaxAccount)"
+                                       Placeholder="Select Tax Account"
+                                       MaximumSuggestions="1000">
+
+                        <SelectedTemplate Context="selectedcard">
+                            @SelectedTaxAccount?.AccTitle
+                        </SelectedTemplate>
+                        <ResultTemplate Context="result">
+                            @result.AccTitle
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+            </div>
+            <div class="row g-2 mb-1 align-items-end">
+                <div class="col-sm-6">
+                    <label for="pname" class="form-label mb-0">Search Director</label>
+                    <BlazoredTypeahead SearchMethod="SearchDirectors"
+                                       EnableDropDown="true"
+                                       Data="DirectorsList"
+                                       TValue="SIALDirectorViewModel"
+                                       TItem="SIALDirectorViewModel"
+                                       Value="SelectedDirector"
+                                       ValueChanged="SelectedResultChanged_Director"
+                                       ValueExpression="@(() => SelectedDirector)"
+                                       Placeholder="Search Director"
+                                       MaximumSuggestions="1000">
+
+                        <SelectedTemplate Context="selectedcard">
+                            @SelectedDirector?.DirectorName
+                        </SelectedTemplate>
+                        <ResultTemplate Context="result">
+                            @result.DirectorName
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-auto">
+                    <InputFile OnChange="HandleExcelUpload" id="excelUpload" style="display:none;" />
+                    <button type="button" class="btn btn-outline-success" style="min-width: 125px;" onclick="document.getElementById('excelUpload').click()">
+                        <i class="fa-solid fa-file-excel me-2"</i>Import
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-outline-secondary" style="min-width: 125px;" @onclick="FetchTitle">
+                        <i class="fa-solid fa-magnifying-glass me-2"</i>Fetch Title
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-outline-secondary" style="min-width: 125px;" @onclick="() => PrintAttendees(false)">
+                        <i class="fa-solid fa-clipboard-user me-2"</i>Attendees
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-outline-secondary" style="min-width: 125px;" @onclick="() => PrintAttendees(true)">
+                        <i class="fa-solid fa-user-gear me-2"</i>Processed
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-outline-primary" style="min-width: 125px;" @onclick="OpenBulkModal">
+                        <i class="fa-solid fa-calculator me-2"></i>Set Amounts
+                    </button>
+                </div>
+            </div>
+            @if (!IsDataLoading)
+            {
+                <div class="table-responsive mb-3" style="max-height: 400px; overflow-y: auto; border: 1px solid #dee2e6">
+                <table class="table table-sm table-bordered table-striped align-middle table-nowrap-header compact-table">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th class="text-center" style="width: 40px;">
+                                <input type="checkbox" @onchange="ToggleAll" />
+                            </th>
+                            <th>Folio</th>
+                            <th>Name</th>
+                            <th>Company</th>
+                            <th>Bank Name</th>
+                            <th>Account Title</th>
+                            <th>Account No.</th>
+                            <th>Code</th>
+                            <th style="width: 120px;">Debit</th>
+                            <th style="width: 120px;">Tax</th>
+                            <th style="width: 120px;">Net</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (DirectorGridList.Count > 0)
+                        {
+                            @for (int i = 0; i < DirectorGridList.Count; i++)
+                            {
+                                    var item = DirectorGridList[i];
+
+                                    <tr id="row-@item.Director.EntryID" class="row-animate @(item.IsChecked ? "table-primary-light" : "") @(item.IsHighlighted ? "table-warning" : "")" style="animation-delay: @(i * 0.03)">
+                                    <td class="text-center">
+                                        <input type="checkbox" @bind="item.IsChecked"/>
+                                    </td>
+                                    <td>@item.Director.FolioNo</td>
+                                    <td>@item.Director.DirectorName</td>
+                                    <td>@item.Director.Company</td>
+                                    <td>@item.Director.Bank_Name</td>
+                                    <td>@item.Director.Bank_Account_Title</td>
+                                    <td>@item.Director.Bank_Account_No</td>
+                                    <td>@item.Director.Bank_Code</td>
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm text-end"
+                                               @bind="@item.Debit" @bind:event="oninput" />
+                                    </td>
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm text-end"
+                                               @bind="@item.Tax" @bind:event="oninput" />
+                                    </td>
+                                    <td class="text-end fw-bold">@item.Net.ToString("N2")</td>
+                                </tr>                                
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="9" class="text-center text-muted py-3">No directors found for this date.</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot class="table-dark fw-bold sticky-bottom">
+                        <tr>
+                            <td colspan="2" class="text-start">
+                                Selected: <span class="text-warning">@DirectorGridList.Count(x => x.IsChecked)</span>
+                            </td>
+                            <td colspan="6" class="text-end">Total Amount:</td>
+                            <td class="text-end">
+                                @DirectorGridList.Where(x => x.IsChecked).Sum(x => x.Debit).ToString("N2")
+                            </td>
+                            <td class="text-end">
+                                @DirectorGridList.Where(x => x.IsChecked).Sum(x => x.Tax).ToString("N2")
+                            </td>
+                            <td class="text-end">
+                                @DirectorGridList.Where(x => x.IsChecked).Sum(x => x.Net).ToString("N2")
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            }
+            <div class="mb-2">
+                <label class="form-label fw-bold d-block mb-1">Payment Mode</label>
+
+                <div class="d-flex align-items-center gap-4">
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio"
+                               name="PayModeGroup"
+                               id="radioOFT"
+                               value="0"
+                               checked="@(voucherViewModel.Transaction_Type == 0)"
+                               @onchange="HandlePayMethodChange">
+                        <label class="form-check-label" for="radioOFT">Online Funds Transfer</label>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio"
+                               name="PayModeGroup"
+                               id="radioCC"
+                               value="1"
+                               checked="@(voucherViewModel.Transaction_Type == 1)"
+                               @onchange="HandlePayMethodChange">
+                        <label class="form-check-label" for="radioCC">Corporate Cheque</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-1 mb-1 align-items-end">
+
+                <div class="col-sm-6">
+                    <label for="Notes" class="form-label mb-0">Remarks</label>
+                    <textarea id="Notes" name="Notes" class="form-control" rows="3" @bind:event="oninput" @bind="voucherViewModel.Remarks"></textarea>
+                </div>
+
+                <div class="col-sm-6 d-flex flex-column">
+                    <div class="d-flex justify-content-end gap-2">                        
+                        <button type="button" class="btn btn-primary" style="min-width: 180px" disabled="@isSaving" @onclick="SaveVoucher">
+                            <i class="fa-solid fa-floppy-disk me-2"></i> Save
+                        </button>
+                        <button type="button" class="btn btn-danger" style="min-width: 180px" @onclick="GoToIndexPage">
+                            <i class="fa-solid fa-circle-xmark me-2"></i> Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+@if (showBulkModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg">
+                <div class="modal-header bg-dark text-white py-2">
+                    <h5 class="modal-title">Bulk Apply Amounts</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">This will update All <strong>@DirectorGridList.Count</strong> directors.</p>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Debit Amount</label>
+                        <input type="number" class="form-control" @bind="globalDebit" autofocus />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Tax Amount</label>
+                        <input type="number" class="form-control" @bind="globalTax" />
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" @onclick="CloseModal">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm" @onclick="ApplyBulkValues">Apply to All</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+@if (IsLoading)
+{
+    <div class="loading-overlay">
+        <div class="loading-card">
+            <div class="spinner-border spinner-custom" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <h5 class="mt-3" style="color: #003366; font-weight: bold;">Processing</h5>
+            <p style="color: #557799;" class="small mb-0">Loading, please wait...</p>
+        </div>
+    </div>
+}

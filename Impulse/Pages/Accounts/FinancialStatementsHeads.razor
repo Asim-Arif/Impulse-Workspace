@@ -1,0 +1,159 @@
+﻿@page "/accounts/financialstatementsheads"
+@attribute [Authorize]
+<PageTitle>Financial Statements Heads</PageTitle>
+
+@using System.Collections.ObjectModel
+@using Microsoft.AspNetCore.Components.Web
+@using BlazorContextMenu
+@using Microsoft.Extensions.Options
+@using DataAccessLibrary
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using CIP.Configurations
+@using DataAccessLibrary.Interface.Accounts
+@using Microsoft.Extensions.Options
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject IFinancialStatementDataAccess ChqBookDetailService
+@inject Radzen.NotificationService NotificationService
+
+<RadzenNotification />
+
+<div class="container-fluid mt-0" style="font-family: Calibri, sans-serif;">
+    <div class="card shadow-sm border-0 rounded-1 bg-transparent">
+        <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color"
+             style="position: sticky; top: 0; z-index: 1000;">
+
+            <h5 class="mb-0"><i class="fas fa-align-left"></i> Financial Statements Heads </h5>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="Refreshlist">
+                    <i class="fas fa-times"></i> Refresh
+                </button>
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
+                    <i class="fas fa-times"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <!-- TABLE START HERE -->
+            <div class="card-body p-0">
+                @if (IsLoading)
+            {
+                <div class="progress rounded-pill" style="width: 100%">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary rounded-pill"
+                         role="progressbar" style="width: 100%">
+                        Please Wait While Loading Data ...
+                    </div>
+                </div>
+            }
+            else if (getDBEntries?.Any() ?? false)
+                {
+                <div style="width: 100%">
+                    <ContextMenuProvider Id="tableContextMenu">
+                        <table class="table table-bordered table-hover align-middle mb-0 shadow-sm"
+                               style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                            <thead class="theme-color"
+                                    style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                                <tr>
+                                    <th class="text-center">Sr #</th>
+                                    <th>Group Description</th>
+                                    <th class="text-center">Note No</th>
+                                    <th class="text-center">Show In BS</th>
+                                    <th class="text-center">Show In NTA</th>
+                                    <th class="text-center">Main Note #</th>
+                                    <th class="text-center"> <i class="fas fa-bolt"></i> </th>
+                                </tr>
+                            </thead>
+                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">
+                                <Virtualize Items="@getDBEntries" Context="heads">
+                                    <ContextMenuTrigger WrapperTag="tr"
+                                                        MenuId="MainContextMenu"
+                                                        Data="heads"
+                                                        MouseButtonTrigger="MouseButtonTrigger.Right"
+                                                        CssClass="@($"key-{heads.EntryID}")">
+
+                                                    <td class="text-center"
+                                                        style="width: 5%;
+                                                        font-weight: @(heads.MainHead ? "bold" : "normal");
+                                                        color: @(heads.MainHead ? "blue" : "black");">
+                                                        @(getDBEntries.IndexOf(heads) + 1)
+                                                    </td>
+                                                    <td class="text-start"
+                                                        style="width: 50%;
+                                                                   font-weight: @(heads.MainHead ? "bold" : "normal");
+                                                                   color: @(heads.MainHead ? "blue" : "black");">
+                                                        @heads.GroupName
+                                                    </td>
+                                                    <td class="text-center"
+                                                        style="width: 10%;
+                                                        font-weight: @(heads.MainHead ? "bold" : "normal");
+                                                        color: @(heads.MainHead ? "blue" : "black");">
+                                                        @heads.Note
+                                                    </td>
+@*                                                     <td class="text-center"
+                                                        style="width: 10%;
+                                                        font-weight: @(heads.MainHead ? "bold" : "normal");
+                                                        color: @(heads.MainHead ? "blue" : "black");">
+                                                        @(heads.ShowInBS ? "Marked BS" : "")
+                                                    </td>
+                                                    <td class="text-center"
+                                                        style="width: 10%;
+                                                            font-weight: @(heads.MainHead ? "bold" : "normal");
+                                                            color: @(heads.MainHead ? "blue" : "black");">
+                                                            @(heads.ShowInNTA ? "Marked NTA" : "")
+                                                    </td> *@
+
+                                                    <td class="text-center" style="width: 10%;">
+                                                        <input type="checkbox" class="form-check-input"
+                                                               checked="@heads.ShowInBS" 
+                                                   @onchange="@((args) => ChangeStatus(heads, 1, (bool)args.Value))" />
+                                                    </td>
+
+                                                    <td class="text-center" style="width: 10%;">
+                                                        <input type="checkbox" 
+                                                        checked="@heads.ShowInNTA" class="form-check-input"
+                                                   @onchange="@((args) => ChangeStatus(heads, 2, (bool)args.Value))" />
+                                                    </td>
+
+                                                    <td class="text-center"
+                                                        style="width: 10%;
+                                                            font-weight: @(heads.MainHead ? "bold" : "normal");
+                                                            color: @(heads.MainHead ? "blue" : "black");">
+                                                            @heads.MainNoteNo
+                                                    </td>
+
+                                                <td style="width: 5%;">
+                                                    <ContextMenuTrigger 
+                                                                    MenuId="MainContextMenu"
+                                                                    Data="heads"
+                                                                    MouseButtonTrigger="MouseButtonTrigger.Both">
+                                                    <button class="btn btn-sm btn-primary" style="border:none; background:none;">
+                                                        <i class="fa-solid fa-ellipsis-vertical" style="color:black"></i>
+                                                    </button>
+                                                    </ContextMenuTrigger>
+                                                </td>
+                                    </ContextMenuTrigger>
+                                </Virtualize>
+                            </tbody>
+                        </table>
+                    </ContextMenuProvider>
+                </div>
+                }
+                else
+                {
+                    <div class="text-center py-3 text-muted">No Data found.</div>
+                }
+
+            <ContextMenu Id="MainContextMenu"  
+                         UseDefaultEventHandlers="true"
+                         Template="Win11Style">
+
+                        <Item Onclick="@Refreshlist">
+                            <i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh
+                        </Item>
+
+            </ContextMenu>
+            </div>
+        </div>
+    </div>

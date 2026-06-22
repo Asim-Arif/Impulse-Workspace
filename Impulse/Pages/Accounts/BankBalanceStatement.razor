@@ -1,0 +1,146 @@
+﻿@page "/accounts/bankbalancestatement"
+@attribute [Authorize]
+<PageTitle>Bank Balance Statement</PageTitle>
+
+@using System.Collections.ObjectModel
+@using Microsoft.AspNetCore.Components.Web
+@using BlazorContextMenu
+@using Microsoft.Extensions.Options
+@using DataAccessLibrary
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using DataAccessLibrary.Models.ViewModels
+@using CIP.Configurations
+@using DataAccessLibrary.Interface.Accounts
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using CIP.Pages.SelectionModals
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+
+<div class="container-fluid mt-0 m-0 p-0" style="font-family: Calibri, sans-serif; ">    
+        
+        <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color"
+             style="position: sticky; top: 0; z-index: 1000;">
+            <h5 class="mb-0"><i class="fas fa-piggy-bank"></i> Bank Balance Statement</h5>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
+                <i class="fas fa-xmark me-2"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <div class="card-body">
+
+        <div class="row g-1 mb-1 align-items-end">
+            <div class="col-sm-4">
+                <label for="TotalBankBalance" class="form-label fw-bold mb-0">Total Bank Balance</label>
+                <input type="text" id="TotalBankBalance" name="TotalBankBalance" class="form-control fw-bold text-center" 
+                        value="@TotalBankBalance.ToString("N0")" style="background-color: black; color: #00FF00;"
+                        readonly>
+            </div>                
+        </div>
+
+            @if (IsLoading)
+            {
+                <div class="progress" style="width: 100%">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                         role="progressbar" style="width: 100%">
+                        Loading Data...
+                    </div>
+                </div>
+            }
+            else if (ListToUse?.Any() ?? false)
+            {
+            <div class="sticky-table-container">                
+                    <ContextMenuProvider Id="accountsContext">
+
+                        <table class="table table-bordered table-hover align-middle mb-0" 
+                               style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+
+                            <thead class="theme-color"
+                                   style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                                <tr>
+                                    <th style="width: 40%;">Bank & Branc</th>
+                                    <th style="width: 20%;">Bank Account No.</th>
+                                    <th style="width: 20%;" class="text-center">Balance</th>
+                                    <th style="width: 20%;" class="text-center">Cheque Format</th>                                    
+                                </tr>
+                            </thead>
+
+                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">                                
+
+                                <Virtualize Items="@ListToUse" Context="row">
+                                    <ContextMenuTrigger WrapperTag="tr"
+                                                    MenuId="accountContextMenu"
+                                                    Data="row"
+                                                    MouseButtonTrigger="MouseButtonTrigger.Right"
+                                                    CssClass="@($"{row.RowClass} key-{row.AccNo}")">
+                                                                            
+                                    <td>@($"{row.Bank} {row.Branch}")</td>
+                                    <td>@row.BankAccNo</td>                                    
+                                    <td class="text-end">@row.Balance.ToString("N0")</td>
+                                    <td @ondblclick="() => StartEdit(row)" style="cursor: pointer; min-width: 150px;">
+                                        @if (EditingAccNo == row.AccNo)
+                                        {
+                                            <input type="text"
+                                                   class="form-control form-control-sm"
+                                                   @bind="row.ChqFormat"
+                                                   @bind:event="oninput"
+                                                   @onfocusout="() => SaveEdit(row)"
+                                                   @onkeydown="@(e => HandleKeyDown(e, row))"
+                                                   id="@($"input-{row.AccNo}")" />
+                                        }
+                                        else
+                                        {
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <span>@row.ChqFormat</span>
+                                                <i class="fas fa-pencil fa-xs text-muted ms-2" style="opacity: 0.5;"></i>
+                                            </div>
+                                        }
+                                    </td>
+                                    </ContextMenuTrigger>
+                                </Virtualize>
+
+                            </tbody>
+                            <tfoot class="bg-light fw-bold" style="position: sticky; bottom: 0; z-index: 10; background-color: #f8f9fa !important; border-top: 2px solid #dee2e6;">
+                                <tr>
+                                    <td colspan="2" class="text-center">TOTALS</td>                                    
+                                    <td class="text-end">@TotalBankBalance.ToString("N0")</td>
+                                    <td class="text-end"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </ContextMenuProvider>
+                </div>
+                <div class="d-flex justify-content-end gap-2 mt-3 border-top pt-3">                
+                    <button class="btn btn-outline-success btn-sm px-3 btn-min-width" @onclick="PrintBankBalanceSheet">
+                            <i class="fas fa-print me-1"></i> Print
+                        </button>
+                    </div>
+            }
+            else
+            {
+                <div class="text-center py-3 text-muted">No entries found.</div>
+            }
+
+        <!-- CONTEXT MENU -->
+        <ContextMenu Id="accountContextMenu"
+                     UseDefaultEventHandlers="true"
+                     Template="Win11Style">
+
+            <Item Onclick="@RefreshList">
+                <i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh
+            </Item>
+
+            <div class="menu-divider"></div>
+            <Seperator />
+
+            <Item Onclick="PrintBankBalanceSheet">
+                <i class="fas fa-square-arrow-up-right fa-fw win11-icon"></i> Print Report
+            </Item>            
+
+        </ContextMenu>
+                
+    </div>
+</div>
+

@@ -1,0 +1,104 @@
+﻿ @page "/"
+ 
+ @attribute [Authorize]
+ @inject NavigationManager Navigation
+
+ 
+<div class="container mt-2 card">
+
+    <div class="image-grid card-body m-3 d-flex flex-wrap justify-content-center gap-3">
+
+        @* <a href="cash.html"> *@
+        @* <a href="CIP_Cash"> *@
+        <a @onclick="() => NavigateToEntryForm(5)">
+            <img src="graphics/cash.png" alt="Cash" class="grid-icon mx-auto" />
+        </a>
+
+        @* <a href="creditcard.html"> *@
+        @* <a href="CIP_Credit"> *@
+        <a @onclick="() => NavigateToEntryForm(6)">
+            <img src="graphics/card.png" alt="Credit Cards" class="grid-icon mx-auto" />
+        </a>
+
+        <a href="banks">
+            <img src="graphics/bank.png" alt="Banks" class="grid-icon mx-auto" />
+        </a>
+
+        <a @onclick="() => NavigateToEntryForm(0)">
+            <img src="graphics/dirbooking.png" alt="Director Booking" class="grid-icon mx-auto" />
+        </a>
+
+        <a @onclick="() => NavigateToEntryForm(1)">
+            <img src="graphics/dirpersonally.png" alt="Director Personally" class="grid-icon mx-auto" />
+        </a>
+
+        <a @onclick="() => NavigateToEntryForm(2)">
+            <img src="graphics/staff.png" alt="Staff" class="grid-icon mx-auto" />
+        </a>
+
+        <a @onclick="() => NavigateToEntryForm(4)">
+            <img src="graphics/guest.png" alt="Guest" class="grid-icon mx-auto" />
+        </a>
+
+        <a @onclick="() => NavigateToEntryForm(3)">
+            <img src="graphics/airlines.png" alt="Airlines" class="grid-icon mx-auto" />
+        </a>
+
+@*         <a href="dirlist.html">
+            <img src="graphics/dirlist.png" alt="Dir. List" class="grid-icon mx-auto" />
+        </a> *@
+
+        <a href="CIPEntriesList">
+            <img src="graphics/ciplist.png" alt="CIP. List" class="grid-icon mx-auto" />
+        </a>
+
+        <a @onclick="() => NavigateToInvoicesForm(1)">
+            <img src="graphics/cash-process.png" alt="Cash Invocies" class="grid-icon mx-auto" />
+        </a>
+
+        <a @onclick="() => NavigateToInvoicesForm(2)"> 
+             <img src="graphics/card-process.png" alt="Credit Invocies" class="grid-icon mx-auto" />
+        </a>
+
+        <a @onclick="() => NavigateToPhotocopyForm(0)">
+            <img src="graphics/copy-entry.png" alt="Photocopy-entry" class="grid-icon mx-auto" />
+        </a>
+
+        <a @onclick="() => NavigateToPhotocopyProcessForm(0)">
+            <img src="graphics/copy-invoice.png" alt="Photocopy-process" class="grid-icon mx-auto" />
+        </a>
+
+        <a href="CIPInvoicesList">
+            <img src="graphics/cipinvoiceslist.png" alt="CIP Invoices List" class="grid-icon mx-auto" />
+        </a>
+
+    </div>
+
+</div>
+
+
+@code{
+    
+    public string MachineName =string.Empty ;
+    
+    private void NavigateToEntryForm(int entrytype)
+    {
+        Navigation.NavigateTo($"/CIP_DirectorBooking/{entrytype}");
+    }
+
+    private void NavigateToInvoicesForm(int entrytype)
+    {
+        Navigation.NavigateTo($"/CIP_Credit_Invoices/{entrytype}");
+    }
+
+    private void NavigateToPhotocopyForm(int entrytype)
+    {
+        Navigation.NavigateTo($"/PhotocopyEntry/");
+    }
+
+    private void NavigateToPhotocopyProcessForm(int entrytype)
+    {
+        Navigation.NavigateTo($"/Photocopy_Invoices/{entrytype}");
+    }
+
+}

@@ -1,0 +1,227 @@
+﻿@page "/SaleBooking"
+
+@attribute [Authorize]
+
+@using DataAccessLibrary
+@using DataAccessLibrary.Models
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+<PageTitle>New Sale Booking</PageTitle>
+
+<div class="card m-4" style="font-family: Calibri, sans-serif;">
+    
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0">New Sale Booking</h5>
+    </div>
+
+    <div class="card-body m-3">
+        <form>
+    
+            <div class="row m-3">
+                
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="BookInvoiceNo" class="control-label">Booking No</label>
+                        <input type="text" id="BookInvoiceNo" class="form-control" placeholder="Booking No." @bind="item.BookInvoiceNo" disabled />
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        @* <label for="ItemName" class="control-label">Date</label>
+                        <input type="text" id="ItemName" class="form-control" placeholder="Enter Item Name" @bind="item.ItemName" /> *@
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="form-group">
+                        @* <label for="ItemName" class="control-label">Date</label>
+                        <input type="text" id="ItemName" class="form-control" placeholder="Enter Item Name" @bind="item.ItemName" /> *@
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="date" class="control-label">Date</label>
+                        <input type="date" id="date" class="form-control" @bind="item.BookDT" @bind:event="oninput" @onchange="OnBookDTChanged" />
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="row m-3">
+
+                <div class="col-md-8">
+
+                    <div class="form-group">
+                        <label for="Customers" class="control-label">Customers</label>
+
+                        <BlazoredTypeahead SearchMethod="GetCustomers"
+                                           EnableDropDown="true"
+                                           TValue="Customers"
+                                           TItem="Customers"
+                                           Value="SelectedCustomer"
+                                           ValueChanged="SelectedResultChanged"
+                                           ValueExpression="@(() => SelectedCustomer)"
+                                           placeholder="Search by Customer...">
+
+                            <SelectedTemplate Context="customer">
+                                @customer.CustomerName
+                            </SelectedTemplate>
+                            <ResultTemplate Context="customer">
+                                @customer.CustomerName
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+
+                    </div>
+
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label for="Remarks" class="control-label">Remarks</label>
+                        <input type="text" id="Remarks" class="form-control" placeholder="Remarks" @bind="item.BookDescription" />
+                    </div>
+                </div>
+
+            </div>
+
+@* Start Table From here *@
+
+            <div class="container">
+                <div class="row m-1">
+                <div class="col-md-12">
+                        <!-- Form to enter item details -->
+                    <div class="row mb-1">
+
+                            <div class="col-sm-7">
+                                <div class="form-group">
+                                    <label for="Items" class="control-label">Items</label>
+                                    
+                                    <BlazoredTypeahead SearchMethod="GetRM"
+                                                       EnableDropDown="true"
+                                                       TValue="Material"
+                                                       TItem="Material"
+                                                       Value="SelectedRM"
+                                                       ValueChanged="SelectedResultChanged_RM"
+                                                       ValueExpression="@(() => SelectedRM)"
+                                                       placeholder="Search by Materials...">
+                                        <SelectedTemplate Context="material">
+                                            @material.MaterialName
+                                        </SelectedTemplate>
+                                        <ResultTemplate Context="material">
+                                            @material.MaterialName
+                                        </ResultTemplate>
+                                    </BlazoredTypeahead>
+
+                                </div>
+                            </div>
+
+                            <div class="col-sm-1">
+                                <div class="form-group">
+                                    <label for="Unit" class="control-label">Unit</label>
+                                    <input type="text" id="Unit" class="form-control" @bind="Unit" readonly />
+                                </div>
+                            </div>
+
+                            <div class="col-sm-1">
+                                <div class="form-group">
+                                    <label for="StockQty" class="control-label">Stock Qty</label>
+                                    <input type="text" id="StockQty" class="form-control" @bind="StockQty" readonly/>
+                                </div>
+                            </div>
+
+                            <div class="col-sm-1">
+                                <div class="form-group">
+                                    <label for="Qty" class="control-label">Qty</label>
+                                    <input type="number" id="Qty" class="form-control" @bind="Qty" />
+                                </div>
+                            </div>
+
+                            <div class="col-sm-1">
+                                <div class="form-group">
+                                    <label for="GQty" class="control-label">G. Qty</label>
+                                    <input type="number" id="GQty" class="form-control" @bind="GQty" />
+                                </div>
+                            </div>
+                            <div class="col-sm-1">
+                                <div class="form-group">
+                                    <br />
+                                    <button type="button" class="btn btn-success w-10" @onclick="AddItem">Post</button>
+                                </div>
+                            </div>
+
+                        </div>
+                    <div class="row mt-3">
+                    @if (Items.Count > 0)
+                    {
+                    <!-- Wrapping the table in a div to apply scrolling -->
+                        <div style="max-height: 400px; overflow-y: auto;">
+
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th class="col-md-7">Items</th>
+                                    <th class="col-md-1" hidden>itemid</th>
+                                    <th class="col-md-1">Unit</th>
+                                    <th class="col-md-1">Stock Qty</th>
+                                    <th class="col-md-1">Qty</th>
+                                    <th class="col-md-1">Godown Qty</th>
+                                    <th class="col-md-1">Actions <i class="fas fa-trash remove-icon"></i></th>
+@*                                  <th>
+                                        <button type="button" class="btn btn-success btn-sm ml-2" @onclick="AddRMDetail">+</button>
+                                    </th> *@
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @* @for (int i = 0; i < item.RMDetails.Count; i++) *@
+                                @foreach (var item in Items)
+                                {
+                                    <tr>
+                                        <td>@item.ItemName</td>
+                                        <td hidden>@item.ItemID</td>
+                                        <td>@item.Unit</td>
+                                        <td>@item.StockQty</td>
+                                        <td>@item.Qty</td>
+                                        <td>@item.GQty</td>
+                                        <td class="d-flex justify-content-center">
+                                            @* <button type="button" class="btn btn-danger btn-sm ml-2" @onclick="() => RemoveRMDetail(iIndex)">&times;</button> *@
+                                           <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveItem(item)">&times;</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        @* <button type="button" class="btn btn-success" @onclick="AddRMDetail">Add New RM Entry</button> *@
+                        </div>
+                            }
+                    else
+                    {
+                        <p>No items added yet.</p>
+                    }
+                    </div>
+                </div>
+            </div>
+            </div>
+
+            <div class="row m-2">
+                <div class="col-md-11 d-flex justify-content-end">
+                    <input type="button" class="btn btn-success w-20" value="Save" @onclick="SaveItem" />
+                </div>
+
+                <div class="col-md-1 d-flex justify-content-end w-10">
+                    <input type="button" class="btn btn-success" value="Cancel" @onclick="ResetForm" />
+                </div>
+                
+                <div class="col-md-4">
+                    <label for="totalqty" class="control-label">Total Quantity.: @totalQuantity</label>
+                </div>
+
+                @if (!string.IsNullOrEmpty(successMessage))
+                {
+                    <div class="alert alert-success">@successMessage</div>
+                }
+            </div>
+        </form>
+    </div>
+</div>

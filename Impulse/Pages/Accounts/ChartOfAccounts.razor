@@ -1,0 +1,368 @@
+﻿@page "/accounts/chartofaccounts"
+@attribute [Authorize]
+<PageTitle>Chart of Accounts</PageTitle>
+
+@using System.Collections.ObjectModel
+@using Microsoft.AspNetCore.Components.Web
+@using BlazorContextMenu
+@using Microsoft.Extensions.Options
+@using DataAccessLibrary
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using CIP.Configurations
+@using DataAccessLibrary.Interface.Accounts
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject IChartOfAccountsDataAccess ChartOfAccountsService
+
+<div class="container-fluid mt-0 m-0 p-0" style="font-family: Calibri, sans-serif; ">
+
+    <div class="card shadow-sm border-0 rounded-1 bg-transparent">
+        <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color" style="position: sticky; top: 0; z-index: 1000;">
+            <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Chart of Accounts</h5>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="ShowAddModal">
+                    <i class="fas fa-plus"></i> Add Account
+                </button>
+
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
+                    <i class="fas fa-xmark me-2"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <!-- TABLE START HERE -->
+        <div class="card-body p-0">
+            @if (IsLoading)
+            {
+                <div class="progress" style="width: 100%">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                         role="progressbar" style="width: 100%">
+                        Loading Chart Of Accounts Data...
+                    </div>
+                </div>
+            }
+            else if (ChartOfAccountsfromDB?.Any() ?? false)
+            {
+                <div style="width: 100%">
+                    <ContextMenuProvider Id="tableContextMenu">
+                        <table class="table table-bordered table-hover align-middle mb-0"
+                               style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                            <thead class="theme-color"
+                                   style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">                                   
+                               
+                                <tr>
+                                    <th scope="col" style="width: 15%;">Account No</th>
+                                    <th scope="col" style="width: 40%;">Account Title</th>
+                                    <th scope="col" style="width: 10%;" class="text-end">Opening</th>
+                                    <th scope="col" style="width: 10%;" class="text-end">Balance</th>
+                                    @* <th scope="col" style="width: 10%;">Group</th> *@
+                                    <th scope="col" style="width: 10%;" class="text-center">Budget</th>
+                                    <th scope="col" style="width: 10%;" class="text-center">Budget-G</th>
+                                    <th scope="col" style="width: 5%;" class="text-center">Tax %</th>
+                                    <th scope="col" style="width: 5%;"> </th>
+                                </tr>
+
+                            </thead>
+
+                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">
+                                <Virtualize Items="@ChartOfAccountsfromDB" Context="account">
+                                @* @foreach (var account in ChartOfAccountsfromDB) *@
+                                @* { *@
+                                     <ContextMenuTrigger WrapperTag="tr"
+                                            MenuId="accountContextMenu"
+                                            Data="account"
+                                            MouseButtonTrigger="MouseButtonTrigger.Right"
+                                            CssClass="@(
+                                            account.Active == false ? "table-danger" :
+                                            account.bMainhead==false ? "table-secondary fw-bold" :
+                                                                    account.AccType ? "fw-bold table-light" : "")"
+                                            @key="account.AccNo"> 
+                                @* @oncontextmenu="() => SelectedAccount = account" *@
+
+                                        <td style="width: 15%;">@account.AccNo</td>
+                                        <td style="width: 40%;">@account.AccTitle</td>
+                                        <td class="text-end" style="width: 10%;">
+                                                @(account.OpeningBalance < 0 ? 
+                                                (Math.Abs(account.OpeningBalance).ToString("N0") + " Cr")
+                                                : account.OpeningBalance.ToString("N0") + " Dr")
+                                        </td>
+
+                                        @if (account.Balance > 0)
+                                        {
+                                            <td class="text-end" style="width: 10%;">@((account.Balance.ToString("N0") + " Dr"))</td>
+                                        }
+                                        else
+                                        {
+                                            <td class="text-end" style="width: 10%;">@((Math.Abs(account.Balance).ToString("N0") + " Cr"))</td>
+                                        }
+                                        @* <td style="width: 10%;">@account.ReportingGroup</td> *@
+
+                                        <td class="text-center" style="width: 10%;">
+                                            <span class="d-block text-center">@account.Budget</span>
+                                        </td>
+                                        <td class="text-center" style="width: 10%;">@account.Budget_G</td>
+                                        <td class="text-center" style="width: 5%;">@account.TaxPercentage</td>
+
+                                        <td style="width: 5%;">
+                                            <ContextMenuTrigger 
+                                                MenuId="accountContextMenu"
+                                                Data="account"
+                                                MouseButtonTrigger="MouseButtonTrigger.Both">
+
+                                                <button class="btn btn-sm btn-primary" style="border:none; background:none;">
+                                                    <i class="fa-solid fa-ellipsis-vertical" style="color:black "></i>
+                                                </button>
+
+                                            </ContextMenuTrigger>
+                                        </td>
+
+                                </ContextMenuTrigger>
+                                @* } *@
+                                </Virtualize>
+                            </tbody>
+                        </table>
+                    </ContextMenuProvider>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-3 text-muted">No accounts found.</div>
+            }
+@* POP MENU START FROM HERE *@
+            @* <ContextMenu Id="accountContextMenu" 
+                          UseDefaultEventHandlers="true"
+                         class="list-group shadow-sm rounded-3 border-0 context-menu-small"
+                         style="min-width: 150px; background: #ffffff; font-family: 'Segoe UI', Calibri, sans-serif; font-size: 6pt;"> *@
+            
+            <ContextMenu Id="accountContextMenu"  
+                         UseDefaultEventHandlers="true"
+                         Template="Win11Style"
+                         >
+
+                <!-- Section 1: General Actions -->
+                @* <Item OnClick="@RefreshData" class="menu-item">
+                    <i class="fas fa-sync-alt fa-fw me-3 text-primary"></i> Refresh
+                </Item> *@
+                <Item OnClick="@RefreshData">
+                    <i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh
+                </Item>
+                @* <Item OnClick="@(async (e) => ShowInActive(e, !bshowinactive))" class="menu-item">
+                    <i class="fas fa-filter fa-fw me-3 text-secondary"></i> Show InActive Accounts
+                 </Item>*@
+                <Item OnClick="@(async (e) => ShowInActive(e, !bshowinactive))">
+                    <i class="fas fa-eye fa-fw win11-icon"></i> Show InActive Accounts
+                </Item>
+                <div class="menu-divider"></div>
+                <Seperator/>
+
+                @* <div class="menu-section text-uppercase text-muted small px-3 mt-2 mb-1">Options</div> *@
+
+                <!-- Section 2: Account Management -->
+                <Item OnClick="ShowAddModal" class="menu-item">
+                    <i class="fas fa-plus fa-fw win11-icon"></i> Add New Account
+                </Item>
+
+                @* <Item OnClick="EditSelectedAccount" class="menu-item"> *@
+                <Item OnClick="EditSelectedAccount" class="menu-item">
+                    <i class="fas fa-pen fa-fw win11-icon"></i> Edit Selected Account
+                </Item>
+
+                @* <Item OnClick="DeleteSelectedAccount" class="menu-item"> *@
+               <Item OnClick="@(async (e) => await DeleteSelectedAccount(e))" class="menu-item">
+                    <i class="fas fa-trash-alt fa-fw win11-icon"></i> Delete Account
+                </Item>
+
+                <Item OnClick="MakeAccountActive" class="menu-item">
+                    <i class="fas fa-toggle-off fa-fw win11-icon"></i> Make This Account InActive
+                </Item>
+
+                <div class="menu-divider"></div>
+                <Seperator />
+                <!-- Section 3: Reports -->
+                @* <div class="menu-section text-uppercase text-muted small px-3 mt-2 mb-1">Reports</div> *@
+
+                <Item class="menu-item" OnClick="@(() => PrintChartOfAccounts(1))">
+                    <i class="fas fa-book fa-fw win11-icon"></i> Print Chart Of Accounts
+                </Item>
+
+                <Item class="menu-item" OnClick="@(() => PrintChartOfAccounts(2))">
+                    <i class="fas fa-box-open fa-fw win11-icon"></i> Print Accounts Opening
+                </Item>
+
+                <Item class="menu-item" OnClick="@(() => PrintChartOfAccounts(1))">
+                    <i class="fas fa-balance-scale-left fa-fw win11-icon"></i> Print Current Balances
+                </Item>
+
+                @* <Item class="menu-item">
+                    <i class="fas fa-list-alt fa-fw win11-icon"></i> Print Ledgers (Sub Accounts)
+                </Item> *@
+
+            </ContextMenu>
+
+            @if (IsContextMenuVisible)
+            {
+                @* <div class="context-menu position-absolute bg-white border rounded shadow-sm p-2"
+                     style="top:@ContextMenuToppx px; left:@ContextMenuLeftpx px; z-index:1000;">
+                    <div class="menu-item py-1 px-2" @onclick="EditSelectedAccount">✏️ Edit</div>
+                    <div class="menu-item py-1 px-2" @onclick="DeleteSelectedAccount">🗑️ Delete</div>
+                    <div class="menu-item py-1 px-2" @onclick="ViewDetails">👁️ View Details</div>
+                </div> *@
+            }
+
+        </div>
+
+
+        <!-- TABLE END HERE -->
+    @* </div> *@
+
+</div>
+    
+    @if (ShowModal)
+    {
+        <div class="modal fade show d-block" tabindex="-1" role="dialog" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content p-2 shadow-lg border-0 rounded-3">
+
+            <!-- Header -->
+            <div class="modal-header text-white rounded-top-4" style="background-color:rgb(7, 44, 96)">
+                <h5 class="modal-title fw-bold d-flex align-items-center">
+                    <i class="fas fa-chart-line me-2"></i>
+                    @(IsAdding ? "Add Account" : "Edit Account")
+                </h5>
+                <button type="button" class="btn-close btn-close-white" @onclick="HideModal" aria-label="Close"></button>
+            </div>
+            
+            <!-- Model Body Starting from here -->
+                <div class="modal-body bg-light">
+                        <div class="container-fluid px-0">
+                        <div class="row g-3">
+                             @if (IsEdit==false)
+                             {
+                                <div class="col-sm-12">
+                                        <label for="AccHeads" class="form-label fw-semibold">Accounts Heads :</label>
+                                    <BlazoredTypeahead
+                                        SearchMethod="GetHeads"
+                                        EnableDropDown="true"
+                                        Data="accheadsforlist"
+                                        TValue="ChartOfAccountsModel"
+                                        TItem="ChartOfAccountsModel"
+                                        Value="Selectedhead"
+                                        ValueChanged="SelectedResultChanged"
+                                        ValueExpression="@(() => Selectedhead)"
+                                        Placeholder="Search By account type..."
+                                        MaximumSuggestions="1000">
+
+                                        <SelectedTemplate Context="selectedhead">
+                                            @selectedhead?.HeadType
+                                        </SelectedTemplate>
+                                        <ResultTemplate Context="result">
+                                            @result.HeadType
+                                        </ResultTemplate>
+                                    </BlazoredTypeahead>
+                                </div>
+                           }
+
+                            <div class="col-sm-6" hidden="hidden">
+                                <label class="form-label fw-semibold">Type:</label>
+                                <input @bind="CurrentAccount.HeadTypeNo" class="form-control" readonly="readonly" disabled="disabled" />
+                            </div>
+
+                            <div class="col-sm-12">
+                                <label class="form-label fw-semibold">Account Title</label>
+                                    <input @bind="CurrentAccount.AccTitle" class="form-control" @bind:event="oninput" @onchange="OnChangedAccTitle" />
+                            </div>
+                            
+                            @if (IsEdit == false){
+                                <div class="col-sm-12">
+                                        <label for="AccHeads" class="form-label fw-semibold">Sub Acc Of:</label>
+
+                                    
+                                    <BlazoredTypeahead 
+                                                SearchMethod="GetHeads_sub"
+                                                EnableDropDown="true"
+                                                Data="accheadsforlist_sub"
+                                                TValue="ChartOfAccountsModel"
+                                                TItem="ChartOfAccountsModel"
+                                                Value="Selectedhead_sub"
+                                                ValueChanged="SelectedResultChanged_sub"
+                                                ValueExpression="@(() => Selectedhead_sub)"
+                                                Placeholder="Search By account sub head..."
+                                                MaximumSuggestions="1000">
+
+                                                <SelectedTemplate Context="selectedhead_sub">
+                                                    @selectedhead_sub?.SubAccTitle
+                                                </SelectedTemplate>
+
+                                                <ResultTemplate Context="result">
+                                                    @result.SubAccTitle
+                                                </ResultTemplate>
+
+                                    </BlazoredTypeahead>
+                                </div>
+                            }
+                            <div class="col-sm-12">
+                                <label class="form-label fw-semibold">Account #</label>
+                                <input type="text" id="AccNo" name="AccNo" @bind="CurrentAccount.AccNo" class="form-control" readonly /> 
+                            </div>
+
+                            @if (IsEdit == false)
+                            {
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Opening Balance :</label>
+                                    <input @bind="CurrentAccount.Balance" type="number" step="0.01" class="form-control" />
+                                </div>
+                            }
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Opening Date :</label>
+                                <input @bind="CurrentAccount.OpenDate" type="date" class="form-control" />
+                            </div>
+
+                            @* <div class="col-md-6">
+                                <label class="form-label fw-semibold" for="opt1">Debit</label>
+                                <input type="radio" id="optDr" name="options" checked="@(CurrentAccount.BalType==1) " @onchange="@(() => OnChangedBalanceType(1))" />
+
+                                <label class="form-label fw-semibold" for="opt2">Credit</label>
+                                 <input type="radio" id="optCr" name="options" checked="@((CurrentAccount.BalType == 2)) " @onchange="@(() => OnChangedBalanceType(2))" />
+                            </div> *@
+                            @if (IsEdit == false)
+                            {
+
+                                <div class="col-md-6 d-flex align-items-center">
+                                    <InputRadioGroup @bind-Value="CurrentAccount.BalType">
+                                        <div class="form-check me-3">
+                                            <InputRadio class="form-check-input" id="optDr" Value="1" />
+                                            <label class="form-check-label fw-semibold" for="optDr">Debit</label>
+                                        </div>
+
+                                        <div class="form-check">
+                                            <InputRadio class="form-check-input" id="optCr" Value="2" />
+                                            <label class="form-check-label fw-semibold" for="optCr">Credit</label>
+                                        </div>
+                                    </InputRadioGroup>
+                                </div>
+                            }
+                                @if (IsEdit == false) 
+                            {
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold" for="opt2">Master Account</label>
+                                    <input @bind="CurrentAccount.AccType" type="checkbox" id="master" name="checkbox" value="checkbox" @bind:event="oninput" @onchange="OnChangedMasterType" />
+                                </div>
+                            }
+                    </div>
+                </div>
+            </div>
+
+        <!-- Model Footer is starting from here -->
+                <div class="modal-footer border-top-0">
+                    <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="HideModal">Cancel</button>
+                    <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="SaveAccount">Save</button>
+                </div>
+
+                </div>
+            </div>
+        </div>
+    }
+</div>
+

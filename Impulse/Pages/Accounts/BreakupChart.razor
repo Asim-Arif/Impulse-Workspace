@@ -1,0 +1,564 @@
+﻿@page "/accounts/breakupchart"
+@attribute [Authorize]
+<PageTitle>Breakup Chart Of Accounts</PageTitle>
+
+@using System.Collections.ObjectModel
+@using Microsoft.AspNetCore.Components.Web
+@using BlazorContextMenu
+@using Microsoft.Extensions.Options
+@using DataAccessLibrary
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using CIP.Configurations
+@using DataAccessLibrary.Interface.Accounts
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject IChartOfAccountsDataAccess ChartOfAccountsService
+
+<div class="container-fluid mt-0 m-0 p-0" style="font-family: Calibri, sans-serif; ">
+
+    <div class="card shadow-sm border-0 rounded-1 bg-transparent">
+        <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color" style="position: sticky; top: 0; z-index: 1000;">
+            <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Breakup Chart Of Accounts</h5>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="ShowAddModal">
+                    <i class="fas fa-plus"></i> Add Account
+                </button>
+
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
+                    <i class="fas fa-xmark me-2"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <!-- TABLE START HERE -->
+        <div class="card-body p-0">
+            @if (IsLoading)
+            {
+                <div class="progress" style="width: 100%">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                         role="progressbar" style="width: 100%">
+                        Loading Chart Of Accounts Data...
+                    </div>
+                </div>
+            }
+            else if (ChartOfAccountsfromDB?.Any() ?? false)
+            {
+                <div style="width: 100%">
+                    <ContextMenuProvider Id="tableContextMenu">
+                        <table class="table table-bordered table-hover align-middle mb-0 table-sm table-hover"
+                               style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 9pt;">
+                            <thead class="theme-color"
+                                   style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 9pt;">                                   
+                               
+                                <tr>
+                                    <th scope="col" style="width: 15%;">Account No</th>
+                                    <th scope="col" style="width: 30%;">Account Title</th>
+                                    <th scope="col" style="width: 10%;" class="text-end">Closing</th>
+                                    <th scope="col" style="width: 20%;" class="text-center">Notes</th>
+                                    <th scope="col" style="width: 5%;" class="text-center">Note No.</th>
+                                    <th scope="col" style="width: 5%;" class="text-center">Mark -ve</th>
+
+                                    <th scope="col" style="width: 5%;" class="text-center">CF</th>
+                                    <th scope="col" style="width: 10%;" class="text-center">CF Heads</th>
+                                    <th scope="col" style="width: 5%;" class="text-center">CF -ve</th>
+                                    @* <th scope="col" style="width: 5%;" class="text-center">Project</th>
+                                    <th scope="col" style="width: 10%;" class="text-center">Budget Description</th>
+                                    <th scope="col" style="width: 10%;" class="text-center">Budget(Receipt/Payment)</th> *@
+                                    <th scope="col" style="width: 5%;"> </th>
+                                </tr>
+
+                            </thead>
+
+                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 8pt;">
+                                <Virtualize Items="@ChartOfAccountsfromDB" Context="account">
+                                @* @foreach (var account in ChartOfAccountsfromDB) *@
+                                @* { *@
+
+                                    @{
+                                            bool isOrange = (account.OpenDate >= myDTStart &&
+                                            account.OpenDate <= TodayDT &&
+                                            !account.Marked &&
+                                            account.ManualMarked == false &&
+                                            account.ParentMarked == false);
+                                        string orangeStyle = isOrange ? "background-color: #FFA07A !important; color: black !important;" : "";
+                                      }
+
+                                     <ContextMenuTrigger WrapperTag="tr"
+                                            MenuId="accountContextMenu"
+                                            Data="account"
+                                            MouseButtonTrigger="MouseButtonTrigger.Right"
+
+                                            CssClass="@(
+                                            account.Active == false ? "table-danger" :
+                                            account.bMainhead==false ? "table-secondary fw-bold" :
+                                            account.AccType ? "fw-bold table-light" : "")"
+                                            style="@orangeStyle"
+                                            @key="account.AccNo">
+                                        @* <td>
+                                            <input type="checkbox" 
+                                            checked="@account.MarkedTB" 
+                                            class="win11-checkbox" readonly />
+                                        </td>
+                                        <td style="width: 10%; @orangeStyle">@account.AccNo</td> *@
+                                        <td style="width: 12%; @orangeStyle" class="align-middle">
+                                            <div class="d-flex align-items-center">
+                                                <div class="form-check mb-0">
+                                                    @if (account.MarkedTB)
+                                                    {
+                                                        <input class="form-check-input" type="checkbox" checked disabled style="opacity: 1;">
+                                                    }
+                                                    else
+                                                    {
+                                                        <input class="form-check-input" type="checkbox" disabled style="opacity: 1;">
+                                                    }
+                                                </div>
+                                                <span class="ms-2">@account.AccNo</span>
+                                            </div>
+                                        </td>
+                                        <td style="width: 30%; @orangeStyle">@account.AccTitle</td>
+                                        <td class="text-end" style="width: 10%; @orangeStyle">
+                                            @($"{Math.Abs(account.Balance):N0} {(account.Balance > 0 ? "Dr" : "Cr")}")
+                                        </td>
+                                        <td class="text-center" style="width: 20%; @orangeStyle">@account.GroupName</td>
+                                        <td class="text-center" style="width: 5%; @orangeStyle">@account.Note</td>
+                                        <td class="text-center" style="width: 5%; @orangeStyle">@(account.Marked ? "Marked" : "")</td>
+
+                                        <td class="text-center" style="width: 5%; @orangeStyle">@(account.Marked_CF ? "Marked" : "")</td>
+                                        <td class="text-center" style="width: 10%; @orangeStyle">@account.Description</td>
+                                        <td class="text-center" style="width: 5%; @orangeStyle">@(account.Marked_CF_Nve ? "Marked" : "")</td>
+                                        @* <td class="text-center" style="width: 5%;">
+                                            @(account.NewProject == 1 ? "New" : account.NewProject == 0 ? "Running" : "")
+                                        </td>
+                                        <td class="text-center" style="width: 10%;">@account.BudgetHeadDesc</td>
+                                        <td class="text-center" style="width: 10%;">@account.GroupDescForBudgetHead</td> *@
+                                        <td style="width: 5%; @orangeStyle">
+                                            <ContextMenuTrigger 
+                                                MenuId="accountContextMenu"
+                                                Data="account"
+                                                MouseButtonTrigger="MouseButtonTrigger.Both">
+
+                                                <button class="btn btn-sm btn-primary" style="border:none; background:none;">
+                                                    <i class="fa-solid fa-ellipsis-vertical" style="color:black "></i>
+                                                </button>
+
+                                            </ContextMenuTrigger>
+                                        </td>
+
+                                </ContextMenuTrigger>
+                                @* } *@
+                                </Virtualize>
+                            </tbody>
+                        </table>
+                    </ContextMenuProvider>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-3 text-muted">No accounts found.</div>
+            }
+@* POP MENU START FROM HERE *@
+            @* <ContextMenu Id="accountContextMenu" 
+                          UseDefaultEventHandlers="true"
+                         class="list-group shadow-sm rounded-3 border-0 context-menu-small"
+                         style="min-width: 150px; background: #ffffff; font-family: 'Segoe UI', Calibri, sans-serif; font-size: 6pt;"> *@
+            
+            <ContextMenu Id="accountContextMenu"  
+                         UseDefaultEventHandlers="true"
+                         Template="Win11Style"
+                         Context="itemContext">
+
+                @{
+                    var selected = itemContext.Data as ChartOfAccountsModel;
+                    SelectedAccount = selected;
+                }
+
+                <Item OnClick="@RefreshData">
+                    <i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh
+                </Item>
+
+                <Item OnClick="@(async (e) => ShowInActive(e, !bshowinactive))">
+                    <i class="fas fa-eye fa-fw win11-icon"></i> Show InActive Accounts
+                </Item>
+                <div class="menu-divider"></div>
+                <Seperator/>
+
+                <Item OnClick="ShowAddModal" class="menu-item">
+                    <i class="fas fa-plus fa-fw win11-icon"></i> Add New Account
+                </Item>
+
+                <Item OnClick="EditSelectedAccount" class="menu-item">
+                    <i class="fas fa-pen fa-fw win11-icon"></i> Edit Selected Account
+                </Item>
+
+               <Item OnClick="@(async (e) => await DeleteSelectedAccount(e))" class="menu-item">
+                    <i class="fas fa-trash-alt fa-fw win11-icon"></i> Delete Account
+                </Item>
+
+                <Item OnClick="MakeAccountActive" class="menu-item">
+                    <i class="fas fa-toggle-off fa-fw win11-icon"></i> Make This Account InActive
+                </Item>
+
+                <div class="menu-divider"></div>
+                <Seperator />
+
+                <Item class="menu-item">
+                    <i class="fas fa-book fa-fw win11-icon"></i> Print Chart Of Accounts
+                </Item>
+
+                <Item class="menu-item">
+                    <i class="fas fa-box-open fa-fw win11-icon"></i> Print Accounts Opening
+                </Item>
+
+                <Item class="menu-item">
+                    <i class="fas fa-balance-scale-left fa-fw win11-icon"></i> Print Current Balances
+                </Item>
+
+                <div class="menu-divider"></div>
+                <Seperator />
+
+                <Item class="menu-item" OnClick="@(() => PrintAccountsHeadsReport(0))">
+                    <i class="fas fa-print fa-fw win11-icon"></i> Print All Heads Report
+                </Item>
+                <Item class="menu-item" OnClick="@(() => PrintAccountsHeadsReport(1))">
+                    <i class="fas fa-check-square fa-fw win11-icon"></i> Print Marked Heads Report
+                </Item>
+                <Item class="menu-item" OnClick="@(() => PrintAccountsHeadsReport(3))">
+                    <i class="far fa-square fa-fw win11-icon"></i> Print UnMarked Heads Report
+                </Item>
+                <Item class="menu-item" OnClick="@(() => PrintAccountsHeadsReport(2))">
+                    <i class="far fa-square fa-fw win11-icon"></i> Print New Added Accounts Reports
+                </Item>
+                <Item class="menu-item">
+                    <i class="fas fa-link fa-fw win11-icon"></i> Link Accounts With Sub Heads
+                </Item>
+
+                <div class="menu-divider"></div>
+                <Seperator />
+                <Item class="menu-item" OnClick="ShowNotesToAccountsModal">
+                    <i class="fas fa-clipboard fa-fw win11-icon"></i> Map to Notes To Accounts
+                </Item>
+                <Item class="menu-item" OnClick="ChangeNotesStatus">
+                    @if (SelectedAccount != null)
+                    {
+                        @if (SelectedAccount.Marked)
+                        {
+                            <i class="far fa-square fa-fw win11-icon"></i> <span>UnMark -ve Notes</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-check-square fa-fw win11-icon"></i> <span>Mark Notes -ve</span>
+                        }
+                    }
+                </Item>
+                <Item class="menu-item" OnClick="ChangeAccountCheckedStatus">
+                    @if (SelectedAccount != null)
+                    {
+                        @if (SelectedAccount.MarkedTB)
+                        {
+                           <i class="far fa-square fa-fw win11-icon"></i> <span>UnMark as Trail Balance</span>
+                        }
+                        else
+                        {
+                           <i class="far fa-square fa-fw win11-icon"></i> <span>Mark as Trail Balance</span>
+                        }
+                    }
+                </Item>
+
+                <Item class="menu-item" OnClick="ShowCashFlowModal">
+                    <i class="fas fa-money-bill-wave fa-fw win11-icon"></i> Map to Cash Flow
+                </Item>
+                <Item class="menu-item" OnClick="MarkCashFlowAccount">
+                    @if (SelectedAccount != null)
+                    {
+                        @if (SelectedAccount.Marked_CF)
+                        {
+                            <i class="far fa-square fa-fw win11-icon"></i> <span>UnMark Cash Flow Account</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-check-square fa-fw win11-icon"></i> <span>Mark Cash Flow Account</span>
+                        }
+                    }
+                </Item>
+
+                <div class="menu-divider"></div>
+                <Seperator />
+                <Item class="menu-item" OnClick="@(() => BreakLink(1))">
+                    <i class="fas fa-unlink fa-fw win11-icon"></i> Break Notes To Accounts Link
+                </Item>
+                <Item class="menu-item" OnClick="@(() => BreakLink(2))">
+                    <i class="fas fa-unlink fa-fw win11-icon"></i> Break Cash Flow Link
+                </Item>
+
+            </ContextMenu>
+
+        </div>
+        <!-- TABLE END HERE -->
+</div>
+    
+@if (ShowModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog"
+            style="font-family: Calibri, sans-serif; display: flex; align-items: center; justify-content: center;">
+
+        <div class="modal-dialog modal-xl" role="document">
+            <div class="modal-content">
+
+                <div class="modal-header text-white rounded-top-4" style="background-color:rgb(7, 44, 96)">
+                    <h5 class="modal-title fw-bold d-flex align-items-center">
+                <i class="fas fa-chart-line me-2"></i>
+                @(IsAdding ? "Add Account" : "Edit Account")
+            </h5>
+            <button type="button" class="btn-close btn-close-white" @onclick="HideModal" aria-label="Close"></button>
+        </div>
+            
+        <!-- Model Body Starting from here -->
+            <div class="modal-body bg-light">
+                    <div class="container-fluid px-0">
+                    <div class="row g-3">
+                            @if (IsEdit==false)
+                            {
+                            <div class="col-sm-12">
+                                    <label for="AccHeads" class="form-label fw-semibold">Accounts Heads :</label>
+                                <BlazoredTypeahead
+                                    SearchMethod="GetHeads"
+                                    EnableDropDown="true"
+                                    Data="accheadsforlist"
+                                    TValue="ChartOfAccountsModel"
+                                    TItem="ChartOfAccountsModel"
+                                    Value="Selectedhead"
+                                    ValueChanged="SelectedResultChanged"
+                                    ValueExpression="@(() => Selectedhead)"
+                                    Placeholder="Search By account type..."
+                                    ControlClass="form-control-sm shadow-sm"
+                                    MaximumSuggestions="1000">
+
+                                    <SelectedTemplate Context="selectedhead">
+                                        @selectedhead?.HeadType
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="result">
+                                        @result.HeadType
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                        }
+
+                        <div class="col-sm-6" hidden="hidden">
+                            <label class="form-label fw-semibold">Type:</label>
+                            <input @bind="CurrentAccount.HeadTypeNo" class="form-control form-control-sm shadow-sm" readonly="readonly" disabled="disabled" />
+                        </div>
+
+                        <div class="col-sm-12">
+                            <label class="form-label fw-semibold">Account Title</label>
+                                <input @bind="CurrentAccount.AccTitle" class="form-control form-control-sm shadow-sm" @bind:event="oninput" @onchange="OnChangedAccTitle" />
+                        </div>
+                            
+                        @if (IsEdit == false){
+                            <div class="col-sm-12">
+                                    <label for="AccHeads" class="form-label fw-semibold">Sub Acc Of:</label>
+
+                                    
+                                <BlazoredTypeahead 
+                                            SearchMethod="GetHeads_sub"
+                                            EnableDropDown="true"
+                                            Data="accheadsforlist_sub"
+                                            TValue="ChartOfAccountsModel"
+                                            TItem="ChartOfAccountsModel"
+                                            Value="Selectedhead_sub"
+                                            ValueChanged="SelectedResultChanged_sub"
+                                            ValueExpression="@(() => Selectedhead_sub)"
+                                            Placeholder="Search By account sub head..."
+                                            ControlClass="form-control-sm shadow-sm"
+                                            MaximumSuggestions="1000">
+
+                                            <SelectedTemplate Context="selectedhead_sub">
+                                                @selectedhead_sub?.SubAccTitle
+                                            </SelectedTemplate>
+
+                                            <ResultTemplate Context="result">
+                                                @result.SubAccTitle
+                                            </ResultTemplate>
+
+                                </BlazoredTypeahead>
+                            </div>
+                        }
+                        <div class="col-sm-12">
+                            <label class="form-label fw-semibold">Account #</label>
+                            <input type="text" id="AccNo" name="AccNo" @bind="CurrentAccount.AccNo" class="form-control form-control-sm shadow-sm" readonly /> 
+                        </div>
+
+                        @if (IsEdit == false)
+                        {
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Opening Balance :</label>
+                                <input @bind="CurrentAccount.Balance" type="number" step="0.01" class="form-control form-control-sm shadow-sm" />
+                            </div>
+                        }
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Opening Date :</label>
+                            <input @bind="CurrentAccount.OpenDate" type="date" class="form-control form-control-sm shadow-sm" />
+                        </div>
+
+                        @* <div class="col-md-6">
+                            <label class="form-label fw-semibold" for="opt1">Debit</label>
+                            <input type="radio" id="optDr" name="options" checked="@(CurrentAccount.BalType==1) " @onchange="@(() => OnChangedBalanceType(1))" />
+
+                            <label class="form-label fw-semibold" for="opt2">Credit</label>
+                                <input type="radio" id="optCr" name="options" checked="@((CurrentAccount.BalType == 2)) " @onchange="@(() => OnChangedBalanceType(2))" />
+                        </div> *@
+                        @if (IsEdit == false)
+                        {
+
+                            <div class="col-md-6 d-flex align-items-center">
+                                <InputRadioGroup @bind-Value="CurrentAccount.BalType">
+                                    <div class="form-check me-3">
+                                        <InputRadio class="form-check-input shadow-sm" id="optDr" Value="1" />
+                                        <label class="form-check-label fw-semibold" for="optDr">Debit</label>
+                                    </div>
+
+                                    <div class="form-check">
+                                        <InputRadio class="form-check-input shadow-sm" id="optCr" Value="2" />
+                                        <label class="form-check-label fw-semibold" for="optCr">Credit</label>
+                                    </div>
+                                </InputRadioGroup>
+                            </div>
+                        }
+                            @if (IsEdit == false) 
+                        {
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold" for="opt2">Master Account</label>
+                                <input @bind="CurrentAccount.AccType" class="shadow-sm" type="checkbox" id="master" name="checkbox" value="checkbox" @bind:event="oninput" @onchange="OnChangedMasterType" />
+                            </div>
+                        }
+                </div>
+            </div>
+        </div>
+
+    <!-- Model Footer is starting from here -->
+            <div class="modal-footer border-top-0">
+                <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="SaveAccount">Save</button>
+                <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="HideModal">Cancel</button>
+            </div>
+
+            </div>
+        </div>
+    </div>
+}
+@if (ShowModal_CF)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content p-2 shadow-lg border-0 rounded-3">
+
+                <!-- Header -->
+                <div class="modal-header text-white rounded-top-4" style="background-color:rgb(7, 44, 96)">
+                    <h5 class="modal-title fw-bold d-flex align-items-center">
+                        <i class="fas fa-chart-line me-2"></i>
+                        Map Account Head To Cash Flow
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="HideCashFlowModal" aria-label="Close"></button>
+                </div>
+
+                <!-- Model Body Starting from here -->
+                <div class="modal-body bg-light">
+                    <div class="container-fluid px-0">
+                        <div class="row g-3">
+                            <div class="col-sm-12">
+                                <label for="AccHeads" class="form-label fw-semibold">Cash Flow Heads :</label>
+                                <BlazoredTypeahead SearchMethod="SearchCashFlowHeads"
+                                                    EnableDropDown="true"
+                                                    Data="cashflowheadslist"
+                                                    TValue="CashFlowHeadsModel"
+                                                    TItem="CashFlowHeadsModel"
+                                                    Value="SelectedHead_CF"
+                                                    ValueChanged="SelectedResultChanged_CF"
+                                                    ValueExpression="@(() => SelectedHead_CF)"
+                                                    Placeholder="Search By head..."
+                                                    MaximumSuggestions="50">
+                                    <SelectedTemplate Context="selectedhead">
+                                        @selectedhead?.Description
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="result">
+                                        @result.Description
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label fw-semibold" for="opt2">Mark Negative  </label>
+                                <input @bind="CurrentAccount.Marked_CF_Nve" type="checkbox" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Model Footer is starting from here -->
+                <div class="modal-footer border-top-0">
+                    <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="SaveCashFlowHeads">Save</button>
+                    <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="HideCashFlowModal">Cancel</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+}
+@if (ShowModal_Notes)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content p-2 shadow-lg border-0 rounded-3">
+
+                <!-- Header -->
+                <div class="modal-header text-white rounded-top-4" style="background-color:rgb(7, 44, 96)">
+                    <h5 class="modal-title fw-bold d-flex align-items-center">
+                        <i class="fas fa-chart-line me-2"></i>
+                        Map Account Head Note To Accounts
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="HideCashFlowModal" aria-label="Close"></button>
+                </div>
+
+                <!-- Model Body Starting from here -->
+                <div class="modal-body bg-light">
+                    <div class="container-fluid px-0">
+                        <div class="row g-3">
+                            <div class="col-sm-12">
+                                <label for="AccHeads" class="form-label fw-semibold">Note To Account Heads :</label>
+                                <BlazoredTypeahead SearchMethod="SearchNotesToAccounts"
+                                                    EnableDropDown="true"
+                                                    Data="cashflowheadslist"
+                                                    TValue="NotesToAccountsModel"
+                                                    TItem="NotesToAccountsModel"
+                                                    Value="SelectedHead_Notes"
+                                                    ValueChanged="SelectedResultChanged_Notes"
+                                                    ValueExpression="@(() => SelectedHead_Notes)"
+                                                    Placeholder="Search By head..."
+                                                    MaximumSuggestions="50">
+                                    <SelectedTemplate Context="selectedhead">
+                                        @selectedhead?.GroupName
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="result">
+                                        @result.GroupName
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label fw-semibold" for="opt2">Mark Negative  </label>
+                                <input @bind="CurrentAccount.Marked" type="checkbox" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Model Footer is starting from here -->
+                <div class="modal-footer border-top-0">
+                    <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="SaveNotesToAccountsAccount">Save</button>
+                    <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="HideNotesToAccountsAccountModal">Cancel</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+}
+</div>
+

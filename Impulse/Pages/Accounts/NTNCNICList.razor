@@ -1,0 +1,180 @@
+﻿@page "/accounts/ntncnicnos"
+@attribute [Authorize]
+<PageTitle>NTN CNIC Nos.</PageTitle>
+
+@using System.Collections.ObjectModel
+@using Microsoft.AspNetCore.Components.Web
+@using BlazorContextMenu
+@using Microsoft.Extensions.Options
+@using DataAccessLibrary
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using DataAccessLibrary.Models.ViewModels
+@using CIP.Configurations
+@using DataAccessLibrary.Interface.Accounts
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+<div class="container-fluid mt-0 m-0 p-0" style="font-family: Calibri, sans-serif;">
+    
+    <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color"
+         style="position: sticky; top: 0; z-index: 1000;">
+        <h5 class="mb-0"><i class="fas fa-file-lines"></i> NTN CNIC Nos.</h5>
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
+                <i class="fas fa-xmark me-2"></i> Close
+            </button>
+        </div>
+    </div>
+
+    <div class="card-body report-flex-column">
+
+        <div class="row g-1 mb-2 align-items-end">            
+            <div class="col-sm-6">
+                <label for="Search" class="fw-bold">Search</label>
+                <input type="text" id="Search" class="form-control form-control-md" @bind="SearchText" />
+            </div>
+            <div class="col-sm-1 d-flex align-items-end">
+                <button class="btn btn-primary btn-sm w-100 text-white" style="background-color:rgb(7, 44, 96);" @onclick="RefreshList">
+                    <i class="fas fa-sync-alt me-1"></i>Refresh
+                </button>
+            </div>
+        </div>
+
+        @if (IsLoading)
+        {
+            <div class="progress mb-2" style="width: 100%; height: 20px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: 100%">
+                    Loading Data...
+                </div>
+            </div>
+        }
+
+        <div class="report-table-grow sticky-table-container">
+            <ContextMenuProvider Id="accountsContext">
+                <table class="table table-bordered table-hover align-middle mb-0" 
+                       style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                    <thead class="theme-color" style="position: sticky; top: 0; z-index: 5;">
+                        <tr>
+                            <th style="width: 3%;">S #</th>
+                            <th style="width: 5%;">Reference No.</th>
+                            <th style="width: 70%;">Name</th>
+                            <th style="width: 10%;">NTN No.</th>
+                            <th style="width: 10%;">CNIC No.</th>                            
+                            <th style="width: 2%;"> </th>
+                        </tr>
+                    </thead>
+                    <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">
+                        @if (ListToUse?.Any() ?? false)
+                        {
+                            <Virtualize Items="@ListToUse" Context="row">
+                                <ContextMenuTrigger WrapperTag="tr" MenuId="accountContextMenu" Data="row" MouseButtonTrigger="MouseButtonTrigger.Right" CssClass="@($"key-{row.EntryID}")">
+                                    <td>@(ListToUse.IndexOf(row) + 1)</td>                                    
+                                    <td>@row.ReferenceNo</td>
+                                    <td>@row.Name</td>
+                                    <td>@row.NTNNo</td>
+                                    <td>@row.CNICNo</td>
+                                    <td>
+
+                                        <ContextMenuTrigger MenuId="accountContextMenu"
+                                                            Data="row"
+                                                            MouseButtonTrigger="MouseButtonTrigger.Both">
+
+                                            <button class="btn btn-sm btn-primary" style="border:none; background:none;">
+
+                                                <i class="fa-solid fa-ellipsis-vertical" style="color:black"></i>
+
+                                            </button>
+
+                                        </ContextMenuTrigger>
+
+                                    </td>
+                                </ContextMenuTrigger>
+                            </Virtualize>
+                        }
+                        else if (!IsLoading)
+                        {
+                            @* Shows when list is empty to maintain table structure *@
+                            <tr>
+                                <td colspan="9" class="text-center py-5 text-muted italic">
+                                    <i class="fas fa-inbox fa-3x d-block mb-3"></i>
+                                    No entries found for the selected period.
+                                </td>
+                            </tr>
+                            @* Optional: Render 5 blank rows to show the grid lines *@
+                            @for (int i = 0; i < 15; i++)
+                            {
+                                <tr><td colspan="9" style="height:35px; border-color: #f2f2f2;">&nbsp;</td></tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </ContextMenuProvider>
+        </div>
+
+        <div class="report-footer-actions d-flex justify-content-end gap-2">
+            
+            <button class="btn btn-outline-success btn-sm px-3" @onclick="OpenAddNew">
+                <i class="fas fa-plus me-1"></i> New Entry
+            </button>
+
+            <button class="btn btn-outline-success btn-sm px-3" @onclick="PrintList">
+                <i class="fas fa-print me-1"></i> Print
+            </button>
+
+        </div>
+
+    </div>
+
+    <ContextMenu Id="accountContextMenu" Template="Win11Style">
+        <Item Onclick="@RefreshList"><i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh</Item>
+        <div class="menu-divider"></div>
+        <Seperator />
+        <Item Onclick="OpenAddNew"><i class="fas fa-plus fa-fw win11-icon"></i> New Entry</Item>
+        <Item Onclick="@(() => OpenEdit(context.Data as NTN_CNIC_ViewModel))"><i class="fas fa-i-cursor fa-fw win11-icon"></i> Edit Entry</Item>
+        <Item Onclick="@(() => DeleteEntry(context.Data as NTN_CNIC_ViewModel))"><i class="fas fa-trash fa-fw win11-icon"></i> Delete Entry</Item>
+        <div class="menu-divider"></div>
+        <Seperator />        
+        <Item Onclick="PrintList"><i class="fas fa-print fa-fw win11-icon"></i> Print List</Item>
+    </ContextMenu>
+</div>
+
+<div class="modal fade @(ShowModal ? "show d-block" : "")" tabindex="-1" role="dialog" style="background: rgba(0,0,0,0.5);">
+    <div class="modal-dialog modal-lg modal-erp" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title fw-bold">NTN CNIC</h6>
+                <button type="button" class="btn-close" @onclick="CloseModal"></button>
+            </div>
+            <EditForm Model="@CurrentEntry" OnValidSubmit="SaveEntry">
+            <DataAnnotationsValidator />
+            <div class="modal-body p-3">
+                <div class="row g-2">                    
+                    <div class="col-md-12">
+                        <label class="form-label">Reference No.</label>
+                        <input type="text" class="form-control" @bind="CurrentEntry.ReferenceNo" />
+                    </div>
+                    <div class="col-md-12">
+                        <label class="form-label">Name</label>
+                            <input type="text" class="form-control" @bind="CurrentEntry.Name" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">NTN No.</label>
+                        <input type="text" class="form-control" @bind="CurrentEntry.NTNNo" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">CNIC No.</label>
+                        <input type="text" class="form-control" @bind="CurrentEntry.CNICNo" />
+                    </div>
+                    
+                </div>
+            </div>
+            <div class="modal-footer bg-light py-1">
+                <button type="submit" class="btn btn-outline-secondary px-4 shadow-sm"><u>S</u>ave</button>
+                <button type="button" class="btn btn-outline-secondary px-4 shadow-sm" @onclick="CloseModal"><u>C</u>ancel</button>
+            </div>
+            </EditForm>
+        </div>
+    </div>
+</div>

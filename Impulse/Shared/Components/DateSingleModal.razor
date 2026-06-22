@@ -1,0 +1,62 @@
+﻿@using DataAccessLibrary.Models.ReportModels
+
+@if (IsVisible)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5); z-index: 1050;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content cip-rpt-modal-content">
+                <div class="modal-header cip-rpt-header">
+                    <h5 class="modal-title text-white">Report Parameters</h5>
+                    <button type="button" class="btn btn-sm p-0 border-0" @onclick="Cancel">
+                        <span class="cip-rpt-close-x">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="cip-rpt-date-display text-center">
+                        <small class="text-uppercase text-muted fw-normal" style="font-size: 0.7rem; letter-spacing: 1px; opacity: 0.8;">
+                            Target Date
+                        </small>
+                        <h3 class="text-primary mb-0">@SelectedDate.ToString("dd-MMM-yyyy")</h3>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="mb-1 fw-bold" style="font-size: 0.85rem;">Select Date:</label>
+                        <input type="date" class="form-control cip-rpt-input-custom" @bind="SelectedDate" />
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-light">
+                    <button class="btn btn-outline-secondary border-0" @onclick="Cancel">Cancel</button>
+                    <button class="btn btn-primary px-4 fw-bold shadow-sm" style="border-radius: 8px;" @onclick="Submit">
+                        Generate Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool IsVisible { get; set; }
+    private DateTime SelectedDate { get; set; } = DateTime.Today;
+    private TaskCompletionSource<DateSingleResult> _tcs;
+
+    public Task<DateSingleResult> Show()
+    {
+        IsVisible = true;
+        _tcs = new TaskCompletionSource<DateSingleResult>();
+        StateHasChanged();
+        return _tcs.Task;
+    }
+
+    private void Submit()
+    {
+        IsVisible = false;
+        _tcs.SetResult(new DateSingleResult(true, SelectedDate));
+    }
+
+    private void Cancel()
+    {
+        IsVisible = false;
+        _tcs.SetResult(new DateSingleResult(false, DateTime.MinValue));
+    }
+}

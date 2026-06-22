@@ -1,0 +1,96 @@
+﻿@page "/erphomepage"
+@using Microsoft.AspNetCore.Components
+
+<div class="container-fluid bg-light min-vh-100 p-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+        <h3 class="fw-bold text-primary mb-0">YourERP Dashboard</h3>
+        <span class="text-secondary small">Welcome, @UserName</span>
+    </div>
+
+    <!-- Quick Stats Section -->
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-sm-6 col-xl-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body text-center">
+                    <div class="text-muted small">Pending Invoices</div>
+                    <div class="display-6 fw-semibold text-primary">42</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-sm-6 col-xl-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body text-center">
+                    <div class="text-muted small">Cargo in Transit</div>
+                    <div class="display-6 fw-semibold text-success">8</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-sm-6 col-xl-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body text-center">
+                    <div class="text-muted small">Employees</div>
+                    <div class="display-6 fw-semibold text-info">126</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modules Section -->
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-white border-0">
+            <h5 class="fw-bold text-dark mb-0">Modules</h5>
+        </div>
+        <div class="card-body">
+            <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-3">
+
+                @foreach (var module in Modules)
+                {
+                    <div class="col">
+                        <div class="card h-100 text-center module-card border-0 shadow-sm p-3"
+                             style="cursor: pointer;"
+                             @onclick="() => NavigateTo(module.Url)">
+                            <i class="@module.Icon fs-2 text-primary mb-2"></i>
+                            <div class="fw-semibold">@module.Name</div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string UserName = "User"; // Replace with logged-in user logic
+
+    private List<ModuleItem> Modules = new()
+    {
+        new() { Name = "Setup", Icon = "fa-solid fa-gear", Url = "/setup" },
+        new() { Name = "Cargo Terminal", Icon = "fa-solid fa-truck-fast", Url = "/cargo" },
+        new() { Name = "Billing", Icon = "fa-solid fa-file-invoice-dollar", Url = "/billing" },
+        new() { Name = "Financial", Icon = "fa-solid fa-chart-line", Url = "/financial" },
+        new() { Name = "Budgeting", Icon = "fa-solid fa-wallet", Url = "/budgeting" },
+        new() { Name = "Payroll", Icon = "fa-solid fa-money-bill-wave", Url = "/payroll" },
+        new() { Name = "HR", Icon = "fa-solid fa-users", Url = "/hr" },
+        new() { Name = "Stock", Icon = "fa-solid fa-boxes-stacked", Url = "/stock" },
+        new() { Name = "Corporate Affairs", Icon = "fa-solid fa-building", Url = "/corporate" },
+        new() { Name = "Fixed Assets", Icon = "fa-solid fa-landmark", Url = "/assets" }
+    };
+
+    private void NavigateTo(string url)
+    {
+        NavigationManager.NavigateTo(url);
+    }
+
+    [Inject]
+    public NavigationManager NavigationManager { get; set; } = default!;
+
+    private class ModuleItem
+    {
+        public string Name { get; set; } = "";
+        public string Icon { get; set; } = "";
+        public string Url { get; set; } = "";
+    }
+}

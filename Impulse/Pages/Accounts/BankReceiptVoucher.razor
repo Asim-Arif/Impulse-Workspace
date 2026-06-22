@@ -1,0 +1,357 @@
+﻿@page "/accounts/bankreceiptvoucher"
+
+@attribute [Authorize]
+@using DataAccessLibrary
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using DataAccessLibrary.Models.ViewModels
+@using DataAccessLibrary.Interface.Accounts
+@using CIP.Services
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+@inject ICIPData CIPDataService
+@inject IVoucherService VoucherService
+
+@inject NavigationManager Navigation
+@inject HttpClient Http
+@inject IHttpClientFactory ClientFactory
+
+<PageTitle>Bank Receipt Voucher</PageTitle>
+
+<div class="" style="font-family: Calibri, sans-serif;">
+    <div class="card shadow-sm bg-transparent">
+
+        <div class="card-header d-flex">
+            <h6 class="mb-0 fw-bold">Bank Receipt Voucher</h6>
+        </div>
+        
+        @* <p>Bank ID: @p_bankId</p> *@
+
+        <form class="card-body">            
+
+            <div class="row g-1 mb-1">
+                <div class="col-sm-2">
+                    <label for="date" class="form-label mb-0 mb-0">Date</label>
+                    <input type="date" id="date" class="form-control" @bind="voucherViewModel.DT" @bind:event="oninput" @onchange="OnDTChanged" />
+                </div>
+                <div class="col-sm-2">
+                    <label for="VchrNo" class="form-label mb-0">Voucher No</label>
+                    <input type="text" id="VchrNo" name="VchrNo" class="form-control" @bind="voucherViewModel.VchrNo" readonly>
+                </div>
+            </div>
+
+            <div class="row g-1 mb-1 align-items-end">
+                <div class="col-sm-11">
+                    <label for="pname" class="form-label mb-0">Account</label>
+                    <BlazoredTypeahead SearchMethod="GetTransactionAccounts"
+                                       EnableDropDown="true"
+                                       Data="Accounts"
+                                       TValue="ChartOfAccountsModel"
+                                       TItem="ChartOfAccountsModel"
+                                       Value="SelectedAccount"
+                                       ValueChanged="SelectedResultChanged_Account"
+                                       ValueExpression="@(() => SelectedAccount)"
+                                       Placeholder="Select Account"
+                                       MaximumSuggestions="1000">
+
+                        <SelectedTemplate Context="selectedcard">
+                            @SelectedAccount?.AccTitle
+                        </SelectedTemplate>
+                        <ResultTemplate Context="result">
+                            @result.AccTitle
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-sm-1">
+                    <label for="AccountBalance" class="form-label mb-0">Balance</label>
+                    <input type="text" id="AccountBalance" name="AccountBalance" class="form-control" @bind="strAccountBalance" readonly>
+                </div>
+            </div>
+
+            <div class="row g-1 mb-1 align-items-end">
+                <div class="col-sm-6">
+                    <label for="description" class="form-label mb-0">Description</label>
+                    <input type="text" id="description" name="description" class="form-control" placeholder="Enter Description" @bind="newVoucherLine.Description">
+                </div>
+
+                <div class="col-sm-3">
+                    <label for="pname" class="form-label mb-0">Admin / Operations</label>
+                    <BlazoredTypeahead SearchMethod="SearchCostCenter"
+                                       EnableDropDown="true"
+                                       Data="CostCenters"
+                                       TValue="GenericDropDownModel"
+                                       TItem="GenericDropDownModel"
+                                       Value="SelectedCostCenter"
+                                       ValueChanged="SelectedResultChanged_CostCenter"
+                                       ValueExpression="@(() => SelectedCostCenter)"
+                                       Placeholder="Select Cost Center"
+                                       Disabled="!EnableCostCenter">
+
+                        <SelectedTemplate Context="selectedcard">
+                            @SelectedCostCenter.DropDownValue_Description
+                        </SelectedTemplate>
+                        <ResultTemplate Context="result">
+                            @result.DropDownValue_Description
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-sm-1">
+                    <label for="authcode" class="form-label mb-0">Debit</label>
+                    <input type="text" id="Debit" name="authcode" class="form-control" placeholder="Debit" @bind="newVoucherLine.Debit">
+                </div>
+                <div class="col-sm-1">
+                    <label for="authcode" class="form-label mb-0">Credit</label>
+                    <input type="text" id="Credit" name="authcode" class="form-control" placeholder="Credit" @bind="newVoucherLine.Credit">
+                </div>
+                <div class="col-sm-1 text-end">
+                    <button type="button" class="btn btn-primary w-100" @onclick="AddEntry">Post</button>
+                </div>
+
+            </div>
+
+            @if (!string.IsNullOrEmpty(validationMessage))
+            {
+                <div class="alert alert-danger mb-3">
+                    @validationMessage
+                </div>
+            }
+
+            <div class="table-responsive mb-3" style="max-height: 200px; overflow-y: auto;">
+                <table class="table table-bordered table-striped align-middle">
+                    <thead>
+                        <tr>
+                            <th>Account</th>
+                            <th>Description</th>
+                            <th>Cost Center</th>
+                            <th>Debit</th>
+                            <th>Credit</th>                            
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (voucherViewModel.LineItems.Count > 0)
+                        {
+                            @foreach (var Acc in voucherViewModel.LineItems)
+                            {
+                                //Skip rendering if the line is flagged as a system line
+                                @if (Acc.IsSystemLine==false)
+                                {
+                                    <tr>
+                                        <td>
+                                            @Acc.AccTitle
+                                            @if (Acc.AdjustmentDetails != null && Acc.AdjustmentDetails.Any())
+                                            {
+                                                <span class="badge rounded-pill bg-success ms-2"
+                                                      style="font-size: 0.7rem; cursor: help;"
+                                                      title="Instructions Added">
+                                                    <i class="bi bi-link-45deg"></i> @Acc.AdjustmentDetails.Count
+                                                </span>
+                                            }
+                                        </td>
+                                        <td>@Acc.Description</td>
+                                        <td>@Acc.CS_Description</td>
+                                        <td>@Acc.Debit</td>
+                                        <td>@Acc.Credit</td>                                
+
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveVoucherLine(Acc)">
+                                                <i class="fa-solid fa-circle-minus"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-secondary btn-sm" @onclick="() => AddDetails(Acc)">
+                                                <i class="fa-solid fa-pen-to-square"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        }
+                        else
+                        {
+                            <tr class="table-light">
+                                <td colspan="6" class="text-center text-muted py-3">
+                                    No accounts added yet.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot class="table-dark fw-bold">
+                        <tr>
+                            <td colspan="3" class="text-end">Total:</td>
+
+                            <td>@voucherViewModel.TotalDebit.ToString("N2")</td>
+
+                            <td>@voucherViewModel.TotalCredit.ToString("N2")</td>
+
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <div class="row g-1 mb-1">
+                <div class="col-sm-10">
+                    <label for="submitto" class="form-label mb-0">Submit To</label>
+                    <BlazoredTypeahead SearchMethod="SearchSubmitTo"
+                                   EnableDropDown="true"
+                                   Data="cashAccounts"
+                                   TValue="GenericDropDownModel"
+                                   TItem="GenericDropDownModel"
+                                   Value="SelectedSubmitTo"
+                                   ValueChanged="SelectedResultChanged_SubmitTo"
+                                   ValueExpression="@(() => SelectedSubmitTo)"
+                                   Placeholder="Submit To"
+                                   MaximumSuggestions="1000">
+
+                        <SelectedTemplate Context="selectedcard">
+                            @SelectedSubmitTo?.DropDownValue_Description
+                        </SelectedTemplate>
+                        <ResultTemplate Context="result">
+                            @result.DropDownValue_Description
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+            </div>
+                                
+                <div class="col-sm-1">
+                    <label for="Difference" class="form-label mb-0">Difference</label>
+                    <input type="text" id="Difference" name="Difference" class="form-control" placeholder="Cash Amount" @bind="dDebitCreditDifference" readonly>
+                </div>
+            </div>
+            <div class="row g-1 mb-1">
+                <div class="col-sm-6">
+                    <label for="ReceivedFrom" class="form-label mb-0">Received From</label>
+                    <input type="text" id="ReceivedFrom" name="ReceivedFrom" class="form-control" @bind:event="oninput" @bind="voucherViewModel.ReceivedFrom">
+                </div>
+                <div class="col-sm-1">
+                    <label for="DepositSlipNo" class="form-label mb-0">Deposit Slip No.</label>
+                    <input type="text" id="DepositSlipNo" name="DepositSlipNo" class="form-control" @bind:event="oninput" @bind="voucherViewModel.SlipNo">
+                </div>
+                <div class="col-sm-2">
+                    <label for="DueDate" class="form-label mb-0 mb-0">Due Date</label>
+                    <input type="date" id="DueDate" class="form-control" @bind="voucherViewModel.DueDate" @bind:event="oninput" @onchange="OnDTChanged" />
+                </div>
+            </div>
+
+            <div class="row g-1 mb-1 align-items-end">
+
+                <div class="col-sm-6">
+                    <label for="Notes" class="form-label mb-0">Notes</label>
+                    <textarea id="Notes" name="Notes" class="form-control" rows="3" @bind:event="oninput" @bind="voucherViewModel.Remarks"></textarea>
+                </div>
+
+                <div class="col-sm-6 d-flex flex-column">
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="" id="defaultCheck1" >
+                        <label class="form-check-label" for="defaultCheck1">
+                            Print When Saved
+                        </label>
+                    </div>                    
+                    <div class="d-flex justify-content-end gap-2">                        
+                        <button type="button" class="btn btn-primary" disabled="@isSaving" @onclick="SaveVoucherMain">Save</button>
+                        <button type="button" class="btn btn-primary" @onclick="GoToIndexPage">Close</button>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-1 mb-1 align-items-end">
+                <div class="col-sm-6 form-control-sm">
+                    <label for="pdfFile" class="form-label">Select PDF Attachment :</label>
+                    @if (!bClearInputFile)
+                    {
+                        <InputFile id="pdfFile" OnChange="HandleFileSelected" accept=".pdf,application/pdf" class="ms-2"/>
+                    }
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (IsModalVisible)
+{
+    <div class="modal-backdrop fade show"></div>
+
+    <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); font-family: Calibri, sans-serif;">
+        <div class="modal-dialog modal-dialog-centered modal-lg" role="document" style="max-width: 850px;">
+            <div class="modal-content border-0 shadow-lg">
+
+                @* Replicating your Main Page Card Header Look *@
+                <div class="card-header bg-white d-flex border-bottom py-2 px-3">
+                    <h6 class="mb-0 fw-bold text-primary">
+                        <i class="fa-solid fa-list-check me-2"></i>
+                        Adjustment Details: @currentLine?.AccTitle
+                    </h6>
+                </div>
+
+                <div class="modal-body bg-light-subtle">
+                    @* Summary Row similar to your Date/VchrNo row *@
+                    <div class="row g-1 mb-3">
+                        <div class="col-sm-10">
+                            <label class="form-label mb-0 small text-muted">Account</label>
+                            <input type="text" class="form-control form-control-sm" value="@currentLine?.AccTitle" readonly>
+                        </div>
+                        <div class="col-sm-2">
+                            <label class="form-label mb-0 small text-muted">Voucher Total</label>
+                            <input type="text" class="form-control form-control-sm text-end fw-bold"
+                                   value="@(Math.Abs((currentLine?.Debit ?? 0) - (currentLine?.Credit ?? 0)).ToString("N2"))"
+                                   readonly>
+                        </div>
+                    </div>
+
+                    @* Table matching your Main Page Table style *@
+                    <div class="table-responsive border rounded bg-white" style="max-height: 350px; overflow-y: auto;">
+                        <table class="table table-bordered table-striped align-middle mb-0" style="font-size: 0.9rem;">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th>Vchr No</th>
+                                    <th class="text-end">Vchr Amount</th>
+                                    <th class="text-end">Prev. Adjusted</th>
+                                    <th class="text-end">Balance</th>
+                                    <th class="text-center" style="width: 140px;">Adjusting</th>
+                                    <th class="text-end">New Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var jv in pendingJVs)
+                                {
+                                    jv.RemainAmount = (jv.BalanceAmount ?? 0) - (jv.Amount ?? 0);
+                                    <tr>
+                                        <td class="fw-bold">@jv.VchrNo</td>
+                                        <td class="text-end">@jv.VchrAmount?.ToString("N2")</td>
+                                        <td class="text-end text-muted">@jv.AdjAmount?.ToString("N2")</td>
+                                        <td class="text-end fw-bold text-primary">@jv.BalanceAmount?.ToString("N2")</td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm text-end border-primary"
+                                                   @bind="jv.Amount" @bind:event="oninput"
+                                                   max="@jv.BalanceAmount" />
+                                        </td>
+                                        <td class="text-end fw-bold @(jv.RemainAmount < 0 ? "text-danger" : "text-success")">
+                                            @jv.RemainAmount?.ToString("N2")
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                @* Footer matching your Main Page button layout *@
+                <div class="card-footer bg-white d-flex justify-content-between align-items-center py-3 px-3">
+                    <div class="d-flex gap-4">
+                        <div>
+                            <label class="d-block small text-muted mb-0">Total Adjusting</label>
+                            <span class="h6 fw-bold text-success mb-0">@pendingJVs.Sum(x => x.Amount ?? 0).ToString("N2")</span>
+                        </div>
+                        <div>
+                            @{
+                                var diff = (double)(Math.Abs((currentLine?.Debit ?? 0) - (currentLine?.Credit ?? 0))) - (double)pendingJVs.Sum(x => x.Amount ?? 0);
+                            }
+                            <label class="d-block small text-muted mb-0">Difference</label>
+                            <span class="h6 fw-bold @(Math.Abs(diff) < 0.01 ? "text-success" : "text-danger") mb-0">@diff.ToString("N2")</span>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-primary px-4" @onclick="SaveAdjustments">Apply</button>
+                        <button type="button" class="btn btn-secondary px-4" @onclick="() => IsModalVisible = false">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}

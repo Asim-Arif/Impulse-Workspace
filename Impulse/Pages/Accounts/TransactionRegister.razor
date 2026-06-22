@@ -1,0 +1,372 @@
+﻿@page "/accounts/transactionregister"
+@page "/accounts/transactionregister/{p_VchrNo?}"
+
+@attribute [Authorize]
+<PageTitle>Transaction Register</PageTitle>
+
+@using System.Collections.ObjectModel
+@using Microsoft.AspNetCore.Components.Web
+@using BlazorContextMenu
+@using Microsoft.Extensions.Options
+@using DataAccessLibrary
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using CIP.Configurations
+@using DataAccessLibrary.Interface.Accounts
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+
+@using Microsoft.AspNetCore.Identity
+@inject HttpClient Http
+@inject IHttpClientFactory ClientFactory
+@inject UserManager<IdentityUser> UserManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IHttpContextAccessor HttpContextAccessor
+
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+
+<div class="container-fluid mt-0 m-0 p-0" style="font-family: Calibri, sans-serif; ">
+    
+        
+        <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color"
+             style="position: sticky; top: 0; z-index: 1000;">
+            <h5 class="mb-0"><i class="fas fa-book"></i> Transaction Register </h5>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
+                <i class="fas fa-xmark me-2"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <div class="card-body p-0">
+            <div class="row mb-1 align-items-end">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="chkJournal" @bind="IsJournal" />
+                            <label class="form-check-label fw-bold" for="chkJournal">Journal</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="chkBPV" @bind="IsBPV" />
+                            <label class="form-check-label fw-bold" for="chkBPV">BPV</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="chkCPV" @bind="IsCPV" />
+                            <label class="form-check-label fw-bold" for="chkCPV">CPV</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="chkCRV" @bind="IsCRV" />
+                            <label class="form-check-label fw-bold" for="chkCRV">CRV</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="chkBRV" @bind="IsBRV" />
+                            <label class="form-check-label fw-bold" for="chkBRV">BRV</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="chkReguler" @bind="IsReguler" />
+                            <label class="form-check-label fw-bold" for="chkReguler">Reguler</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="chkOnline" @bind="IsOnline" />
+                            <label class="form-check-label fw-bold" for="chkOnline">Online</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="chkCorp" @bind="IsCorp" />
+                            <label class="form-check-label fw-bold" for="chkCorp">Corp.</label>
+                        </div>
+                    </div>
+                    
+                    @* <div class="col-md-2"> </div> *@
+
+                    <!-- Date From -->
+                    <div class="col-md-2">
+                        <label for="fromDate" class="form-label fw-bold">From:</label>
+                        <input type="date" id="fromDate" class="form-control form-control-sm" @bind="CurrentAccount.DTFrom" />
+                    </div>
+
+                    <!-- Date To -->
+                    <div class="col-md-2">
+                        <label for="toDate" class="form-label fw-bold">To:</label>
+                        <input type="date" id="toDate" class="form-control form-control-sm" @bind="CurrentAccount.DTTo" />
+                    </div>
+
+                    <!-- Refresh Button -->
+                    <div class="col-md-2 mt-4">
+                        <label for="toDate" class="form-label fw-bold"> </label>
+                        <label for="toDate" class="form-label fw-bold"> </label>
+                        <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="RefreshLedger">Refresh</button>
+                    </div>
+
+                </div>
+            </div>
+            
+            @if (IsLoading)
+            {
+                <div class="progress" style="width: 100%">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                         role="progressbar" style="width: 100%">
+                        Loading Transaction Data...
+                    </div>
+                </div>
+            }
+            else if (LedgerDatafromDB?.Any() ?? false)
+            {
+                <div style="width: 100%">
+                    <ContextMenuProvider Id="accountsContextMenu">
+                        <table class="table table-bordered table-hover align-middle mb-0"
+                               style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+
+                            <thead class="theme-color"
+                                   style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                                <tr >
+                                    <th style="width: 7%;" class="text-center">Dated</th>
+                                    <th style="width: 7%;">Voucher</th>
+                                    <th style="width: 20%;">Description</th>
+                                    <th style="width: 7%;" class="text-end">Debit</th>
+                                    <th style="width: 7%;" class="text-end">Credit</th>
+                                    <th style="width: 7%;" class="text-end">Bill Date</th>
+                                    <th style="width: 7%;" class="text-end">Bill No</th>
+                                    <th style="width: 6%;" class="text-end">Gen. By</th>
+                                    <th style="width: 6%;" class="text-end">Machine</th>
+                                    <th style="width: 6%;" class="text-end">Entry Date</th>
+                                    <th style="width: 6%;" class="text-end">Edited By</th>
+                                    <th style="width: 6%;" class="text-end">Machine</th>
+                                    <th style="width: 6%;" class="text-end">Edit Date</th>
+                                    <th style="width: 2%;"> </th>
+                                </tr>
+                            </thead>
+
+                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 7pt;">
+
+                                @foreach (var group in LedgerGroups)
+                                {
+                                    <!-- ******* GROUP HEADER ROW ******* -->
+                                    <tr class="table-secondary">
+                                        <td colspan="14" class="text-center fw-bold py-2" style="font-family: Calibri, 'Segoe UI'; font-size: 10pt;">
+                                            @(group.Key == "BPV"
+                                                    ? "Bank Payment Transactions"
+                                                    : group.Key == "CPV"
+                                                    ? "Cash Payment Transactions"
+                                                    : group.Key == "BRV"
+                                                    ? "Bank Receipt Transactions"
+                                                    : group.Key == "CRV"
+                                                    ? "Cash Receipt Transactions"
+                                                    : group.Key == "JV"
+                                                    ? "Journal Transactions"
+                                                    : "Other")
+                                        </td>
+                                    </tr>
+
+                                    <Virtualize Items="@LedgerDatafromDB.Where(x => x.VoucherType == group.Key).ToList()"
+                                                Context="ledger">
+
+                                        @if (lastVoucher != ledger.VchrNo)
+                                        {
+                                            <tr>
+                                                <td colspan="14" class="text-center fw-bold py-2">
+                                                    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+                                                </td>
+                                            </tr>
+                                            lastVoucher = ledger.VchrNo;
+                                        }
+                                       
+                                        <ContextMenuTrigger WrapperTag="tr"
+                                                MenuId="accountContextMenu"
+                                                Data="ledger"
+                                                tabindex="0"
+                                                MouseButtonTrigger="MouseButtonTrigger.Right"
+                                                CssClass="@($"key-{ledger.VchrNo} {(ledger.VchrNo == pVoucherNo ? "table-primary" : "")}")"
+                                                Id="@($"row-{ledger.VchrNo}")"        
+                                        >
+                                                @* CssClass="@($"key-{ledger.VchrNo} {(ledger.VchrNo == pVoucherNo ? "table-primary" : "")}")"
+                                                Id="@($"row-{ledger.VchrNo}")"> *@
+                                            @* CssClass="@($"key-{ledger.VchrNo}")"> *@
+
+                                            <td>@ledger.VDate.ToString("dd-MMM-yyyy")</td>
+                                            <td>@ledger.VchrNo</td>
+                                            <td>@ledger.Description</td>
+                                            <td class="text-end">@ledger.Debit</td>
+                                            <td class="text-end">@ledger.Credit</td>
+
+                                            <td class="text-end">
+                                                @(ledger.BillDate == DateTime.MinValue ? "" : ledger.BillDate.ToString("dd-MMM-yyyy"))
+                                            </td>
+                                            <td class="text-end">@ledger.BillNo</td>
+                                            <td class="text-end">@ledger.GeneratedBy</td>
+                                            <td class="text-end">@ledger.MachineName</td>
+                                            <td class="text-end">@ledger.EntryDate.ToString("dd-MMM-yyyy")</td>
+                                            <td class="text-end">@ledger.EditedBy</td>
+                                            <td class="text-end">@ledger.EditMachineName</td>
+                                            <td class="text-end">
+                                                @(ledger.EditedDate == DateTime.MinValue ? "" : ledger.EditedDate.ToString("dd-MMM-yyyy"))
+                                            </td>
+
+                                            <td>
+                                            <ContextMenuTrigger MenuId="accountContextMenu"
+                                                     Data="ledger"
+                                                     MouseButtonTrigger="MouseButtonTrigger.Both">
+                                                    <button class="btn btn-sm btn-primary" style="border:none; background:none;">
+                                                        <i class="fa-solid fa-ellipsis-vertical" style="color:black"></i>
+                                                    </button>
+                                                </ContextMenuTrigger>
+                                            </td>
+                                        </ContextMenuTrigger>
+                                    @* } *@
+
+                                 </Virtualize>
+                                }
+                            </tbody>
+
+                        </table>
+                    </ContextMenuProvider>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-3 text-muted">No Transaction Entries Found.</div>
+            }
+
+            <!-- CONTEXT MENU -->
+        <ContextMenu Id="accountContextMenu"
+                UseDefaultEventHandlers="true"
+                     Template="Win11Style">
+
+                <Item class="menu-item" OnClick="@RefreshLedger">
+                <i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh
+                </Item>
+
+                <div class="menu-divider"></div>
+                <Seperator />
+
+                <Item class="menu-item" OnClick="@(async e => await DeleteSelectedVoucher(e))">
+                <i class="fas fa-delete-left fa-fw win11-icon"></i> Delete Voucher
+                </Item>
+
+                <Item class="menu-item" OnClick="@(async e => await DeleteSelectedVoucher(e))">
+                <i class="fas fa-pen-to-square fa-fw win11-icon"></i> Edit Voucher
+                </Item>
+
+                <div class="menu-divider"></div>
+                <Seperator />
+
+                <Item class="menu-item">
+                <i class="fas fa-ticket fa-fw win11-icon"></i> Print This Voucher
+                </Item>
+                <Item class="menu-item">
+                <i class="fas fa-file-pdf fa-fw win11-icon"></i> Preview This Voucher
+                </Item>
+                <Item class="menu-item">
+                <i class="fas fa-money-check fa-fw win11-icon"></i> Print Cheque
+                </Item>
+
+            </ContextMenu>
+      
+        </div>
+    </div>
+
+<!-- Modal for New/Edit Bank -->
+@if (ShowModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" style="font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+        <div class="modal-dialog modal-dialog-centered modal-xl" role="document">
+            <div class="modal-content">
+                <!-- Header -->
+                <div class="modal-header text-white rounded-top-4" style="background-color:rgb(7, 44, 96)">
+                    <h5 class="modal-title fw-bold d-flex align-items-center">
+                        <i class="bi bi-bank me-2"></i>
+                        Delete Voucher
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="HideModal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="row" style="font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+
+                        <div class="col-md-4 mb-2">
+                            <label class="fw-semibold">Acc No :</label>
+                            <input class="form-control" @bind="SelectedVoucher.AccNo" readonly />
+                        </div>
+
+                        <div class="col-md-4 mb-2">
+                            <label class="fw-semibold">Acc Title :</label>
+                            <input class="form-control" @bind="SelectedVoucher.AccTitle" readonly />
+                        </div>
+
+                        <div class="col-md-4 mb-2">
+                            <label class="fw-semibold">Voucher # :</label>
+                            <input class="form-control" @bind="SelectedVoucher.VchrNo" readonly />
+                        </div>
+
+                        <div class="col-md-4 mb-2">
+                            <label class="fw-semibold">Date :</label>
+                            <input class="form-control" @bind="SelectedVoucher.VDate"
+                                   @bind:format="yyyy-MM-dd" / readonly>
+                        </div>
+
+                        <div class="col-md-8 mb-2">
+                            <label class="fw-semibold">Description</label>
+                            <input class="form-control" @bind="SelectedVoucher.Description" readonly />
+                        </div>
+
+@* --------------------------------- *@
+                <div style="width: 100%">
+                    <table class="table table-bordered table-hover align-middle mb-2 mt-2"
+                           style="font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 8pt;">
+
+                        <thead class="theme-color">
+                            <tr>
+                                <th style="width: 20%;">Acc #</th>
+                                <th style="width: 50%;">AccTitle</th>
+                                <th style="width: 15%;" class="text-end">Debit</th>
+                                <th style="width: 15%;" class="text-end">Credit</th>
+                            </tr>
+                        </thead>
+
+                                <tbody style="font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size:8pt;">
+                        @foreach (var ledger in LedgerDatafromDB_temp)
+                         { 
+                             <tr>
+                                <td>@ledger.AccNo</td>
+                                <td>@ledger.AccTitle</td>
+                                <td class="text-end">@ledger.Debit</td>
+                                <td class="text-end">@ledger.Credit</td>
+                            </tr>
+                         }
+                        </tbody>
+                    </table>
+                </div>
+@* END FOR TABLE *@
+
+                    <div class="row ">
+                            <div class="col-md-4 mb-2">
+
+                            </div>
+
+                            <div class="col-md-4 mb-2">
+                                <label class="fw-semibold">User Name</label>
+                                <input class="form-control" @bind="SelectedVoucher.GeneratedBy" readonly />
+                            </div>
+
+                            <div class="col-md-4 mb-2">
+                                <label class="fw-semibold">Computer</label>
+                                <input class="form-control" @bind="SelectedVoucher.MachineName" readonly />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12 mb-2">
+                            <label class="fw-semibold">Reason of Deletion :</label>
+                            <textarea class="form-control" rows="1" @bind="SelectedVoucher.DeleteReason"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 text-end">
+                        <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="DeleteVoucher">Delete!</button>
+                        <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="HideModal">Cancel</button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+}

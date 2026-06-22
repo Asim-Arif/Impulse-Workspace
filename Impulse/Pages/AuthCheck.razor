@@ -1,0 +1,10 @@
+﻿@page "/authcheck"
+<AuthorizeView>
+    <Authorized>
+        <h3>You are authenticated!</h3>
+        <p>Welcome, @context.User.Identity.Name</p>
+    </Authorized>
+    <NotAuthorized>
+        <h3>You are not authenticated! :: User : @context.User.Identity.Name</h3>
+    </NotAuthorized>
+</AuthorizeView>

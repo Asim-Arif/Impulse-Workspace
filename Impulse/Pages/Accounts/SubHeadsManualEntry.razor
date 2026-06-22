@@ -1,0 +1,245 @@
+﻿@page "/accounts/subheadsmanualentry"
+@attribute [Authorize]
+<PageTitle>Accounts Sub Heads Manual Entry With Totals</PageTitle>
+
+@using System.Collections.ObjectModel
+@using Microsoft.AspNetCore.Components.Web
+@using BlazorContextMenu
+@using Microsoft.Extensions.Options
+@using DataAccessLibrary
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using CIP.Configurations
+@using DataAccessLibrary.Interface.Accounts
+@using Microsoft.Extensions.Options
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject IChqBookDetailDataAccess ChqBookDetailService
+@inject Radzen.NotificationService NotificationService
+
+<RadzenNotification />
+
+<div class="container-fluid mt-0" style="font-family: Calibri, sans-serif;">
+    <div class="card shadow-sm border-0 rounded-1 bg-transparent">
+        <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color"
+             style="position: sticky; top: 0; z-index: 1000;">
+            <h5 class="mb-0"><i class="fas fa-sticky-note"></i> Accounts Sub Heads Manual Entry </h5>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="ShowAddModal">
+                    <i class="fas fa-plus"></i> Add New Entry
+                </button>
+
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
+                    <i class="fas fa-times"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <!-- TABLE START HERE -->
+            <div class="card-body p-0">
+                @if (IsLoading)
+            {
+                <div class="progress rounded-pill" style="width: 100%">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary rounded-pill"
+                         role="progressbar" style="width: 100%">
+                        Please Wait While Loading Data ...
+                    </div>
+                </div>
+            }
+            else if (getDBEntries?.Any() ?? false)
+                {
+                <div style="width: 100%">
+                    <ContextMenuProvider Id="tableContextMenu">
+                        <table class="table table-bordered table-hover align-middle mb-0 shadow-sm"
+                               style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                            <thead class="theme-color"
+                                    style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                                <tr>
+                                    <th>Main Head</th>
+                                    <th>Sub Head</th>
+                                    <th class="text-center">Date From</th>
+                                    <th class="text-center">Date To</th>
+                                    <th class="text-center">Sr #</th>
+                                    <th>Description</th>
+                                    <th class="text-center">Note</th>
+                                    <th class="text-end">Opening</th>
+                                    <th class="text-end">Closing</th>
+                                    <th class="text-center"> <i class="fas fa-bolt"></i> </th>
+                                </tr>
+                            </thead>
+                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">
+                                <Virtualize Items="@getDBEntries" Context="heads">
+                                    <ContextMenuTrigger WrapperTag="tr"
+                                                        MenuId="MainContextMenu"
+                                                        Data="heads"
+                                                        MouseButtonTrigger="MouseButtonTrigger.Right"
+                                                        CssClass="@($"key-{heads.EntryID}")">
+                                        <td style="width: 15%;">@heads.MainGroupName</td>
+                                        <td style="width: 15%;">@heads.GroupName</td>
+                                        <td class="text-center" style="width: 10%;">@heads.DTFrom.ToString("dd-MMM-yyyy")</td>
+                                        <td class="text-center" style="width: 10%;">@heads.DTTo.ToString("dd-MMM-yyyy")</td>
+                                        <td class="text-center" style="width: 5%;">@heads.SrNo</td>
+                                        <td style="width: 15%;">@heads.Description</td>
+                                        <td class="text-center" style="width: 10%;">@heads.Notes</td>
+                                        <td class="text-end" style="width: 10%;">@heads.OpeningBalance</td>
+                                        <td class="text-end" style="width: 10%;">@heads.ClosingBalance</td>
+                                        <td style="width: 5%;">
+                                            <ContextMenuTrigger 
+                                                            MenuId="MainContextMenu"
+                                                            Data="heads"
+                                                            MouseButtonTrigger="MouseButtonTrigger.Both">
+                                            <button class="btn btn-sm btn-primary" style="border:none; background:none;">
+                                                <i class="fa-solid fa-ellipsis-vertical" style="color:black"></i>
+                                            </button>
+                                            </ContextMenuTrigger>
+                                        </td>
+                                    </ContextMenuTrigger>
+                                </Virtualize>
+                            </tbody>
+                        </table>
+                    </ContextMenuProvider>
+                </div>
+                }
+                else
+                {
+                    <div class="text-center py-3 text-muted">No Data found.</div>
+                }
+
+            <ContextMenu Id="MainContextMenu"  
+                         UseDefaultEventHandlers="true"
+                         Template="Win11Style">
+
+                    <Item Onclick="@Refreshlist">
+                        <i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh
+                    </Item>
+
+                    <div class="menu-divider "></div>
+                    <Seperator />
+
+                    <Item OnClick="ShowAddModal">
+                        <i class="fas fa-plus-circle fa-fw win11-icon"></i> Add New Entry
+                    </Item>
+
+                    <Item OnClick="EditSelectedBank">
+                        <i class="fas fa-edit fa-fw win11-icon"></i> Edit Selected Entry
+                    </Item>
+
+                    <Item OnClick="@(async (e) => await DeleteSelected(e))">
+                        <i class="fas fa-trash-alt fa-fw win11-icon"></i> Delete Selected Entry
+                    </Item>
+
+            </ContextMenu>
+            </div>
+        </div>
+    </div>
+
+@if (ShowModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog"
+         style="font-family: Calibri, sans-serif; display: flex; align-items: center; justify-content: center;">
+
+        <div class="modal-dialog modal-xl" role="document">
+            <div class="modal-content">
+
+            <div class="modal-header text-white rounded-top-4" style="background-color:rgb(7, 44, 96)">
+                <h5 class="modal-title fw-bold d-flex align-items-center">
+                        <i class="fas fa-sticky-note me-2"></i>
+                        Manual Entry For Notes To Accounts
+                </h5>
+                <div class="ms-auto d-flex gap-2 align-items-center">
+                    <button class="btn btn-light btn-sm fw-semibold" @onclick="HideModal">
+                        <i class="fas fa-xmark me-2"></i>
+                        Close
+                    </button>
+                </div>
+            </div>
+
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-4 mb-2">
+                        <label class="fw-semibold">Date From :</label>
+                            <input class="form-control form-control-sm shadow-sm" type="date" @bind="CurrentHead.DTFrom" />
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label class="fw-semibold">Date To :</label>
+                            <input class="form-control form-control-sm shadow-sm" type="date" @bind="CurrentHead.DTTo" />
+                    </div>
+
+                    <div class="col-sm-6">
+                        <label class="fw-semibold">Main Heads :</label>
+                            <BlazoredTypeahead SearchMethod="SearchMainHeads"
+                                               EnableDropDown="true"
+                                               Data="MainHeads"
+                                               TValue="SubHeadsModel"
+                                               TItem="SubHeadsModel"
+                                               Value="SelectedMainHead"
+                                               ValueChanged="SelectedResultChanged_MainHead"
+                                               ValueExpression="@(() => SelectedMainHead)" 
+                                               Placeholder="Select Head"
+                                               MaximumSuggestions="1000"
+                                               ControlClass="form-control-sm shadow-sm"
+                                               Disabled="@IsEdit">
+
+                                <SelectedTemplate Context="selectedhead">
+                                    @SelectedMainHead?.MainGroupName
+                                </SelectedTemplate>
+                                <ResultTemplate Context="result">
+                                    @result.MainGroupName
+                                </ResultTemplate>
+                            </BlazoredTypeahead>
+                    </div>
+
+                    <div class="col-sm-6">
+                        <label class="fw-semibold">Group Name :</label>
+                        <BlazoredTypeahead SearchMethod="SearchGetSubHeads"
+                                            EnableDropDown="true"
+                                            Data="SubHeads"
+                                            TValue="SubHeadsListModel"
+                                            TItem="SubHeadsListModel"
+                                            Value="SelectedSubHead"
+                                            ValueChanged="SelectedResultChanged_SubHead"
+                                            ValueExpression="@(() => SelectedSubHead)"
+                                            Placeholder="Select Head"
+                                            MaximumSuggestions="1000"
+                                               ControlClass="form-control-sm shadow-sm"
+                                            Disabled="@IsEdit">
+
+                            <SelectedTemplate Context="selectedhead">
+                                @SelectedSubHead?.GroupName
+                            </SelectedTemplate>
+                            <ResultTemplate Context="result">
+                                @result.GroupName
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                            
+                    <div class="col-md-4 mb-2">
+                        <label class="fw-semibold">Note No :</label>
+                        <input class="form-control form-control-sm shadow-sm" @bind="CurrentHead.Notes" />
+                    </div>
+
+                    <div class="col-md-4 mb-2">
+                        <label class="fw-semibold">Opening Balance :</label>
+                            <input class="form-control form-control-sm shadow-sm" @bind="CurrentHead.OpeningBalance" />
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label class="fw-semibold">Closing Balance :</label>
+                            <input class="form-control form-control-sm shadow-sm" @bind="CurrentHead.ClosingBalance" />
+                    </div>
+
+                    <div class="col-md-12 mb-2">
+                        <label class="fw-semibold">Description :</label>
+                            <textarea class="form-control form-control-sm shadow-sm" rows="2" @bind="CurrentHead.Description"></textarea>
+                    </div>
+                </div>
+
+                <div class="ml-2 mt-3 text-end">
+                    <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="SaveHead">Save</button>
+                    <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="HideModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+}

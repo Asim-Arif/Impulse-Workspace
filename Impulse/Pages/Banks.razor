@@ -1,0 +1,98 @@
+﻿@page "/banks"
+@attribute [Authorize]
+@inject NavigationManager Navigation
+
+<div class="container py-4" style="font-family: Calibri, sans-serif;">
+
+    <div class="card shadow-sm">
+
+        <div class="card-header text-center bg-danger text-white">
+            CIP LOUNGE BANKS
+        </div>
+
+        <div class="card-body m-3 d-flex flex-wrap justify-content-center gap-3">
+            <div class="d-flex flex-wrap justify-content-center gap-3">
+
+                <!-- HBL -->
+                @* <div class="text-center">
+                    <a @onclick="() => NavigateToEntryForm(82)" class="text-decoration-none text-dark">
+                        <img src="graphics/hbl.png" alt="HBL" class="img-fluid rounded mb-2 grid-icon mx-auto" />
+                    </a>
+                 </div>
+                <!-- MBL -->
+                <div class="text-center">
+                    <a @onclick="() => NavigateToEntryForm(80)" class="text-decoration-none text-dark">
+                        <img src="graphics/mbl.png" alt="MBL" class="img-fluid rounded mb-2 grid-icon mx-auto" />
+                    </a>
+                </div>
+                <!-- AL HABIB -->
+                <div class="text-center">
+                    <a @onclick="() => NavigateToEntryForm(93)" class="text-decoration-none text-dark">
+                        <img src="graphics/alhabib.png" alt="ALH" class="img-fluid rounded mb-2 grid-icon mx-auto" />
+                    </a>
+                </div>
+                <!-- ALFALAH -->
+                <div class="text-center" >
+                    <a @onclick="() => NavigateToEntryForm(91)" class="text-decoration-none text-dark">
+                        <img src="graphics/alfalah.png" alt="ALFA" class="img-fluid rounded mb-2 grid-icon mx-auto" />
+                    </a>
+                </div>
+                <!-- ABL -->
+                <div class="text-center">
+                    <a @onclick="() => NavigateToEntryForm(94)" class="text-decoration-none text-dark">
+                        <img src="graphics/abl.png" alt="ABL" class="img-fluid rounded mb-2 grid-icon mx-auto" />
+                    </a>
+                </div>
+                <!-- UBL -->
+                <div class="text-center">
+                    <a @onclick="() => NavigateToEntryForm(95)" class="text-decoration-none text-dark">
+                        <img src="graphics/ubl.png" alt="UBL" class="img-fluid rounded mb-2 grid-icon mx-auto" />
+                    </a>
+                </div>
+                <!-- BOP -->
+                <div class="text-center">
+                    <a @onclick="() => NavigateToEntryForm(92)" class="text-decoration-none text-dark">
+                        <img src="graphics/bop.png" alt="BOP" class="img-fluid rounded mb-2 grid-icon mx-auto" />
+                    </a>
+                </div>
+                *@
+
+                @foreach (var bank in banks)
+                {
+                    <div class="text-center">
+                        @* <a @onclick="() => NavigateToEntryForm(bank.bankid)" class="text-decoration-none text-dark"> *@
+                            @* <img src="graphics/abl.png" alt="@bank.bankname" class="img-fluid rounded mb-2 grid-icon mx-auto" /> *@
+                            @* <img src="graphics/bop.png" alt="BOP" class="img-fluid rounded mb-2 grid-icon mx-auto" /> *@
+                        @* </a> *@
+                        
+                        @* <button @onclick="() => NavigateToEntryForm(bank.bankid)" class="btn btn-danger w-100 py-4 fw-bold fs-5 text-white shadow-lg">
+                            @bank.bankname
+                        </button> *@
+
+                        @if (bank.bCOA)
+                        {
+                            <button @onclick="() => NavigateToEntryForm(bank.bankid)"
+                                    class="btn btn-danger w-100 py-4 fw-bold fs-5 text-white shadow-lg">
+                                @bank.bankname
+                            </button>
+                        }
+                        else
+                        {
+                            <button @onclick="() => NavigateToEntryForm(bank.bankid)"
+                                    class="btn btn-success w-100 py-4 fw-bold fs-5 text-white shadow-lg">
+                                @bank.bankname
+                            </button>
+                        }
+
+                    </div>
+                }
+
+            </div>
+        </div>
+
+        <div class="card-footer text-end bg-white">
+            <button class="btn btn-danger btn-md" @onclick="ClosePage">Close</button>
+        </div>
+
+    </div>
+</div>

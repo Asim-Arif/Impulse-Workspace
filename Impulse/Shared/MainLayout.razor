@@ -1,0 +1,863 @@
+﻿@using CIP.Shared.Components
+@using CIP.Services
+@using CIP.Constants
+@using DataAccessLibrary.Models.ViewModels
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject IJSRuntime JSRuntime
+@inject IReportManagerService ReportManager
+@inject IReportNavigationService ReportService
+@inject LoadingService LoadingService
+@inject SecurityService SecurityService
+@inject IDBHelperService DB
+
+<PageTitle>CIP</PageTitle>
+
+<div class="layout">
+    <div class="sidebar-container">
+        <NavMenu IsSidebarCollapsed="@isSidebarCollapsed" OnToggleSidebar="ToggleSidebar" />
+    </div>
+    <main class="@(isSidebarCollapsed ? "collapsed" : "")">
+        <div class="top-row px-0 auth">
+            <button class="navbar-toggler " @onclick="ToggleSidebar">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <LoginDisplay />
+        </div>
+        @* <article class="content px-4"> *@
+        <article class="content">
+            @Body
+        </article>
+    </main>
+    <RadzenNotification />
+</div>
+
+@* These modals sit on top of the whole app *@
+<DateRangeModal @ref="rangeModal" />
+<DateSingleModal @ref="singleModal" />
+<DateRangeWithSingleSelectModal @ref="dateRangeModalWithSingleSelect" />
+<DateRangeWithSubHeadsSelectModal @ref="dateRangeModalWithSubHeadsSelect" />
+
+@if (isProcessing)
+{
+    <div class="cip-rpt-loading-screen">
+        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
+        <h4 class="mt-4 text-dark fw-bold">Loading</h4>
+        <p class="text-muted">Please wait, your document is being prepared...</p>
+    </div>
+}
+@if (isVisible)
+{
+    <div class="cip-rpt-loading-screen">
+        <div class="data-flow-container">
+            <div class="flow-node database">
+                <i class="fa fa-database"></i>
+                <span class="node-label">SQL DATA</span>
+            </div>
+
+            <div class="flow-path-short">
+                <div class="data-bit">1011</div>
+                <div class="data-bit d1">0101</div>
+            </div>
+
+            <div class="flow-node processor">
+                <i class="fa fa-cog fa-spin-slow"></i>
+                <span class="node-label">PROCESSING</span>
+            </div>
+
+            <div class="flow-path-short">
+                <div class="file-fragment">
+                    <i class="fa-solid fa-file-circle-plus"></i>
+                </div>
+                <div class="file-fragment d2">
+                    <i class="fa-solid fa-file-lines"></i>
+                </div>
+            </div>
+
+            <div class="flow-node document">
+                <i class="fa-solid fa-file-lines pdf-icon-color"></i>
+                <span class="node-label">PDF REPORT</span>
+            </div>
+        </div>
+
+        <div class="loader-text mt-4">
+            <h4 class="text-dark fw-bold">Processing Report</h4>
+            <p class="text-muted">@loadingMessage</p>
+        </div>
+    </div>
+}
+@if (IsShowingPrompt)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5); z-index: 3000;">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content shadow-lg border-primary">
+                <div class="modal-header py-2 theme-color text-white">
+                    <h6 class="mb-0">Security Authorization</h6>
+                </div>
+                <div class="modal-body">
+                    <input type="text" style="display:none;" tabindex="-1" />
+                    <input type="password" style="display:none;" tabindex="-1" />
+
+                    <label class="small fw-bold">Enter Password</label>
+                    <input type="password"
+                           class="form-control mt-1"
+                           @bind="UserInput"
+                           @bind:event="oninput"
+                           @onkeyup="HandleKeyUp"
+                           autocomplete="new-password" />
+                </div>
+                <div class="modal-footer py-1">
+                    <button class="btn btn-sm btn-primary" @onclick="Submit">OK</button>
+                    <button class="btn btn-sm btn-secondary" @onclick="Cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+@code {
+
+    private bool IsShowingPrompt = false;
+    private string UserInput = "";
+    private string CurrentSetting = "";
+    private TaskCompletionSource<bool> _tcs;
+    private ElementReference passwordInput;
+
+    private bool isVisible;
+    private string loadingMessage = "";
+    private bool isSidebarCollapsed = false;
+
+    private DateRangeModal rangeModal;
+    private DateSingleModal singleModal;
+    private DateRangeWithSingleSelectModal dateRangeModalWithSingleSelect;
+    private DateRangeWithSubHeadsSelectModal dateRangeModalWithSubHeadsSelect;
+    private bool isProcessing = false;
+    [Inject]
+    private IFinancialStatementService _financialstatementService { get; set; }
+
+    protected override void OnInitialized()
+    {
+        // Listen for report requests from the NavMenu
+        LoadingService.OnLoadingStateChanged += HandleLoading;
+        ReportManager.OnRequestReport += HandleReportRequest;
+        SecurityService.OnPasswordRequest += ShowPrompt;
+    }
+    private void HandleLoading(bool visible, string message)
+    {
+        isVisible = visible;
+        loadingMessage = message;
+        InvokeAsync(StateHasChanged);
+    }
+    public void Dispose()
+    {
+        // Unsubscribe to stay clean
+        ReportManager.OnRequestReport -= HandleReportRequest;
+        LoadingService.OnLoadingStateChanged -= HandleLoading;
+        SecurityService.OnPasswordRequest -= ShowPrompt;
+    }
+    private async void HandleReportRequest(string key, IDictionary<string, object>? extraArgs)
+    {
+        dynamic res, req;
+        string reportName = "";
+        string selectionFormula = "";
+        List<GenericDropDownModel> AccountHeads = new();
+        List<GenericDropDownModel> AccountHeads_sub = new();
+        // Helper to get values from extraArgs safely
+        T GetArg<T>(string name, T defaultValue) =>
+            (extraArgs != null && extraArgs.TryGetValue(name, out var val)) ? (T)val : defaultValue;
+
+        switch (key.ToLower())
+        {
+            case "vouchers-deleted":
+                res = await rangeModal.Show();
+                if (res.Success)
+                {
+                    /*isProcessing = true;
+                    StateHasChanged();*/
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                    req = new ReportRequest
+                    {
+                        ReportName = ReportNames.EditedVouchers,
+                        SelectionFormula = $"{{VouchersDeleted.VDate}} >= #{res.DateFrom:yyyy-MM-dd}# AND {{VouchersDeleted.VDate}} <= #{res.DateTo:yyyy-MM-dd}#"
+                    };
+                    await ReportService.PrintReportAsync(req);
+
+                    /*isProcessing = false;
+                    StateHasChanged();*/
+                }
+                break;
+            case "cost_center_report":
+                res = await rangeModal.Show();
+                if (res.Success)
+                {
+                    /*isProcessing = true;
+                    StateHasChanged();*/
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                    req = new ReportRequest
+                    {
+                        ReportName = ReportNames.CostCenterReport,
+                        Parameters = new Dictionary<string, object>
+                        {
+                            { "@DTFrom", res.DateFrom },
+                            { "@DTTo", res.DateTo }
+                        }
+                    };
+                    await ReportService.PrintReportAsync(req);
+
+                    /*isProcessing = false;
+                    StateHasChanged();*/
+                }
+                break;
+            case "accounts-breakup":
+
+                /*isProcessing = true;
+                StateHasChanged();*/
+
+                                                                                                                                                                                                                                                                                                                                                req = new ReportRequest
+                {
+                    ReportName = ReportNames.AccountsBreakup,
+                    Parameters = new Dictionary<string, object>
+                        {
+                            { "@DTFrom", DateTime.Today },
+                            { "@DTTo", DateTime.Today },
+                            { "@Code", "0" }
+                        }
+                };
+                await ReportService.PrintReportAsync(req);
+
+                /*isProcessing = false;
+                StateHasChanged();*/
+                break;
+            case "printed-cheque-history":
+                res = await rangeModal.Show();
+                if (res.Success)
+                {
+                    /*isProcessing = true;
+                    StateHasChanged();*/
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                    req = new ReportRequest
+                    {
+                        ReportName = ReportNames.PrintedChequeHistory,
+                        SelectionFormula = $"{{ChequePrintHistory.PrintDT}} >= #{res.DateFrom:yyyy-MM-dd}# AND {{ChequePrintHistory.PrintDT}} <= #{res.DateTo:yyyy-MM-dd}#"
+                    };
+                    await ReportService.PrintReportAsync(req);
+
+                    /*isProcessing = false;
+                    StateHasChanged();*/
+                }
+                break;
+            case "payable-w.h-tax-report":
+                res = await rangeModal.Show();
+                if (res.Success)
+                {
+                    /*isProcessing = true;
+                    StateHasChanged();*/
+                                                                                                                                                                                                                                                                                                                                                                                                                                    string strDateRange = $"'{res.DateFrom:dd-MMM-yyyy} to {res.DateTo:dd-MMM-yyyy}'";
+                    req = new ReportRequest
+                    {
+                        ReportName = ReportNames.VoucherList_TaxPayable,
+                        Parameters = new Dictionary<string, object>
+                        {
+                            { "@DTFrom", res.DateFrom },
+                            { "@DTTo", res.DateTo }
+                        },
+                        FormulaValues = new Dictionary<string, object>
+                        {
+                            { "DateRange", strDateRange }
+                        }
+                    };
+                    await ReportService.PrintReportAsync(req);
+
+                    /*isProcessing = false;
+                    StateHasChanged();*/
+                }
+                break;
+            case "car-parking":
+                res = await rangeModal.Show();
+                if (res.Success)
+                {
+                    /*isProcessing = true;
+                    StateHasChanged();*/
+                                                                                                                                                                                                                                                                                                                                                                                                                                    string strDateRange = $"'{res.DateFrom:dd-MMM-yyyy} to {res.DateTo:dd-MMM-yyyy}'";
+                    // Extract local variables from the "bag"
+                    int iType = GetArg("iType", 1);
+                    bool withInfant = GetArg("withInfant", false);
+
+                    string suffix = withInfant ? "" : "_WOI";
+                    string timeframe = iType == 1 ? "Daily" : iType == 2 ? "Monthly" : "Yearly";
+                    req = new ReportRequest
+                    {
+                        ReportName = $"CarParking{timeframe}Report{suffix}.rpt",
+                        Parameters = new Dictionary<string, object>
+                        {
+                            { "@DTFrom", res.DateFrom },
+                            { "@DTTo", res.DateTo },
+                            { "@iType", iType }
+                        },
+                        FormulaValues = new Dictionary<string, object>
+                        {
+                            { "DateRange", strDateRange }
+                        }
+
+                    };
+                    await ReportService.PrintReportAsync(req);
+                    /*isProcessing = false;
+                    StateHasChanged();*/
+                }
+                break;
+            case "tax-reports":
+
+                AccountHeads = await DB.GetListAsync<GenericDropDownModel>("'{ ' + AccNo + ' } ' + AccTitle AS DropDownValue_Description,AccNo AS DropDownValue_ID", "VAccounts_Parent");
+                AccountHeads.Insert(0, new GenericDropDownModel
+                {
+                    DropDownValue_ID = "0",
+                    DropDownValue_Description = "-- All Accounts --"
+                });
+
+                res = await dateRangeModalWithSingleSelect.Show(AccountHeads, "Tax Reports");
+
+                if (res.Success)
+                {
+                    /*isProcessing = true;
+                    StateHasChanged();*/
+                                                                                                                                                                                                                                                                                                                                                                                                                                    string strDateRange = $"'{res.DateFrom:dd-MMM-yyyy} to {res.DateTo:dd-MMM-yyyy}'";
+                    int iType = GetArg("iType", 1);
+                    string strReportName = "";
+                    if (iType == 1)
+                        strReportName = ReportNames.BelowTaxLimitReport;
+                    else if (iType == 2)
+                        strReportName = ReportNames.TaxDeductionReport;
+                    else if (iType == 3)
+                        strReportName = ReportNames.TaxExemptedReport;
+                    else if (iType == 4)
+                        strReportName = ReportNames.TaxNotApplicableReport;
+                    else if (iType == 5)
+                        strReportName = ReportNames.TaxDetailReportHeadwise;
+
+                    int iType_P = iType;
+                    if (iType == 5)
+                        iType_P = 1;
+
+                    req = new ReportRequest
+                    {
+                        ReportName = strReportName,
+                        Parameters = new Dictionary<string, object>
+                        {
+                            { "@DTFrom", res.DateFrom },
+                            { "@DTTo", res.DateTo },
+                            { "@Type", iType_P },
+                            { "@SubAccNo", res.SelectedValue ?? "0" }
+                        },
+                        FormulaValues = new Dictionary<string, object>
+                        {
+                            { "DateRange", strDateRange }
+                        }
+                    };
+                    await ReportService.PrintReportAsync(req);
+                    /*isProcessing = false;
+                    StateHasChanged();*/
+                }
+                break;
+            case "aging-report":
+
+                AccountHeads = await DB.GetListAsync<GenericDropDownModel>("AccTitle AS DropDownValue_Description,AccNo AS DropDownValue_ID", "Accounts", "WHERE Active=1 AND Parent=1");
+                AccountHeads.Insert(0, new GenericDropDownModel
+                {
+                    DropDownValue_ID = "0",
+                    DropDownValue_Description = "-- All Accounts --"
+                });
+
+                res = await dateRangeModalWithSingleSelect.Show(AccountHeads, "Aging Report");
+
+                if (res.Success)
+                {
+                    string strDateRange = $"'{res.DateFrom:dd-MMM-yyyy} to {res.DateTo:dd-MMM-yyyy}'";
+
+                    req = new ReportRequest
+                    {
+                        ReportName = ReportNames.AccountsAgingReport,
+                        Parameters = new Dictionary<string, object>
+                        {
+                            { "@DT", res.DateTo },
+                            { "@SubAccof", res.SelectedValue ?? "0" }
+                        }
+                    };
+                    await ReportService.PrintReportAsync(req);
+                }
+                break;
+
+            case "accounts-datewise":
+                res = await rangeModal.Show();
+                if (res.Success)
+                {
+                    req = new ReportRequest
+                    {
+                        ReportName = ReportNames.Accounts_Datewise,
+                        SelectionFormula = $"{{VAccounts.opendate}} >= #{res.DateFrom:yyyy-MM-dd}# AND {{VAccounts.opendate}} <= #{res.DateTo:yyyy-MM-dd}#"
+                    };
+                    await ReportService.PrintReportAsync(req);
+
+                }
+                break;  
+
+            case "capital-work-inprogress":
+                res = await rangeModal.Show();
+                if (res.Success)
+                {
+                    string strDateRange = $"'{res.DateFrom:dd-MMM-yyyy} to {res.DateTo:dd-MMM-yyyy}'";
+                    string dtfrom = $"'{res.DateFrom:dd-MMM-yyyy}'";
+                    string dtto = $"'{res.DateTo:dd-MMM-yyyy}'";
+
+                    // Extract local variables from the "bag"
+                    int iType = GetArg("ssiType", 1);
+                    bool withInfant = GetArg("withInfant", false);
+
+                    req = new ReportRequest
+                    {
+                        ReportName = $"CapitalWorkInProgress.rpt",
+                        Parameters = new Dictionary<string, object>
+                        {
+                            { "@CurDTStart", res.DateFrom },
+                            { "@CurDTEnd", res.DateTo }
+                        },
+                        FormulaValues = new Dictionary<string, object>
+                        {
+                            { "DateRange", strDateRange },
+                            { "DtFrom", dtfrom },
+                            { "DtTo", dtto }
+                        }
+
+                    };
+                    await ReportService.PrintReportAsync(req);
+                }
+                break;
+            case "sub-heads-reports":
+
+                AccountHeads = await DB.GetListAsync<GenericDropDownModel>("GroupName +' { ' + 'Note No. ' + CAST(SortNo AS VARCHAR(50)) + ' } ' AS DropDownValue_Description,EntryID AS DropDownValue_ID", "GroupsForFinancialReport", " ORDER BY GroupsForFinancialReport.EntryID");
+                AccountHeads.Insert(0, new GenericDropDownModel
+                {
+                    DropDownValue_ID = "0",
+                    DropDownValue_Description = "< All Main Heads >"
+                });
+
+                AccountHeads_sub = await DB.GetListAsync<GenericDropDownModel>("GroupName +' { ' + 'Note No. ' + Notes + ' } ' AS DropDownValue_Description,EntryID AS DropDownValue_ID", "GroupsForFinancialReport_Sub", " ORDER BY GroupsForFinancialReport_Sub.EntryID");
+                AccountHeads_sub.Insert(0, new GenericDropDownModel
+                {
+                    DropDownValue_ID = "0",
+                    DropDownValue_Description = "< All Sub Heads >"
+                });
+
+                res = await dateRangeModalWithSubHeadsSelect.Show(AccountHeads, AccountHeads_sub, "Print Sub Heads Reports");
+
+                if (res.Success)
+                {
+
+                    int icount = 0;
+                    icount = await DB.getSingleIntValueasync(
+                                    "COUNT(*)",
+                                    "VAccountGroupsForBalanceSheet",
+                                    $"WHERE AccGroup_RefID='{res.SelectedValue_sub}'"
+                                );
+                    if (icount == 0)
+                    {
+                        icount = await DB.getSingleIntValueasync(
+                                        "COUNT(*)",
+                                        "VAccountGroupsForIncomeANDExpense",
+                                        $"WHERE AccGroup_RefID='{res.SelectedValue_sub}'"
+                                    );
+                    }
+                    if (icount == 0)
+                    {
+                        icount = await DB.getSingleIntValueasync(
+                                        "COUNT(*)",
+                                        "VAccountHeads_ManualEntry",
+                                        $"WHERE AccGroup_RefID='{res.SelectedValue_sub}'"
+                                    );
+                    }
+
+                    string strDateRange = $"'{res.DateFrom:dd-MMM-yyyy} to {res.DateTo:dd-MMM-yyyy}'";
+                    string dtfrom = $"'{res.DateFrom:dd-MMM-yyyy}'";
+                    string dtto = $"'{res.DateTo:dd-MMM-yyyy}'";
+                    string Trailas = $"'{res.DateTo:d mmmm - yyyy}'";
+
+                    int iType = GetArg("iType", 1);
+                    string strReportName = "";
+
+                    string strMainHeadsEntryID =$"{res.SelectedValue}";
+                    string strSubHeadsEntryID = $"{res.SelectedValue_sub}";
+
+                    if (strSubHeadsEntryID == "0")
+                    {
+                        strReportName = "PrintSubHeadsDetail_BS.rpt";
+                    }
+                    else
+                    {
+                        if (icount>0)
+                            strReportName = "PrintSubHeadsDetail_BS.rpt";
+                        else
+                            strReportName = "PrintSubHeadsDetail_IE.rpt";
+                    }
+
+                    string strcond = "1=1";
+                    if ((strMainHeadsEntryID == "0") && (strSubHeadsEntryID == "0"))
+                    {
+                        /// do nothing
+                    }
+                    else if ((strMainHeadsEntryID != "0") && (strSubHeadsEntryID == "0"))
+                    {
+                        strcond = strcond + $" AND {{BalanceSheet.EntryID}}= {strMainHeadsEntryID}";
+                    }
+                    else if ((strMainHeadsEntryID == "0") && (strSubHeadsEntryID != "0"))
+                    {
+                        strcond = strcond + $" AND {{BalanceSheet.SubEntryID}}= {strSubHeadsEntryID}";
+                    }
+                    else if ((strMainHeadsEntryID != "0") && (strSubHeadsEntryID != "0"))
+                    {
+                        strcond = strcond + $" AND {{BalanceSheet.EntryID}}= {strMainHeadsEntryID} AND {{BalanceSheet.SubEntryID}}= {strSubHeadsEntryID}";
+                    } 
+                    else
+                    {
+                        strcond = strcond + $" AND {{BalanceSheet.SubEntryID}}= {strSubHeadsEntryID}";
+                    }
+                    req = new ReportRequest
+                    {
+                        ReportName = strReportName,
+                        SelectionFormula = strcond,
+                        Parameters = new Dictionary<string, object>
+                        {
+                            { "@PrvDTStart", res.DateFrom },
+                            { "@PrvDTEnd", res.DateTo },
+                            { "@CurDTStart", res.DateFrom },
+                            { "@CurDTEnd", res.DateTo }
+                        },
+                        FormulaValues = new Dictionary<string, object>
+                        {
+                            { "DTFrom", dtfrom },
+                            { "Dtto", dtto },
+                            { "Trailas", Trailas }
+                        }
+                    };
+                    await ReportService.PrintReportAsync(req);
+                }
+                break;
+            case "notes-to-accounts":
+                {
+                    var resnotes = await rangeModal.Show();
+                    if (resnotes.Success)
+                    {
+                        isProcessing = true;
+                        StateHasChanged();
+
+                        await _financialstatementService.GenerateBalanceSheetReportAsync(resnotes.DateFrom, resnotes.DateTo);
+
+                        DateTime openYear2 = resnotes.DateFrom;
+                        DateTime closeYear2 = resnotes.DateTo;
+                        DateTime closeYear1 = closeYear2.AddYears(-1);
+                        DateTime openYear1 = openYear2.AddYears(-1);
+
+                        string dtfrom = $"'{closeYear1:dd-MMM-yyyy}'";
+                        string dtto = $"'{closeYear2:dd-MMM-yyyy}'";
+                        string Trailas = $"'{closeYear2:d MMM - yyyy}'";
+
+                        req = new ReportRequest
+                        {
+
+                            ReportName = ReportNames.NotesToAccounts, 
+                            SelectionFormula = $"1=1",
+
+                            // Parameters = new Dictionary<string, object>
+                            // {
+                            //     { "PrvDTStart", openYear1 },
+                            //     { "PrvDTEnd", closeYear1 },
+                            //     { "CurDTStart", openYear2 },
+                            //     { "CurDTEnd", closeYear2 },
+                            // },
+                            FormulaValues = new Dictionary<string, object>
+                            {
+                                { "p_PrvDTStart", $"Date({openYear1:yyyy, MM, dd})" },
+                                { "p_PrvDTEnd",   $"Date({closeYear1:yyyy, MM, dd})" },
+                                { "p_CurDTStart", $"Date({openYear2:yyyy, MM, dd})" },
+                                { "p_CurDTEnd",   $"Date({closeYear2:yyyy, MM, dd})" },
+
+                                { "DtFrom",  dtfrom },
+                                { "DtTo",    dtto },
+
+                                { "Trailas", Trailas },
+                            }
+                        };
+
+                        await ReportService.PrintReportAsync(req);
+
+                        isProcessing = false;
+                        StateHasChanged();
+                    }
+                    break;
+                }
+            case "balance-sheet":
+                var resbs = await rangeModal.Show();
+                if (resbs.Success)
+                {
+                    isProcessing = true;
+                    StateHasChanged();
+
+                    await _financialstatementService.GenerateBalanceSheetReportAsync(resbs.DateFrom, resbs.DateTo);
+                    await _financialstatementService.ProcessCapitalWorkInProgress();
+                    await _financialstatementService.SaveProperty();
+                    await _financialstatementService.SaveBalanceSheetToPrint();
+
+                    DateTime openYear2 = resbs.DateFrom;
+                    DateTime closeYear2 = resbs.DateTo;
+                    DateTime closeYear1 = closeYear2.AddYears(-1);
+                    DateTime openYear1 = openYear2.AddYears(-1);
+
+                    string dtfrom = $"'{closeYear1:dd-MMM-yyyy}'";
+                    string dtto = $"'{closeYear2:dd-MMM-yyyy}'";
+                    string Trailas = $"'{closeYear2:d MMM - yyyy}'";
+
+                    req = new ReportRequest
+                    {
+
+                        ReportName = ReportNames.BalanceSheet,
+                        SelectionFormula = $"1=1",
+
+                        FormulaValues = new Dictionary<string, object>
+                            {
+                                { "DtFrom",  dtfrom },
+                                { "DtTo",    dtto },
+
+                                { "Trailas", Trailas },
+                            }
+                    };
+
+                    await ReportService.PrintReportAsync(req);
+
+                    isProcessing = false;
+                    StateHasChanged();
+                }
+                break;
+
+            case "profit-loss_report":
+                var respl = await rangeModal.Show();
+                if (respl.Success)
+                {
+                    isProcessing = true;
+                    StateHasChanged();
+
+                    await _financialstatementService.GenerateBalanceSheetReportAsync(respl.DateFrom, respl.DateTo);
+                    await _financialstatementService.ProcessCapitalWorkInProgress();
+                    await _financialstatementService.PrintIncomeAndExpenseReport();
+
+                    DateTime openYear2 = respl.DateFrom;
+                    DateTime closeYear2 = respl.DateTo;
+                    DateTime closeYear1 = closeYear2.AddYears(-1);
+                    DateTime openYear1 = openYear2.AddYears(-1);
+
+                    string dtfrom = $"'{closeYear1:dd-MMM-yyyy}'";
+                    string dtto = $"'{closeYear2:dd-MMM-yyyy}'";
+                    string Trailas = $"'{closeYear2:d MMM - yyyy}'";
+
+                    req = new ReportRequest
+                    {
+
+                        ReportName = ReportNames.ProfitandLoss,
+                        SelectionFormula = $"1=1",
+
+                        FormulaValues = new Dictionary<string, object>
+                            {
+                                { "DtFrom",  dtfrom },
+                                { "DtTo",    dtto },
+
+                                { "Trailas", Trailas },
+                            }
+                    };
+
+                    await ReportService.PrintReportAsync(req);
+
+                    isProcessing = false;
+                    StateHasChanged();
+                }
+                break;
+            case "cash-flow-summary":
+                {
+                    var rescf_summary = await rangeModal.Show();
+                    if (rescf_summary.Success)
+                    {
+                        isProcessing = true;
+                        StateHasChanged();
+
+                        // await _financialstatementService.GenerateBalanceSheetReportAsync(rescf_summary.DateFrom, rescf_summary.DateTo);
+
+                        DateTime closeYear1 = new DateTime(rescf_summary.DateFrom.Year, 6, 30);
+                        DateTime openYear2 = rescf_summary.DateFrom;
+                        DateTime openYear1 = openYear2.AddYears(-1);
+                        DateTime closeYear2 = rescf_summary.DateTo;
+
+                        string dtfrom = $"'{openYear2:dd-MMM-yyyy}'";
+                        string dtto = $"'{closeYear2:dd-MMM-yyyy}'";
+
+                        int iType = GetArg("iType", 1);
+                        string strReportName = "";
+                        if (iType == 1)
+                            strReportName = ReportNames.CashFlowSummary;
+                        else if (iType == 2)
+                            strReportName = ReportNames.CashFlowSummary_WOZ;
+                        else if (iType == 3)
+                            strReportName = ReportNames.CashFlowSummary_Headwise;
+
+                        req = new ReportRequest
+                        {
+
+                            ReportName = strReportName,
+                            SelectionFormula = $"1=1",
+
+                            Parameters = new Dictionary<string, object>
+                            {
+                                { "@PrvDTStart", openYear1 },
+                                { "@PrvDTEnd", closeYear1 },
+                                { "@CurDTStart", openYear2 },
+                                { "@CurDTEnd", closeYear2 },
+                            },
+                            FormulaValues = new Dictionary<string, object>
+                            {
+                                { "DtFrom",  dtfrom },
+                                { "DtTo",    dtto },
+                            }
+                        };
+
+                        await ReportService.PrintReportAsync(req);
+
+                        isProcessing = false;
+                        StateHasChanged();
+                    }
+                    break;
+                }
+            case "cash-flow-statement":
+                {
+                    var rescf_summary = await rangeModal.Show();
+                    if (rescf_summary.Success)
+                    {
+                        isProcessing = true;
+                        StateHasChanged();
+
+                        DateTime closeYear1 = new DateTime(rescf_summary.DateFrom.Year, 6, 30);
+                        DateTime openYear2 = rescf_summary.DateFrom;
+                        DateTime openYear1 = openYear2.AddYears(-1);
+                        DateTime closeYear2 = rescf_summary.DateTo;
+
+                        await _financialstatementService.GenerateBalanceSheetReportAsync(rescf_summary.DateFrom, rescf_summary.DateTo);
+                        await _financialstatementService.SaveCashFlowStatementToPrint(openYear1,new DateTime(closeYear1.Year, 6, 30),openYear2,closeYear2);
+                        await _financialstatementService.SaveCashFlowStatementToPrint(openYear1.AddYears(-1), closeYear1.AddYears(-1), openYear2.AddYears(-1), closeYear2.AddYears(-1), true);
+
+                        
+                        string dtfrom = $"'{openYear2:dd-MMM-yyyy}'";
+                        string dtto = $"'{closeYear2:dd-MMM-yyyy}'";
+                        string Trailas = $"'{closeYear2:d MMM - yyyy}'";
+                        string Foryear = $"' FOR THE YEAR ENDED  + {closeYear2:d-mmmm-yyyy}'";
+
+                        double dOpenBal_BB = await DB.getSingleDoubleValueasync("ClBal_Prv", "VCashFlow_SIAL_BankBalance");
+                        double dClBal_BB = await DB.getSingleDoubleValueasync("ClBal_Cur", "VCashFlow_SIAL_BankBalance");
+
+                        double dOpenBal_BB_Cur = await DB.getSingleDoubleValueasync("ClBal_Prv_Dr", "VCashFlow_SIAL_BankBalance");
+                        double dClBal_BB_Cur = await DB.getSingleDoubleValueasync("ClBal_Cur_Dr", "VCashFlow_SIAL_BankBalance");
+
+                        req = new ReportRequest
+                        {
+
+                            ReportName = ReportNames.CashFlowStatement,
+                            SelectionFormula = $"1=1",
+
+                            FormulaValues = new Dictionary<string, object>
+                            {
+
+                                { "BB_OpenBal",    dOpenBal_BB },
+                                { "BB_ClBal",    dClBal_BB },
+
+                                { "OpenBal_BB_Cur",    dOpenBal_BB_Cur },
+                                { "ClBal_Cur_Dr",    dClBal_BB_Cur },
+
+                                { "DtFrom",  dtfrom },
+                                { "DtTo",    dtto },
+
+                                { "Trailas",  Trailas },
+                                { "ForYear",    Foryear },
+                            }
+                        };
+
+                        await ReportService.PrintReportAsync(req);
+
+                        isProcessing = false;
+                        StateHasChanged();
+                    }
+                    break;
+                }
+        }
+    }
+
+    private async Task<bool> ShowPrompt(string settingName)
+    {
+        CurrentSetting = settingName;
+        IsShowingPrompt = true;
+        _tcs = new TaskCompletionSource<bool>();
+
+        // First render shows the modal
+        StateHasChanged();
+
+        // Tiny delay to allow the browser to attempt its autofill
+        await Task.Delay(50);
+
+        // Now explicitly wipe it again
+        UserInput = string.Empty;
+
+        // Second render ensures the UI reflects the empty string
+        StateHasChanged();
+
+        return await _tcs.Task;
+    }
+    private async Task Submit()
+    {
+        var correctPass = await DB.getDatabasePasswordAsync(CurrentSetting);
+        if (UserInput == correctPass)
+        {
+            IsShowingPrompt = false;
+            _tcs.SetResult(true);
+        }
+        else
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Invalid Password");
+        }
+    }
+    private void Cancel()
+    {
+        IsShowingPrompt = false;
+        _tcs.SetResult(false);
+    }
+    private async Task HandleKeyUp(KeyboardEventArgs e) { if (e.Key == "Enter") await Submit(); }
+
+    private void ToggleSidebar()
+    {
+        isSidebarCollapsed = !isSidebarCollapsed;
+        Console.WriteLine($"Sidebar collapsed: {isSidebarCollapsed}"); // Debug state
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                // Get window width after render when JS interop is available
+                var windowWidth = await JSRuntime.InvokeAsync<int>("getWindowWidth");
+                //Console.WriteLine($"Window width: {windowWidth}"); // Debug window width
+                if (windowWidth <= 991)
+                {
+                    isSidebarCollapsed = true; // Collapse sidebar on mobile
+                    StateHasChanged(); // Trigger re-render
+                }
+            }
+            catch (Exception ex)
+            {
+                // Handle potential JS interop errors
+                Console.WriteLine($"JS Interop error: {ex.Message}");
+            }
+        }
+    }
+}

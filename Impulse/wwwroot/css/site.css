@@ -1,0 +1,1667 @@
+/* Import Google Font */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
+
+:root {
+    --primary-color: #4a90e2;
+    --secondary-color: #2e3192;
+    --background-color: #f0f2f5;
+    --text-color: #2c3e50;
+    --hover-color: #e0e7ff;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #f5f5f5;
+    margin: 0;
+    padding: 0;
+    font-weight: 300;
+}
+
+/* Layout container */
+.layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar container to hold hamburger button and sidebar */
+.sidebar-container {
+    position: relative;
+}
+
+/* Sidebar styling */
+.sidebar {
+    width: 250px;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background: var(--background-color);
+    color: var(--text-color);
+    padding-top: 20px;
+    border-right: 1px solid rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    transition: transform 0.3s ease-in-out, width 0.3s ease-in-out;
+    overflow-x: hidden;
+    font-family: 'Poppins', sans-serif;
+}
+
+    .sidebar.collapsed {
+        transform: translateX(-100%);
+        width: 0;
+    }
+
+/* Hamburger icon */
+.navbar-toggler {
+    border: none;
+    background: transparent; /*/var(--background-color);*/
+    padding: 0.15rem 0.8rem !important;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 0.3s, background-color 0.3s;
+    position: absolute;    
+    /*top: 10px;
+    right: 20px;*/
+    z-index: 1100;
+    /*border: 1px solid rgba(0, 0, 0, 0.1);*/
+    border-radius: 4px;    
+    width: 44px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /*display: none;  Hidden by default */
+}
+/* Hide sidebar toggler when sidebar is collapsed */
+main.collapsed .sidebar .navbar-toggler {
+    display: none;
+}
+/* Hamburger icon in top bar */
+/*.topbar-toggler {
+    border: none;
+    background: transparent;
+    padding: 0.4rem 0.8rem;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 0.3s, background-color 0.3s;
+    position: absolute;
+    left: 10px;*/ /* Align to left edge of top-row */
+    /*top: 10px;
+    z-index: 1100;*/ /* Above other elements */
+    /*border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    width: 44px;*/ /* Touch-friendly minimum */
+    /*height: 44px;*/ /* Touch-friendly minimum */
+    /*display: flex;*/ /* Hidden by default */
+/*}*/
+/*navbar-toggler:hover {
+    transform: scale(1.1);
+    background-color: rgba(224, 231, 255, 0.5);*/ /* Semi-transparent hover effect */
+/*}*/
+
+/* Show topbar toggler when sidebar is collapsed */
+main.collapsed navbar-toggler {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.navbar-toggler:hover {
+    transform: scale(1);
+    background-color: rgba(224, 231, 255, 0.5);/*var(--hover-color);*/
+}
+
+.navbar-toggler-icon {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='%232c3e50' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+    width: 1.2em;
+    height: 1.2em;
+}
+
+.sidebar-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(5px);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 0 0 10px 0;
+    position: relative;
+}
+
+.navbar-brand {
+    color: var(--secondary-color);
+    font-size: 1.4rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.nav-link {
+    color: var(--text-color);
+    padding: 12px 20px;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    transition: all 0.3s ease;
+    border-radius: 5px;
+    min-height: 44px; /* Touch-friendly */
+}
+
+    .nav-link i {
+        margin-right: 12px;
+        font-size: 1.1rem;
+        transition: color 0.3s;
+    }
+
+    .nav-link:hover {
+        color: var(--primary-color);
+        background-color: var(--hover-color);
+        transform: translateX(5px);
+    }
+
+    .nav-link.active {
+        color: var(--primary-color);
+        background-color: rgba(74, 144, 226, 0.2);
+        font-weight: 600;
+        box-shadow: inset 2px 0 0 var(--primary-color);
+    }
+
+    .nav-link.text-danger {
+        color: #e74c3c !important;
+    }
+
+        .nav-link.text-danger:hover {
+            color: #c0392b !important;
+            background-color: var(--hover-color);
+        }
+
+.nav-item.mt-auto {
+    margin-top: auto;
+}
+
+.nav-section-header {
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border-radius: 5px;
+}
+
+    .nav-section-header:hover {
+        background-color: var(--hover-color);
+        color: var(--primary-color);
+    }
+
+    .nav-section-header i.fa-chevron-down {
+        transition: transform 0.3s, color 0.3s;
+        font-size: 0.9rem;
+        color: var(--text-color);        
+    }
+
+        .nav-section-header i.fa-chevron-down.rotated {            
+            transform: rotate(180deg);
+        }
+
+    .nav-section-header:hover i.fa-chevron-down {
+        color: var(--primary-color);
+    }
+.nav-link .fas.fa-chevron-down {
+    color: #888888; /* A nice mid-gray */
+    transition: color 0.3s ease, transform 0.3s ease; /* Ensure smooth transition */
+}
+.fas.fa-chevron-down.rotated {
+    color: #007bff; /* Standard Bootstrap Blue */
+    /* Keep your existing rotation property here */
+    transform: rotate(180deg);
+}
+.nav-vouchers-links .nav-link i.fas {
+    color: navy !important;
+}
+.nav-sub-header {
+    padding: 8px 15px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 0.9rem;
+    /*color: #7f8c8d;*/
+    color: midnightblue;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border-radius: 5px;
+}
+
+    .nav-sub-header:hover {
+        color: var(--primary-color);
+        background-color: var(--hover-color);
+    }
+
+    .nav-sub-header i.fa-chevron-down {
+        transition: transform 0.3s, color 0.3s;
+        font-size: 0.8rem;
+        color: #7f8c8d;
+    }
+
+        .nav-sub-header i.fa-chevron-down.rotated {
+            transform: rotate(180deg);
+        }
+
+    .nav-sub-header:hover i.fa-chevron-down {
+        color: var(--primary-color);
+    }
+
+.nav-sub-section {
+    background: var(--background-color);
+    border-left: 2px solid rgba(74, 144, 226, 0.3);
+    border-radius: 0 0 5px 5px;
+}
+
+.nav-sub-links {
+    padding-left: 25px;
+}
+
+    .nav-sub-links .nav-link {
+        padding: 6px 10px;
+        font-size: 0.85rem;
+        /*color: #7f8c8d;*/
+        color: navy;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: all 0.3s ease;
+        border-radius: 5px;
+    }
+
+        .nav-sub-links .nav-link:hover,
+        .nav-sub-links .nav-link.active {
+            color: var(--primary-color);
+            background-color: var(--hover-color);
+            transform: translateX(5px);
+        }
+
+/* Main content */
+main {
+    flex: 1;
+    margin-left: 250px;
+    padding: 20px;
+    transition: margin-left 0.3s ease-in-out;
+    background: #f5f7fa;
+    /*background:Gold;*/
+}
+
+    main.collapsed {
+        margin-left: 0;
+    }
+
+/* Responsive Design */
+@media (max-width: 991px) {
+    .sidebar {
+        width: 250px;
+        transform: translateX(-100%);
+    }
+
+        .sidebar:not(.collapsed) {
+            transform: translateX(0);
+        }
+
+    main {
+        margin-left: 0;
+    }
+
+    .navbar-toggler {
+        display: block !important; /* Ensure visibility on mobile */
+    }
+}
+
+
+
+/* Top row and content */
+.top-row {
+    /*background-color: #fff;*/
+    border-bottom: 1px solid #e7e7e7;
+    padding: 0 20px;
+    position: relative;
+    min-height: 40px;
+    display:flex;
+    align-items:center;
+}
+/* Top row auth content */
+.top-row.auth {
+    padding-left: 35px; /* Fallback to avoid overlap with topbar-toggler */
+}
+/* LoginDisplay content */
+.login-display-content {
+    margin-left: 45px; /* Shift content right to clear 44px toggler + spacing */
+    position: relative;
+    flex: 0 0 auto;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    
+}
+.content {
+    /*padding: 20px;*/
+    padding-top: 1.1rem;
+    /*background-color: green;*/
+}
+
+/* Your existing styles (unchanged) */
+.card {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 0px 0px rgba(0, 0, 0, 0.1);
+    background-color: #ffffff;
+    /*background-color: purple;*/
+    border: none;
+}
+
+.card-header {
+    background-color: transparent;
+    
+    color: #333333;
+    text-align: left;
+    padding: 0 0 10px 0;
+    font-size: 2em;
+    font-weight: 500;
+    border-radius: 0;
+    border-bottom: 2px solid #eeeeee;
+    /*margin-bottom: 20px;*/
+}
+
+.image-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+
+.module-card {
+    border-radius: 0.75rem;
+    transition: all 0.25s ease-in-out;
+    background-color: #ffffff;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
+    border: none;
+}
+
+    .module-card:hover {
+        transform: translateY(-4px) scale(1.02);
+        box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+        background-color: #f8f9fa;
+    }
+
+.btn-primary {
+    color: #fff;
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+    .btn-primary:hover {
+        background-color: #0056b3;
+        border-color: #0056b3;
+    }
+
+.container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 85vh;
+}
+
+.grid-icon {
+    width: 180px;
+    height: auto;
+    cursor: pointer;
+    transition: transform 0.3s;
+    border: 2px solid transparent;
+    border-radius: 8px;
+}
+
+    .grid-icon:hover {
+        transform: scale(1.1);
+    }
+
+html, body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+h1:focus {
+    outline: none;
+}
+
+a, .btn-link {
+    color: #0071c1;
+}
+
+.valid.modified:not([type=checkbox]) {
+    outline: 1px solid #26b050;
+}
+
+.invalid {
+    outline: 1px solid red;
+}
+
+.validation-message {
+    color: red;
+}
+
+#blazor-error-ui {
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+    #blazor-error-ui .dismiss {
+        cursor: pointer;
+        position: absolute;
+        right: 0.75rem;
+        top: 0.5rem;
+    }
+
+.blazor-error-boundary {
+    background: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iNDkiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIG92ZXJmbG93PSJoaWRkZW4iPjxkZWZzPjxjbGlwUGF0aCBpZD0iY2xpcDAiPjxyZWN0IHg9IjIzNSIgeT0iNTEiIHdpZHRoPSI1NiIgaGVpZ2h0PSI0OSIvPjwvY2xpcFBhdGg+PC9kZWZzPjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMCkiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0yMzUgLTUxKSI+PHBhdGggZD0iTTI2My41MDYgNTFDMjY0LjcxNyA1MSAyNjUuODEzIDUxLjQ4MzcgMjY2LjYwNiA1Mi4yNjU4TDI2Ny4wNTIgNTIuNzk4NyAyNjcuNTM5IDUzLjYyODMgMjkwLjE4NSA5Mi4xODMxIDI5MC41NDUgOTIuNzk1IDI5MC42NTYgOTIuOTk2QzI5MC44NzcgOTMuNTEzIDI5MSA5NC4wODE1IDI5MSA5NC42NzgyIDI5MSA5Ny4wNjUxIDI4OS4wMzggOTkgMjg2LjYxNyA5OUwyNDAuMzgzIDk5QzIzNy45NjMgOTkgMjM3Ljk2MyA5OSAyMzYuMDM4IDk5IDI1OS40NzMgNTMuNjI5NCAyNTkuOTYxIDUyLjc5ODUgMjYwLjQzNyA1Mi4yNjU4QzI2MS4yIDUxLjQ4MzcgMjYyLjI5NiA1MSAyNjMuNTA2IDUxWk0yNjMuNTg2IDY2LjAxODNDMjYwLjczNyA2Ni4wMTgzIDI1OS4zMTMgNjcuMTI0NSAyNTkuMzEzIDY5LjMzNyAyNTkuMzEzIDY5LjYxMDIgMjU5LjMzMiA2OS44NjA4IDI1OS4zNzEgNzAuMDg4N0wyNjEuNzk1IDg0LjAxNjEgMjY1LjM4IDg0LjAxNjEgMjY3LjgyMSA2OS43NDc1QzI2Ny44NiA2OS43MzA5IDI2Ny44NzkgNjkuNTg3NyAyNjcuODc5IDY5LjMxNzkgMjY3Ljg3OSA2Ny4xMTgyIDI2Ni40NDggNjYuMDE4MyAyNjMuNTg2IDY2LjAxODNaTTI2My41NzYgODYuMDU0N0MyNjEuMDQ5IDg2LjA1NDcgMjU5Ljc4NiA4Ny4zMDA1IDI1OS43ODYgODkuNzkyMSAyNTkuNzg2IDkyLjI4MzcgMjYxLjA0OSA5My41Mjk1IDI2My41NzYgOTMuNTI5NSAyNjYuMTE2IDkzLjNyOTUgMjY3LjM4NyA5Mi4yODM3IDI2Ny4zODcgODkuNzkyMSAyNjcuMzg3IDg3LjMwMDUgMjY2LjExNiA4Ni4wNTQ3IDI2My41NzYgODYuMDU0N1oiIGZpbGw9IiNGRkU1MDAiIGZpbGwtcnVsZT0iZXZlbm9kZCIvPjwvZz48L25zZyI+Cg==) no-repeat 1rem/1.8rem, #b32121;
+    padding: 1rem 1rem 1rem 3.7rem;
+    color: white;
+}
+
+    .blazor-error-boundary::after {
+        content: "An error has occurred.";
+    }
+
+.button-with-divider {
+    position: relative;
+}
+
+    .button-with-divider:not(:last-child)::after {
+        content: "";
+        position: absolute;
+        right: 0;
+        top: 5px;
+        bottom: 5px;
+        width: 1px;
+        background-color: rgba(255, 255, 255, 0.3);
+    }
+
+.card-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /*min-height: 100vh;*/
+    padding: 20px;
+}
+
+.logo-section {
+    text-align: center;
+    margin: 10px 0;
+    padding: 20px;
+}
+
+    .logo-section img {
+        width: 150px;
+        height: auto;
+    }
+
+.form-group {
+    margin-bottom: 20px;
+    display: flex;
+    width: auto;
+}
+
+    .form-group label {
+        font-weight: bold;
+        display: block;
+        margin-bottom: 8px;
+    }
+
+    .form-group input {
+        width: 100%;
+        padding: 5px;
+        border-radius: 2px;
+        border: 1px solid #ddd;
+        font-size: 14px;
+        box-sizing: border-box;
+    }
+
+        .form-group input:focus {
+            border-color: black;
+            outline: none;
+        }
+
+    .form-group.flex {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
+    }
+
+        .form-group.flex div {
+            flex: 1;
+            min-width: 180px;
+        }
+
+.form-buttons {
+    text-align: center;
+    margin-top: 20px;
+}
+
+    .form-buttons button {
+        padding: 12px 30px;
+        font-size: 16px;
+        border-radius: 3px;
+        border: none;
+        cursor: pointer;
+        margin: 10px 10px;
+        transition: background-color 0.3s;
+    }
+
+.btn-secondary {
+    background-color: #ddd;
+    color: #333;
+}
+
+    .btn-secondary:hover {
+        background-color: #bbb;
+    }
+
+.custom-cip-date {
+    margin-top: 50px;
+    width: 200px;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 2px;
+}
+
+    .custom-cip-date label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+
+    .custom-cip-date input {
+        width: 100%;
+        padding: 5px;
+        border-radius: 2px;
+        border: 1px solid #ddd;
+        font-size: 14px;
+        box-sizing: border-box;
+    }
+
+.custom-passenger-name {
+    width: 350px;
+    margin-bottom: 20px;
+    flex: 0 0 350px;
+}
+
+    .custom-passenger-name input {
+        padding: 5px;
+        border-radius: 2px;
+        border: 1px solid #ddd;
+        font-size: 14px;
+        box-sizing: border-box;
+    }
+
+.input-group {
+    flex: 1;
+    min-width: 350px;
+}
+
+    .input-group input {
+        width: 100%;
+        padding: 5px;
+        border-radius: 2px;
+        border: 1px solid #ddd;
+        font-size: 14px;
+    }
+
+.page-wrapper {
+    display: flex;
+    width: 100%;
+    min-height: 100%;
+    margin-left: 0;
+}
+
+.chart-container {
+    padding: 0.5rem;
+    background: green; /* #f4f6f8; */
+    font-family: 'Segoe UI', Roboto, sans-serif;
+}
+
+.chart-title {
+    color: red;
+    font-size: 1.8rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.controls {
+    margin-bottom: 20px;
+    text-align: right;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 25px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.account-grid {
+    max-height: 75vh;
+    overflow-y: auto;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    width: 100%;
+    display: grid;
+}
+
+.grid-header {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    padding: 10px;
+    background-color: #f0f0f0;
+    font-weight: 600;
+    border-bottom: 2px solid #ddd;
+}
+
+.grid-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    padding: 12px 15px;
+    border-bottom: 1px solid #eee;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+    .grid-row:hover {
+        background-color: #f0f2f5;
+        transform: translateX(5px);
+    }
+
+.card-body {
+    padding: 0 15px;
+    width: 100%;
+}
+
+.cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+    .cell.id {
+        font-weight: 500;
+        color: #34495e;
+    }
+
+    .cell.name {
+        color: #2c3e50;
+    }
+
+    .cell.type {
+        color: #7f8c8d;
+    }
+
+    .cell.balance {
+        text-align: right;
+        color: #16a085;
+    }
+
+.context-menu {
+    position: fixed;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    padding: 5px 0;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease-in;
+}
+
+    .context-menu .menu-item {
+        padding: 8px 15px;
+        cursor: pointer;
+        color: #2c3e50;
+        transition: all 0.3s ease;
+    }
+
+        .context-menu .menu-item:hover {
+            background-color: #4a90e2;
+            color: #fff;
+            transform: translateX(5px);
+        }
+
+.modal.fade.show.d-block {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+/*.modal-content {
+    background: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+    animation: slideUp 0.3s ease;
+}*/
+
+.modal-header .btn-close {
+    padding: 0.5rem 0.75rem;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #7f8c8d;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 500;
+        color: #34495e;
+    }
+
+.form-control {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    box-sizing: border-box;
+}
+
+    .form-control:focus {
+        border-color: #4a90e2;
+        outline: none;
+    }
+
+.modal-footer {
+    margin-top: 20px;
+    text-align: right;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@media (max-width: 991px) {
+    .chart-container {
+        margin-left: 0;
+        width: 100%;
+        padding: 10px;
+    }
+
+    .account-grid {
+        max-height: 50vh;
+    }
+
+    .grid-row {
+        padding: 10px;
+        font-size: 0.9rem;
+    }
+
+/*    .modal-content {
+        width: 95%;
+    }*/
+}
+
+.menu-item {
+    padding: 5px 15px;
+    cursor: pointer;
+}
+
+    .menu-item:hover {
+        background-color: #f0f0f0;
+    }
+
+/* ADDED BY ZEESHAN ON 11-18-2025 */
+.table-container {
+    position: relative;
+    height: 500px; /* adjust as needed */
+    border: 1px solid #ddd;
+}
+
+.table-scroll {
+    height: 100%;
+    overflow-y: auto;
+}
+
+.close-btn {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    z-index: 10;
+    background: #0d6efd;
+    color: white;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 5px;
+    font-size: 12px;
+}
+/* theme color */
+.theme-color {
+    background-color: rgb(7, 44, 96);    
+}
+
+/* --- Win11 Context Menu Container --- */
+.win11-context-menu-container {
+    /* 1. Set the subtle blue tint and transparency using RGBA */
+    /*background: rgba(245, 248, 255, 0.95) !important;
+    background-color: rgba(245, 248, 255, 0.95) !important;*/
+    background: rgba(212, 223, 230, 0.5) !important;
+    /*background-color: rgba(212, 223, 230, 0.95) !important;*/
+    /* 2. Re-enable the Fluent blur effect */
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    /* 3. Ensure essential container styles are also using this high specificity selector */
+    border-radius: 12px !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), 0 0 0 1px #e3e3e3;
+    padding: 8px !important;
+    color: #000000;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+    font-weight: 400;
+    cursor: default;
+}
+
+/* --- Menu Items --- */
+.win11-context-menu-container .win11-menu-item {
+    display: flex !important;
+    align-items: center !important;
+    /* MOST IMPORTANT: Use precise, slightly smaller vertical padding */
+    padding: 6px 12px !important;
+    /* Reduce font size slightly for that precise Win11 look */
+    font-size: 13px !important;
+    /* Keep the small radius on the hover box */
+    border-radius: 4px !important;
+    transition: background-color 0.1s, color 0.1s; /* Faster transition */
+}
+
+.win11-context-menu-container .win11-menu-item:hover {
+    /* Use a slightly darker blue highlight color */
+    background-color: rgba(0, 103, 191, 0.15) !important;
+}
+    /* --- Icons --- */
+    .win11-context-menu-container .win11-icon {
+        /* Fixed width for perfect alignment */
+        width: 18px;
+        text-align: center;
+        /* Spacing between icon and text */
+        margin-right: 12px;
+        /* Mute the color for the standard icon look */
+        color: #606060 !important;
+    }
+
+    /* --- Dividers and Separators --- */
+    .win11-context-menu-container .win11-divider {
+        height: 1px !important;
+        background-color: #e0e0e0 !important;
+        /* Crucial: Adjust vertical margin to create separation gap */
+        margin: 6px 0 !important;
+        border: none !important;
+    }
+
+    /* --- Section Headers (If you keep them) --- */
+    /* The Win11 menu doesn't have headers. If you keep yours (OPTIONS, REPORTS), 
+   make them very subtle to blend in */
+.win11-context-menu-container .win11-section-header {
+    font-size: 10px;
+    color: #888888;
+    padding: 8px 12px 4px 12px;
+    text-transform: uppercase;
+}
+
+/* Windows 11 Acrylic Blue-Glass Style */
+
+.rz-notification-item-wrapper {
+    position: fixed !important;
+    background: rgba(212, 223, 230, 0.50) !important; /* same tint as your menu */
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    border-radius: 12px !important;
+    border: 1px solid rgba(255, 255, 255, 0.6) !important; /* subtle border */
+    padding: 14px 18px !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.10), 0 0 0 1px #e3e3e3 !important; /* same as context menu */
+
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+    font-weight: 400 !important;
+    color: #000000 !important;
+    min-width: 320px !important;
+    max-width: 430px !important;
+    display: flex !important;
+    gap: 12px !important;
+    top: 20px !important;
+    right: 20px !important;
+    z-index: 1001 !important; /* Set it to anything higher than 1000 */
+}
+
+/* Title */
+.rz-notification-title {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    color: #000 !important;
+    margin-bottom: 3px !important;
+}
+
+/* Message text */
+.rz-notification-content {
+    font-size: 13px !important;
+    color: #222 !important;
+}
+
+
+/* Close button */
+.rz-notification-close {
+    opacity: 0.45 !important;
+    cursor: pointer !important;
+    transition: opacity 0.2s ease !important;
+}
+
+.rz-notification-close:hover {
+    opacity: 0.8 !important;
+}
+
+/* Remove existing glyph */
+/* Hide the built-in Razden icon */
+.rz-notification-icon {
+    font-size: 0 !important;
+    width: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+
+/* Replace icons */
+.rzi-exclamation-triangle::before {
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    content: "\f071"; /* fa-triangle-exclamation */
+    font-size: 22px;
+    color: #ffc107 !important;
+}
+
+.rzi-check::before {
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    content: "\f058"; /* fa-circle-check */
+    font-size: 22px;
+    color: #28a745 !important; /* Standard green tone */
+}
+
+.rzi-x-circle::before {
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    content: "\f057"; /* fa-circle-xmark */
+    color: #007bff !important; /* Standard blue tone */
+}
+
+.rzi-info-circle::before {
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    content: "\f05a"; /* fa-circle-info */
+    font-size: 22px;
+    color: #007bff !important; /* Standard blue tone */
+}
+/* ERROR FIX: Target the correct Radzen class for Error (rzi-times) */
+.rzi-times::before {
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    content: "\f057"; /* fa-circle-xmark (You can also use \f00d for a simpler fa-times) */
+    font-size: 22px;
+    color: #dc3545 !important; /* Standard red tone */
+}
+
+.table-parent, .table-parent td {
+    background-color: rgba(212, 223, 230, 0.50);
+}
+
+.table-child, .table-child td {
+    background-color: white;
+}
+
+/*the following css is for BOD Meeting Table*/
+/* Prevents table headers from wrapping */
+.table-nowrap-header th {
+    white-space: nowrap !important;
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+}
+
+/* Compact row height for data-heavy grids */
+.compact-table tbody td {
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+    font-size: 0.85rem;
+}
+
+/* Ensure input boxes don't force the row to be tall */
+.compact-table .form-control-sm {
+    padding: 0px 4px;
+    height: 24px;
+    font-size: 0.85rem;
+}
+
+/* Custom light blue highlight for checked rows */
+.table-primary-light {
+    background-color: #e7f1ff !important;
+}
+
+/* Ensure the Typeahead dropdown container is higher than the sticky header */
+.blazored-typeahead__results {
+    z-index: 2000 !important; /* Higher than Bootstrap's sticky-top (1020) */
+    position: absolute;
+    background: white;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+
+/* Fix for the sticky header itself to ensure it stays below the dropdowns */
+.sticky-top {
+    z-index: 1010 !important;
+}
+
+/* Fix for the sticky footer to ensure it stays below the dropdowns */
+.sticky-bottom {
+    z-index: 1010 !important;
+}
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.15); /* Very light dimming */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.loading-card {
+    /* Much lighter: almost white, just a hint of blue */
+    background-color: #f8fbff;
+    padding: 2rem;
+    border-radius: 8px; /* Slightly sharper corners for a professional feel */
+    /* A very thin, subtle border */
+    border: 1px solid #e1e9f5;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    min-width: 280px;
+}
+
+.spinner-custom {
+    /* A professional 'Muted Blue' for the spinner */
+    color: #5d8aa8;
+}
+
+.row-animate {
+    opacity: 0;
+    animation: slideUp 0.5s ease-out forwards;
+}
+/* Subtle Green for Posted */
+.table-success-light {
+    background-color: #d1e7dd !important;
+    color: #0f5132 !important;
+}
+
+/* Subtle Orange for Under Process */
+.table-warning-light {
+    background-color: #fff3cd !important;
+    color: #664d03 !important;
+}
+/* Subtle Blue */
+.table-primary-light {
+    background-color: #cfe2ff !important;
+    color: #084298 !important;
+}
+/* Target the cells inside your custom row classes */
+.table-success-light td {
+    background-color: #d1e7dd !important;
+    color: #0f5132 !important;
+}
+
+.table-warning-light td {
+    background-color: #fff3cd !important;
+    color: #664d03 !important;
+}
+
+.table-primary-light td {
+    background-color: #cfe2ff !important;
+    color: #084298 !important;
+}
+
+/* Fix for hover state so the color doesn't disappear when mousing over */
+.table-hover tbody tr.table-success-light:hover td {
+    background-color: #c1d6cc !important;
+}
+
+.table-hover tbody tr.table-warning-light:hover td {
+    background-color: #f0e2ba !important;
+}
+
+.table-hover tbody tr.table-primary-light:hover td {
+    background-color: #bacbe6 !important;
+}
+/* Ensure badges look clean */
+.badge {
+    font-weight: 500;
+    padding: 0.5em 0.8em;
+}
+input:disabled {
+    background-color: #e9ecef; /* Light gray background */
+    cursor: not-allowed; /* Show the "forbidden" circle icon */
+    opacity: 0.6; /* Make it look faded */
+}
+
+/* ============================================================
+   CIP REPORTING SYSTEM - GLOBAL STYLES
+   ============================================================ */
+
+/* 1. Main Modal Container */
+.cip-rpt-modal-content {
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+    border: none !important;
+    border-radius: 12px !important;
+    box-shadow: 0 15px 40px rgba(0,0,0,0.3) !important;
+    overflow: hidden;
+    background-color: #ffffff;
+}
+
+/* 2. Header with Gradient */
+.cip-rpt-header {
+    background: linear-gradient(135deg, #1a5ab1 0%, #0d6efd 100%) !important;
+    color: white !important;
+    padding: 1.25rem !important;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.cip-rpt-header .modal-title {
+    font-family: 'Segoe UI', Roboto, sans-serif !important;
+    font-weight: 600 !important;
+    font-size: 1.1rem;
+    letter-spacing: 0.3px;
+    margin-bottom: 0;
+}
+
+/* 3. Date Selection Display (The Summary Box) */
+.cip-rpt-date-display {
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    padding: 15px;
+    border: 1px dashed #dee2e6;
+    margin-bottom: 20px;
+    font-family: 'Segoe UI', Roboto, sans-serif !important;
+}
+
+    .cip-rpt-date-display h3,
+    .cip-rpt-date-display h5 {
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        color: #0d6efd;
+        margin-bottom: 0;
+    }
+
+    .cip-rpt-date-display small {
+        letter-spacing: 1px;
+        opacity: 0.8;
+    }
+
+/* 4. Input Controls */
+.cip-rpt-input-custom {
+    font-family: 'Segoe UI', Roboto, sans-serif !important;
+    border: 2px solid #eaedf0 !important;
+    border-radius: 8px !important;
+    height: 45px;
+    color: #444;
+}
+
+    .cip-rpt-input-custom:focus {
+        border-color: #0d6efd !important;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15) !important;
+        outline: none;
+    }
+
+.cip-rpt-modal-content label {
+    font-family: 'Segoe UI', Roboto, sans-serif !important;
+    color: #555;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.2px;
+}
+
+/* 5. Action Buttons */
+.cip-rpt-modal-content .btn-primary {
+    font-family: 'Segoe UI', Roboto, sans-serif !important;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+    padding: 10px 24px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.cip-rpt-modal-content .btn-outline-secondary {
+    font-family: 'Segoe UI', Roboto, sans-serif !important;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* 6. Global Loading Screen Overlay */
+.cip-rpt-loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px); /* Safari support */
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Segoe UI', Roboto, sans-serif !important;
+}
+.data-flow-container {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+}
+
+.flow-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: #0d6efd; /* Bootstrap Primary Blue */
+}
+
+.flow-node i {
+    font-size: 4rem;
+}
+
+.node-label {
+    font-size: 0.7rem;
+    font-weight: 800;
+    margin-top: 10px;
+    color: #6c757d;
+    letter-spacing: 1px;
+}
+
+/* The "Pipe" connecting them */
+.flow-path {
+    width: 200px;
+    height: 3px;
+    background: #e9ecef;
+    position: relative;
+    border-radius: 4px;
+}
+
+/* Flying Binary Bits Animation */
+.data-bit {
+    position: absolute;
+    top: -15px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: #198754; /* Success Green */
+    opacity: 0;
+    animation: binaryFlow 1.8s infinite linear;
+}
+
+.d1 {
+    animation-delay: 0.4s;
+}
+
+.d2 {
+    animation-delay: 0.9s;
+}
+
+.d3 {
+    animation-delay: 1.3s;
+}
+
+@keyframes binaryFlow {
+    0% {
+        left: 0%;
+        opacity: 0;
+        transform: scale(0.8);
+    }
+
+    20% {
+        opacity: 1;
+    }
+
+    80% {
+        opacity: 1;
+    }
+
+    100% {
+        left: 100%;
+        opacity: 0;
+        transform: scale(1.1);
+    }
+}
+
+.pdf-icon-color {
+    color: #F40F02; /* Official PDF Red */
+    filter: drop-shadow(0 0 2px rgba(244, 15, 2, 0.2));
+}
+/* Make the PDF icon pulse slightly when data hits it */
+.document i {
+    animation: pulseDocument 1.8s infinite ease-in-out;
+}
+
+@keyframes pulseDocument {
+    0% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 2px rgba(244, 15, 2, 0.2));
+    }
+    /* The "Hit" - happens at the end of the binary flow */
+    90% {
+        transform: scale(1.1);
+        filter: drop-shadow(0 0 8px rgba(244, 15, 2, 0.6));
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+/* Container adjustments */
+.data-flow-container {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+/* The shorter paths between nodes */
+.flow-path-short {
+    width: 80px;
+    height: 2px;
+    background: #e9ecef;
+    position: relative;
+}
+
+/* The Spinning Gear */
+.processor i {
+    font-size: 3rem;
+    color: #6c757d;
+}
+
+/* Animation for the Output Fragments */
+.file-fragment {
+    position: absolute;
+    top: -12px;
+    font-size: 1rem;
+    color: #0d6efd;
+    opacity: 0;
+    animation: fragmentFlow 1.5s infinite linear;
+}
+
+/* Binary flow (Input side) */
+@keyframes binaryFlow {
+    0% {
+        left: 0%;
+        opacity: 0;
+    }
+
+    50% {
+        opacity: 1;
+    }
+
+    100% {
+        left: 100%;
+        opacity: 0;
+    }
+}
+
+/* Fragment flow (Output side) */
+@keyframes fragmentFlow {
+    0% {
+        left: 0%;
+        opacity: 0;
+        transform: scale(0.5) rotate(0deg);
+    }
+
+    50% {
+        opacity: 1;
+    }
+
+    100% {
+        left: 100%;
+        opacity: 0;
+        transform: scale(1) rotate(15deg);
+    }
+}
+
+/* Timing Delays */
+.d1 {
+    animation-delay: 0.7s;
+}
+
+.d2 {
+    animation-delay: 0.4s;
+}
+
+/* Slow rotation for the gear */
+.fa-spin-slow {
+    animation: fa-spin 3s infinite linear;
+}
+
+@keyframes fa-spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+.cip-rpt-loading-screen h4 {
+    font-weight: 700;
+    color: #333;
+}
+
+/* 7. Close Button Adjustments */
+.cip-rpt-close-x {
+    color: white;
+    font-size: 1.8rem;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+    transition: opacity 0.2s;
+}
+
+.cip-rpt-close-x:hover {
+    opacity: 0.7;
+}
+
+/* Trial Balance Sticky Table Styles */
+.sticky-table-container {
+    max-height: 70vh; /* Limits height so scrolling happens inside the table */
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+}
+
+/* Ensure the Header stays at the top */
+.sticky-table-container thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1020; /* Same as your existing sticky-top logic */
+    background-color: rgb(7, 44, 96) !important; /* Your theme-color */
+    color: white;
+}
+
+/* Ensure the Footer stays at the bottom */
+.sticky-table-container tfoot td {
+    position: sticky;
+    bottom: 0;
+    z-index: 1020;
+    background-color: #f8f9fa !important; /* Light gray for totals */
+    font-weight: bold;
+    border-top: 2px solid #dee2e6;
+    box-shadow: 0 -2px 5px rgba(0,0,0,0.05); /* Separates totals from scrolling rows */
+}
+
+/* Fix for borders disappearing during scroll */
+.sticky-table-container table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+}
+.btn-min-width {
+    min-width: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: center; /* Keeps icon and text centered */
+}
+.report-loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.6); /* Semi-transparent black */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999; /* Higher than sticky headers and context menus */
+    backdrop-filter: blur(4px); /* Modern blur effect */
+}
+/* Container to push buttons to bottom */
+.flex-wrapper {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 120px); /* Adjust based on your header height */
+}
+
+/* Allow table to grow and fill space */
+.table-fill {
+    flex-grow: 1;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    background-color: white;
+    min-height: 300px; /* Ensures table is visible when empty */
+}
+
+/* Force empty table to show grid lines if desired */
+.table-empty-grid {
+    min-height: 400px;
+}
+/* This is the main wrapper for the card body content */
+.report-flex-column {
+    display: flex;
+    flex-direction: column;
+    /* This calculates the height: Viewport height minus your Header and Top Nav */
+    height: calc(100vh - 160px);
+    overflow: hidden;
+}
+
+/* This tells the table container to GROW to fill all empty space */
+.report-table-grow {
+    flex: 1;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    background-color: white;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Ensures the table inside fills the container height */
+.report-table-grow table {
+    margin-bottom: 0;
+}
+
+.report-footer-pinned {
+    margin-top: auto; /* Final insurance to keep it at the bottom */
+    padding: 10px 0;
+    background: #fff;
+}
+
+/* ERP Style Modal Adjustments */
+.modal-erp .modal-content {
+    border-radius: 8px;
+    border: 2px solid #0056b3;
+}
+
+.modal-erp .modal-header {
+    background-color: #f0f0f0;
+    border-bottom: 1px solid #ccc;
+    padding: 8px 15px;
+}
+
+.modal-erp .form-label {
+    font-weight: bold;
+    font-size: 0.9rem;
+    margin-bottom: 2px;
+}
+
+.modal-erp .form-control, .modal-erp .form-select {
+    border-radius: 2px;
+    border: 1px solid #999;
+}
+
+.modal-erp .bg-light-orange {
+    background-color: #ffe5cc; /* Matching your image's Employee field */
+}
+/* Matching the orange background from your image */
+.erp-typeahead .blazored-typeahead__controls {
+    background-color: #ffe5cc !important;
+    border: 1px solid #999 !important;
+    border-radius: 2px !important;
+    min-height: 31px !important;
+}
+
+.erp-typeahead .blazored-typeahead__input {
+    background-color: transparent !important;
+    font-size: 0.9rem !important;
+}
+
+/* Ensure the results dropdown looks like a classic Windows list */
+.erp-typeahead .blazored-typeahead__results {
+    font-size: 0.9rem;
+    border: 1px solid #999;
+}
+

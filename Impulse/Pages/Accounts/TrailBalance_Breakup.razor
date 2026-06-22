@@ -1,0 +1,201 @@
+﻿@page "/accounts/trialbalancebreakup"
+
+@attribute [Authorize]
+<PageTitle>Trial Balance Breakup</PageTitle>
+
+@using System.Collections.ObjectModel
+@using Microsoft.AspNetCore.Components.Web
+@using BlazorContextMenu
+@using Microsoft.Extensions.Options
+@using DataAccessLibrary
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using CIP.Configurations
+@using DataAccessLibrary.Interface.Accounts
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+<div class="container-fluid mt-0" style="font-family: Calibri, sans-serif;">
+    <div class="card shadow-sm border-0 rounded-1 bg-transparent">
+        
+        <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color" 
+             style="position: sticky; top: 0; z-index: 1000;">
+            <h5 class="mb-0">
+                <i class="fas fa-balance-scale"></i> Trial Balance Breakup
+            </h5>
+            <div class="d-flex align-items-center gap-2">
+                @* <button class="btn btn-light btn-sm fw-semibold" @onclick="Refreshlist">
+                    <i class="fas fa-sync-alt"></i> Print Adjusted
+                </button>
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="Refreshlist">
+                    <i class="fas fa-sync-alt"></i> Print Closing
+                </button>
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="Refreshlist">
+                    <i class="fas fa-sync-alt"></i> Print Opening
+                </button>
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="Refreshlist">
+                    <i class="fas fa-sync-alt"></i> Print II
+                </button>
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="Refreshlist">
+                    <i class="fas fa-sync-alt"></i> Print
+                </button> *@
+                @* <button class="btn btn-light btn-sm fw-semibold" @onclick="Refreshlist">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button> *@
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
+                    <i class="fas fa-times"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <div class="card-body p-2">
+            
+            <div class="row g-2 mb-2 bg-light rounded-3 p-2 border" >
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold mb-0">From Date</label>
+                    <input type="date" @bind="FromDate" class="form-control form-control-sm shadow-sm" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold mb-0">To Date</label>
+                    <input type="date" @bind="ToDate" class="form-control form-control-sm shadow-sm" />
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <div class="form-check mb-1">
+                        <input class="form-check-input" type="checkbox" @bind="ShowDetail" id="chkDetail" disabled>
+                        <label class="form-check-label small fw-bold" for="chkDetail">Show Detail (Sub-Accounts)</label>
+                    </div>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <div class="form-check mb-1">
+                        <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="Refreshlist">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            @if (IsLoading)
+            {
+                <div class="progress rounded-pill mt-3" style="width: 100%">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary rounded-pill"
+                         role="progressbar" style="width: 100%">
+                        Calculating Balances...
+                    </div>
+                </div>
+
+            }
+            else if (getDBEntries?.Any() ?? false)
+            {
+                <div style="width: 100%; overflow-x: auto;">
+                    <ContextMenuProvider Id="tbContextMenu">
+                        <table class="table table-bordered table-hover align-middle mb-0"
+                               style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                            <thead class="theme-color text-center">
+                                <tr>
+                                    <th rowspan="2" style="width: 10%;">Acc No</th>
+                                    <th rowspan="2" style="width: 30%;">Account Title</th>
+                                    <th colspan="2" style="theme-color" class="">Opening Balance</th>
+                                    <th colspan="2">Transactions</th>
+                                    <th colspan="2">Closing Balance</th>
+                                    <th colspan="2">Adjustments</th>
+                                    <th colspan="2">Closing Balance</th>
+                                </tr>
+                                <tr>
+                                    <th>Debit</th>
+                                    <th>Credit</th>
+                                    <th>Debit</th>
+                                    <th>Credit</th>
+                                    <th>Debit</th>
+                                    <th>Credit</th>
+                                    <th>Debit</th>
+                                    <th>Credit</th>
+                                    <th>Debit</th>
+                                    <th>Credit</th>
+                                </tr>
+                            </thead>
+                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">
+                                <Virtualize Items="@getDBEntries" Context="row">
+                                    <ContextMenuTrigger WrapperTag="tr"
+                                                        MenuId="TBContextMenu"
+                                                        Data="row"
+                                                        MouseButtonTrigger="MouseButtonTrigger.Right"
+                                                        @key="row.AccNo"
+                                                        style="@GetRowStyle(row)">
+                                        
+                                        <td>@row.AccNo</td>
+                                        
+                                        <td style="@(row.Parent ? "font-weight:bold;" : "padding-left: 20px;")">
+                                            @row.AccTitle
+                                        </td>
+
+                                        <td class="text-end">@(row.OpeningDr == 0 ? "-" : row.OpeningDr.ToString("#,##0"))</td>
+                                        <td class="text-end">@(row.OpeningCr == 0 ? "-" : row.OpeningCr.ToString("#,##0"))</td>
+
+                                        <td class="text-end">@(row.Debit == 0 ? "-" : row.Debit.ToString("#,##0"))</td>
+                                        <td class="text-end">@(row.Credit == 0 ? "-" : row.Credit.ToString("#,##0"))</td>
+
+                                        <td class="text-end fw-bold">@(row.ClosingDr == 0 ? "-" : row.ClosingDr.ToString("#,##0"))</td>
+                                        <td class="text-end fw-bold">@(row.ClosingCr == 0 ? "-" : row.ClosingCr.ToString("#,##0"))</td>
+
+                                        <td class="text-end">@(row.AdjDr == 0 ? "-" : row.AdjDr.ToString("#,##0"))</td>
+                                        <td class="text-end">@(row.AdjCr == 0 ? "-" : row.AdjCr.ToString("#,##0"))</td>
+
+                                        <td class="text-end fw-bold">@(row.FinalClosingDr == 0 ? "-" : row.FinalClosingDr.ToString("#,##0"))</td>
+                                        <td class="text-end fw-bold">@(row.FinalClosingCr == 0 ? "-" : row.FinalClosingCr.ToString("#,##0"))</td>
+
+                                    </ContextMenuTrigger>
+                                </Virtualize>
+                            </tbody>
+                            <tfoot class="table-light fw-bold text-end" style="font-size: 9pt; border-top: 2px solid #333;">
+                                <tr>
+                                    <td colspan="2" class="text-center">TOTALS</td>
+                                    <td>@getDBEntries.Sum(x => x.OpeningDr).ToString("#,##0")</td>
+                                    <td>@getDBEntries.Sum(x => x.OpeningCr).ToString("#,##0")</td>
+                                    <td>@getDBEntries.Sum(x => x.Debit).ToString("#,##0")</td>
+                                    <td>@getDBEntries.Sum(x => x.Credit).ToString("#,##0")</td>
+                                    <td>@getDBEntries.Sum(x => x.ClosingDr).ToString("#,##0")</td>
+                                    <td>@getDBEntries.Sum(x => x.ClosingCr).ToString("#,##0")</td>
+                                    <td>@getDBEntries.Sum(x => x.AdjDr).ToString("#,##0")</td>
+                                    <td>@getDBEntries.Sum(x => x.AdjCr).ToString("#,##0")</td>
+                                    <td>@getDBEntries.Sum(x => x.FinalClosingDr).ToString("#,##0")</td>
+                                    <td>@getDBEntries.Sum(x => x.FinalClosingCr).ToString("#,##0")</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </ContextMenuProvider>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5 text-muted border mt-2 bg-light rounded">
+                    <i class="fas fa-folder-open fa-2x mb-2"></i>
+                    <p>No records found for the selected date range.</p>
+                </div>
+            }
+        </div>
+    </div>
+
+    <ContextMenu Id="TBContextMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+        <Item OnClick ="@(()=>GenerateAndSaveReport(1))">
+            <i class="fas fa-print fa-fw win11-icon"></i> Print
+        </Item>
+
+        <Item OnClick="@(() => GenerateAndSaveReport(2))">
+            <i class="fas fa-file-alt fa-fw win11-icon"></i> Print II
+        </Item>
+
+        <Item OnClick="@(() => GenerateAndSaveReport(4))">
+            <i class="fas fa-door-open fa-fw win11-icon"></i> Print Trial ( Opening )
+        </Item> 
+
+        <Item OnClick="@(() => GenerateAndSaveReport(5))">
+            <i class="fas fa-door-closed fa-fw win11-icon"></i> Print Trial ( Closing )
+        </Item>
+
+        <Item OnClick="@(() => GenerateAndSaveReport(3))">
+            <i class="fas fa-balance-scale fa-fw win11-icon"></i> Print Adjusted Trial
+        </Item>
+
+    </ContextMenu>  
+</div>

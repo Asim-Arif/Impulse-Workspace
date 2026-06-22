@@ -1,0 +1,215 @@
+﻿@page "/accounts/banklist"
+@attribute [Authorize]
+<PageTitle>Bank List</PageTitle>
+
+@using System.Collections.ObjectModel
+@using Microsoft.AspNetCore.Components.Web
+@using BlazorContextMenu
+@using Microsoft.Extensions.Options
+@using DataAccessLibrary
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using CIP.Configurations
+@using DataAccessLibrary.Interface.Accounts
+@using Microsoft.Extensions.Options
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject IChartOfAccountsDataAccess ChartOfAccountsService
+@inject Radzen.NotificationService NotificationService
+
+<RadzenNotification />
+
+<div class="container-fluid mt-0" style="font-family: Calibri, sans-serif;">
+    <div class="card shadow-sm border-0 rounded-1 bg-transparent">
+        <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color"
+             style="position: sticky; top: 0; z-index: 1000;">
+            <h5 class="mb-0"><i class="fa fa-university"></i> Banks List </h5>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="ShowAddModal">
+                    <i class="fas fa-plus"></i> Add New Bank
+                </button>
+
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
+                    <i class="fas fa-times"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <!-- TABLE START HERE -->
+            <div class="card-body p-0">
+                @if (IsLoading)
+                {
+                <div class="progress" style="width: 100%">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                            role="progressbar" style="width: 100%">
+                        Loading Data please wait...
+                    </div>
+                </div>
+                }
+            else if (BankListfromDB?.Any() ?? false)
+                {
+                <div style="width: 100%">
+                    <ContextMenuProvider Id="tableContextMenu">
+                        <table class="table table-bordered table-hover align-middle mb-0"
+                               style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                            <thead class="theme-color"
+                                    style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                                <tr>
+                                    <th>Bank Name</th>
+                                    <th>Branch</th>
+                                    <th>City</th>
+                                    <th>Account No</th>
+                                    <th>Phone No.</th>
+                                    <th>Email</th>
+                                    <th> </th>
+                                </tr>
+                            </thead>
+                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">
+                                <Virtualize Items="@BankListfromDB" Context="banks">
+                                    <ContextMenuTrigger WrapperTag="tr"
+                                                        MenuId="accountContextMenu"
+                                                        Data="banks"
+                                                        MouseButtonTrigger="MouseButtonTrigger.Right"
+                                                        CssClass="@($"key-{banks.BankID}")">
+                                        <td style="width: 25%;">@banks.Bank</td>
+                                        <td style="width: 25%;">@banks.Branch</td>
+                                        <td class="text-center" style="width: 15%;">@banks.City</td>
+                                        <td class="text-center" style="width: 10%;">@banks.BankAccNo</td>
+                                        <td class="text-center" style="width: 10%;">@banks.Phone1</td>
+                                        <td class="text-center" style="width: 10%;">@banks.Email</td>
+                                        <td style="width: 5%;">
+                                            <ContextMenuTrigger MenuId="accountContextMenu"
+                                                            Data="banks"
+                                                            MouseButtonTrigger="MouseButtonTrigger.Both">
+                                            <button class="btn btn-sm btn-primary" style="border:none; background:none;">
+                                                <i class="fa-solid fa-ellipsis-vertical" style="color:black"></i>
+                                            </button>
+                                            </ContextMenuTrigger>
+                                        </td>
+                                    </ContextMenuTrigger>
+                                </Virtualize>
+                            </tbody>
+                        </table>
+                    </ContextMenuProvider>
+                </div>
+                }
+                else
+                {
+                    <div class="text-center py-3 text-muted">No accounts found.</div>
+                }
+
+            <ContextMenu Id="accountContextMenu"  
+                         UseDefaultEventHandlers="true"
+                         Template="Win11Style">
+
+                    <Item Onclick="@Refreshlist">
+                    <i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh
+                    </Item>
+
+                    <div class="menu-divider "></div>
+                    <Seperator />
+
+                    <Item OnClick="ShowAddModal">
+                    <i class="fas fa-plus-circle fa-fw win11-icon"></i> Add New Bank
+                    </Item>
+
+                    <Item OnClick="EditSelectedBank">
+                    <i class="fas fa-edit fa-fw win11-icon"></i> Edit Selected Bank
+                    </Item>
+
+                    <Item OnClick="@(async (e) => await DeleteSelectedBank(e))">
+                    <i class="fas fa-trash-alt fa-fw win11-icon"></i> Delete Bank
+                    </Item>
+
+            </ContextMenu>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for New/Edit Bank -->
+    @if (ShowModal)
+    {
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" style="font-family: Calibri, sans-serif; display: flex; align-items: center; justify-content: center;">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                
+            <!-- Header -->
+                <div class="modal-header text-white rounded-top-4" style="background-color:rgb(7, 44, 96)">
+                    <h5 class="modal-title fw-bold d-flex align-items-center">
+                        <i class="bi bi-bank me-2"></i>
+                          Bank Profile
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="HideModal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-12 mb-2">
+                            <label class="fw-semibold">Bank Name :</label>
+                            <input class="form-control form-control-sm shadow-sm" @bind="CurrentBank.Bank" />
+                            </div>
+                            
+                            <div class="col-md-6 mb-2">
+                            <label class="fw-semibold">Branch Name :</label>
+                            <input class="form-control form-control-sm shadow-sm" @bind="CurrentBank.Branch" />
+                            </div>
+
+                            <div class="col-md-6 mb-2">
+                            <label class="fw-semibold">City :</label>
+                            <input class="form-control form-control-sm shadow-sm" @bind="CurrentBank.City" />
+                            </div>
+
+                            <div class="col-md-4 mb-2">
+                            <label class="fw-semibold">Bank Account No :</label>
+                            <input class="form-control form-control-sm shadow-sm" @bind="CurrentBank.BankAccNo" />
+                            </div>
+                            <div class="col-md-4 mb-2">
+                            <label class="fw-semibold">Phone 1 :</label>
+                            <input class="form-control form-control-sm shadow-sm" @bind="CurrentBank.Phone1" />
+                            </div>
+                            <div class="col-md-4 mb-2">
+                            <label class="fw-semibold">Phone 2 :</label>
+                            <input class="form-control form-control-sm shadow-sm" @bind="CurrentBank.Phone2" />
+                            </div>
+                            <div class="col-md-4 mb-2">
+                            <label class="fw-semibold">Fax No :</label>
+                            <input class="form-control form-control-sm shadow-sm" @bind="CurrentBank.FaxNo" />
+                            </div>
+                            <div class="col-md-4 mb-2">
+                            <label class="fw-semibold">E-Mail :</label>
+                            <input type="email" class="form-control form-control-sm shadow-sm" @bind="CurrentBank.Email" />
+                            </div>
+                            <div class="col-md-4 mb-2">
+                            <label class="fw-semibold">Manager Name :</label>
+                            <input class="form-control form-control-sm shadow-sm" @bind="CurrentBank.Manager" />
+                            </div>
+                            <div class="mb-2">
+                            <label class="fw-semibold">Remittance :</label>
+                            <input class="form-control form-control-sm shadow-sm" rows="1" @bind="CurrentBank.Remittance"></input>
+                            </div>
+                            <div class="mb-2">
+                            <label class="fw-semibold">Address :</label>
+                            <textarea class="form-control form-control-sm shadow-sm" rows="1" @bind="CurrentBank.Address"></textarea>
+                            </div>
+
+                            <div class="form-check col-md-6 mt-1">
+                                <label class="form-check-label fw-semibold">Show in CIP </label>
+                                <input type="checkbox" class="form-check-input shadow-sm" @bind="CurrentBank.ShowInCIP" />
+                            </div>
+                            <div class="form-check col-md-6">
+                                <label class="form-check-label fw-semibold">Add In Chart of Accounts</label>
+                                <input type="checkbox" class="form-check-input shadow-sm" @bind="CurrentBank.COA" />
+                            </div
+
+                        </div>
+
+                        <div class="ml-2 mt-3 text-end">
+                            <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="SaveBank">Save</button>
+                            <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="HideModal">Close</button>
+                        </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}

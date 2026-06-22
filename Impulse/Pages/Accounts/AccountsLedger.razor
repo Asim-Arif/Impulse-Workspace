@@ -1,0 +1,209 @@
+﻿@page "/accounts/accountsledger"
+@attribute [Authorize]
+<PageTitle>Accounts Ledger</PageTitle>
+
+@using System.Collections.ObjectModel
+@using Microsoft.AspNetCore.Components.Web
+@using BlazorContextMenu
+@using Microsoft.Extensions.Options
+@using DataAccessLibrary
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using CIP.Configurations
+@using DataAccessLibrary.Interface.Accounts
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+
+<div class="container-fluid mt-0 m-0 p-0" style="font-family: Calibri, sans-serif; ">    
+        
+        <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color"
+             style="position: sticky; top: 0; z-index: 1000;">
+            <h5 class="mb-0"><i class="fas fa-file-invoice"></i> Accounts Ledger </h5>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
+                <i class="fas fa-xmark me-2"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <div class="card-body p-0">
+
+            <div class="row mb-1 align-items-end">
+                <div class="col-sm-6 form-control-sm">
+                    <label for="Accounts" class="form-label fw-bold">Accounts</label>
+                    <BlazoredTypeahead SearchMethod="GetAccounts" EnableDropDown="true"
+                                       Data="AccountsList"
+                                       TValue="AccountsReportingModel"
+                                       TItem="AccountsReportingModel"
+                                       Value="SelectedAccount"
+                                       ValueChanged="SelectedResultChanged"
+                                       ValueExpression="@(() => SelectedAccount)"
+                                       Placeholder="Search By Account ..."
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="selectedhead">
+                            @selectedhead?.AccNo @selectedhead?.AccTitle
+                        </SelectedTemplate>
+                        <ResultTemplate Context="result">
+                            @result.AccNo @result.AccTitle
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-sm-2 form-control-sm">
+                    <label for="fromDate" class="fw-bold">Date From:</label>
+                    <input type="date" id="fromDate" class="form-control form-control-md" @bind="CurrentAccount.DTFrom" />
+                </div>
+
+                <div class="col-sm-2 form-control-sm">
+                    <label for="toDate" class="fw-bold">Date To:</label>
+                    <input type="date" id="toDate" class="form-control form-control-md" @bind="CurrentAccount.DTTo" />
+                </div>
+                <div class="col-sm-2 form-control-sm">
+                    <div class="col d-flex">
+                        <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="RefreshLedger">Refresh</button>
+                    </div>
+                </div>
+
+            </div>
+
+            @if (IsLoading)
+            {
+                <div class="progress" style="width: 100%">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                         role="progressbar" style="width: 100%">
+                        Loading Ledger Data...
+                    </div>
+                </div>
+            }
+            else if (LedgerDatafromDB?.Any() ?? false)
+            {
+                <div style="width: 100%">
+                    <ContextMenuProvider Id="accountsContext">
+
+                        <table class="table table-bordered table-hover align-middle mb-0" 
+                               style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+
+                            <thead class="theme-color"
+                                   style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                                <tr>
+                                    <th style="width: 10%;" class="text-center">Dated</th>
+                                    <th style="width: 10%;">Voucher</th>
+                                    <th style="width: 48%;">Description</th>
+                                    <th style="width: 10%;" class="text-end">Debit</th>
+                                    <th style="width: 10%;" class="text-end">Credit</th>
+                                    <th style="width: 10%;" class="text-end">Balance</th>
+                                    <th style="width: 2%;"> </th>
+                                </tr>
+                            </thead>
+
+                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">
+
+                                <tr >
+                                    <td class="text-center" colspan="3"> <strong>@StrOpeningMsg</strong> </td>
+                                    <td class="text-end" colspan="4"><strong>@CurrentAccount.OpeningBalance</strong></td>
+                                </tr>
+
+                                <Virtualize Items="@LedgerDatafromDB" Context="ledger">
+                                    <ContextMenuTrigger WrapperTag="tr"
+                                                        MenuId="accountContextMenu"
+                                                        Data="ledger"
+                                                        MouseButtonTrigger="MouseButtonTrigger.Right"
+                                                        CssClass="@($"key-{ledger.VchrNo}")">
+
+                                        <td>@ledger.VDate.ToString("dd-MMM-yyyy")</td>
+                                        <td>@ledger.VchrNo</td>
+                                        <td>@ledger.Description</td>
+                                        <td class="text-end">@ledger.Debit</td>
+                                        <td class="text-end">@ledger.Credit</td>
+                                        <td class="text-end">@ledger.Balance</td>
+                                        @* @{
+                                            TotalDebit =TotalDebit+ ledger.Debit;
+                                            TotalCredit =TotalCredit+ ledger.Credit;
+                                        } *@
+                                        <td>
+                                        <ContextMenuTrigger MenuId="accountContextMenu"
+                                                                Data="ledger"
+                                                                MouseButtonTrigger="MouseButtonTrigger.Both">
+                                                <button class="btn btn-sm btn-primary" style="border:none; background:none;">
+                                                    <i class="fa-solid fa-ellipsis-vertical" style="color:black"></i>
+                                                </button>
+                                            </ContextMenuTrigger>
+                                        </td>
+
+                                    </ContextMenuTrigger>
+                                </Virtualize>
+
+                                <tr>
+
+                                    <td class="text-center"> </td>
+                                    <td class="text-center"> </td>
+
+                                    <td class="text-center" >
+                                        <strong>@StrClosingMsg</strong>
+                                    </td>
+
+                                    <td class="text-end">
+                                        <strong>@TotalDebit</strong>
+                                    </td>
+
+                                    <td class="text-end">
+                                        <strong> @TotalCredit </strong>
+                                    </td>
+
+                                    <td class="text-end">
+                                        <strong>@CurrentAccount.Balance</strong>
+                                    </td>
+
+                                </tr>
+
+                            </tbody>
+
+                        </table>
+                    </ContextMenuProvider>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-3 text-muted">No ledger entries found.</div>
+            }
+
+        <!-- CONTEXT MENU -->
+        <ContextMenu Id="accountContextMenu"
+                     UseDefaultEventHandlers="true"
+                     Template="Win11Style">
+
+            <Item Onclick="@RefreshLedger">
+                <i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh
+            </Item>
+
+            <div class="menu-divider"></div>
+            <Seperator />
+
+            <Item Onclick="GoToVoucherTransaction">
+                <i class="fas fa-square-arrow-up-right fa-fw win11-icon"></i> Go To Transaction
+            </Item>
+
+            <Item OnClick="PrintVoucher">
+                <i class="fas fa-ticket fa-fw win11-icon"></i> Print Voucher
+            </Item>
+
+            <div class="menu-divider"></div>
+            <Seperator />
+            <Item OnClick="PrintLedger">
+                <i class="fas fa-book-open fa-fw win11-icon"></i> Print Ledger
+            </Item>
+            <Item Onclick="PrintLedgerWithTitle">
+                <i class="fas fa-file-invoice fa-fw win11-icon"></i> Print Ledger With Title
+            </Item>
+            <Item Onclick="PrintTransactionReport">
+                <i class="fas fa-exchange-alt fa-fw win11-icon"></i> Print Transaction Report
+            </Item>
+
+        </ContextMenu>
+      
+        </div>
+    </div>
+
+

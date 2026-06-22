@@ -1,0 +1,165 @@
+﻿@using DataAccessLibrary.Models.ReportModels
+@using DataAccessLibrary.Models.ViewModels
+@using Blazored.Typeahead
+
+@if (IsVisible)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5); z-index: 1050;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content cip-rpt-modal-content">
+                <div class="modal-header cip-rpt-header d-flex align-items-center justify-content-between">
+                    <h5 class="modal-title text-white">
+                        <i class="fa fa-filter me-2"></i>@Title
+                    </h5>
+                    <button type="button" class="btn btn-sm p-0 border-0" @onclick="Cancel">
+                        <span class="cip-rpt-close-x">&times;</span>
+                    </button>
+                </div>
+
+                <div class="modal-body p-4">
+                    <div class="mb-4">
+                        <label class="mb-1 fw-bold" style="font-size: 0.85rem;">@LabelText</label>
+                        <BlazoredTypeahead SearchMethod="SearchData" EnableDropDown="true"
+                                           Data="LocalOptions"
+                                           TValue="GenericDropDownModel"
+                                           TItem="GenericDropDownModel"
+                                           Value="SelectedOption"
+                                           ValueChanged="SelectedResultChanged_AccountHead"
+                                           ValueExpression="@(() => SelectedOption)"
+                                           Placeholder="Search Account ..."
+                                           MaximumSuggestions="1000">
+                            <SelectedTemplate Context="selectedcard">
+                                @SelectedOption?.DropDownValue_Description
+                            </SelectedTemplate>
+                            <ResultTemplate Context="result">
+                                @result.DropDownValue_Description
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="mb-1 fw-bold" style="font-size: 0.85rem;">@LabelText</label>
+                        <BlazoredTypeahead SearchMethod="SearchData_sub" EnableDropDown="true"
+                                           Data="LocalOptions_sub"
+                                           TValue="GenericDropDownModel"
+                                           TItem="GenericDropDownModel"
+                                           Value="SelectedOption_sub"
+                                           ValueChanged="SelectedResultChanged_AccountHead_sub"
+                                           ValueExpression="@(() => SelectedOption_sub)"
+                                           Placeholder="Search Account ..."
+                                           MaximumSuggestions="1000">
+                            <SelectedTemplate Context="selectedcard">
+                                @SelectedOption_sub?.DropDownValue_Description
+                            </SelectedTemplate>
+                            <ResultTemplate Context="result">
+                                @result.DropDownValue_Description
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+
+                    <div class="cip-rpt-date-display text-center mb-4">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <small class="text-uppercase text-muted fw-normal" style="font-size: 0.7rem; letter-spacing: 1px; opacity: 0.8;">From Date</small>
+                                <h5 class="text-primary mb-0">@DateFrom.ToString("dd-MMM-yyyy")</h5>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fa-solid fa-arrow-right text-muted" style="font-size: 0.8rem;"></i>
+                            </div>
+                            <div class="col">
+                                <small class="text-uppercase text-muted fw-normal" style="font-size: 0.7rem; letter-spacing: 1px; opacity: 0.8;">To Date</small>
+                                <h5 class="text-primary mb-0">@DateTo.ToString("dd-MMM-yyyy")</h5>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="mb-1 fw-bold" style="font-size: 0.85rem;">Start Date:</label>
+                            <input type="date" class="form-control cip-rpt-input-custom" @bind="DateFrom" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="mb-1 fw-bold" style="font-size: 0.85rem;">End Date:</label>
+                            <input type="date" class="form-control cip-rpt-input-custom" @bind="DateTo" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer border-0 bg-light">
+                    <button class="btn btn-outline-secondary border-0" @onclick="Cancel">Cancel</button>
+                    <button class="btn btn-primary px-4 fw-bold shadow-sm" style="border-radius: 8px;" @onclick="Submit">
+                        Generate Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Title { get; set; } = "Select Parameters";
+    [Parameter] public string LabelText { get; set; } = "Select Account:";
+
+    private bool IsVisible { get; set; }
+    private DateTime DateFrom { get; set; } = DateTime.Today.AddDays(-30);
+    private DateTime DateTo { get; set; } = DateTime.Today;
+
+    private List<GenericDropDownModel> LocalOptions { get; set; } = new();
+    private GenericDropDownModel SelectedOption { get; set; }
+
+    private List<GenericDropDownModel> LocalOptions_sub { get; set; } = new();
+    private GenericDropDownModel SelectedOption_sub { get; set; }
+
+    private TaskCompletionSource<DateRangeSingleSelectionResultSubHeads> _tcs;
+
+    public Task<DateRangeSingleSelectionResultSubHeads> Show(List<GenericDropDownModel> dataOptions, List<GenericDropDownModel> dataOptions_sub, string title = "Select Parameters")
+    {
+        LocalOptions = dataOptions;
+        LocalOptions_sub = dataOptions_sub;
+        Title = title;
+        SelectedOption = LocalOptions.FirstOrDefault();
+        SelectedOption_sub = LocalOptions_sub.FirstOrDefault();
+
+        IsVisible = true;
+        _tcs = new TaskCompletionSource<DateRangeSingleSelectionResultSubHeads>();
+        StateHasChanged();
+        return _tcs.Task;
+    }
+
+    private async Task<IEnumerable<GenericDropDownModel>> SearchData(string searchText)
+    {
+        return await Task.FromResult(LocalOptions
+            .Where(x => x.DropDownValue_Description?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)
+            .ToList());
+    }
+    private async Task SelectedResultChanged_AccountHead(GenericDropDownModel? selectedValue)
+    {
+        SelectedOption = selectedValue;
+    }
+
+    private async Task<IEnumerable<GenericDropDownModel>> SearchData_sub(string searchText)
+    {
+        return await Task.FromResult(LocalOptions_sub
+                .Where(x => x.DropDownValue_Description?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)
+                .ToList());
+    }
+    private async Task SelectedResultChanged_AccountHead_sub(GenericDropDownModel? selectedValue)
+    {
+        SelectedOption_sub = selectedValue;
+    }
+
+    private void Submit()
+    {
+        IsVisible = false;
+        // Using the new record from your DataAccessLibrary
+        _tcs.SetResult(new DateRangeSingleSelectionResultSubHeads(true, DateFrom, DateTo, SelectedOption?.DropDownValue_ID, SelectedOption_sub?.DropDownValue_ID));
+    }
+
+    private void Cancel()
+    {
+        IsVisible = false;
+        // Passing null or empty string for the value on cancel
+        _tcs.SetResult(new DateRangeSingleSelectionResultSubHeads(false, DateTime.MinValue, DateTime.MinValue, null,null));
+    }
+
+}

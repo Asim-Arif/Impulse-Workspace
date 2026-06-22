@@ -1,0 +1,181 @@
+﻿@page "/accounts/trialbalance"
+@page "/accounts/trialbalance/{TrialType:int}"
+@attribute [Authorize]
+<PageTitle>Trial Balance</PageTitle>
+
+@using System.Collections.ObjectModel
+@using Microsoft.AspNetCore.Components.Web
+@using BlazorContextMenu
+@using Microsoft.Extensions.Options
+@using DataAccessLibrary
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using DataAccessLibrary.Models.ViewModels
+@using CIP.Configurations
+@using DataAccessLibrary.Interface.Accounts
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using CIP.Pages.SelectionModals
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+
+<div class="container-fluid mt-0 m-0 p-0" style="font-family: Calibri, sans-serif; ">    
+        
+        <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color"
+             style="position: sticky; top: 0; z-index: 1000;">
+            <h5 class="mb-0"><i class="fas fa-scale-balanced"></i> Trial Balance</h5>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
+                <i class="fas fa-xmark me-2"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <div class="card-body">
+
+        <div class="row g-1 mb-1 align-items-end">
+            <div class="col-sm-7">
+                <label for="AccountHeads" class="form-label fw-bold mb-0">Account Head</label>
+                <BlazoredTypeahead SearchMethod="AccountHeadSearch" EnableDropDown="true"
+                                   Data="Banks"
+                                   TValue="GenericDropDownModel"
+                                   TItem="GenericDropDownModel"
+                                   Value="SelectedAccount"
+                                   ValueChanged="SelectedResultChanged_AccountHead"
+                                   ValueExpression="@(() => SelectedAccount)"
+                                   Placeholder="Search Bank Account ..."
+                                   MaximumSuggestions="1000"
+                                   disabled="@IsDropdownDisabled">
+                    <SelectedTemplate Context="selectedcard">
+                        @SelectedAccount?.DropDownValue_Description
+                    </SelectedTemplate>
+                    <ResultTemplate Context="result">
+                        @result.DropDownValue_Description
+                    </ResultTemplate>
+                </BlazoredTypeahead>
+            </div>                
+                <div class="col-sm-2">
+                <label for="fromDate" class="mb-0 fw-bold">From</label>
+                <input type="date" id="fromDate" class="form-control form-control-md py-2" @bind="DTFrom" />
+                </div>
+
+                <div class="col-sm-2">
+                    <label for="toDate" class="fw-bold">To</label>
+                <input type="date" id="toDate" class="form-control form-control-md" @bind="DTTo"/>
+                </div>                                
+                <div class="col-sm-1 d-flex align-items-end">
+                    <button class="btn btn-primary btn-sm w-100 text-white" style="background-color:rgb(7, 44, 96);" @onclick="RefreshList">
+                        <i class="fas fa-sync-alt me-1"></i>Refresh
+                    </button>                    
+                </div>
+            </div>
+
+            @if (IsLoading)
+            {
+                <div class="progress" style="width: 100%">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                         role="progressbar" style="width: 100%">
+                        Loading Data...
+                    </div>
+                </div>
+            }
+            else if (ListToUse?.Any() ?? false)
+            {
+            <div class="sticky-table-container">                
+                    <ContextMenuProvider Id="accountsContext">
+
+                        <table class="table table-bordered table-hover align-middle mb-0" 
+                               style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+
+                            <thead class="theme-color"
+                                   style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                                <tr>
+                                    <th style="width: 12%;">Account #</th>
+                                    <th style="width: 40%;">Account Title</th>
+                                    <th style="width: 8%;" class="text-center">Opening Bal(Dr)</th>
+                                    <th style="width: 8%;" class="text-center">Opening Bal(Cr)</th>
+                                    <th style="width: 8%;" class="text-center">Debit</th>
+                                    <th style="width: 8%;" class="text-center">Credit</th>
+                                    <th style="width: 8%;" class="text-center">Last Balance(Dr)</th>
+                                    <th style="width: 8%;" class="text-center">Last Balance(Cr)</th>                                    
+                                </tr>
+                            </thead>
+
+                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">                                
+
+                                <Virtualize Items="@ListToUse" Context="row">
+                                    <ContextMenuTrigger WrapperTag="tr"
+                                                    MenuId="accountContextMenu"
+                                                    Data="row"
+                                                    MouseButtonTrigger="MouseButtonTrigger.Right"
+                                                    CssClass="@($"{row.RowClass} key-{row.AccNo}")">
+                                                                            
+                                    <td>@row.AccNo</td>
+                                    <td>@row.AccTitle</td>                                    
+                                    <td class="text-end">@row.Opening_Debit.ToString("N0")</td>
+                                    <td class="text-end">@row.Opening_Credit.ToString("N0")</td>
+                                    <td class="text-end">@row.Debit.ToString("N0")</td>
+                                    <td class="text-end">@row.Credit.ToString("N0")</td>
+                                    <td class="text-end">@row.Balance_Debit.ToString("N0")</td>
+                                    <td class="text-end">@row.Balance_Credit.ToString("N0")</td>
+                                    </ContextMenuTrigger>
+                                </Virtualize>
+
+                            </tbody>
+                            <tfoot class="bg-light fw-bold" style="position: sticky; bottom: 0; z-index: 10; background-color: #f8f9fa !important; border-top: 2px solid #dee2e6;">
+                                <tr>
+                                    <td colspan="2" class="text-center">TOTALS</td>
+                                    <td class="text-end">@TotalOpeningDr.ToString("N0")</td>
+                                    <td class="text-end">@TotalOpeningCr.ToString("N0")</td>
+                                    <td class="text-end">@TotalDebit.ToString("N0")</td>
+                                    <td class="text-end">@TotalCredit.ToString("N0")</td>
+                                    <td class="text-end">@TotalBalanceDr.ToString("N0")</td>
+                                    <td class="text-end">@TotalBalanceCr.ToString("N0")</td>                                    
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </ContextMenuProvider>
+                </div>
+                <div class="d-flex justify-content-end gap-2 mt-3 border-top pt-3">
+                <button class="btn btn-outline-success btn-sm px-3 btn-min-width" @onclick="PrintTrialBalanceReport">
+                        <i class="fas fa-print me-1"></i> Print with Closing Balance
+                    </button>
+
+                <button class="btn btn-outline-success btn-sm px-3 btn-min-width" @onclick="PrintTrialBalanceReport">
+                        <i class="fas fa-print me-1"></i> Print with Op. Balance
+                    </button>
+
+                <button class="btn btn-outline-success btn-sm px-3 btn-min-width" @onclick="PrintTrialBalanceReport">
+                        <i class="fas fa-print me-1"></i> Print II
+                    </button>
+
+                    <button class="btn btn-outline-success btn-sm px-3 btn-min-width" @onclick="PrintTrialBalanceReport">
+                            <i class="fas fa-print me-1"></i> Print
+                        </button>
+                    </div>
+            }
+            else
+            {
+                <div class="text-center py-3 text-muted">No entries found.</div>
+            }
+
+        <!-- CONTEXT MENU -->
+        <ContextMenu Id="accountContextMenu"
+                     UseDefaultEventHandlers="true"
+                     Template="Win11Style">
+
+            <Item Onclick="@RefreshList">
+                <i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh
+            </Item>
+
+            <div class="menu-divider"></div>
+            <Seperator />
+
+            <Item Onclick="PrintTrialBalanceReport">
+                <i class="fas fa-square-arrow-up-right fa-fw win11-icon"></i> Print Report
+            </Item>            
+
+        </ContextMenu>
+                
+    </div>
+</div>
+

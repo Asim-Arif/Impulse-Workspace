@@ -1,0 +1,446 @@
+﻿@page "/accounts/definesubheads"
+@attribute [Authorize]
+<PageTitle>Define Sub Heads</PageTitle>
+
+@using System.Collections.ObjectModel
+@using Microsoft.AspNetCore.Components.Web
+@using BlazorContextMenu
+@using Microsoft.Extensions.Options
+@using DataAccessLibrary
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using CIP.Configurations
+@using DataAccessLibrary.Interface.Accounts
+@using Microsoft.Extensions.Options
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject IFinancialStatementDataAccess FinancialStatementServices
+@inject Radzen.NotificationService NotificationService
+
+<RadzenNotification />
+
+<div class="container-fluid mt-0" style="font-family: Calibri, sans-serif;">
+    <div class="card shadow-sm border-0 rounded-1 bg-transparent">
+        <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color"
+             style="position: sticky; top: 0; z-index: 1000;">
+            <h5 class="mb-0"><i class="fas fa-sitemap"></i> Financial Statement Sub Heads </h5>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="ShowAddModal">
+                    <i class="fas fa-plus"></i> Add New Sub Head
+                </button>
+
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
+                    <i class="fas fa-times"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <!-- TABLE START HERE -->
+            <div class="card-body p-0">
+                @if (IsLoading)
+            {
+                <div class="progress rounded-pill" style="width: 100%">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary rounded-pill"
+                         role="progressbar" style="width: 100%">
+                        Please Wait While Loading Data ...
+                    </div>
+                </div>
+            }
+            else if (getDBEntries?.Any() ?? false)
+                {
+                <div style="width: 100%">
+                    <ContextMenuProvider Id="tableContextMenu">
+                        <table class="table table-bordered table-hover align-middle mb-0"
+                               style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                            <thead class="theme-color"
+                                    style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                                <tr>
+                                    <th>Group Name</th>
+                                    <th>Main Group</th>
+                                    <th>Note No</th>
+                                    <th>Description</th>
+                                    <th>Show Sub Heads</th>
+                                    <th class="text-center"> <i class="fas fa-bolt"></i> </th>
+                                </tr>
+                            </thead>
+                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">
+                                <Virtualize Items="@getDBEntries" Context="heads">
+                                    <ContextMenuTrigger WrapperTag="tr"
+                                                        MenuId="MainContextMenu"
+                                                        Data="heads"
+                                                        MouseButtonTrigger="MouseButtonTrigger.Right"
+                                                        CssClass="@($"key-{heads.EntryID}")">
+                                        <td style="width: 20%;">@heads.GroupName</td>
+                                        <td style="width: 20%;">@heads.MainGroupName - Note No. @heads.SortNo</td>
+                                        <td style="width: 10%;">@heads.Notes</td>
+                                        <td style="width: 40%;">@heads.SubDesc</td>
+                                        @if (heads.bShowSubHeadDetail_NTA)
+                                        {
+                                            <td class="text-Center text-danger fw-semibold" style="width: 5%;">Yes</td>
+                                        }
+                                        else
+                                        {
+                                            <td class="text-Center text-success fw-semibold" style="width: 5%;"> No </td>
+                                        }
+                                        <td style="swidth: 5%;">
+                                            <ContextMenuTrigger 
+                                                            MenuId="MainContextMenu"
+                                                            Data="heads"
+                                                            MouseButtonTrigger="MouseButtonTrigger.Both">
+                                            <button class="btn btn-sm btn-primary" style="border:none; background:none;">
+                                                <i class="fa-solid fa-ellipsis-vertical" style="color:black"></i>
+                                            </button>
+                                            </ContextMenuTrigger>
+                                        </td>
+                                    </ContextMenuTrigger>
+                                </Virtualize>
+                            </tbody>
+                        </table>
+                    </ContextMenuProvider>
+                </div>
+                }
+                else
+                {
+                    <div class="text-center py-3 text-muted">No Data found.</div>
+                }
+
+            <ContextMenu Id="MainContextMenu"  
+                         UseDefaultEventHandlers="true"
+                         Template="Win11Style"
+                         Context="itemContext">
+
+                    @{
+                    var selected = itemContext.Data as SubHeadsModel;
+                        SelectedHead = selected;
+                    }
+
+                    <Item Onclick="@Refreshlist">
+                        <i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh
+                    </Item>
+
+                    <div class="menu-divider "></div>
+                    <Seperator />
+
+                    <Item OnClick="ShowAddModal">
+                        <i class="fas fa-plus-circle fa-fw win11-icon"></i> Add New Head
+                    </Item>
+
+                    <Item OnClick="EditSelected">
+                        <i class="fas fa-edit fa-fw win11-icon"></i> Edit Selected Head
+                    </Item>
+
+                    <Item OnClick="@(async (e) => await DeleteSelected(e))">
+                        <i class="fas fa-trash-alt fa-fw win11-icon"></i> Delete Selected Head
+                    </Item>
+
+                    <div class="menu-divider "></div>
+                    <Seperator />
+
+                    <Item OnClick=" ()=>SaveHead(SelectedHead.bShowSubHeadDetail_NTA ? 2:1)">
+                        <i class="fa-solid fa-circle-info fa-fw win11-icon"></i> Show Head Detail
+                    </Item>
+
+                    <div class="menu-divider "></div>
+                    <Seperator />
+
+                    <Item OnClick="ShowAddDetailModel">
+                        <i class="fa-solid fa-asterisk fa-fw win11-icon"></i> Add Heads for Detail
+                    </Item>
+            </ContextMenu>
+            </div>
+        </div>
+    </div>
+
+@if (ShowModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog"
+         style="font-family: Calibri, sans-serif; display: flex; align-items: center; justify-content: center;">
+
+        <div class="modal-dialog modal-xl" role="document">
+            <div class="modal-content">
+
+            <div class="modal-header text-white rounded-top-4" style="background-color:rgb(7, 44, 96)">
+                <h5 class="modal-title fw-bold d-flex align-items-center">
+                    <i class="bi bi-bank me-2"></i>
+                    Add new Sub Head
+                </h5>
+                <div class="ms-auto d-flex gap-2 align-items-center">
+                    <button class="btn btn-light btn-sm fw-semibold" @onclick="HideModal">
+                        <i class="fas fa-xmark me-2"></i>
+                        Close
+                    </button>
+                </div>
+            </div>
+
+            <div class="modal-body">
+                <div class="row">
+                       @* @if (IsEdit=false)
+                       { *@
+                        <div class="col-sm-12">
+                            <label class="fw-semibold">Group Name :</label>
+                            <BlazoredTypeahead SearchMethod="SearchGetMainHeads"
+                                               EnableDropDown="true"
+                                               Data="MainHeads"
+                                               TValue="SubHeadsModel"
+                                               TItem="SubHeadsModel"
+                                               Value="SelectedMainHead"
+                                               ValueChanged="SelectedResultChanged_MainHead"
+                                               ValueExpression="@(() => SelectedMainHead)"
+                                               Placeholder="Select Head"
+                                               MaximumSuggestions="1000"
+                                               Disabled="@IsEdit"
+                                               ControlClass="form-control-sm shadow-sm">
+
+                                <SelectedTemplate Context="selectedhead">
+                                    @SelectedMainHead?.MainGroupName
+                                </SelectedTemplate>
+                                <ResultTemplate Context="result">
+                                    @result.MainGroupName
+                                </ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+                        @* } *@
+                    <div class="col-md-8 mb-2">
+                        <label class="fw-semibold">Group Name :</label>
+                        <input class="form-control form-control-sm shadow-sm" @bind="CurrentHead.GroupName" />
+                    </div>
+                            
+                    <div class="col-md-4 mb-2">
+                        <label class="fw-semibold">Note No :</label>
+                        <input class="form-control form-control-sm shadow-sm" @bind="CurrentHead.Notes" />
+                    </div>
+
+                    <div class="col-md-12 mb-2">
+                        <label class="fw-semibold">Description :</label>
+                        <textarea class="form-control form-control-sm shadow-sm" rows="2" @bind="CurrentHead.SubDesc"></textarea>
+                    </div>
+                </div>
+
+                <div class="ml-2 mt-3 text-end">
+                    <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="()=>SaveHead(0)">Save</button>
+                    <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="HideModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+}
+@if (bShowAddDetailModel)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog"
+         style="z-index: 1040; font-family: Calibri, sans-serif; display: flex; align-items: center; justify-content: center;">
+
+        <div class="modal-dialog modal-xl" role="document">
+            <div class="modal-content">
+
+                <div class="modal-header text-white rounded-top-4" style="background-color:rgb(7, 44, 96)">
+                    <h5 class="modal-title fw-bold d-flex align-items-center">
+                        <i class="bi bi-bank me-2"></i>
+                        Add Sub Groups Heads Details For @(SelectedHead?.GroupName ?? "")
+                    </h5>
+                    <div class="ms-auto d-flex gap-2 align-items-center">
+                        <button class="btn btn-light btn-sm fw-semibold" @onclick="HideAddDetailModal">
+                            <i class="fas fa-xmark me-2"></i>
+                            Close
+                        </button>
+                    </div>
+                </div>
+
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-sm-12">
+                            <label class="fw-semibold">Accounts:</label>
+                            <BlazoredTypeahead SearchMethod="SearchSelectedAccount"
+                                               EnableDropDown="true"
+                                               Data="Accounts"
+                                               TValue="ChartOfAccountsModel"
+                                               TItem="ChartOfAccountsModel"
+                                               Value="SelectedAccount"
+                                               ValueChanged="SelectedResultChanged_Accounts"
+                                               ValueExpression="@(() => SelectedAccount)"
+                                               Placeholder="Select Head"
+                                               MaximumSuggestions="1000"
+                                               Disabled="@IsEditSub">
+
+                                <SelectedTemplate Context="selectedhead">
+                                    @SelectedAccount?.AccNo @SelectedAccount?.AccTitle
+                                </SelectedTemplate>
+                                <ResultTemplate Context="result">
+                                    @result.AccNo @result.AccTitle
+                                </ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+
+                        <div class="col-md-2 mb-2">
+                            <label class="fw-semibold">Note No :</label>
+                            <input class="form-control form-control-sm shadow-sm" @bind="SelectedSubHead.NoteNo" />
+                        </div>
+
+                        <div class="col-md-10 mb-2">
+                            <label class="fw-semibold">Description :</label>
+                            <textarea class="form-control form-control-sm shadow-sm" rows="2" @bind="SelectedSubHead.Description"></textarea>
+                        </div>
+
+                    </div>
+
+                    <div class="ml-2 mt-3 text-end">
+                        <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="SaveSubHeadEntry">Save</button>
+                        <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="HideAddDetailModal">Close</button>
+                    </div>
+
+        <!-- TABLE START HERE -->
+            <div class="card-body p-2">
+               @if (IsLoadingDetail)
+                {
+                <div class="progress rounded-pill" style="width: 100%">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary rounded-pill"
+                            role="progressbar" style="width: 100%">
+                        Please Wait While Loading Data ...
+                    </div>
+                </div>
+                }
+                else if (getDBEntries_accounthead?.Any() ?? false)
+                {
+                <div style="width: 100%">
+                    <ContextMenuProvider Id="tableContextMenu">
+                        <table class="table table-bordered table-hover align-middle mb-0"
+                                style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                            <thead class="theme-color"
+                                    style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                                <tr>
+                                    <th>Group Name</th>
+                                    <th>Main Group</th>
+                                    <th>Note No</th>
+                                    <th>Description</th>
+                                    <th>Show Sub Heads</th>
+                                    <th> </th>
+                                </tr>
+                            </thead>
+                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">
+                                    <Virtualize Items="@getDBEntries_accounthead" Context="headsdetail">
+                                    <ContextMenuTrigger WrapperTag="tr"
+                                            MenuId="subheadsContextMenu"
+                                            Data="headsdetail"
+                                            MouseButtonTrigger="MouseButtonTrigger.Right"
+                                            CssClass="@($"key-{headsdetail.EntryID}")">
+                                        <td style="width: 20%;">@headsdetail.GroupName</td>
+                                        <td style="width: 20%;">{ @headsdetail.AccNo } @headsdetail.AccTitle</td>
+                                        <td style="width: 10%;">@headsdetail.NoteNo</td>
+                                        <td style="width: 40%;">@headsdetail.Description</td>
+                                        @if (headsdetail.Marked)
+                                        {
+                                            <td class="text-Center text-danger fw-semibold" style="width: 5%;">Marked</td>
+                                        }
+                                        else
+                                        {
+                                            <td class="text-Center text-success fw-semibold" style="width: 5%;">Unmarked</td>
+                                        }
+                                        <td style="swidth: 5%;">
+                                            <ContextMenuTrigger 
+                                                            MenuId="subheadsContextMenu"
+                                                            Data="headsdetail"
+                                                            MouseButtonTrigger="MouseButtonTrigger.Both">
+                                            <button class="btn btn-sm btn-primary" style="border:none; background:none;">
+                                                <i class="fa-solid fa-ellipsis-vertical" style="color:black"></i>
+                                            </button>
+                                            </ContextMenuTrigger>
+                                        </td>
+                                    </ContextMenuTrigger>
+                                </Virtualize>
+                            </tbody>
+                        </table>
+                    </ContextMenuProvider>
+                </div>
+                }
+                else
+                {
+                    <div class="text-center py-3 text-muted">No Data found.</div>
+                }
+            </div>
+
+                    <ContextMenu Id="subheadsContextMenu"  
+                            UseDefaultEventHandlers="true"
+                            Template="Win11Style"
+                            Context="itemContext">
+
+                            @{
+                                var selected = itemContext.Data as SubHeadAccountDetailModel;
+                                CurrentSubHead = selected;
+                            }
+
+                        <Item Onclick="@RefreshSubHeadsAccountslist">
+                            <i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh
+                        </Item>
+
+                        <div class="menu-divider "></div>
+                        <Seperator />
+
+                        @if (CurrentSubHead.Marked)
+                        {
+                            <Item OnClick="@((e) => ChangeMarkStatus(1, e))">
+                                <i class="fas fa-edit fa-fw win11-icon"></i> Unmark
+                            </Item>
+                        }
+                        else
+                        {
+                            <Item OnClick="@((e) => ChangeMarkStatus(2, e))">
+                                <i class="fas fa-edit fa-fw win11-icon"></i> Mark
+                            </Item>
+                        }
+
+                        <div class="menu-divider "></div>
+                        <Seperator />
+
+                        <Item OnClick="EditSelectedSubHeadEntry">
+                            <i class="fas fa-edit fa-fw win11-icon"></i> Edit Selected Sub Head Entry
+                        </Item>
+
+                        <Item OnClick="@(async (e) => await DeleteSelectedSubHeadEntry(e))">
+                            <i class="fas fa-trash-alt fa-fw win11-icon"></i> Delete Selected Sub Head Entry
+                        </Item>
+                        
+                    </ContextMenu>
+
+            </div>
+        </div>
+    </div>
+</div>
+}
+<!-- CANCEL ENTRY -->
+@if (IsEditSub)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" style="z-index: 1060; font-family: Calibri, sans-serif; display: flex; align-items: center; justify-content: center;">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <!-- Header -->
+                <div class="modal-header text-white rounded-top-4" style="background-color:rgb(7, 44, 96)">
+                    <h5 class="modal-title fw-bold d-flex align-items-center">
+                        <i class="bi bi-bank me-2"></i>
+                        Edit Sub Head Account Entry
+                    </h5>
+                </div>
+
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-12 mb-2">
+                            <label class="fw-semibold">Description</label>
+                            <textarea class="form-control shadow-sm" rows="1" @bind="CurrentSubHead.Description"></textarea>
+                        </div>
+                        <div class="col-md-12 mb-2">
+                            <label class="fw-semibold">Note No :</label>
+                            <input class="form-control form-control-sm shadow-sm" rows="1" @bind="CurrentSubHead.NoteNo"></input>
+                        </div>
+                    </div>
+
+                    <div class="ml-2 mt-3 text-end">
+                        <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="SaveSubHeadEntry">Save</button>
+                        <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="HideSubHeadEntryModel">Close</button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+}

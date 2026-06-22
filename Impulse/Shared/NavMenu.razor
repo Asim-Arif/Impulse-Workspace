@@ -1,0 +1,407 @@
+﻿@using CIP.Services
+@inject IJSRuntime JSRuntime
+@inject IReportManagerService ReportManager
+
+<div class="sidebar @(IsSidebarCollapsed ? "collapsed" : "")">
+    <div class="sidebar-header p-3 bg-transparent">
+        <a class="navbar-brand fw-bold" href="">
+            <strong>SIAL ERP</strong>
+        </a>
+        @* <button class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button> *@
+    </div>
+    <nav class="nav flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="setup">
+                <i class="fas fa-cog me-2"></i> Setups
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="/">
+                <i class="fas fa-plane me-2"></i> CIP
+            </NavLink>
+        </div>
+        <div class="nav-item px-2">
+            <div class="nav-section-header" @onclick="ToggleFinancial">
+                <i class="fas fa-chart-line me-2"></i>
+                <span>Financial</span>
+                <i class="fas fa-chevron-down ms-auto @(isFinancialExpanded ? "rotated" : "")"></i>
+            </div>
+            @if (isFinancialExpanded)
+            {
+                <div class="nav-sub-section">
+                    <div class="nav-sub-item px-3">
+                        <div class="nav-sub-header" @onclick="ToggleAccountSetup">
+                            <i class="fas fa-screwdriver-wrench me-2"></i>
+                            <span>Account Setup</span>
+                            <i class="fas fa-chevron-down ms-auto @(isAccountSetupExpanded ? "rotated" : "")"></i>
+                        </div>
+                        @if (isAccountSetupExpanded)
+                        {
+                            <div class="nav-sub-links px-2">
+                                <NavLink class="nav-link" href="/accounts/chartofaccounts">
+                                    <i class="fas fa-file-invoice me-2"></i> Chart of Accounts
+                                </NavLink>
+                            </div>
+                        }
+                    </div>
+@* BANK OPTIONS *@
+                    <div class="nav-sub-item px-4">
+                        <div class="nav-sub-header" @onclick="ToggleBanks">
+                            <i class="fas fa-user-tie me-2"></i>
+                            <span>Bank Setup</span>
+                            <i class="fas fa-chevron-down ms-auto @(isBankSetupExpanded ? "rotated" : "")"></i>
+                        </div>
+                        @if (isBankSetupExpanded)
+                        {
+                            <div class="nav-sub-links px-3">
+                                <NavLink class="nav-link" href="/accounts/banklist">
+                                    <i class="fa fa-university me-2"></i> Bank List
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/chqbookdetail">
+                                    <i class="fa fa-money-check-alt me-2"></i> Bank & Chq Book Detail
+                                </NavLink>
+                            </div>
+                        }
+                    </div>
+                    <div class="nav-sub-item px-4">
+                        <div class="nav-sub-header" @onclick="ToggleVouchers">
+                            <i class="fas fa-file-alt me-2" ></i>
+                            <span>Vouchers</span>
+                            <i class="fas fa-chevron-down ms-auto @(isVouchersExpanded ? "rotated" : "")"></i>
+                        </div>
+                        @if (isVouchersExpanded)
+                        {
+                            <div class="nav-sub-links px-2">
+                                <NavLink class="nav-link" href="/accounts/cashpaymentvoucher">
+                                    <i class="fas fa-money-check-dollar me-2"></i> Cash Payment
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/bankpaymentvoucher">
+                                    <i class="fas fa-money-check me-2"></i> Bank Payment
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/cashreceiptvoucher">
+                                    <i class="fas fa-file-invoice-dollar me-2"></i> Cash Receipt
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/bankreceiptvoucher">
+                                    <i class="fas fa-receipt me-2"></i> Bank Receipt
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/journalvoucher">
+                                    <i class="fas fa-book me-2"></i> Journal Voucher
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/bodmeetingpayment">
+                                    <i class="fas fa-chalkboard-user me-2"></i> BOD Payment
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/bodmeetingpaymentlist">
+                                    <i class="fas fa-list me-2"></i> BOD Payment List
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/onlinepaymentvoucher">
+                                    <i class="fas fa-money-bill-trend-up me-2"></i> Online Payment
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/onlinepaymentvoucherlist">
+                                    <i class="fas fa-list me-2"></i> Online Payment List
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/onlinetitlesearch">
+                                    <i class="fas fa-magnifying-glass me-2"></i> Title Search
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/voucherslist">
+                                    <i class="fas fa-list me-2"></i> Vouchers List
+                                </NavLink>
+                            </div>
+                        }
+                    </div>
+
+@* Reports *@
+                    <div class="nav-sub-item px-4">
+                        <div class="nav-sub-header" @onclick="ToggleReports">
+                            <i class="fas fa-user-tie me-2"></i>
+                            <span>Reports</span>
+                            <i class="fas fa-chevron-down ms-auto @(isBankSetupExpanded ? "rotated" : "")"></i>
+                        </div>
+                        @if (isReportsExpanded)
+                        {
+                            <div class="nav-sub-links px-3">
+                                <NavLink class="nav-link" href="/accounts/accountsledger">
+                                    <i class="fas fa-list me-2"></i> Accounts Ledgder
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/transactionregister">
+                                    <i class="fas fa-list me-2"></i> Transaction Register
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/trialbalance">
+                                    <i class="fas fa-scale-balanced me-2"></i> Trial Balance
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/bankbalancestatement">
+                                    <i class="fas fa-piggy-bank me-2"></i> Bank Balance Statement
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/cashbookreport">
+                                    <i class="fas fa-Rupee-sign me-2"></i> Cash Book Report
+                                </NavLink>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal" @onclick='() => ReportManager.RequestReport("vouchers-deleted")'>
+                                    <span class="fas fa-equals me-2"></span> Monthly Comparison
+                                </button>
+                                <NavLink class="nav-link" href="/accounts/chequereceiving">
+                                    <i class="fas fa-file-lines me-2"></i> Cheque Receiving
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/importanttasks">
+                                    <i class="fas fa-file-lines me-2"></i> Important Tasks
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/billsreceived">
+                                    <i class="fas fa-file-lines me-2"></i> Bills Received
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/ntncnicnos">
+                                    <i class="fas fa-file-lines me-2"></i> NTN/CNIC Nos.
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/lettersdispatchregister">
+                                    <i class="fas fa-file-lines me-2"></i> Letter Dispatch Register
+                                </NavLink>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal" @onclick='() => ReportManager.RequestReport("vouchers-deleted")'>
+                                    <span class="fas fa-trash me-2"></span> Edit Vouchers
+                                </button>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal" @onclick='() => ReportManager.RequestReport("cost_center_report")'>
+                                    <span class="fas fa-cubes-stacked me-2"></span> Cost Center Report
+                                </button>
+                                <NavLink class="nav-link" href="/accounts/chequelist">
+                                    <i class="fas fa-list me-2"></i> Cheque List
+                                </NavLink>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal" @onclick='() => ReportManager.RequestReport("accounts-breakup")'>
+                                    <span class="fas fa-object-ungroup me-2"></span> Accounts Break-up
+                                </button>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal" @onclick='() => ReportManager.RequestReport("printed-cheque-history")'>
+                                    <span class="fas fa-timeline me-2"></span> Printed Cheque History
+                                </button>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal" @onclick='() => ReportManager.RequestReport("payable-w.h-tax-report")'>
+                                    <span class="fas fa-file-lines me-2"></span> Payable W.H Tax Report
+                                </button>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal" @onclick='() => ReportManager.RequestReport("car-parking",
+                                                                                                                                                                                                     new Dictionary<string, object> { { "iType", 1 }, { "withInfant", false } })'>
+                                    <span class="fas fa-square-parking me-2"></span> Parking Daily Report (W.I)
+                                </button>
+
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal" @onclick='() => ReportManager.RequestReport("car-parking",
+                                                                                                                                                                                                     new Dictionary<string, object> { { "iType", 2 }, { "withInfant", false } })'>
+                                    <span class="fas fa-square-parking me-2"></span> Parking Monthly Report (W.I)
+                                </button>
+
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal" @onclick='() => ReportManager.RequestReport("car-parking",
+                                                                                                                                                                                                     new Dictionary<string, object> { { "iType", 3 }, { "withInfant", false } })'>
+                                    <span class="fas fa-square-parking me-2"></span> Parking Yearly Report (W.I)
+                                </button>
+
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal" @onclick='() => ReportManager.RequestReport("car-parking",
+                                                                                                                                                                                                     new Dictionary<string, object> { { "iType", 1 }, { "withInfant", true } })'>
+                                    <span class="fas fa-square-parking me-2"></span> Parking Daily Report (W.O.I)
+                                </button>
+
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal" @onclick='() => ReportManager.RequestReport("car-parking",
+                                                                                                                                                                                                     new Dictionary<string, object> { { "iType", 2 }, { "withInfant", true } })'>
+                                    <span class="fas fa-square-parking me-2"></span> Parking Monthly Report (W.O.I)
+                                </button>
+
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal" @onclick='() => ReportManager.RequestReport("car-parking",
+                                                                                                                                                                                                     new Dictionary<string, object> { { "iType", 3 }, { "withInfant", true } })'>
+                                    <span class="fas fa-square-parking me-2"></span> Parking Yearly Report (W.O.I)
+                                </button>
+
+                                <NavLink class="nav-link" href="/accounts/trialbalance/1">
+                                    <i class="fas fa-scale-balanced me-2"></i> Trial Balance (Suppliers)
+                                </NavLink>
+
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal" @onclick='() => ReportManager.RequestReport("tax-reports",
+                                                                                                                                                                                                         new Dictionary<string, object> { { "iType", 1 } })'>
+                                    <span class="fas fa-clipboard-list me-2"></span> Below Tax Limit Report
+                                </button>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal" @onclick='() => ReportManager.RequestReport("tax-reports",
+                                                                                                                                                                                                         new Dictionary<string, object> { { "iType", 2 } })'>
+                                    <span class="fas fa-clipboard-list me-2"></span> Tax Deduction Report
+                                </button>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal" @onclick='() => ReportManager.RequestReport("tax-reports",
+                                                                                                                                                                                                         new Dictionary<string, object> { { "iType", 3 } })'>
+                                    <span class="fas fa-clipboard-list me-2"></span> Tax Exempted Report
+                                </button>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal" @onclick='() => ReportManager.RequestReport("tax-reports",
+                                                                                                                                                                                                         new Dictionary<string, object> { { "iType", 4 } })'>
+                                    <span class="fas fa-clipboard-list me-2"></span> Tax Not Applicable Report
+                                </button>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal" @onclick='() => ReportManager.RequestReport("tax-reports",
+                                                                                                                                                                                                         new Dictionary<string, object> { { "iType", 5 } })'>
+                                    <span class="fas fa-clipboard-list me-2"></span> Tax Report (Headwise)
+                                </button>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal" @onclick='() => ReportManager.RequestReport("aging-report")'>
+                                    <span class="fa-regular fa-newspaper me-2"></span> Aging Report
+                                </button>
+                            </div>
+                    }
+                    </div>
+
+                    @* Financial Statments *@
+                    <div class="nav-sub-item px-4">
+                        <div class="nav-sub-header" @onclick="ToggleStatements">
+                            <i class="fa-solid fa-coins"></i>
+                            <span>Financial Statements</span>
+                            <i class="fas fa-chevron-down ms-auto @(isStatementsExpanded ? "rotated" : "")"></i>
+                        </div>
+                        @if (isStatementsExpanded)
+                        {
+                            <div class="nav-sub-links px-3">
+                                <NavLink class="nav-link" href="/accounts/definemainheads">
+                                    <i class="fas fa-sitemap me-2"></i> Define Main Heads
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/definesubheads">
+                                    <i class="fas fa-project-diagram me-2"></i> Define Sub Heads
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/groupsaccounts">
+                                    <i class="fas fa-project-diagram me-2"></i> Groups Accounts
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/breakupchart">
+                                    <i class="fas fa-chart-pie me-2"></i> Breakup Chart
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/adjustmentvoucher">
+                                    <i class="fas fa-sliders-h me-2"></i> Adjustment Entry
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/transactionregister_adjustment">
+                                    <i class="fas fa-book me-2"></i> Transaction Register (Adjustment With Edit etc.)
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/trialbalancebreakup">
+                                    <i class="fas fa-balance-scale me-2"></i> Trail Balance (Breakup)
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/accountsheadmanualentry">
+                                    <i class="fas fa-keyboard me-2"></i> Accounts Heads Manual Entry
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/accountsheadmanualentry_sharecapital">
+                                    <i class="fas fa-coins me-2"></i> Share Capitcal Entry
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/remunerationandotherbenefits">
+                                    <i class="fas fa-money-check-alt me-2"></i> Remuneration and Other Benefits Entry
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/subheadsmanualentry">
+                                    <i class="fas fa-sticky-note me-2"></i> Sub Heads Manual Entry
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/manualentryfornotes">
+                                    <i class="fas fa-list me-2"></i> Manual Entry For Accounts Notes
+                                </NavLink>
+
+                                <NavLink class="nav-link" href="/accounts/balancesheetheads">
+                                    <i class="fas fa-layer-group me-2"></i> Balance Sheet Heads
+                                </NavLink>
+                                @* <NavLink class="nav-link" href="accounts/financialstatementreports"> *@
+                                @* <NavLink class="nav-link" href="">
+                                    <i class="fas fa-file-invoice-dollar me-2"></i> Balance Sheet
+                                </NavLink> *@
+
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal"
+                                        @onclick='() => ReportManager.RequestReport("balance-sheet")'>
+                                    <span class="fas fa-file-contract me-2"></span> Balance Sheet
+                                </button>
+
+                                <NavLink class="nav-link" href="/accounts/profitandlossheads">
+                                    <i class="fas fa-align-left me-2"></i> Profit and Loss Heads Description
+                                </NavLink>
+                                @* <NavLink class="nav-link">
+                                    <i class="fas fa-chart-line me-2"></i> Profit and Loss Report
+                                </NavLink> *@
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal"
+                                        @onclick='() => ReportManager.RequestReport("profit-loss_report")'>
+                                    <span class="fas fa-file-contract me-2"></span> Profit and Loss Report
+                                </button>
+                                <NavLink class="nav-link" href="/accounts/financialstatementsheads">
+                                    <i class="fas fa-folder-open me-2"></i> Financial Statement Heads
+                                </NavLink>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal" 
+                                        @onclick='() => ReportManager.RequestReport("notes-to-accounts")'>
+                                    <span class="fas fa-file-contract me-2"></span> Notes To the Fincnacial Statement
+                                </button>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal" 
+                                    @onclick='() => ReportManager.RequestReport("sub-heads-reports")'>
+                                    <span class="fas fa-clipboard-list me-2"></span> Print Sub-Heads Report
+                                </button>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal"
+                                        @onclick='() => ReportManager.RequestReport("depreciation-schedule")'>
+                                    <span class="fas fa-file-contract me-2"></span> Print Depriciation Schedule
+                                </button>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal"
+                                        @onclick='() => ReportManager.RequestReport("accounts-datewise")'>
+                                    <span class="fas fa-file-contract me-2"></span> Print new Accounts Report (Datewise)
+                                </button>
+                                <NavLink class="nav-link" href="/accounts/printattachments">
+                                    <i class="fas fa-paperclip me-2"></i> Print Attachments
+                                </NavLink>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal"
+                                        @onclick='() => ReportManager.RequestReport("capital-work-inprogress")'>
+                                    <span class="fas fa-file-contract me-2"></span> Capital Work in progress
+                                </button>
+                                <NavLink class="nav-link">
+                                    <i class="fas fa-water me-2"></i> Cash Flow Statement
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/cashflowmainheads">
+                                    <i class="fas fa-stream me-2"></i> Cash Flow Heads
+                                </NavLink>
+                                <NavLink class="nav-link" href="/accounts/cashflowreportheads">
+                                    <i class="fas fa-list-alt me-2"></i> Cash Flow Report Heads
+                                </NavLink>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal"
+                                        @onclick='() => ReportManager.RequestReport("cash-flow-summary",new Dictionary<string, object> { { "iType", 1 } })'>
+                                    <span class="fas fa-chart-line me-2"></span> Print Cash Flow Summary
+                                </button>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal"
+                                        @onclick='() => ReportManager.RequestReport("cash-flow-summary", new Dictionary<string, object> { { "iType", 2 } })'>
+                                    <span class="fas fa-filter me-2"></span> Print Cash Flow Summary (Without Zero Value)
+                                </button>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal"
+                                        @onclick='() => ReportManager.RequestReport("cash-flow-summary", new Dictionary<string, object> { { "iType", 3 } })'>
+                                    <span class="fas fa-sitemap me-2"></span> Print Cash Flow Summary (Headwise)
+                                </button>
+                                <button class="nav-link btn btn-link text-start w-100 fw-normal"
+                                        @onclick='() => ReportManager.RequestReport("cash-flow-statement")'>
+                                    <span class="fas fa-money-bill-wave me-2"></span> Print Cash Flow Statement
+                                </button>
+
+                            </div>
+                        }
+                    </div>
+
+
+                </div>
+            }
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="billing">
+                <i class="fas fa-file-invoice-dollar me-2"></i> Billing
+            </NavLink>
+        </div>
+        <div class="nav-item px-3 mt-auto">
+            <form method="post" action="/Identity/Account/Logout">
+                <button type="submit" class="nav-link text-danger w-100 text-start sign-out-button">
+                    <i class="fas fa-sign-out-alt me-2"></i> Sign Out
+                </button>
+            </form>
+        </div>
+    </nav>
+</div>
+
+@code {
+    [Parameter]
+    public bool IsSidebarCollapsed { get; set; }
+
+    [Parameter]
+    public EventCallback OnToggleSidebar { get; set; }
+
+    private bool isFinancialExpanded = false;
+    private bool isAccountSetupExpanded = false;
+    private bool isBankSetupExpanded = false;
+    private bool isVouchersExpanded = false;
+    private bool isReportsExpanded = false;
+    private bool isStatementsExpanded = false;
+
+    private async Task ToggleNavMenu()
+    {
+        await OnToggleSidebar.InvokeAsync();
+    }
+
+    private void ToggleFinancial() => isFinancialExpanded = !isFinancialExpanded;
+    private void ToggleAccountSetup() => isAccountSetupExpanded = !isAccountSetupExpanded;
+    private void ToggleVouchers() => isVouchersExpanded = !isVouchersExpanded;
+    private void ToggleBanks() => isBankSetupExpanded = !isBankSetupExpanded;
+    private void ToggleReports() => isReportsExpanded = !isReportsExpanded;
+    private void ToggleStatements() => isStatementsExpanded = !isStatementsExpanded;
+    
+}

@@ -1,0 +1,129 @@
+﻿@page "/accounts/printattachments"
+@attribute [Authorize]
+<PageTitle>Print Notes Attachments</PageTitle>
+
+@using System.Collections.ObjectModel
+@using Microsoft.AspNetCore.Components.Web
+@using BlazorContextMenu
+@using Microsoft.Extensions.Options
+@using DataAccessLibrary
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using CIP.Configurations
+@using DataAccessLibrary.Interface.Accounts
+@using Microsoft.Extensions.Options
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject IFinancialStatementDataAccess FinancialStatementService
+@inject Radzen.NotificationService NotificationService
+@inject HttpClient Http
+@inject IHttpClientFactory ClientFactory
+@inject IHttpContextAccessor HttpContextAccessor
+
+<RadzenNotification />
+
+<div class="container-fluid mt-0" style="font-family: Calibri, sans-serif;">
+    <div class="card shadow-sm border-0 rounded-1 bg-transparent">
+        <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color"
+             style="position: sticky; top: 0; z-index: 1000;">
+            <h5 class="mb-0"><i class="fas fa-sitemap"></i> Print Notes Attachments </h5>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
+                    <i class="fas fa-times"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <!-- TABLE START HERE -->
+            <div class="card-body p-0">
+            <div class="row align-items-end mb-3">
+
+                <div class="col-md-4">
+                    <label class="fw-semibold">Attachment Name :</label>
+                    <input class="form-control form-control-sm shadow-sm"
+                           @bind="CurrentHead.Attachment_Name" />
+                </div>
+
+                @if (!bClearInputFile)
+                {
+                    <div class="col-md-4">
+                        <label class="fw-semibold d-block">&nbsp;</label>
+                        <InputFile OnChange="HandleFileSelected"
+                        class="form-control form-control-sm" />
+                    </div>
+                }
+
+                <div class="col-md-2">
+                    <label class="d-block">&nbsp;</label>
+                    <button class="btn btn-sm text-white w-100"
+                            style="background-color:rgb(7, 44, 96)"
+                            @onclick="SaveAttachment">
+                        <i class="fas fa-save me-1"></i> Save
+                    </button>
+                </div>
+
+            </div>
+
+
+            @if (IsLoading)
+            {
+                <div class="progress rounded-pill" style="width: 100%">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary rounded-pill"
+                         role="progressbar" style="width: 100%">
+                        Please Wait While Loading Data ...
+                    </div>
+                </div>
+            }
+            else if (getDBEntries?.Any() ?? false)
+                {
+                <div style="width: 100%">
+                    <ContextMenuProvider Id="tableContextMenu">
+                        <table class="table table-bordered table-hover align-middle mb-0"
+                               style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                            <thead class="theme-color"
+                                    style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                                <tr>
+                                    <th>Attachment Name</th>
+                                    <th class="text-center"> <i class="fas fa-bolt"></i> </th>
+                                </tr>
+                            </thead>
+                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">
+                                <Virtualize Items="@getDBEntries" Context="heads">
+                                    <ContextMenuTrigger WrapperTag="tr"
+                                                        MenuId="MainContextMenu"
+                                                        Data="heads"
+                                                        MouseButtonTrigger="MouseButtonTrigger.Right"
+                                                        CssClass="@($"key-{heads.EntryID}")">
+
+                                            <td style="width: 95% ; cursor:pointer">
+                                                <a class="text-primary text-decoration-underline"
+                                                    style="cursor:pointer"
+                                                    @onclick="() => OpenAttachment(heads)">
+                                                    @heads.Attachment_Name
+                                                </a>
+                                            </td>
+                                            <td style="width: 5%;">
+                                                <ContextMenuTrigger 
+                                                                MenuId="MainContextMenu"
+                                                                Data="heads"
+                                                                MouseButtonTrigger="MouseButtonTrigger.Both">
+                                                <button class="btn btn-sm btn-primary" style="border:none; background:none;">
+                                                    <i class="fa-solid fa-ellipsis-vertical" style="color:black"></i>
+                                                </button>
+                                                </ContextMenuTrigger>
+                                            </td>
+                                    </ContextMenuTrigger>
+                                </Virtualize>
+                            </tbody>
+                        </table>
+                    </ContextMenuProvider>
+                </div>
+                }
+                else
+                {
+                    <div class="text-center py-3 text-muted">No Data found.</div>
+                }
+            </div>
+        </div>
+    </div>
