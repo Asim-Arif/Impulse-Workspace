@@ -33,7 +33,8 @@ namespace Impulse.Areas.Identity
             //return user.Password == password;
             //CryptRC4(FromHexDump(strPassword), "awmsial")
             string strPassword="";
-            strPassword=encryption.CryptRC4(user.Password, "awmsial");
+            //strPassword=encryption.CryptRC4(user.Password, "awmsial");
+            strPassword = user.Password;
             //return user.Password ==  password;
             return strPassword == password;
 

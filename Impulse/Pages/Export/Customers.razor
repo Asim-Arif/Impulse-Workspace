@@ -1,0 +1,112 @@
+@page "/export/customers"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Export
+@using Impulse.Services
+
+<PageTitle>Foreign Customers</PageTitle>
+
+<div class="" style="font-family: Calibri, sans-serif;">
+    <div class="card shadow-sm bg-transparent">
+
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <h6 class="mb-0 fw-bold">Foreign Customers</h6>
+            <a href="/export/customer" class="btn btn-success btn-sm">
+                <i class="fas fa-plus me-1"></i> New Customer
+            </a>
+        </div>
+
+        <div class="card-body">
+
+            @* Search bar *@
+            <div class="row g-1 mb-3">
+                <div class="col-sm-5">
+                    <input type="text" class="form-control" placeholder="Search by name, code or country…"
+                           @bind="searchText" @bind:event="oninput" />
+                </div>
+            </div>
+
+            @if (isLoading)
+            {
+                <p class="text-muted">Loading…</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>Cust. Code</th>
+                                <th>Company Name</th>
+                                <th>City</th>
+                                <th>Country</th>
+                                <th>Currency</th>
+                                <th>Active</th>
+                                <th class="text-center" style="width:130px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var c in FilteredCustomers)
+                            {
+                                <tr>
+                                    <td>@c.CustCode</td>
+                                    <td>@c.Name</td>
+                                    <td>@c.City</td>
+                                    <td>@c.Country</td>
+                                    <td>@c.Curr</td>
+                                    <td class="text-center">
+                                        @if (c.Active)
+                                        {
+                                            <span class="badge bg-success">Yes</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">No</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        <a href="/export/customer/@(c.CustCode + c.Country)"
+                                           class="btn btn-warning btn-sm me-1">Edit</a>
+                                        <button type="button" class="btn btn-danger btn-sm"
+                                                @onclick="() => ConfirmDelete(c)">
+                                            &times;
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                            @if (!FilteredCustomers.Any())
+                            {
+                                <tr class="table-light">
+                                    <td colspan="7" class="text-center text-muted py-3">No customers found.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+        </div>
+    </div>
+</div>
+
+@* Delete confirmation modal *@
+@if (customerToDelete != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,0.4);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Delete</h5>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to delete customer
+                    <strong>@customerToDelete.Name</strong> (@customerToDelete.CustCode)?
+                    This action cannot be undone.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+                    <button type="button" class="btn btn-danger" @onclick="DeleteCustomer">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

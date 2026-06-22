@@ -87,13 +87,13 @@ namespace Impulse.Areas.Identity.Pages.Account
             
             if (ModelState.IsValid)
             {
-                string currentusername = await _idbhelper.getSingleStringValue("UserName", "Users", $"WHERE EmpID ='{Input.UserName}' AND Inactive=0");
+                /*string currentusername = await _idbhelper.getSingleStringValue("UserName", "Users", $"WHERE EmpID ='{Input.UserName}' AND Inactive=0");
                 
                 if (currentusername == "") 
                 {
                     currentusername = Input.UserName;
-                }
-
+                }*/
+                string currentusername = Input.UserName;
                 if (await _userStore.ValidateCredentialsAsync(currentusername, Input.Password))
                 //if (await _userStore.ValidateCredentialsAsync(Input.EmpID, Input.Password))
                     {

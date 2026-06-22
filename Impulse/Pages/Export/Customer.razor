@@ -1,0 +1,917 @@
+@page "/export/customer"
+@page "/export/customer/{CustId}"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels
+@using DataAccessLibrary.Models.ViewModels.Export
+@using Impulse.Services
+
+<PageTitle>Foreign Customer Info.</PageTitle>
+
+<div class="" style="font-family: Calibri, sans-serif;">
+    <div class="card shadow-sm bg-transparent">
+
+        <div class="card-header d-flex">
+            <h6 class="mb-0 fw-bold">Foreign Customer Info.</h6>
+        </div>
+
+        <form class="card-body">
+
+            @* ============================================================ *@
+            @* HEADER ROW: Customer ID / Name / City / Country / Currency   *@
+            @* ============================================================ *@
+            <div class="row g-1 mb-2">
+                <div class="col-sm-2">
+                    <label class="form-label mb-0 fw-bold">Customer ID</label>
+                    <input type="text" class="form-control" @bind="model.CustCode" placeholder="Customer ID" />
+                </div>
+                <div class="col-sm-4">
+                    <label class="form-label mb-0 fw-bold">Company Name</label>
+                    <input type="text" class="form-control" @bind="model.Name" placeholder="Company Name" />
+                </div>
+                <div class="col-sm-2">
+                    <label class="form-label mb-0 fw-bold">City</label>
+                    <input type="text" class="form-control" @bind="model.City" placeholder="City" />
+                </div>
+                <div class="col-sm-2">
+                    <label class="form-label mb-0 fw-bold">Country</label>
+                    <BlazoredTypeahead SearchMethod="SearchCountries"
+                                       EnableDropDown="true"
+                                       Data="Countries"
+                                       TValue="GenericDropDownModel"
+                                       TItem="GenericDropDownModel"
+                                       Value="SelectedCountry"
+                                       ValueChanged="OnCountryChanged"
+                                       ValueExpression="@(() => SelectedCountry)"
+                                       Placeholder="Country">
+                        <SelectedTemplate>@SelectedCountry?.DropDownValue_Description</SelectedTemplate>
+                        <ResultTemplate Context="r">@r.DropDownValue_Description</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-sm-2">
+                    <label class="form-label mb-0 fw-bold">Currency</label>
+                    <BlazoredTypeahead SearchMethod="SearchCurrencies"
+                                       EnableDropDown="true"
+                                       Data="Currencies"
+                                       TValue="GenericDropDownModel"
+                                       TItem="GenericDropDownModel"
+                                       Value="SelectedCurrency"
+                                       ValueChanged="OnCurrencyChanged"
+                                       ValueExpression="@(() => SelectedCurrency)"
+                                       Placeholder="Currency">
+                        <SelectedTemplate>@SelectedCurrency?.DropDownValue_Description</SelectedTemplate>
+                        <ResultTemplate Context="r">@r.DropDownValue_Description</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+            </div>
+
+            @* ============================================================ *@
+            @* TAB NAV                                                       *@
+            @* ============================================================ *@
+            <ul class="nav nav-tabs mb-2">
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(activeTab=="company"?"active":"")"
+                            @onclick='() => SetTab("company")'>Company Info.</button>
+                </li>
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(activeTab=="bank"?"active":"")"
+                            @onclick='() => SetTab("bank")'>Bank Info.</button>
+                </li>
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(activeTab=="contact"?"active":"")"
+                            @onclick='() => SetTab("contact")'>Contact Info.</button>
+                </li>
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(activeTab=="agent"?"active":"")"
+                            @onclick='() => SetTab("agent")'>Agent Info.</button>
+                </li>
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(activeTab=="accounts"?"active":"")"
+                            @onclick='() => SetTab("accounts")'>Accounts Info.</button>
+                </li>
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(activeTab=="shipping"?"active":"")"
+                            @onclick='() => SetTab("shipping")'>Ship. Addresses</button>
+                </li>
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(activeTab=="events"?"active":"")"
+                            @onclick='() => SetTab("events")'>Events</button>
+                </li>
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(activeTab=="invoiceto"?"active":"")"
+                            @onclick='() => SetTab("invoiceto")'>Invoice To</button>
+                </li>
+            </ul>
+
+            @* ============================================================ *@
+            @* TAB: COMPANY INFO                                             *@
+            @* ============================================================ *@
+            @if (activeTab == "company")
+            {
+                <div class="row g-1 mb-1">
+                    <div class="col-sm-3">
+                        <label class="form-label mb-0">Phone 1</label>
+                        <input type="text" class="form-control" @bind="model.Phone1" />
+                    </div>
+                    <div class="col-sm-3">
+                        <label class="form-label mb-0">Phone 2</label>
+                        <input type="text" class="form-control" @bind="model.Phone2" />
+                    </div>
+                    <div class="col-sm-3">
+                        <label class="form-label mb-0">Phone 3</label>
+                        <input type="text" class="form-control" @bind="model.Phone3" />
+                    </div>
+                </div>
+                <div class="row g-1 mb-1">
+                    <div class="col-sm-3">
+                        <label class="form-label mb-0">Fax 1</label>
+                        <input type="text" class="form-control" @bind="model.Fax1" />
+                    </div>
+                    <div class="col-sm-3">
+                        <label class="form-label mb-0">Fax 2</label>
+                        <input type="text" class="form-control" @bind="model.Fax2" />
+                    </div>
+                    <div class="col-sm-3">
+                        <label class="form-label mb-0">Fax 3</label>
+                        <input type="text" class="form-control" @bind="model.Fax3" />
+                    </div>
+                </div>
+                <div class="row g-1 mb-1">
+                    <div class="col-sm-4">
+                        <label class="form-label mb-0">Email 1</label>
+                        <input type="text" class="form-control" @bind="model.EMail1" />
+                    </div>
+                    <div class="col-sm-4">
+                        <label class="form-label mb-0">Email 2</label>
+                        <input type="text" class="form-control" @bind="model.EMail2" />
+                    </div>
+                    <div class="col-sm-4">
+                        <label class="form-label mb-0">Company URL</label>
+                        <input type="text" class="form-control" @bind="model.URL" />
+                    </div>
+                </div>
+                <div class="row g-1 mb-1">
+                    <div class="col-sm-6">
+                        <label class="form-label mb-0">Original Address / Consignee</label>
+                        <textarea class="form-control" rows="3" @bind="model.Address"></textarea>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label mb-0">Fake Address</label>
+                        <textarea class="form-control" rows="3" @bind="model.FakeAddress"></textarea>
+                    </div>
+                </div>
+                <div class="row g-1 mb-1">
+                    <div class="col-sm-4">
+                        <label class="form-label mb-0">Trade Terms</label>
+                        <BlazoredTypeahead SearchMethod="SearchTradeTerms"
+                                           EnableDropDown="true"
+                                           Data="TradeTermsList"
+                                           TValue="GenericDropDownModel"
+                                           TItem="GenericDropDownModel"
+                                           Value="SelectedTradeTerms"
+                                           ValueChanged="OnTradeTermsChanged"
+                                           ValueExpression="@(() => SelectedTradeTerms)"
+                                           Placeholder="Trade Terms">
+                            <SelectedTemplate>@SelectedTradeTerms?.DropDownValue_Description</SelectedTemplate>
+                            <ResultTemplate Context="r">@r.DropDownValue_Description</ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                    <div class="col-sm-4">
+                        <label class="form-label mb-0">Payment Terms</label>
+                        <BlazoredTypeahead SearchMethod="SearchPaymentTerms"
+                                           EnableDropDown="true"
+                                           Data="PaymentTermsList"
+                                           TValue="GenericDropDownModel"
+                                           TItem="GenericDropDownModel"
+                                           Value="SelectedPaymentTerms"
+                                           ValueChanged="OnPaymentTermsChanged"
+                                           ValueExpression="@(() => SelectedPaymentTerms)"
+                                           Placeholder="Payment Terms">
+                            <SelectedTemplate>@SelectedPaymentTerms?.DropDownValue_Description</SelectedTemplate>
+                            <ResultTemplate Context="r">@r.DropDownValue_Description</ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                    <div class="col-sm-4">
+                        <label class="form-label mb-0">Date Format</label>
+                        <select class="form-select" @bind="model.DTFormat">
+                            @foreach (var f in DTFormats)
+                            {
+                                <option value="@f.DropDownValue_ID">@f.DropDownValue_Description</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div class="row g-1 mb-1">
+                    <div class="col-sm-3">
+                        <label class="form-label mb-0">Payment Days After B/L</label>
+                        <input type="number" class="form-control" @bind="model.PaymentDays" />
+                    </div>
+                    <div class="col-sm-3">
+                        <label class="form-label mb-0">Max. Discount</label>
+                        <input type="number" class="form-control" @bind="model.MaxDiscount" />
+                    </div>
+                    <div class="col-sm-3">
+                        <label class="form-label mb-0">Finishing</label>
+                        <BlazoredTypeahead SearchMethod="SearchFinishingQualities"
+                                           EnableDropDown="true"
+                                           Data="FinishingQualities"
+                                           TValue="GenericDropDownModel"
+                                           TItem="GenericDropDownModel"
+                                           Value="SelectedFinishingQuality"
+                                           ValueChanged="OnFinishingQualityChanged"
+                                           ValueExpression="@(() => SelectedFinishingQuality)"
+                                           Placeholder="Finishing Quality">
+                            <SelectedTemplate>@SelectedFinishingQuality?.DropDownValue_Description</SelectedTemplate>
+                            <ResultTemplate Context="r">@r.DropDownValue_Description</ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                    <div class="col-sm-3">
+                        <label class="form-label mb-0">Source</label>
+                        <BlazoredTypeahead SearchMethod="SearchCustomerSources"
+                                           EnableDropDown="true"
+                                           Data="CustomerSources"
+                                           TValue="GenericDropDownModel"
+                                           TItem="GenericDropDownModel"
+                                           Value="SelectedCustomerSource"
+                                           ValueChanged="OnCustomerSourceChanged"
+                                           ValueExpression="@(() => SelectedCustomerSource)"
+                                           Placeholder="Customer Source">
+                            <SelectedTemplate>@SelectedCustomerSource?.DropDownValue_Description</SelectedTemplate>
+                            <ResultTemplate Context="r">@r.DropDownValue_Description</ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                </div>
+                <div class="row g-1 mb-1">
+                    <div class="col-sm-4">
+                        <label class="form-label mb-0">Default Ship. Method</label>
+                        <BlazoredTypeahead SearchMethod="SearchShippingMethods"
+                                           EnableDropDown="true"
+                                           Data="ShippingMethods"
+                                           TValue="GenericDropDownModel"
+                                           TItem="GenericDropDownModel"
+                                           Value="SelectedShippingMethod"
+                                           ValueChanged="OnShippingMethodChanged"
+                                           ValueExpression="@(() => SelectedShippingMethod)"
+                                           Placeholder="Shipping Method">
+                            <SelectedTemplate>@SelectedShippingMethod?.DropDownValue_Description</SelectedTemplate>
+                            <ResultTemplate Context="r">@r.DropDownValue_Description</ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                    <div class="col-sm-4">
+                        <label class="form-label mb-0">Outer Label (Report file name)</label>
+                        <input type="text" class="form-control" @bind="model.OuterPackingLabel" />
+                    </div>
+                    <div class="col-sm-4">
+                        <label class="form-label mb-0">Inner Label (Report file name)</label>
+                        <input type="text" class="form-control" @bind="model.InnerPackingLabel" />
+                    </div>
+                </div>
+                <div class="row g-1 mb-1">
+                    <div class="col-sm-6">
+                        <label class="form-label mb-0">Inner Label - Manual Qty (Report file name)</label>
+                        <input type="text" class="form-control" @bind="model.Inner_Label_Manual_I" />
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label mb-0">Inner Label - II Manual Qty (Report file name)</label>
+                        <input type="text" class="form-control" @bind="model.Inner_Label_Manual_II" />
+                    </div>
+                </div>
+                <div class="row g-1 mb-1">
+                    <div class="col-sm-6">
+                        <label class="form-label mb-0">Foreign Customer Note I</label>
+                        <textarea class="form-control" rows="2" @bind="model.FC_Note_I"></textarea>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label mb-0">Foreign Customer Note II</label>
+                        <textarea class="form-control" rows="2" @bind="model.FC_Note_II"></textarea>
+                    </div>
+                </div>
+                <div class="row g-1 mb-1">
+                    <div class="col-sm-3">
+                        <label class="form-label mb-0">Stamps</label>
+                        <input type="text" class="form-control" @bind="model.Stamps" />
+                    </div>
+                    <div class="col-sm-3">
+                        <label class="form-label mb-0">Received Via</label>
+                        <input type="text" class="form-control" @bind="model.RcvdVia" />
+                    </div>
+                </div>
+                <div class="row g-1 mb-1">
+                    <div class="col-sm-12">
+                        <label class="form-label mb-0">Special Instructions</label>
+                        <textarea class="form-control" rows="2" @bind="model.SpecialInstructions"></textarea>
+                    </div>
+                </div>
+                <div class="row g-1 mb-1">
+                    <div class="col-sm-auto">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="chkExtra"
+                                   @bind="model.AcceptsExtraQty" />
+                            <label class="form-check-label" for="chkExtra">Accepts Extra Qty</label>
+                        </div>
+                    </div>
+                    <div class="col-sm-auto">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="chkLateAlert"
+                                   @bind="model.LateOrderAlerts" />
+                            <label class="form-check-label" for="chkLateAlert">Late Order Alert</label>
+                        </div>
+                    </div>
+                    <div class="col-sm-auto">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="chkShowRef"
+                                   @bind="model.ShowCustomerRef" />
+                            <label class="form-check-label" for="chkShowRef">Show Customer Ref. on Docs.</label>
+                        </div>
+                    </div>
+                    <div class="col-sm-auto">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="chkInactive"
+                                   @bind="model.Active" />
+                            <label class="form-check-label" for="chkInactive">Customer is Active</label>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @* ============================================================ *@
+            @* TAB: BANK INFO                                                *@
+            @* ============================================================ *@
+            @if (activeTab == "bank")
+            {
+                <div class="card mb-2">
+                    <div class="card-header fw-bold py-1">
+                        @(editingBankIndex >= 0 ? "Edit Bank" : "Add New Bank")
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-1 mb-1">
+                            <div class="col-sm-6">
+                                <label class="form-label mb-0">Bank Name</label>
+                                <input type="text" class="form-control" @bind="currentBank.BankName" />
+                            </div>
+                            <div class="col-sm-3">
+                                <label class="form-label mb-0">Country</label>
+                                <BlazoredTypeahead SearchMethod="SearchBankCountries"
+                                                   EnableDropDown="true"
+                                                   Data="BankCountries"
+                                                   TValue="GenericDropDownModel"
+                                                   TItem="GenericDropDownModel"
+                                                   Value="SelectedBankCountry"
+                                                   ValueChanged="OnBankCountryChanged"
+                                                   ValueExpression="@(() => SelectedBankCountry)"
+                                                   Placeholder="Bank Country">
+                                    <SelectedTemplate>@SelectedBankCountry?.DropDownValue_Description</SelectedTemplate>
+                                    <ResultTemplate Context="r">@r.DropDownValue_Description</ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                            <div class="col-sm-3">
+                                <label class="form-label mb-0">Email 1</label>
+                                <input type="text" class="form-control" @bind="currentBank.Email1" />
+                            </div>
+                        </div>
+                        <div class="row g-1 mb-1">
+                            <div class="col-sm-3">
+                                <label class="form-label mb-0">Phone 1</label>
+                                <input type="text" class="form-control" @bind="currentBank.Phone1" />
+                            </div>
+                            <div class="col-sm-3">
+                                <label class="form-label mb-0">Phone 2</label>
+                                <input type="text" class="form-control" @bind="currentBank.Phone2" />
+                            </div>
+                            <div class="col-sm-3">
+                                <label class="form-label mb-0">Fax 1</label>
+                                <input type="text" class="form-control" @bind="currentBank.Fax1" />
+                            </div>
+                            <div class="col-sm-3">
+                                <label class="form-label mb-0">Fax 2</label>
+                                <input type="text" class="form-control" @bind="currentBank.Fax2" />
+                            </div>
+                        </div>
+                        <div class="row g-1 mb-1">
+                            <div class="col-sm-3">
+                                <label class="form-label mb-0">Email 2</label>
+                                <input type="text" class="form-control" @bind="currentBank.Email2" />
+                            </div>
+                            <div class="col-sm-9">
+                                <label class="form-label mb-0">Address 1</label>
+                                <input type="text" class="form-control" @bind="currentBank.Address1" />
+                            </div>
+                        </div>
+                        <div class="row g-1 mb-1">
+                            <div class="col-sm-9">
+                                <label class="form-label mb-0">Address 2</label>
+                                <input type="text" class="form-control" @bind="currentBank.Address2" />
+                            </div>
+                            <div class="col-sm-3 d-flex align-items-end gap-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="chkDefBank"
+                                           @bind="currentBank.DefaultBank" />
+                                    <label class="form-check-label" for="chkDefBank">Default Bank</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-primary btn-sm"
+                                    @onclick="AddOrUpdateBank">
+                                @(editingBankIndex >= 0 ? "Update" : "Add Bank")
+                            </button>
+                            @if (editingBankIndex >= 0)
+                            {
+                                <button type="button" class="btn btn-secondary btn-sm"
+                                        @onclick="ResetBankForm">Cancel</button>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive" style="max-height:260px;overflow-y:auto;">
+                    <table class="table table-bordered table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>Bank Name</th>
+                                <th>Country</th>
+                                <th>Phone 1</th>
+                                <th>Email 1</th>
+                                <th>Default</th>
+                                <th class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (model.Banks.Any())
+                            {
+                                @for (int i = 0; i < model.Banks.Count; i++)
+                                {
+                                    var idx = i;
+                                    var b = model.Banks[i];
+                                    <tr>
+                                        <td>@b.BankName</td>
+                                        <td>@b.Country</td>
+                                        <td>@b.Phone1</td>
+                                        <td>@b.Email1</td>
+                                        <td class="text-center">
+                                            @if (b.DefaultBank)
+                                            {
+                                                <span class="badge bg-success">Default</span>
+                                            }
+                                            else
+                                            {
+                                                <button type="button" class="btn btn-outline-secondary btn-sm"
+                                                        @onclick="() => SetDefaultBank(idx)">Set Default</button>
+                                            }
+                                        </td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-warning btn-sm me-1"
+                                                    @onclick="() => EditBank(idx)">Edit</button>
+                                            <button type="button" class="btn btn-danger btn-sm"
+                                                    @onclick="() => RemoveBank(idx)">&times;</button>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr class="table-light">
+                                    <td colspan="6" class="text-center text-muted py-3">No banks added yet.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            @* ============================================================ *@
+            @* TAB: CONTACT INFO                                             *@
+            @* ============================================================ *@
+            @if (activeTab == "contact")
+            {
+                <div class="row g-2 mb-2">
+                    @* Contact Person 1 *@
+                    <div class="col-sm-6">
+                        <fieldset class="border p-2 rounded">
+                            <legend class="float-none w-auto px-2 fw-bold" style="font-size:0.9rem;">Contact Person 1</legend>
+                            <div class="row g-1 mb-1">
+                                <div class="col-sm-7">
+                                    <label class="form-label mb-0">Name</label>
+                                    <input type="text" class="form-control" @bind="model.Cont1Name" />
+                                </div>
+                                <div class="col-sm-5">
+                                    <label class="form-label mb-0">Designation</label>
+                                    <input type="text" class="form-control" @bind="model.Cont1Designation" />
+                                </div>
+                            </div>
+                            <div class="row g-1 mb-1">
+                                <div class="col-sm-12">
+                                    <label class="form-label mb-0">E-Mail</label>
+                                    <input type="text" class="form-control" @bind="model.Cont1Email" />
+                                </div>
+                            </div>
+                            <div class="row g-1 mb-1">
+                                <div class="col-sm-6">
+                                    <label class="form-label mb-0">Phone</label>
+                                    <input type="text" class="form-control" @bind="model.cont1Phone" />
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="form-label mb-0">Mobile</label>
+                                    <input type="text" class="form-control" @bind="model.Cont1Mobile" />
+                                </div>
+                            </div>
+                            <div class="row g-1">
+                                <div class="col-sm-12">
+                                    <label class="form-label mb-0">Skype ID</label>
+                                    <input type="text" class="form-control" @bind="model.Cont1Skype" />
+                                </div>
+                            </div>
+                        </fieldset>
+                    </div>
+                    @* Contact Person 2 *@
+                    <div class="col-sm-6">
+                        <fieldset class="border p-2 rounded">
+                            <legend class="float-none w-auto px-2 fw-bold" style="font-size:0.9rem;">Contact Person 2</legend>
+                            <div class="row g-1 mb-1">
+                                <div class="col-sm-7">
+                                    <label class="form-label mb-0">Name</label>
+                                    <input type="text" class="form-control" @bind="model.Cont2Name" />
+                                </div>
+                                <div class="col-sm-5">
+                                    <label class="form-label mb-0">Designation</label>
+                                    <input type="text" class="form-control" @bind="model.Cont2Designation" />
+                                </div>
+                            </div>
+                            <div class="row g-1 mb-1">
+                                <div class="col-sm-12">
+                                    <label class="form-label mb-0">E-Mail</label>
+                                    <input type="text" class="form-control" @bind="model.Cont2Email" />
+                                </div>
+                            </div>
+                            <div class="row g-1 mb-1">
+                                <div class="col-sm-6">
+                                    <label class="form-label mb-0">Phone</label>
+                                    <input type="text" class="form-control" @bind="model.Cont2Phone" />
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="form-label mb-0">Mobile</label>
+                                    <input type="text" class="form-control" @bind="model.Cont2Mobile" />
+                                </div>
+                            </div>
+                            <div class="row g-1">
+                                <div class="col-sm-12">
+                                    <label class="form-label mb-0">Skype ID</label>
+                                    <input type="text" class="form-control" @bind="model.Cont2Skype" />
+                                </div>
+                            </div>
+                        </fieldset>
+                    </div>
+                </div>
+                @* Misc. Information *@
+                <fieldset class="border p-2 rounded mb-2">
+                    <legend class="float-none w-auto px-2 fw-bold" style="font-size:0.9rem;">Misc. Information</legend>
+                    <div class="row g-1 mb-1">
+                        <div class="col-sm-6">
+                            <label class="form-label mb-0">Nearest Airport</label>
+                            <input type="text" class="form-control" @bind="model.NearestAirport" />
+                        </div>
+                        <div class="col-sm-3">
+                            <label class="form-label mb-0">Fedex #</label>
+                            <input type="text" class="form-control" @bind="model.FedexNo" />
+                        </div>
+                    </div>
+                    <div class="row g-1">
+                        <div class="col-sm-6">
+                            <label class="form-label mb-0">Nearest Railwaystation</label>
+                            <input type="text" class="form-control" @bind="model.NearestRailwaystation" />
+                        </div>
+                        <div class="col-sm-3">
+                            <label class="form-label mb-0">DHL #</label>
+                            <input type="text" class="form-control" @bind="model.DHLNo" />
+                        </div>
+                    </div>
+                </fieldset>
+                @* Default Port *@
+                <fieldset class="border p-2 rounded mb-2">
+                    <legend class="float-none w-auto px-2 fw-bold" style="font-size:0.9rem;">Default Port</legend>
+                    <div class="row g-1">
+                        <div class="col-sm-4">
+                            <label class="form-label mb-0">Port ID</label>
+                            <input type="number" class="form-control" @bind="model.DefaultPort" placeholder="Port ID" />
+                        </div>
+                    </div>
+                </fieldset>
+            }
+
+            @* ============================================================ *@
+            @* TAB: AGENT INFO                                               *@
+            @* ============================================================ *@
+            @if (activeTab == "agent")
+            {
+                <div class="row g-1 mb-1">
+                    <div class="col-sm-8">
+                        <label class="form-label mb-0">Agent Name</label>
+                        <input type="text" class="form-control" @bind="model.AgentName" />
+                    </div>
+                    <div class="col-sm-4">
+                        <label class="form-label mb-0">URL</label>
+                        <input type="text" class="form-control" @bind="model.AgentURL" />
+                    </div>
+                </div>
+                <div class="row g-1 mb-1">
+                    <div class="col-sm-8">
+                        <label class="form-label mb-0">E-Mail</label>
+                        <input type="text" class="form-control" @bind="model.AgentEmail" />
+                    </div>
+                </div>
+                <div class="row g-1 mb-1">
+                    <div class="col-sm-3">
+                        <label class="form-label mb-0">Phone 1</label>
+                        <input type="text" class="form-control" @bind="model.AgentPhone1" />
+                    </div>
+                    <div class="col-sm-3">
+                        <label class="form-label mb-0">Phone 2</label>
+                        <input type="text" class="form-control" @bind="model.AgentPhone2" />
+                    </div>
+                    <div class="col-sm-3">
+                        <label class="form-label mb-0">Fax 1</label>
+                        <input type="text" class="form-control" @bind="model.AgentFax1" />
+                    </div>
+                    <div class="col-sm-3">
+                        <label class="form-label mb-0">Fax 2</label>
+                        <input type="text" class="form-control" @bind="model.AgentFax2" />
+                    </div>
+                </div>
+                <div class="row g-1 mb-2">
+                    <div class="col-sm-6">
+                        <label class="form-label mb-0">Address</label>
+                        <textarea class="form-control" rows="3" @bind="model.AgentAddress"></textarea>
+                    </div>
+                </div>
+                @* Agent Contact Person *@
+                <fieldset class="border p-2 rounded">
+                    <legend class="float-none w-auto px-2 fw-bold" style="font-size:0.9rem;">Contact Person</legend>
+                    <div class="row g-1 mb-1">
+                        <div class="col-sm-6">
+                            <label class="form-label mb-0">Name</label>
+                            <input type="text" class="form-control" @bind="model.ACName" />
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label mb-0">E-Mail</label>
+                            <input type="text" class="form-control" @bind="model.ACEmail" />
+                        </div>
+                    </div>
+                    <div class="row g-1">
+                        <div class="col-sm-4">
+                            <label class="form-label mb-0">Phone</label>
+                            <input type="text" class="form-control" @bind="model.ACPhone" />
+                        </div>
+                        <div class="col-sm-4">
+                            <label class="form-label mb-0">Mobile</label>
+                            <input type="text" class="form-control" @bind="model.ACMobile" />
+                        </div>
+                    </div>
+                </fieldset>
+            }
+
+            @* ============================================================ *@
+            @* TAB: ACCOUNTS INFO                                            *@
+            @* ============================================================ *@
+            @if (activeTab == "accounts")
+            {
+                <div class="row g-1 mb-1">
+                    <div class="col-sm-4">
+                        <label class="form-label mb-0">Acc #</label>
+                        <input type="text" class="form-control" @bind="model.AccNo" readonly />
+                    </div>
+                </div>
+                <p class="text-muted small mt-2">Account details are managed by the accounts module. The account number is assigned automatically when a new customer is saved.</p>
+            }
+
+            @* ============================================================ *@
+            @* TAB: SHIPPING ADDRESSES                                       *@
+            @* ============================================================ *@
+            @if (activeTab == "shipping")
+            {
+                <div class="row g-1 mb-2 align-items-end">
+                    <div class="col-sm-10">
+                        <label class="form-label mb-0">Shipping Address</label>
+                        <input type="text" class="form-control" @bind="newShippingAddress"
+                               placeholder="Enter shipping address" />
+                    </div>
+                    <div class="col-sm-2">
+                        <button type="button" class="btn btn-primary w-100"
+                                @onclick="AddShippingAddress">Add</button>
+                    </div>
+                </div>
+
+                <div class="table-responsive" style="max-height:300px;overflow-y:auto;">
+                    <table class="table table-bordered table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>Shipping Address</th>
+                                <th class="text-center" style="width:120px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (model.ShippingAddresses.Any())
+                            {
+                                @foreach (var addr in model.ShippingAddresses)
+                                {
+                                    <tr>
+                                        <td>
+                                            @if (editingAddress == addr)
+                                            {
+                                                <input type="text" class="form-control form-control-sm"
+                                                       @bind="addr.ShippingAddress" />
+                                            }
+                                            else
+                                            {
+                                                @addr.ShippingAddress
+                                            }
+                                        </td>
+                                        <td class="text-center">
+                                            @if (editingAddress == addr)
+                                            {
+                                                <button type="button" class="btn btn-success btn-sm me-1"
+                                                        @onclick="SaveEditAddress">Save</button>
+                                            }
+                                            else
+                                            {
+                                                <button type="button" class="btn btn-warning btn-sm me-1"
+                                                        @onclick="() => StartEditAddress(addr)">Edit</button>
+                                            }
+                                            <button type="button" class="btn btn-danger btn-sm"
+                                                    @onclick="() => RemoveShippingAddress(addr)">&times;</button>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr class="table-light">
+                                    <td colspan="2" class="text-center text-muted py-3">No shipping addresses added yet.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            @* ============================================================ *@
+            @* TAB: EVENTS                                                   *@
+            @* ============================================================ *@
+            @if (activeTab == "events")
+            {
+                <div class="row g-1 mb-2 align-items-end">
+                    <div class="col-sm-5">
+                        <label class="form-label mb-0">Event Description</label>
+                        <input type="text" class="form-control" @bind="newEventDescription"
+                               placeholder="Event description" />
+                    </div>
+                    <div class="col-sm-2">
+                        <label class="form-label mb-0">Event Date</label>
+                        <input type="date" class="form-control" @bind="newEventDate" />
+                    </div>
+                    <div class="col-sm-3">
+                        <label class="form-label mb-0">Repetition</label>
+                        <BlazoredTypeahead SearchMethod="SearchEventRepetitions"
+                                           EnableDropDown="true"
+                                           Data="EventRepetitions"
+                                           TValue="GenericDropDownModel"
+                                           TItem="GenericDropDownModel"
+                                           Value="SelectedEventRepeat"
+                                           ValueChanged="@(v => SelectedEventRepeat = v)"
+                                           ValueExpression="@(() => SelectedEventRepeat)"
+                                           Placeholder="Repetition">
+                            <SelectedTemplate>@SelectedEventRepeat?.DropDownValue_Description</SelectedTemplate>
+                            <ResultTemplate Context="r">@r.DropDownValue_Description</ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                    <div class="col-sm-2">
+                        <button type="button" class="btn btn-primary w-100"
+                                @onclick="AddEvent">Add</button>
+                    </div>
+                </div>
+
+                <div class="table-responsive" style="max-height:300px;overflow-y:auto;">
+                    <table class="table table-bordered table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>Event Description</th>
+                                <th>Event Date</th>
+                                <th>Repetition</th>
+                                <th class="text-center" style="width:80px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (model.Events.Any())
+                            {
+                                @foreach (var ev in model.Events)
+                                {
+                                    <tr>
+                                        <td>@ev.Description</td>
+                                        <td>@ev.EventDT.ToString("dd-MMM-yyyy")</td>
+                                        <td>@ev.RepeatDescription</td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-danger btn-sm"
+                                                    @onclick="() => RemoveEvent(ev)">&times;</button>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr class="table-light">
+                                    <td colspan="4" class="text-center text-muted py-3">No events added yet.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            @* ============================================================ *@
+            @* TAB: INVOICE TO                                               *@
+            @* ============================================================ *@
+            @if (activeTab == "invoiceto")
+            {
+                <div class="row g-1 mb-2 align-items-end">
+                    <div class="col-sm-10">
+                        <label class="form-label mb-0">Invoice To</label>
+                        <textarea class="form-control" rows="2" @bind="newInvoiceTo"
+                                  placeholder="Enter invoice-to address"></textarea>
+                    </div>
+                    <div class="col-sm-2">
+                        <button type="button" class="btn btn-primary w-100"
+                                @onclick="AddInvoiceTo">Add</button>
+                    </div>
+                </div>
+
+                <div class="table-responsive" style="max-height:300px;overflow-y:auto;">
+                    <table class="table table-bordered table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>Invoice To</th>
+                                <th class="text-center" style="width:120px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (model.InvoiceTo.Any())
+                            {
+                                @foreach (var it in model.InvoiceTo)
+                                {
+                                    <tr>
+                                        <td>
+                                            @if (editingInvoiceTo == it)
+                                            {
+                                                <textarea class="form-control form-control-sm" rows="2"
+                                                          @bind="it.InvoiceTo"></textarea>
+                                            }
+                                            else
+                                            {
+                                                @it.InvoiceTo
+                                            }
+                                        </td>
+                                        <td class="text-center">
+                                            @if (editingInvoiceTo == it)
+                                            {
+                                                <button type="button" class="btn btn-success btn-sm me-1"
+                                                        @onclick="SaveEditInvoiceTo">Save</button>
+                                            }
+                                            else
+                                            {
+                                                <button type="button" class="btn btn-warning btn-sm me-1"
+                                                        @onclick="() => StartEditInvoiceTo(it)">Edit</button>
+                                            }
+                                            <button type="button" class="btn btn-danger btn-sm"
+                                                    @onclick="() => RemoveInvoiceTo(it)">&times;</button>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr class="table-light">
+                                    <td colspan="2" class="text-center text-muted py-3">No invoice-to entries added yet.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            @* ============================================================ *@
+            @* FOOTER ACTION BUTTONS                                         *@
+            @* ============================================================ *@
+            <div class="row g-1 mt-3">
+                <div class="col-sm-12 d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-success"
+                            disabled="@isSaving"
+                            @onclick="SaveAndNew">Save &amp; New</button>
+                    <button type="button" class="btn btn-primary"
+                            disabled="@isSaving"
+                            @onclick="SaveAndClose">Save &amp; Close</button>
+                    <button type="button" class="btn btn-secondary"
+                            @onclick="Cancel">Cancel</button>
+                </div>
+            </div>
+
+        </form>
+    </div>
+</div>
+

@@ -5,6 +5,8 @@ using DataAccessLibrary.DAC;
 using DataAccessLibrary.DAC.Accounts;
 using DataAccessLibrary.Interface;
 using DataAccessLibrary.Interface.Accounts;
+using DataAccessLibrary.Interface.Export;
+using DataAccessLibrary.DAC.Export;
 using DataAccessLibrary.Models;
 using DocumentFormat.OpenXml.Office2016.Drawing.ChartDrawing;
 using Impulse.Areas.Identity;
@@ -109,6 +111,9 @@ builder.Services.AddScoped<IChqBookDetailDataAccess, ChqBookDetailDataAccess>();
 
 
 builder.Services.AddScoped<IReportManagerService, ReportManagerService>();
+
+builder.Services.AddScoped<IForeignCustomerDataAccess, ForeignCustomerDataAccess>();
+builder.Services.AddScoped<Impulse.Services.IForeignCustomerService, Impulse.Services.ForeignCustomerService>();
 
 
 builder.Services.AddScoped<LoadingService>();
