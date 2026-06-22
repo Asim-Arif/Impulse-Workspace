@@ -2,7 +2,7 @@
 using DataAccessLibrary.Models.ViewModels;
 using DataAccessLibrary.Interface.Accounts;
 
-namespace CIP.Services
+namespace Impulse.Services
 {
     public class ChqBookDetail : IChqBookDetail
     {

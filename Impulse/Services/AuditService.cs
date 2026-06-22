@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using System.Net;
 
-namespace CIP.Services
+namespace Impulse.Services
 {
     public class AuditService : IAuditService
     {

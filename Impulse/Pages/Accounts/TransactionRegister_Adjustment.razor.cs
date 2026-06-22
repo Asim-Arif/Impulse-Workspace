@@ -1,7 +1,6 @@
 ﻿using Azure.Identity;
 using BlazorBootstrap;
 using BlazorContextMenu;
-using CIP.Pages;
 using DataAccessLibrary;
 using DataAccessLibrary.DAC.Accounts;
 using DataAccessLibrary.Interface.Accounts;
@@ -22,10 +21,10 @@ using System.Collections.ObjectModel;
 using System.Security.AccessControl;
 using System.Threading.Tasks;
 using OpenXmlMenu = DocumentFormat.OpenXml.Office2010.CustomUI;
-using CIP.Services;
 using DocumentFormat.OpenXml.Wordprocessing;
+using Impulse.Services;
 
-namespace CIP.Pages.Accounts
+namespace Impulse.Pages.Accounts
 {
     public partial class TransactionRegister_Adjustment : ComponentBase
     {

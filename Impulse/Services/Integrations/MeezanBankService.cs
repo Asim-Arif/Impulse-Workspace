@@ -1,7 +1,8 @@
-﻿using System.Text;
+﻿using Impulse.Services;
+using System.Text;
 using System.Xml.Linq;
 
-namespace CIP.Services.Integrations
+namespace Impulse.Services.Integrations
 {
     public class MeezanBankService : IMeezanBankService
     {

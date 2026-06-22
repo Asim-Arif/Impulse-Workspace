@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Components;
 using System;
-namespace CIP.Services
+namespace Impulse.Services
 {
     public class ReportNavigationServiceCA : IReportNavigationServiceCA
     {

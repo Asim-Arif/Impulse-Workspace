@@ -1,4 +1,4 @@
-﻿using CIP.Configurations;
+﻿using Impulse.Configurations;
 using Microsoft.JSInterop;
 using System;
 using System.Net.Http;
@@ -7,7 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace CIP.Services
+namespace Impulse.Services
 {
     public class ReportNavigationService : IReportNavigationService
     {

@@ -1,14 +1,13 @@
 ﻿using BlazorBootstrap;
 using BlazorContextMenu;
-using CIP.Configurations;
-using CIP.Pages;
-using CIP.Services;
 using DataAccessLibrary;
 using DataAccessLibrary.DAC.Accounts;
 using DataAccessLibrary.Interface.Accounts;
 using DataAccessLibrary.Models;
 using DataAccessLibrary.Models.ViewModels.Accounts;
 using DocumentFormat.OpenXml.Drawing;
+using Impulse.Configurations;
+using Impulse.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
@@ -28,7 +27,7 @@ using static System.Net.WebRequestMethods;
 using OpenXmlMenu = DocumentFormat.OpenXml.Office2010.CustomUI;
 
 
-namespace CIP.Pages.Accounts
+namespace Impulse.Pages.Accounts
 {
     public partial class PrintAttachments : ComponentBase, IDisposable
     {

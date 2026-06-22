@@ -1,9 +1,9 @@
 ﻿using DataAccessLibrary.Models.ViewModels.Accounts;
 using DataAccessLibrary.Models.ViewModels;
-using CIP.Pages.Accounts;
+using Impulse.Pages.Accounts;
 using System.Security.Cryptography.X509Certificates;
 
-namespace CIP.Services
+namespace Impulse.Services
 {
     public interface ITrailBalance_BreakupService
     {

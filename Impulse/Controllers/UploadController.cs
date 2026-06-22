@@ -1,12 +1,12 @@
-﻿using CIP.Configurations;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
+using Impulse.Configurations;
 
-namespace CIP.Controllers
+namespace Impulse.Controllers
 {
     [Route("api/upload")]
     [ApiController]

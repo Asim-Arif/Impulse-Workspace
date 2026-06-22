@@ -1,4 +1,4 @@
-﻿namespace CIP.Configurations
+﻿namespace Impulse.Configurations
 {
     public class AppSettings
     {

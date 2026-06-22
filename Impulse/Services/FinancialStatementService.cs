@@ -1,4 +1,4 @@
-﻿using CIP.Pages.Accounts;
+﻿using Impulse.Pages.Accounts;
 using DataAccessLibrary.Interface.Accounts;
 using DataAccessLibrary.Models.ViewModels;
 using DataAccessLibrary.Models.ViewModels.Accounts;
@@ -7,7 +7,7 @@ using DocumentFormat.OpenXml.Wordprocessing;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Features;
 using System.Data;
 
-namespace CIP.Services
+namespace Impulse.Services
 {
     public class FinancialStatementService : IFinancialStatementService
     {

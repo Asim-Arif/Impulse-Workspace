@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
-namespace CIP.Data
+namespace Impulse.Data
 {
     public class ApplicationDbContext : IdentityDbContext
     {

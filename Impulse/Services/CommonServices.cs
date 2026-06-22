@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Components.Forms;
 using System.Data;
 using System.Xml.Linq;
 
-namespace CIP.Services 
+namespace Impulse.Services
 {
     public class CommonServices : ICommonServices
     {

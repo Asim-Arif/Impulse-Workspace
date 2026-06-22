@@ -4,11 +4,12 @@ using DataAccessLibrary.DAC.Accounts;
 using DataAccessLibrary.Models.ViewModels.Accounts;
 using DocumentFormat.OpenXml.Spreadsheet;
 using DocumentFormat.OpenXml.Vml.Office;
+using Impulse.Services;
 using Renci.SshNet;
 using System.Data;
 using System.IO;
 
-namespace CIP.Services.Integrations
+namespace Impulse.Services.Integrations
 {
     public class FaysalBankServices : IFaysalBankServices
     {

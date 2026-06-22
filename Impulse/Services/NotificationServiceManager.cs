@@ -1,7 +1,7 @@
 ﻿using Microsoft.JSInterop;
 using Radzen;
 
-namespace CIP.Services
+namespace Impulse.Services
 {
     public class NotificationServiceManager : INotificationService
     {

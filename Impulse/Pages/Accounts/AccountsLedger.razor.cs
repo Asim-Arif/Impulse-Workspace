@@ -1,17 +1,16 @@
 ﻿using BlazorBootstrap;
 using BlazorContextMenu;
-using CIP.Constants;
-using CIP.Pages;
-using CIP.Services;
 using DataAccessLibrary;
 using DataAccessLibrary.Interface.Accounts;
 using DataAccessLibrary.Models.ViewModels;
 using DataAccessLibrary.Models.ViewModels.Accounts;
+using Impulse.Constants;
+using Impulse.Services;
 using Microsoft.AspNetCore.Components;
 using Radzen;
 using System.Collections.Generic;
 
-namespace CIP.Pages.Accounts
+namespace Impulse.Pages.Accounts
 {
     public partial class AccountsLedger : ComponentBase
     {

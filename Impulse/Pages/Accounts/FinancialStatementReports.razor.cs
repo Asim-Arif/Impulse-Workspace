@@ -9,9 +9,9 @@ using Microsoft.JSInterop;
 using DataAccessLibrary.Models;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Components.Forms;
-using CIP.Controllers;
+using Impulse.Controllers;
 
-namespace CIP.Pages.Accounts
+namespace Impulse.Pages.Accounts
 {
         public partial class FinancialStatementReports : ComponentBase
         {

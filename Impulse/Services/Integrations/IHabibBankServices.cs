@@ -1,6 +1,6 @@
 ﻿using DataAccessLibrary.Models.ViewModels.Accounts;
 
-namespace CIP.Services
+namespace Impulse.Services.Integrations
 {
     public interface IHabibBankServices
     {

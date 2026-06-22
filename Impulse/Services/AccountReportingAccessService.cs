@@ -3,7 +3,7 @@ using DataAccessLibrary.Models.ViewModels;
 using DataAccessLibrary.Models.ViewModels.Accounts;
 using System.Data;
 
-namespace CIP.Services
+namespace Impulse.Services
 {
     public class AccountReportingAccessService : IAccountReportingAccessService
     {

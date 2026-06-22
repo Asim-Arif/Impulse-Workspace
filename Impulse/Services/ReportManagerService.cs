@@ -1,4 +1,4 @@
-﻿namespace CIP.Services
+﻿namespace Impulse.Services
 {
     public class ReportManagerService : IReportManagerService
     {

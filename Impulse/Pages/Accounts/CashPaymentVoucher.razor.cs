@@ -1,11 +1,11 @@
-﻿using CIP.Services;
-using DataAccessLibrary.Models.ViewModels.Accounts;
+﻿using DataAccessLibrary.Models.ViewModels.Accounts;
 using DataAccessLibrary.Models.ViewModels;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Radzen;
+using Impulse.Services;
 
-namespace CIP.Pages.Accounts
+namespace Impulse.Pages.Accounts
 {
     public partial class CashPaymentVoucher : ComponentBase, IDisposable
     {

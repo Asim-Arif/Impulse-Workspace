@@ -1,13 +1,12 @@
 ﻿using BlazorBootstrap;
 using BlazorContextMenu;
-using CIP.Pages;
-using CIP.Services;
 using DataAccessLibrary;
 using DataAccessLibrary.DAC.Accounts;
 using DataAccessLibrary.Interface.Accounts;
 using DataAccessLibrary.Models;
 using DataAccessLibrary.Models.ViewModels.Accounts;
 using DocumentFormat.OpenXml.Drawing;
+using Impulse.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -23,7 +22,7 @@ using System.Threading.Tasks;
 using OpenXmlMenu = DocumentFormat.OpenXml.Office2010.CustomUI;
 
 
-namespace CIP.Pages.Accounts
+namespace Impulse.Pages.Accounts
 {
     public partial class TrailBalance_Breakup : ComponentBase, IDisposable
     {

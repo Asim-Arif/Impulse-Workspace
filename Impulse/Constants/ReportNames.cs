@@ -1,4 +1,4 @@
-﻿namespace CIP.Constants
+﻿namespace Impulse.Constants
 {
     public static class ReportNames
     {

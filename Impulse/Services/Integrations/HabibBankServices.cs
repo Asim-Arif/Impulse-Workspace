@@ -8,7 +8,7 @@ using Renci.SshNet;
 using System.Data;
 using System.IO;
 
-namespace CIP.Services.Integrations
+namespace Impulse.Services.Integrations
 {
     public class HabibBankServices : IHabibBankServices
     {

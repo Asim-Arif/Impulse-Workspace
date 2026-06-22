@@ -1,6 +1,6 @@
 ﻿using System.Data;
 
-namespace CIP.Services
+namespace Impulse.Services
 {
     public interface IDBHelperService
     {

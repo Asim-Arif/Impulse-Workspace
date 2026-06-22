@@ -1,4 +1,4 @@
-namespace CIP.Data
+namespace Impulse.Data
 {
     public class WeatherForecastService
     {

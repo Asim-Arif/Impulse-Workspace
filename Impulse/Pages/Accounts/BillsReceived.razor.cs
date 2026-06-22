@@ -1,22 +1,21 @@
 ﻿using BlazorBootstrap;
 using BlazorContextMenu;
-using CIP.Constants;
-using CIP.Pages;
-using CIP.Pages.SelectionModals;
-using CIP.Services;
-using CIP.Services.Integrations;
+using Impulse.Pages.SelectionModals;
+using Impulse.Services.Integrations;
 using DataAccessLibrary;
 using DataAccessLibrary.Interface.Accounts;
 using DataAccessLibrary.Models.ViewModels;
 using DataAccessLibrary.Models.ViewModels.Accounts;
 using DocumentFormat.OpenXml.Spreadsheet;
 using Humanizer;
+using Impulse.Constants;
+using Impulse.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.JSInterop;
 using Radzen;
 
-namespace CIP.Pages.Accounts
+namespace Impulse.Pages.Accounts
 {
     public partial class BillsReceived : ComponentBase
     {

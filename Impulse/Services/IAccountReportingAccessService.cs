@@ -1,7 +1,7 @@
 ﻿using DataAccessLibrary.Models.ViewModels;
 using DataAccessLibrary.Models.ViewModels.Accounts;
 
-namespace CIP.Services
+namespace Impulse.Services
 {
     public interface IAccountReportingAccessService
     {

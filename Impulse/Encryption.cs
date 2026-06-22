@@ -1,6 +1,6 @@
 ﻿using System.Text;
 
-namespace CIP
+namespace Impulse
 {
     public class Encryption
     {

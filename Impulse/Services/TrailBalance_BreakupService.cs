@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using CIP.Pages.Accounts;
+using Impulse.Pages.Accounts;
 using DataAccessLibrary.Interface.Accounts;
 using DataAccessLibrary.Models.ViewModels;
 using DataAccessLibrary.Models.ViewModels.Accounts;
@@ -10,7 +10,7 @@ using DocumentFormat.OpenXml.Vml.Office;
 using DocumentFormat.OpenXml.Wordprocessing;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Features;
 
-namespace CIP.Services
+namespace Impulse.Services
 {
     public class TrailBalance_BreakupService : ITrailBalance_BreakupService
     {

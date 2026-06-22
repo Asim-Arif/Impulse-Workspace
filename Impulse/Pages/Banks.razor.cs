@@ -10,9 +10,9 @@ using Microsoft.JSInterop;
 using DataAccessLibrary.Models;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Components.Forms;
-using CIP.Controllers;
+using Impulse.Controllers;
 
-namespace CIP.Pages
+namespace Impulse.Pages
 {
         public partial class Banks : ComponentBase
         {

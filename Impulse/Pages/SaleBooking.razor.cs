@@ -8,7 +8,7 @@ using DataAccessLibrary.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
-namespace CIP.Pages
+namespace Impulse.Pages
 {
     public partial class SaleBooking : ComponentBase
     {

@@ -1,7 +1,7 @@
 ﻿using DataAccessLibrary.Models.ViewModels;
 using Microsoft.AspNetCore.Components;
 
-namespace CIP.Pages.SelectionModals
+namespace Impulse.Pages.SelectionModals
 {
     public partial class GetSingleDropdownValue
     {

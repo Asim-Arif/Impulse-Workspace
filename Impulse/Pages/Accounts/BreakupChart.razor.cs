@@ -1,12 +1,12 @@
 ﻿using BlazorBootstrap;
 using BlazorContextMenu;
-using CIP.Services;
 using DataAccessLibrary;
 using DataAccessLibrary.Interface.Accounts;
 using DataAccessLibrary.Models;
 using DataAccessLibrary.Models.ViewModels.Accounts;
 using DocumentFormat.OpenXml.Office2010.CustomUI;
 using DocumentFormat.OpenXml.VariantTypes;
+using Impulse.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
@@ -15,7 +15,7 @@ using Radzen;
 using System.Collections.ObjectModel;
 using OpenXmlMenu = DocumentFormat.OpenXml.Office2010.CustomUI;
 
-namespace CIP.Pages.Accounts
+namespace Impulse.Pages.Accounts
 {
     public partial class BreakupChart : ComponentBase
     {

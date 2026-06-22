@@ -31,8 +31,7 @@ using DataAccessLibrary;
 using DataAccessLibrary.Models;
 using Microsoft.PowerBI.Api.Models;
 
-
-namespace CIP.Areas.Identity.Pages.Account
+namespace Impulse.Areas.Identity.Pages.Account
 {
     public class LoginModel : PageModel
     {

@@ -2,7 +2,7 @@
 using DataAccessLibrary.Models.ViewModels.Accounts;
 using Microsoft.AspNetCore.Components.Forms;
 
-namespace CIP.Services
+namespace Impulse.Services
 {
     public interface ICommonServices
     {

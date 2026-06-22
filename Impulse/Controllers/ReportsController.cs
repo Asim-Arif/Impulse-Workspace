@@ -1,4 +1,4 @@
-﻿using CIP.Configurations;
+﻿using Impulse.Configurations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.Extensions.Options;
@@ -8,7 +8,7 @@ using System;
 using System.Diagnostics;
 using System.Text;
 
-namespace CIP.Controllers
+namespace Impulse.Controllers
 {
     [Route("api/reports")]
     [ApiController]

@@ -1,12 +1,12 @@
-﻿using CIP.Services;
-using DataAccessLibrary.Models.ViewModels;
+﻿using DataAccessLibrary.Models.ViewModels;
 using DataAccessLibrary.Models.ViewModels.Accounts;
+using Impulse.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.JSInterop;
 using Radzen;
 
-namespace CIP.Pages.Accounts
+namespace Impulse.Pages.Accounts
 {
     public partial class JournalVoucher : ComponentBase, IDisposable
     {

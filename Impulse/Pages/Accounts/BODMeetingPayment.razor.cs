@@ -1,13 +1,14 @@
-﻿using CIP.Constants;
-using CIP.Services;
-using DataAccessLibrary.Models.ViewModels;
+﻿using DataAccessLibrary.Models.ViewModels;
 using DataAccessLibrary.Models.ViewModels.Accounts;
+using Impulse.Constants;
+using Impulse.Services;
+using Impulse.Services.Integrations;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.JSInterop;
 using Radzen;
 
-namespace CIP.Pages.Accounts
+namespace Impulse.Pages.Accounts
 {
     public partial class BODMeetingPayment : ComponentBase
     {

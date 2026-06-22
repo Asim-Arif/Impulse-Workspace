@@ -1,9 +1,10 @@
 ﻿using DataAccessLibrary;
 using DataAccessLibrary.Interface.Accounts;
+using Impulse;
 using Microsoft.PowerBI.Api.Models;
 using System.Data;
 
-namespace CIP.Services
+namespace Impulse.Services
 {
     public class DBHelperService : IDBHelperService
     {

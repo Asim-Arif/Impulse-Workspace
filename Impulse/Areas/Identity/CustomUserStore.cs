@@ -1,11 +1,12 @@
 ﻿using Azure.Core.Cryptography;
-using CIP.Data;
+using Impulse;
+using Impulse.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.BlazorIdentity.Pages.Manage;
 
-namespace CIP.Areas.Identity
+namespace Impulse.Areas.Identity
 {
     public class CustomUserStore
     {

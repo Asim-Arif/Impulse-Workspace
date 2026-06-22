@@ -1,7 +1,7 @@
 ﻿using DataAccessLibrary.Models.ViewModels.Accounts;
 using DataAccessLibrary.Models.ViewModels;
 
-namespace CIP.Services
+namespace Impulse.Services
 {
     public interface IVoucherService
     {
