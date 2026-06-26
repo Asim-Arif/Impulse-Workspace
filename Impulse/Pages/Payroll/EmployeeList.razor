@@ -1,0 +1,389 @@
+@page "/payroll/employeelist"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Impulse.Services
+@using Blazored.Typeahead
+
+<PageTitle>@(ContractorsOnly ? "Temp. Employee List" : "Employee List")</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+
+        <div class="card-body pt-3">
+
+            <!-- ── Toolbar: filters + actions all in one row ── -->
+            <div class="row g-2 mb-3 align-items-end">
+
+                <!-- Title -->
+                <div class="col-auto d-flex align-items-end pb-1">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas @(ContractorsOnly ? "fa-user-clock" : "fa-user-tie") text-primary me-2"></i>
+                        @(ContractorsOnly ? "Temp. Employee List" : "Employee List")
+                    </h5>
+                </div>
+
+                <!-- Department -->
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Department</label>
+                    <BlazoredTypeahead SearchMethod="SearchDepartments"
+                                       EnableDropDown="true"
+                                       Data="departments"
+                                       TValue="DepartmentListItemModel"
+                                       TItem="DepartmentListItemModel"
+                                       Value="selectedDepartment"
+                                       ValueChanged="OnDepartmentChanged"
+                                       ValueExpression="@(() => selectedDepartment)"
+                                       Placeholder="All Departments"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="selectedDept">
+                            @selectedDept?.Name
+                        </SelectedTemplate>
+                        <ResultTemplate Context="dept">
+                            @dept.Name
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <!-- Employee -->
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Employee</label>
+                    <BlazoredTypeahead SearchMethod="SearchEmployees"
+                                       EnableDropDown="true"
+                                       Data="employeesForSelect"
+                                       TValue="EmployeeListItemModel"
+                                       TItem="EmployeeListItemModel"
+                                       Value="selectedEmployeeFilter"
+                                       ValueChanged="OnEmployeeChanged"
+                                       ValueExpression="@(() => selectedEmployeeFilter)"
+                                       Placeholder="All Employees"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="selectedEmp">
+                            @selectedEmp?.Name
+                        </SelectedTemplate>
+                        <ResultTemplate Context="emp">
+                            @emp.Name
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <!-- Search -->
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;"><i class="fas fa-search me-1"></i>Search</label>
+                    <input type="text" class="form-control form-control-sm" placeholder="Search by ID, name, designation, phone…" @bind="searchText" @bind:event="oninput" />
+                </div>
+
+                <!-- Switches -->
+                <div class="col-auto d-flex align-items-center gap-3 pb-1">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="showInactiveCheck" checked="@showInactive" @onchange="OnShowInactiveChanged">
+                        <label class="form-check-label text-dark-emphasis fw-semibold" for="showInactiveCheck" style="font-size:0.85rem;">Inactive</label>
+                    </div>
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="showPictureCheck" checked="@showPicture" @onchange="OnShowPictureChanged">
+                        <label class="form-check-label text-dark-emphasis fw-semibold" for="showPictureCheck" style="font-size:0.85rem;">Photo</label>
+                    </div>
+                </div>
+
+                <!-- Action Buttons (pushed to far right) -->
+                <div class="col d-flex align-items-end justify-content-end gap-2 pb-1">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="RefreshList" title="Refresh List">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <div class="dropdown">
+                        <button class="btn btn-primary btn-sm dropdown-toggle" type="button" id="reportsMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-print me-1"></i> Reports
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="reportsMenuButton">
+                            <li><h6 class="dropdown-header">Employee Lists</h6></li>
+                            <li><button class="dropdown-item" @onclick="() => PrintEmpList(false, false)"><i class="fas fa-file-invoice-dollar me-2 text-muted"></i>With Salary</button></li>
+                            <li><button class="dropdown-item" @onclick='() => PrintEmpListWithoutSal(false, ContractorsOnly ? "Temp. Employee List" : "Employee List")'><i class="fas fa-file-alt me-2 text-muted"></i>Without Salary</button></li>
+                            <li><button class="dropdown-item" @onclick='() => PrintEmpListWithoutSal(true, ContractorsOnly ? "Temp. Employee List (With DOB)" : "Employee List (With DOB)")'><i class="fas fa-calendar-alt me-2 text-muted"></i>With DOB</button></li>
+                            <li><button class="dropdown-item" @onclick="() => PrintEmpList(false, false, false, true)"><i class="fas fa-tags me-2 text-muted"></i>Designationwise</button></li>
+                            <li><button class="dropdown-item" @onclick="() => PrintEmpList(false, false, true, false)"><i class="fas fa-id-badge me-2 text-muted"></i>With Old ID</button></li>
+                            <li><button class="dropdown-item" @onclick="() => PrintEmpList(true, false)"><i class="fas fa-coins me-2 text-muted"></i>External Salary</button></li>
+                            <li><button class="dropdown-item" @onclick="PrintEmpListCF"><i class="fas fa-credit-card me-2 text-muted"></i>Card Fields</button></li>
+                            <li><button class="dropdown-item" @onclick="PrintEmpListWCardID"><i class="fas fa-barcode me-2 text-muted"></i>Card ID List</button></li>
+                            <li><button class="dropdown-item" @onclick="PrintEmpListSalaryPercentage"><i class="fas fa-percentage me-2 text-muted"></i>Salary Percentage</button></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header">Special Filters</h6></li>
+                            <li><button class="dropdown-item" @onclick='() => PrintEmpListWithoutSal(false, "Mess Members", false)'><i class="fas fa-utensils me-2 text-muted"></i>Mess Members</button></li>
+                            <li><button class="dropdown-item" @onclick='() => PrintEmpListWithoutSal(false, "Union Members", false)'><i class="fas fa-handshake me-2 text-muted"></i>Union Members</button></li>
+                            <li><button class="dropdown-item" @onclick="PrintEmpListDeptSelection"><i class="fas fa-building me-2 text-muted"></i>Department Selection</button></li>
+                            @if (ContractorsOnly)
+                            {
+                                <li><button class="dropdown-item" @onclick='() => PrintEmpListWithoutSal(false, "Temporary Employee List", true)'><i class="fas fa-user-clock me-2 text-muted"></i>Temporary Employee List Report</button></li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Selected employee badge -->
+            @if (highlightedEmployee != null)
+            {
+                <div class="mb-3">
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill">
+                        Selected: <strong>@highlightedEmployee.Name</strong> (@highlightedEmployee.EmpID)
+                    </span>
+                </div>
+            }
+
+            <!-- ── Main Workspace Layout (List + Preview) ── -->
+            <div class="row g-3">
+                <!-- Employee List Table -->
+                <div class="@(showPicture && !string.IsNullOrEmpty(selectedEmployeePicBase64) ? "col-lg-9" : "col-12")">
+                    @if (isLoading)
+                    {
+                        <div class="d-flex align-items-center justify-content-center py-5">
+                            <div class="spinner-border text-primary me-2" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="text-secondary fw-semibold">Loading data...</span>
+                        </div>
+                    }
+                    else
+                    {
+                        @if (selectedDepartment != null)
+                        {
+                            @* ── Single-department view ── *@
+                            var singleDeptEmps = GetFilteredEmployees(selectedDepartment.DeptID).ToList();
+                            <div class="card border border-light-subtle rounded-3 overflow-hidden shadow-xs">
+                                <div class="card-header d-flex justify-content-between align-items-center py-2 px-3 bg-light">
+                                    <div class="d-flex align-items-center">
+                                        <span class="badge rounded-circle p-2 me-2" style="background-color: @ConvertWin32ColorToHex(selectedDepartment.Color); width: 12px; height: 12px;"></span>
+                                        <h6 class="mb-0 fw-bold" style="color: @(selectedDepartment.Active ? ConvertWin32ColorToHex(selectedDepartment.Color) : "#777777"); text-decoration: @(selectedDepartment.Active ? "none" : "line-through");">
+                                            @selectedDepartment.Name <small class="text-secondary ms-1 fw-normal">(@selectedDepartment.DeptID)</small>
+                                        </h6>
+                                    </div>
+                                    <span class="badge bg-secondary-subtle text-secondary rounded-pill">@singleDeptEmps.Count Employees</span>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.9rem;">
+                                        <thead class="table-light text-secondary" style="font-size: 0.8rem; text-transform: uppercase; position: sticky; top: 0; z-index: 1;">
+                                            <tr>
+                                                <th class="ps-3" style="width: 120px;">Emp ID</th>
+                                                <th>Name</th>
+                                                <th>Father's Name</th>
+                                                <th>Designation</th>
+                                                <th>Phone</th>
+                                                <th class="text-end">Salary</th>
+                                                <th>Since</th>
+                                                <th class="text-center" style="width: 150px;">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var emp in singleDeptEmps)
+                                            {
+                                                bool isSelected = highlightedEmployee?.EmpID == emp.EmpID;
+                                                <tr @onclick="() => HighlightEmployee(emp)"
+                                                    class="clickable-row @(isSelected ? "table-primary" : "")"
+                                                    style="cursor: pointer; transition: background 0.15s ease;">
+                                                    <td class="ps-3 fw-semibold">
+                                                        <span style="color: @(emp.Active ? ConvertWin32ColorToHex(selectedDepartment.Color) : "red"); text-decoration: @(emp.Active ? "none" : "line-through");">
+                                                            @emp.EmpID
+                                                        </span>
+                                                    </td>
+                                                    <td><span class="fw-semibold" style="color: @(emp.Active ? "#2b3035" : "red");">@emp.Name</span></td>
+                                                    <td class="text-secondary">@emp.FName</td>
+                                                    <td><span class="badge bg-light-subtle border text-dark-emphasis">@emp.Designation</span></td>
+                                                    <td>@emp.Phone1</td>
+                                                    <td class="text-end fw-bold">@emp.StartingSalary.ToString("N0")</td>
+                                                    <td>@emp.JoinDate?.ToString("dd-MMM-yyyy")</td>
+                                                    <td class="text-center" @onclick:stopPropagation="true">
+                                                        <div class="btn-group">
+                                                            <button type="button" class="btn btn-outline-secondary btn-xs dropdown-toggle py-0 px-2" style="font-size: 0.8rem;" data-bs-toggle="dropdown" aria-expanded="false">Manage</button>
+                                                            <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="font-size: 0.85rem;">
+                                                                <li><button class="dropdown-item text-primary" @onclick="() => PrintEmpDetail(emp.EmpID)"><i class="fas fa-file-user me-2"></i>Print Details</button></li>
+                                                                <li><button class="dropdown-item text-primary" @onclick="() => PrintEmpCard(emp.EmpID)"><i class="fas fa-id-badge me-2"></i>Print Card</button></li>
+                                                                <li><button class="dropdown-item" @onclick="() => ToggleActiveState(emp)">
+                                                                    @if (emp.Active) { <span class="text-danger"><i class="fas fa-user-slash me-2"></i>Make Inactive</span> }
+                                                                    else { <span class="text-success"><i class="fas fa-user-check me-2"></i>Make Active</span> }
+                                                                </button></li>
+                                                                @if (ContractorsOnly && emp.Active)
+                                                                {
+                                                                    <li><hr class="dropdown-divider"></li>
+                                                                    <li><button class="dropdown-item text-warning" @onclick="() => TransferToPermanent(emp)"><i class="fas fa-exchange-alt me-2"></i>Transfer to Permanent</button></li>
+                                                                }
+                                                            </ul>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            @* ── All-departments view: ONE unified table with department group-header rows ── *@
+                            <div class="card border border-light-subtle rounded-3 overflow-hidden shadow-xs">
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.9rem;">
+                                        <thead class="text-secondary" style="font-size: 0.8rem; text-transform: uppercase; position: sticky; top: 0; z-index: 2; background: #f8f9fa; box-shadow: 0 1px 0 #dee2e6;">
+                                            <tr>
+                                                <th class="ps-3" style="width: 120px;">Emp ID</th>
+                                                <th>Name</th>
+                                                <th>Father's Name</th>
+                                                <th>Designation</th>
+                                                <th>Phone</th>
+                                                <th class="text-end">Salary</th>
+                                                <th>Since</th>
+                                                <th class="text-center" style="width: 150px;">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var dept in departments)
+                                            {
+                                                var deptEmployees = GetFilteredEmployees(dept.DeptID).ToList();
+                                                @if (deptEmployees.Count > 0)
+                                                {
+                                                    @* Department group-header row *@
+                                                    <tr style="background: linear-gradient(90deg, @(ConvertWin32ColorToHex(dept.Color))18 0%, #f8f9fa 100%); border-top: 2px solid @(ConvertWin32ColorToHex(dept.Color))40;">
+                                                        <td colspan="8" class="py-2 ps-3">
+                                                            <div class="d-flex align-items-center justify-content-between">
+                                                                <div class="d-flex align-items-center">
+                                                                    <span class="rounded-circle d-inline-block me-2" style="background-color: @ConvertWin32ColorToHex(dept.Color); width: 10px; height: 10px; flex-shrink: 0;"></span>
+                                                                    <span class="fw-bold" style="color: @(dept.Active ? ConvertWin32ColorToHex(dept.Color) : "#777777"); font-size: 0.85rem; text-decoration: @(dept.Active ? "none" : "line-through"); text-transform: none; letter-spacing: 0;">
+                                                                        @dept.Name
+                                                                    </span>
+                                                                    <span class="text-secondary ms-2 fw-normal" style="font-size: 0.78rem; text-transform: none;">(@dept.DeptID)</span>
+                                                                </div>
+                                                                <span class="badge rounded-pill me-2" style="background: @(ConvertWin32ColorToHex(dept.Color))22; color: @ConvertWin32ColorToHex(dept.Color); border: 1px solid @(ConvertWin32ColorToHex(dept.Color))55; font-size: 0.75rem;">@deptEmployees.Count</span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    @* Employee data rows *@
+                                                    @foreach (var emp in deptEmployees)
+                                                    {
+                                                        bool isSelected = highlightedEmployee?.EmpID == emp.EmpID;
+                                                        <tr @onclick="() => HighlightEmployee(emp)"
+                                                            class="clickable-row @(isSelected ? "table-primary" : "")"
+                                                            style="cursor: pointer; transition: background 0.15s ease;">
+                                                            <td class="ps-3 fw-semibold">
+                                                                <span style="color: @(emp.Active ? ConvertWin32ColorToHex(dept.Color) : "red"); text-decoration: @(emp.Active ? "none" : "line-through");">
+                                                                    @emp.EmpID
+                                                                </span>
+                                                            </td>
+                                                            <td><span class="fw-semibold" style="color: @(emp.Active ? "#2b3035" : "red");">@emp.Name</span></td>
+                                                            <td class="text-secondary">@emp.FName</td>
+                                                            <td><span class="badge bg-light-subtle border text-dark-emphasis">@emp.Designation</span></td>
+                                                            <td>@emp.Phone1</td>
+                                                            <td class="text-end fw-bold">@emp.StartingSalary.ToString("N0")</td>
+                                                            <td>@emp.JoinDate?.ToString("dd-MMM-yyyy")</td>
+                                                            <td class="text-center" @onclick:stopPropagation="true">
+                                                                <div class="btn-group">
+                                                                    <button type="button" class="btn btn-outline-secondary btn-xs dropdown-toggle py-0 px-2" style="font-size: 0.8rem;" data-bs-toggle="dropdown" aria-expanded="false">Manage</button>
+                                                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="font-size: 0.85rem;">
+                                                                        <li><button class="dropdown-item text-primary" @onclick="() => PrintEmpDetail(emp.EmpID)"><i class="fas fa-file-user me-2"></i>Print Details</button></li>
+                                                                        <li><button class="dropdown-item text-primary" @onclick="() => PrintEmpCard(emp.EmpID)"><i class="fas fa-id-badge me-2"></i>Print Card</button></li>
+                                                                        <li><button class="dropdown-item" @onclick="() => ToggleActiveState(emp)">
+                                                                            @if (emp.Active) { <span class="text-danger"><i class="fas fa-user-slash me-2"></i>Make Inactive</span> }
+                                                                            else { <span class="text-success"><i class="fas fa-user-check me-2"></i>Make Active</span> }
+                                                                        </button></li>
+                                                                        @if (ContractorsOnly && emp.Active)
+                                                                        {
+                                                                            <li><hr class="dropdown-divider"></li>
+                                                                            <li><button class="dropdown-item text-warning" @onclick="() => TransferToPermanent(emp)"><i class="fas fa-exchange-alt me-2"></i>Transfer to Permanent</button></li>
+                                                                        }
+                                                                    </ul>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                }
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        }
+
+                        <!-- Total count footer -->
+                        <div class="d-flex align-items-center mt-3 p-3 bg-light rounded-3 border">
+                            <span class="fw-bold text-dark-emphasis"><i class="fas fa-users text-secondary me-2"></i> Total Active Employees:</span>
+                            <span class="badge bg-primary text-white ms-2 px-3 py-2 rounded-pill fs-6">@allEmployees.Count(e => e.Active)</span>
+                        </div>
+                    }
+                </div>
+
+                <!-- Picture Preview Column -->
+                @if (showPicture && !string.IsNullOrEmpty(selectedEmployeePicBase64))
+                {
+                    <div class="col-lg-3">
+                        <div class="card border border-light-subtle rounded-3 p-3 shadow-xs text-center" style="background: rgba(255, 255, 255, 0.95); position: sticky; top: 15px;">
+                            <h6 class="fw-bold text-secondary border-bottom pb-2 mb-3">Employee Photo</h6>
+
+                            <div class="bg-light rounded-3 p-2 mb-3 border d-flex align-items-center justify-content-center" style="height: 250px;">
+                                <img src="data:image/jpeg;base64,@selectedEmployeePicBase64" class="img-fluid rounded-3 shadow-sm" style="max-height: 100%; max-width: 100%; object-fit: contain;" alt="Photo" />
+                            </div>
+
+                            @if (highlightedEmployee != null)
+                            {
+                                <div class="text-start">
+                                    <h6 class="fw-bold text-dark mb-1">@highlightedEmployee.Name</h6>
+                                    <p class="text-muted mb-2" style="font-size: 0.85rem;">@highlightedEmployee.Designation</p>
+
+                                    <div class="border-top pt-2" style="font-size: 0.8rem;">
+                                        <div class="d-flex justify-content-between mb-1">
+                                            <span class="text-secondary">Emp ID:</span>
+                                            <span class="fw-bold">@highlightedEmployee.EmpID</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between mb-1">
+                                            <span class="text-secondary">Joined:</span>
+                                            <span class="fw-bold">@highlightedEmployee.JoinDate?.ToString("dd-MMM-yyyy")</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Discontinuation Remarks Modal -->
+@if (showInactiveModal && employeeToInactivate != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.45); backdrop-filter: blur(4px);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-danger text-white border-0 py-3" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <h6 class="modal-title fw-bold"><i class="fas fa-user-slash me-2"></i>Employee Discontinuation</h6>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CancelInactivation"></button>
+                </div>
+                <div class="modal-body py-4">
+                    <p class="text-secondary">You are about to discontinue employee <strong>@employeeToInactivate.Name</strong> (@employeeToInactivate.EmpID).</p>
+
+                    <div class="mb-3">
+                        <label for="discontDate" class="form-label fw-bold text-secondary">Discontinuation Date</label>
+                        <input type="date" id="discontDate" class="form-control" @bind="discontinuationDate" />
+                    </div>
+
+                    <div class="mb-0">
+                        <label for="discontRemarks" class="form-label fw-bold text-secondary">Remarks / Reason</label>
+                        <textarea id="discontRemarks" class="form-control" rows="3" placeholder="Enter discontinuation details..." @bind="discontinuationRemarks"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-3">
+                    <button type="button" class="btn btn-secondary btn-sm rounded-pill px-4" @onclick="CancelInactivation">Cancel</button>
+                    <button type="button" class="btn btn-danger btn-sm rounded-pill px-4" @onclick="SaveInactivation">Deactivate Employee</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .clickable-row:hover {
+        background-color: rgba(13, 110, 253, 0.05) !important;
+    }
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+</style>

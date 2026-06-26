@@ -8,6 +8,9 @@ using DataAccessLibrary.Interface.Accounts;
 using DataAccessLibrary.Interface.Export;
 using DataAccessLibrary.DAC.Export;
 using DataAccessLibrary.Models;
+using DataAccessLibrary.Interface.Payroll;
+using DataAccessLibrary.DAC.Payroll;
+using Impulse.Services.Payroll;
 using DocumentFormat.OpenXml.Office2016.Drawing.ChartDrawing;
 using Impulse.Areas.Identity;
 using Impulse.Configurations;
@@ -94,6 +97,8 @@ builder.Services.AddRadzenComponents();
 builder.Services.AddScoped<Radzen.NotificationService>();
 
 builder.Services.AddScoped<IVoucherService, VoucherService>();
+builder.Services.AddScoped<IEmployeeDataAccess, EmployeeDataAccess>();
+builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<ICommonServices, CommonServices>();
 builder.Services.AddScoped<IDBHelperService, DBHelperService>();
 builder.Services.AddScoped<IAuditService, AuditService>();

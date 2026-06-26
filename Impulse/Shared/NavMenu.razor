@@ -1,4 +1,4 @@
-﻿@using Impulse.Services
+@using Impulse.Services
 @inject IJSRuntime JSRuntime
 @inject IReportManagerService ReportManager
 
@@ -388,6 +388,26 @@
                 </div>
             }
         </div>
+        <div class="nav-item px-2">
+            <div class="nav-section-header" @onclick="TogglePayroll">
+                <i class="fas fa-users-gear me-2"></i>
+                <span>Payroll</span>
+                <i class="fas fa-chevron-down ms-auto @(isPayrollExpanded ? "rotated" : "")"></i>
+            </div>
+            @if (isPayrollExpanded)
+            {
+                <div class="nav-sub-section">
+                    <div class="nav-sub-links px-2">
+                        <NavLink class="nav-link" href="/payroll/employeelist">
+                            <i class="fas fa-user-tie me-2"></i> Employee List
+                        </NavLink>
+                        <NavLink class="nav-link" href="/payroll/employeelist?contractorsOnly=true">
+                            <i class="fas fa-user-clock me-2"></i> Temp. Employee List
+                        </NavLink>
+                    </div>
+                </div>
+            }
+        </div>
         <div class="nav-item px-3 mt-auto">
             <form method="post" action="/Identity/Account/Logout">
                 <button type="submit" class="nav-link text-danger w-100 text-start sign-out-button">
@@ -412,6 +432,7 @@
     private bool isReportsExpanded = false;
     private bool isStatementsExpanded = false;
     private bool isExportExpanded = false;
+    private bool isPayrollExpanded = false;
 
     private async Task ToggleNavMenu()
     {
@@ -425,5 +446,6 @@
     private void ToggleReports() => isReportsExpanded = !isReportsExpanded;
     private void ToggleStatements() => isStatementsExpanded = !isStatementsExpanded;
     private void ToggleExport() => isExportExpanded = !isExportExpanded;
+    private void TogglePayroll() => isPayrollExpanded = !isPayrollExpanded;
     
 }

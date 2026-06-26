@@ -1,4 +1,4 @@
-﻿namespace Impulse.Constants
+namespace Impulse.Constants
 {
     public static class ReportNames
     {
@@ -57,6 +57,18 @@
         {
             private const string Folder = "Payroll/";
             public const string PaySlip = Folder + "PaySlip.rpt";
+
+            // Employee List Reports
+            public const string EmpList                = Folder + "rptEmpList.rpt";
+            public const string EmpListWithOldID       = Folder + "rptEmpListWithOldID.rpt";
+            public const string EmpListDesignationwise = Folder + "rptEmpListDesignationwise.rpt";
+            public const string EmpListWithoutSal      = Folder + "rptEmpListWithoutSal.rpt";
+            public const string EmpCards               = Folder + "rptEmpCards.rpt";
+            public const string EmpDetail              = Folder + "rptEmpDetail.rpt";
+            public const string EmpCardFields          = Folder + "rptEmpCardFields.rpt";
+            public const string EmpListWCardID         = Folder + "rptEmpListWCardID.rpt";
+            public const string EmpListPercentage      = Folder + "rptEmpListPercentage.rpt";
+            public const string AppForm                = Folder + "rptAppForm.rpt";
         }
     }
 }
