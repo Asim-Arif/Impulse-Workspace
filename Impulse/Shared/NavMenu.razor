@@ -1,29 +1,44 @@
 @using Impulse.Services
 @inject IJSRuntime JSRuntime
 @inject IReportManagerService ReportManager
+@inject NavigationManager NavigationManager
 
 <div class="sidebar @(IsSidebarCollapsed ? "collapsed" : "")">
     <div class="sidebar-header p-3 bg-transparent">
         <a class="navbar-brand fw-bold" href="">
-            <strong>SIAL ERP</strong>
+            <strong>Impulse</strong>
         </a>
-        @* <button class="navbar-toggler" @onclick="ToggleNavMenu">
-            <span class="navbar-toggler-icon"></span>
-        </button> *@
+        <button class="sidebar-toggle-btn @(!IsSidebarCollapsed ? "is-active" : "")" @onclick="ToggleNavMenu" title="Toggle sidebar">
+            <span class="bar top-bar"></span>
+            <span class="bar middle-bar"></span>
+            <span class="bar bottom-bar"></span>
+        </button>
     </div>
     <nav class="nav flex-column">
         <div class="nav-item">
             <NavLink class="nav-link" href="setup">
-                <i class="fas fa-cog me-2"></i> Setups
+                <i class="fas fa-cog"></i><span class="nav-label"> Setups</span>
             </NavLink>
         </div>
         <div class="nav-item">
-            <NavLink class="nav-link" href="/">
-                <i class="fas fa-plane me-2"></i> CIP
-            </NavLink>
+            <div class="nav-section-header" @onclick="NavigateCompany">
+                <i class="fas fa-building me-2"></i>
+                <span>Company</span>
+                <i class="fas fa-chevron-down ms-auto @(isCompanyExpanded ? "rotated" : "")"></i>
+            </div>
+            @if (isCompanyExpanded)
+            {
+                <div class="nav-sub-section">
+                    <div class="nav-sub-links">
+                        <NavLink class="nav-link" href="/company/items">
+                            <i class="fas fa-boxes-stacked me-2"></i> Items List
+                        </NavLink>
+                    </div>
+                </div>
+            }
         </div>
         <div class="nav-item">
-            <div class="nav-section-header" @onclick="ToggleFinancial">
+            <div class="nav-section-header" @onclick="NavigateFinancial">
                 <i class="fas fa-chart-line me-2"></i>
                 <span>Financial</span>
                 <i class="fas fa-chevron-down ms-auto @(isFinancialExpanded ? "rotated" : "")"></i>
@@ -364,12 +379,7 @@
             }
         </div>
         <div class="nav-item">
-            <NavLink class="nav-link" href="billing">
-                <i class="fas fa-file-invoice-dollar me-2"></i> Billing
-            </NavLink>
-        </div>
-        <div class="nav-item">
-            <div class="nav-section-header" @onclick="ToggleExport">
+            <div class="nav-section-header" @onclick="NavigateExport">
                 <i class="fas fa-ship me-2"></i>
                 <span>Export</span>
                 <i class="fas fa-chevron-down ms-auto @(isExportExpanded ? "rotated" : "")"></i>
@@ -389,7 +399,7 @@
             }
         </div>
         <div class="nav-item">
-            <div class="nav-section-header" @onclick="TogglePayroll">
+            <div class="nav-section-header" @onclick="NavigatePayroll">
                 <i class="fas fa-users-gear me-2"></i>
                 <span>Payroll</span>
                 <i class="fas fa-chevron-down ms-auto @(isPayrollExpanded ? "rotated" : "")"></i>
@@ -411,10 +421,44 @@
                 </div>
             }
         </div>
+        <div class="nav-item">
+            <div class="nav-section-header" @onclick="NavigateStock">
+                <i class="fas fa-boxes-stacked me-2"></i>
+                <span>Stock</span>
+                <i class="fas fa-chevron-down ms-auto @(isStockExpanded ? "rotated" : "")"></i>
+            </div>
+            @if (isStockExpanded)
+            {
+                <div class="nav-sub-section">
+                    <div class="nav-sub-links">
+                        <NavLink class="nav-link" href="/stock">
+                            <i class="fas fa-gauge me-2"></i> Stock Dashboard
+                        </NavLink>
+                    </div>
+                </div>
+            }
+        </div>
+        <div class="nav-item">
+            <div class="nav-section-header" @onclick="NavigateProduction">
+                <i class="fas fa-industry me-2"></i>
+                <span>Production</span>
+                <i class="fas fa-chevron-down ms-auto @(isProductionExpanded ? "rotated" : "")"></i>
+            </div>
+            @if (isProductionExpanded)
+            {
+                <div class="nav-sub-section">
+                    <div class="nav-sub-links">
+                        <NavLink class="nav-link" href="/production">
+                            <i class="fas fa-gauge me-2"></i> Production Dashboard
+                        </NavLink>
+                    </div>
+                </div>
+            }
+        </div>
         <div class="nav-item mt-auto">
             <form method="post" action="/Identity/Account/Logout">
                 <button type="submit" class="nav-link text-danger w-100 text-start sign-out-button">
-                    <i class="fas fa-sign-out-alt me-2"></i> Sign Out
+                    <i class="fas fa-sign-out-alt"></i><span class="nav-label"> Sign Out</span>
                 </button>
             </form>
         </div>
@@ -436,19 +480,56 @@
     private bool isStatementsExpanded = false;
     private bool isExportExpanded = false;
     private bool isPayrollExpanded = false;
+    private bool isStockExpanded = false;
+    private bool isProductionExpanded = false;
+    private bool isCompanyExpanded = false;
 
     private async Task ToggleNavMenu()
     {
         await OnToggleSidebar.InvokeAsync();
     }
 
-    private void ToggleFinancial() => isFinancialExpanded = !isFinancialExpanded;
+    // Dual-action: navigate to module dashboard AND expand its sub-menu
+    private void NavigateFinancial()
+    {
+        isFinancialExpanded = !isFinancialExpanded;
+        NavigationManager.NavigateTo("/financial");
+    }
+
+    private void NavigateExport()
+    {
+        isExportExpanded = !isExportExpanded;
+        NavigationManager.NavigateTo("/export");
+    }
+
+    private void NavigatePayroll()
+    {
+        isPayrollExpanded = !isPayrollExpanded;
+        NavigationManager.NavigateTo("/payroll");
+    }
+
+    private void NavigateStock()
+    {
+        isStockExpanded = !isStockExpanded;
+        NavigationManager.NavigateTo("/stock");
+    }
+
+    private void NavigateProduction()
+    {
+        isProductionExpanded = !isProductionExpanded;
+        NavigationManager.NavigateTo("/production");
+    }
+
+    private void NavigateCompany()
+    {
+        isCompanyExpanded = !isCompanyExpanded;
+        NavigationManager.NavigateTo("/company/items");
+    }
+
+    // Sub-section toggles (no navigation — these expand nested sub-groups)
     private void ToggleAccountSetup() => isAccountSetupExpanded = !isAccountSetupExpanded;
-    private void ToggleVouchers() => isVouchersExpanded = !isVouchersExpanded;
-    private void ToggleBanks() => isBankSetupExpanded = !isBankSetupExpanded;
-    private void ToggleReports() => isReportsExpanded = !isReportsExpanded;
-    private void ToggleStatements() => isStatementsExpanded = !isStatementsExpanded;
-    private void ToggleExport() => isExportExpanded = !isExportExpanded;
-    private void TogglePayroll() => isPayrollExpanded = !isPayrollExpanded;
-    
+    private void ToggleVouchers()     => isVouchersExpanded     = !isVouchersExpanded;
+    private void ToggleBanks()        => isBankSetupExpanded    = !isBankSetupExpanded;
+    private void ToggleReports()      => isReportsExpanded      = !isReportsExpanded;
+    private void ToggleStatements()   => isStatementsExpanded   = !isStatementsExpanded;
 }

@@ -1,0 +1,35 @@
+@page "/production"
+@attribute [Authorize]
+
+<PageTitle>Production Dashboard</PageTitle>
+
+<div class="dashboard-shell">
+    <div class="dashboard-hero">
+        <div class="dashboard-icon-wrap" style="background:#fde8e8; color:#7a0000;">
+            <i class="fas fa-industry"></i>
+        </div>
+        <div>
+            <h1 class="dashboard-title">Production</h1>
+            <p class="dashboard-subtitle">Manufacturing orders &amp; production tracking</p>
+        </div>
+    </div>
+
+    <div class="dashboard-modules">
+        <div class="dash-card coming-soon">
+            <i class="fas fa-circle-plus"></i>
+            <span>Coming Soon</span>
+        </div>
+    </div>
+</div>
+
+<style>
+    .dashboard-shell { padding: 2rem; max-width: 1100px; }
+    .dashboard-hero { display: flex; align-items: center; gap: 1.25rem; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e0e2ec; }
+    .dashboard-icon-wrap { width: 64px; height: 64px; border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 1.75rem; flex-shrink: 0; }
+    .dashboard-title { font-size: 2rem; font-weight: 700; color: #1b1b1f; margin: 0; line-height: 1.2; }
+    .dashboard-subtitle { color: #44474f; margin: 0.25rem 0 0; font-size: 0.95rem; }
+    .dashboard-modules { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 1rem; }
+    .dash-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; padding: 1.5rem 1rem; background: #ffffff; border: 1px solid #e0e2ec; border-radius: 16px; color: #1b1b1f; font-weight: 500; font-size: 0.875rem; text-align: center; }
+    .dash-card i { font-size: 1.75rem; color: #bf3a3a; }
+    .dash-card.coming-soon { opacity: 0.55; cursor: default; }
+</style>

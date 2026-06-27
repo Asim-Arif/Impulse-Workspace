@@ -1,17 +1,19 @@
-﻿
 <AuthorizeView>
     <Authorized>
-        
-        <div class="d-flex align-items-center login-display-content">
-            <span class="fw-bold">Hello, @context.User.Identity?.Name</span>
-
-            @* <form method="post" action="/Identity/Account/Logout" class="d-flex align-items-center ms-2 mt-2">
-                <button type="submit" class="btn btn-outline-danger btn-sm">Log out</button>
-            </form> *@
+        @{
+            var name = context.User.Identity?.Name ?? "Administrator";
+            var initial = !string.IsNullOrEmpty(name) ? name.Substring(0, 1).ToUpper() : "A";
+        }
+        <div class="login-display-content">
+            <div class="md3-user-profile">
+                <div class="md3-avatar">@initial</div>
+                <div class="md3-user-info">
+                    <div class="md3-greeting">@GetGreeting(), @name</div>
+                    <div class="md3-subtext">System Administrator &bull; Live Overview</div>
+                </div>
+            </div>
         </div>
-
     </Authorized>
-
     <NotAuthorized>
         <div class="d-flex align-items-center login-display-content">
             <a href="/Identity/Account/Register" class="btn btn-outline-primary btn-sm me-2">Register</a>
@@ -19,3 +21,22 @@
         </div>
     </NotAuthorized>
 </AuthorizeView>
+
+@code {
+    private string GetGreeting()
+    {
+        var hour = DateTime.Now.Hour;
+        if (hour < 12)
+        {
+            return "Good morning";
+        }
+        else if (hour < 17)
+        {
+            return "Good afternoon";
+        }
+        else
+        {
+            return "Good evening";
+        }
+    }
+}

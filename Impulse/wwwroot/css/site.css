@@ -45,82 +45,75 @@ body {
     font-family: 'Poppins', sans-serif;
 }
 
+    /* Rail mode: sidebar shrinks to icon-only strip instead of disappearing */
     .sidebar.collapsed {
-        transform: translateX(-100%);
-        width: 0;
+        width: 72px;
+        padding-top: 0;
     }
 
-/* Hamburger icon */
-.navbar-toggler {
+/* Sidebar inline toggle button (lives inside the sidebar header) */
+.sidebar-toggle-btn {
+    position: relative;
     border: none;
-    background: transparent; /*/var(--background-color);*/
-    padding: 0.15rem 0.8rem !important;
-    font-size: 1rem;
-    line-height: 1;
-    cursor: pointer;
-    transition: transform 0.3s, background-color 0.3s;
-    position: absolute;    
-    /*top: 10px;
-    right: 20px;*/
-    z-index: 1100;
-    /*border: 1px solid rgba(0, 0, 0, 0.1);*/
-    border-radius: 4px;    
-    width: 44px;
+    background: transparent;
+    padding: 0;
+    width: 36px;
     height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
-    /*display: none;  Hidden by default */
-}
-/* Hide sidebar toggler when sidebar is collapsed */
-main.collapsed .sidebar .navbar-toggler {
-    display: none;
-}
-/* Hamburger icon in top bar */
-/*.topbar-toggler {
-    border: none;
-    background: transparent;
-    padding: 0.4rem 0.8rem;
-    font-size: 1rem;
-    line-height: 1;
+    border-radius: 8px;
     cursor: pointer;
-    transition: transform 0.3s, background-color 0.3s;
+    flex-shrink: 0;
+    transition: background-color 0.2s ease;
+    z-index: 1100;
+}
+
+.sidebar-toggle-btn:hover {
+    background-color: rgba(27, 27, 31, 0.08);
+}
+
+/* Animated Hamburger Bars */
+.sidebar-toggle-btn .bar {
     position: absolute;
-    left: 10px;*/ /* Align to left edge of top-row */
-    /*top: 10px;
-    z-index: 1100;*/ /* Above other elements */
-    /*border: 1px solid rgba(0, 0, 0, 0.1);
-    border-radius: 4px;
-    width: 44px;*/ /* Touch-friendly minimum */
-    /*height: 44px;*/ /* Touch-friendly minimum */
-    /*display: flex;*/ /* Hidden by default */
-/*}*/
-/*navbar-toggler:hover {
-    transform: scale(1.1);
-    background-color: rgba(224, 231, 255, 0.5);*/ /* Semi-transparent hover effect */
-/*}*/
-
-/* Show topbar toggler when sidebar is collapsed */
-main.collapsed navbar-toggler {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 20px;
+    height: 2px;
+    background-color: #2c3e50;
+    border-radius: 2px;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease-in-out;
 }
 
-.navbar-toggler:hover {
-    transform: scale(1);
-    background-color: rgba(224, 231, 255, 0.5);/*var(--hover-color);*/
+.sidebar-toggle-btn .top-bar {
+    transform: translateY(-6px);
 }
 
-.navbar-toggler-icon {
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='%232c3e50' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
-    width: 1.2em;
-    height: 1.2em;
+.sidebar-toggle-btn .middle-bar {
+    /* Centered */
 }
 
+.sidebar-toggle-btn .bottom-bar {
+    transform: translateY(6px);
+}
+
+/* Morph to 'X' */
+.sidebar-toggle-btn.is-active .top-bar {
+    transform: translateY(0) rotate(45deg);
+}
+
+.sidebar-toggle-btn.is-active .middle-bar {
+    opacity: 0;
+    transform: scale(0);
+}
+
+.sidebar-toggle-btn.is-active .bottom-bar {
+    transform: translateY(0) rotate(-45deg);
+}
+
+
+/* Sidebar header: brand + toggle button side by side */
 .sidebar-header {
-    padding: 15px 20px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 15px 16px 15px 20px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
     background: rgba(255, 255, 255, 0.9);
     backdrop-filter: blur(5px);
     display: flex;
@@ -396,7 +389,6 @@ main.collapsed navbar-toggler {
         .nav-sub-links .nav-link.active {
             color: var(--primary-color);
             background-color: var(--hover-color);
-            transform: translateX(5px);
         }
 
 /* Main content */
@@ -410,58 +402,172 @@ main {
 }
 
     main.collapsed {
-        margin-left: 0;
+        margin-left: 72px; /* Matches rail width */
     }
 
-/* Responsive Design */
+/* ================================================================
+   NAVIGATION RAIL MODE — applied when .sidebar.collapsed
+   Hides text labels, chevrons, sub-sections.
+   Centers icons inside compact capsules.
+   ================================================================ */
+
+/* Compact header: center just the toggle button, hide brand text */
+.sidebar.collapsed .sidebar-header {
+    justify-content: center;
+    padding: 14px 0;
+}
+
+.sidebar.collapsed .navbar-brand {
+    display: none !important;
+}
+
+/* Tighten lateral nav padding in rail mode */
+.sidebar.collapsed .nav {
+    padding: 0 6px;
+    align-items: stretch;
+}
+
+/* Compact capsule height + full-center icon layout */
+.sidebar.collapsed .nav-link,
+.sidebar.collapsed .nav-section-header,
+.sidebar.collapsed .nav-sub-header {
+    height: 44px !important;
+    padding: 0 !important;
+    margin: 4px 6px !important;       /* tighter margin for narrow rail */
+    justify-content: center !important;
+    border-radius: 22px !important;
+    gap: 0 !important;
+}
+
+/* Make icon slightly bigger and centered in rail mode */
+.sidebar.collapsed .nav-link i,
+.sidebar.collapsed .nav-section-header i:first-child,
+.sidebar.collapsed .nav-sub-header i:first-child {
+    font-size: 1.35rem !important;
+    width: auto !important;
+    margin: 0 !important;
+}
+
+/* Hide all text labels */
+.sidebar.collapsed .nav-label,
+.sidebar.collapsed .nav-section-header span,
+.sidebar.collapsed .nav-sub-header span {
+    display: none !important;
+}
+
+/* Hide chevron arrows (can't expand in rail mode) */
+.sidebar.collapsed .fa-chevron-down {
+    display: none !important;
+}
+
+/* Collapse all open sub-sections when in rail mode */
+.sidebar.collapsed .nav-sub-section,
+.sidebar.collapsed .nav-sub-links {
+    display: none !important;
+}
+
+/* Keep active capsule pill looking correct in rail mode */
+.sidebar.collapsed .nav-link.active {
+    background-color: #d3e3fd !important;
+    color: #041e49 !important;
+    border-radius: 22px !important;
+}
+
+.sidebar.collapsed .nav-link.active i {
+    color: #041e49 !important;
+}
+
+/* Responsive Design — on mobile, sidebar fully slides in/out (no rail) */
 @media (max-width: 991px) {
     .sidebar {
         width: 250px;
-        transform: translateX(-100%);
+        transform: translateX(0);
     }
 
-        .sidebar:not(.collapsed) {
-            transform: translateX(0);
-        }
+    /* Fully off-screen when collapsed on mobile */
+    .sidebar.collapsed {
+        transform: translateX(-100%) !important;
+        width: 250px !important;  /* keep width so transition is smooth */
+    }
 
     main {
         margin-left: 0;
     }
 
-    .navbar-toggler {
-        display: block !important; /* Ensure visibility on mobile */
+    main.collapsed {
+        margin-left: 0 !important;
     }
 }
 
 
-
 /* Top row and content */
 .top-row {
-    /*background-color: #fff;*/
-    border-bottom: 1px solid #e7e7e7;
-    padding: 0 20px;
+    background-color: #ffffff; /* Modern solid white background */
+    border-bottom: 1px solid #e0e2ec; /* Muted MD3 border */
+    padding: 12px 24px;
     position: relative;
-    min-height: 40px;
-    display:flex;
-    align-items:center;
+    min-height: 64px; /* Increased height to host avatar + stack beautifully */
+    display: flex;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); /* Subtle shadow separator */
 }
 /* Top row auth content */
 .top-row.auth {
-    padding-left: 35px; /* Fallback to avoid overlap with topbar-toggler */
+    padding-left: 24px;
 }
 /* LoginDisplay content */
 .login-display-content {
-    margin-left: 45px; /* Shift content right to clear 44px toggler + spacing */
     position: relative;
     flex: 0 0 auto;
-    font-size: 0.875rem;
-    line-height: 1.5;
-    
 }
+
+/* MD3 User Profile Component */
+.md3-user-profile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.md3-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #d3e3fd; /* Soft pastel primary container */
+    color: #041e49; /* High-contrast text */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.15rem;
+    font-family: 'Outfit', sans-serif;
+    user-select: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.md3-user-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.md3-greeting {
+    font-weight: 500;
+    font-size: 1.05rem;
+    color: #1b1b1f; /* On Surface */
+    font-family: 'Outfit', 'Segoe UI', 'Poppins', sans-serif;
+    line-height: 1.25;
+}
+
+.md3-subtext {
+    font-size: 0.8rem;
+    color: #44474f; /* Muted Variant */
+    opacity: 0.8;
+    font-family: 'Outfit', 'Segoe UI', 'Poppins', sans-serif;
+    line-height: 1.25;
+}
+
 .content {
-    /*padding: 20px;*/
     padding-top: 1.1rem;
-    /*background-color: green;*/
 }
 
 /* Your existing styles (unchanged) */

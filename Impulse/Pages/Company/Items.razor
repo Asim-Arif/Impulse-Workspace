@@ -1,0 +1,335 @@
+@page "/company/items"
+@attribute [Authorize]
+@using Blazored.Typeahead
+@using Impulse.Pages.Company
+@using BlazorContextMenu
+
+<PageTitle>Company Items</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Outfit', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; min-height: 80vh;">
+        <div class="card-body pt-3">
+            
+            <!-- ── Toolbar: Filters + Actions ── -->
+            <div class="row g-2 mb-3 align-items-end">
+                
+                <!-- Title -->
+                <div class="col-auto d-flex align-items-end pb-1">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-boxes-stacked text-primary me-2"></i>
+                        Company Items
+                    </h5>
+                </div>
+
+                <!-- Group Filter -->
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Item Group</label>
+                    <BlazoredTypeahead SearchMethod="SearchGroups"
+                                       EnableDropDown="true"
+                                       Data="groups"
+                                       TValue="ItemGroupModel"
+                                       TItem="ItemGroupModel"
+                                       Value="selectedGroup"
+                                       ValueChanged="OnGroupChanged"
+                                       ValueExpression="@(() => selectedGroup)"
+                                       Placeholder="All Groups"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="selectedG">
+                            @selectedG?.Description
+                        </SelectedTemplate>
+                        <ResultTemplate Context="g">
+                            @g.Description
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <!-- Category Filter -->
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Category</label>
+                    <BlazoredTypeahead SearchMethod="SearchCategories"
+                                       EnableDropDown="true"
+                                       Data="categories"
+                                       TValue="ItemCategoryModel"
+                                       TItem="ItemCategoryModel"
+                                       Value="selectedCategory"
+                                       ValueChanged="OnCategoryChanged"
+                                       ValueExpression="@(() => selectedCategory)"
+                                       Placeholder="All Categories"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="selectedC">
+                            @selectedC?.Description
+                        </SelectedTemplate>
+                        <ResultTemplate Context="c">
+                            @c.Description
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <!-- Main Group Filter -->
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Main Group</label>
+                    <BlazoredTypeahead SearchMethod="SearchMainGroups"
+                                       EnableDropDown="true"
+                                       Data="mainGroups"
+                                       TValue="ItemMainGroupModel"
+                                       TItem="ItemMainGroupModel"
+                                       Value="selectedMainGroup"
+                                       ValueChanged="OnMainGroupChanged"
+                                       ValueExpression="@(() => selectedMainGroup)"
+                                       Placeholder="All Main Groups"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="selectedMG">
+                            @selectedMG?.MainGroupName
+                        </SelectedTemplate>
+                        <ResultTemplate Context="mg">
+                            @mg.MainGroupName
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <!-- Search -->
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Search</label>
+                    <input type="text" class="form-control form-control-sm" placeholder="Search ID, Name..." value="@searchText" @oninput="OnSearchInput" />
+                </div>
+
+                <!-- Switches -->
+                <div class="col-auto d-flex align-items-center gap-3 pb-1">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="showInactiveCheck" checked="@showInactive" @onchange="OnShowInactiveChanged">
+                        <label class="form-check-label text-dark-emphasis fw-semibold" for="showInactiveCheck" style="font-size:0.85rem;">Inactive</label>
+                    </div>
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="showPictureCheck" checked="@showPicture" @onchange="OnShowPictureChanged">
+                        <label class="form-check-label text-dark-emphasis fw-semibold" for="showPictureCheck" style="font-size:0.85rem;">Photo</label>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="col d-flex align-items-end justify-content-end gap-2 pb-1">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => RefreshList(null)" title="Refresh List">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" @onclick="OpenToolbarOptions" title="More Options">
+                        <i class="fas fa-ellipsis-v me-1"></i> Options
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- Selected item indicator -->
+            @if (highlightedItem != null)
+            {
+                <div class="mb-3">
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill">
+                        Selected: <strong>@highlightedItem.ItemName</strong> (@highlightedItem.ItemID)
+                    </span>
+                </div>
+            }
+
+            <!-- ── Workspace Layout (Grid + Image Preview) ── -->
+            <div class="row g-3">
+                <div class="@(showPicture && !string.IsNullOrEmpty(itemPicBase64) ? "col-lg-9" : "col-12")">
+                    @if (isLoading)
+                    {
+                        <div class="d-flex align-items-center justify-content-center py-5">
+                            <div class="spinner-border text-primary me-2" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="text-secondary fw-semibold">Loading data...</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <ContextMenuProvider Id="itemsContextMenuProvider">
+                            <div class="table-responsive border rounded-3" style="background:#fff; max-height: 60vh; overflow-y:auto;">
+                                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th>Item No.</th>
+                                            <th>Item Group</th>
+                                            <th>Description</th>
+                                            <th>Size</th>
+                                            <th class="text-end">Fin. Weight</th>
+                                            <th class="text-end">Stock</th>
+                                            <th>Unit</th>
+                                            <th class="text-end">Cost</th>
+                                            <th class="text-end">Value</th>
+                                            <th class="text-end">FOB SKT</th>
+                                            <th class="text-end">FOB Top</th>
+                                            <th>Type</th>
+                                            <th>Tip Size</th>
+                                            <th>Fin. Quality</th>
+                                            <th class="text-end">ReOrder</th>
+                                            <th class="text-end">PU</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (!pagedItems.Any())
+                                        {
+                                            <tr>
+                                                <td colspan="16" class="text-center text-muted py-4">No items matched your filters.</td>
+                                            </tr>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var item in pagedItems)
+                                            {
+                                                var isSelected = highlightedItem?.ItemID == item.ItemID;
+                                                <ContextMenuTrigger WrapperTag="tr"
+                                                                    MenuId="rowContextMenu"
+                                                                    Data="item"
+                                                                    MouseButtonTrigger="MouseButtonTrigger.Right"
+                                                                    style="cursor:pointer;"
+                                                                    CssClass="@(isSelected ? "table-primary fw-semibold" : "")"
+                                                                    @onclick="() => SelectItem(item)">
+                                                    <td class="font-monospace text-primary">@item.ItemID</td>
+                                                    <td>@item.ItemGroup</td>
+                                                    <td>@item.ItemName</td>
+                                                    <td>@item.ItemSize @item.SizeUnit</td>
+                                                    <td class="text-end">@item.FinishedWeight.ToString("N3")</td>
+                                                    <td class="text-end fw-bold @(item.InHand < item.ReorderPoint ? "text-danger" : "text-success")">@item.InHand.ToString("N0")</td>
+                                                    <td>@item.Unit</td>
+                                                    <td class="text-end">@item.PriceForCost.ToString("C2")</td>
+                                                    <td class="text-end fw-bold">@((item.InHand * item.PriceForCost).ToString("C2"))</td>
+                                                    <td class="text-end">@item.ExWorks.ToString("N2")</td>
+                                                    <td class="text-end">@item.ExWorksTop.ToString("N2")</td>
+                                                    <td>@item.Type</td>
+                                                    <td>@item.TipSize</td>
+                                                    <td>@item.FinQuality</td>
+                                                    <td class="text-end">@item.ReorderPoint.ToString("N0")</td>
+                                                    <td class="text-end">@item.FixedPackingUnit.ToString("N0")</td>
+                                                </ContextMenuTrigger>
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </ContextMenuProvider>
+
+                        <!-- Paging Info & Controls -->
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <div class="text-muted" style="font-size: 0.85rem;">
+                                Showing @(((currentPage - 1) * pageSize) + 1) to @Math.Min(currentPage * pageSize, totalCount) of @totalCount items
+                            </div>
+                            @if (totalPages > 1)
+                            {
+                                <nav aria-label="Items Page Navigation">
+                                    <ul class="pagination pagination-sm mb-0">
+                                        <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                                            <button class="page-link" @onclick="() => GoToPage(currentPage - 1)">Previous</button>
+                                        </li>
+                                        @for (int idx = 1; idx <= totalPages; idx++)
+                                        {
+                                            var pageNumber = idx;
+                                            <li class="page-item @(currentPage == pageNumber ? "active" : "")">
+                                                <button class="page-link" @onclick="() => GoToPage(pageNumber)">@pageNumber</button>
+                                            </li>
+                                        }
+                                        <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                                            <button class="page-link" @onclick="() => GoToPage(currentPage + 1)">Next</button>
+                                        </li>
+                                    </ul>
+                                </nav>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <!-- Product Preview image -->
+                @if (showPicture && !string.IsNullOrEmpty(itemPicBase64))
+                {
+                    <div class="col-lg-3">
+                        <div class="card border-0 shadow-sm text-center p-3" style="background:#fff;">
+                            <h6 class="fw-bold text-secondary mb-3">Product Photo</h6>
+                            <img src="data:image/jpeg;base64,@itemPicBase64" class="img-fluid rounded shadow-sm" style="max-height: 250px; object-fit: cover;" />
+                        </div>
+                    </div>
+                }
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ── BlazorContextMenu: Row Context Menu (Operations Only) ── -->
+<ContextMenu Id="rowContextMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <div class="win11-section-header">Operations</div>
+    <Item class="win11-menu-item" OnClick="@RefreshList">
+        <i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh
+    </Item>
+    <Item class="win11-menu-item" OnClick="@ShowAll">
+        <i class="fas fa-list fa-fw win11-icon"></i> Show All
+    </Item>
+    <Item class="win11-menu-item" OnClick="@ViewStockHistory">
+        <i class="fas fa-history fa-fw win11-icon"></i> Stock History
+    </Item>
+    <Item class="win11-menu-item" OnClick="@NewItem">
+        <i class="fas fa-plus fa-fw win11-icon"></i> New Item
+    </Item>
+    <Item class="win11-menu-item" OnClick="@NewCategory">
+        <i class="fas fa-folder-plus fa-fw win11-icon"></i> New Category
+    </Item>
+    <Item class="win11-menu-item" OnClick="@EditItem">
+        <i class="fas fa-edit fa-fw win11-icon"></i> Edit Item
+    </Item>
+    <Item class="win11-menu-item" OnClick="@DeleteItem">
+        <i class="fas fa-trash fa-fw win11-icon"></i> Delete Item
+    </Item>
+    <Item class="win11-menu-item" OnClick="@CopyItem">
+        <i class="fas fa-copy fa-fw win11-icon"></i> Copy Item
+    </Item>
+    <Item class="win11-menu-item" OnClick="@ToggleActive">
+        <i class="fas fa-ban fa-fw win11-icon"></i> Toggle Active Status
+    </Item>
+    <Item class="win11-menu-item" OnClick="@ToggleLockThisItem">
+        <i class="fas fa-lock fa-fw win11-icon"></i> Lock/Unlock Item
+    </Item>
+    <Item class="win11-menu-item" OnClick="@AssignAllProcesses">
+        <i class="fas fa-spinner fa-fw win11-icon"></i> Assign All Processes
+    </Item>
+    <Item class="win11-menu-item" OnClick="@ViewSales">
+        <i class="fas fa-dollar-sign fa-fw win11-icon"></i> View Sales
+    </Item>
+    <Item class="win11-menu-item" OnClick="@ViewPurchases">
+        <i class="fas fa-shopping-cart fa-fw win11-icon"></i> View Purchases
+    </Item>
+    <Item class="win11-menu-item" OnClick="@ResetProcessGroups">
+        <i class="fas fa-rotate-left fa-fw win11-icon"></i> Reset Process Groups
+    </Item>
+</ContextMenu>
+
+<!-- ── BlazorContextMenu: Toolbar Options Menu (Reports Only) ── -->
+<ContextMenu Id="optionsBarMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <div class="win11-section-header">Reports</div>
+    <Item class="win11-menu-item" OnClick="@PrintCatalog">
+        <i class="fas fa-print fa-fw win11-icon"></i> Print Catalog
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintSpecSheet">
+        <i class="fas fa-file-pdf fa-fw win11-icon"></i> Print Spec Sheet
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintSummaryStock">
+        <i class="fas fa-table fa-fw win11-icon"></i> Print Summary Stock
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintCombineStockReport">
+        <i class="fas fa-chart-pie fa-fw win11-icon"></i> Print Combine Stock
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintCombineReportWithLocation">
+        <i class="fas fa-location-dot fa-fw win11-icon"></i> Print Combine Stock W/ Location
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintItemsBelowMin">
+        <i class="fas fa-arrow-down fa-fw win11-icon"></i> Print Below Min Level
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintItemsAboveMax">
+        <i class="fas fa-arrow-up fa-fw win11-icon"></i> Print Above Max Level
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintItemsNotUsed">
+        <i class="fas fa-folder-open fa-fw win11-icon"></i> Print Items Not Used
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintECommerceStock">
+        <i class="fas fa-globe fa-fw win11-icon"></i> Print E-Commerce Stock
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintSFStock">
+        <i class="fas fa-industry fa-fw win11-icon"></i> Print Semi-Finished Stock
+    </Item>
+</ContextMenu>
