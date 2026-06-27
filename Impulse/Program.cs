@@ -99,6 +99,8 @@ builder.Services.AddScoped<Radzen.NotificationService>();
 builder.Services.AddScoped<IVoucherService, VoucherService>();
 builder.Services.AddScoped<IEmployeeDataAccess, EmployeeDataAccess>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
+builder.Services.AddScoped<IDepartmentDataAccess, DepartmentDataAccess>();
+builder.Services.AddScoped<IDepartmentService, DepartmentService>();
 builder.Services.AddScoped<ICommonServices, CommonServices>();
 builder.Services.AddScoped<IDBHelperService, DBHelperService>();
 builder.Services.AddScoped<IAuditService, AuditService>();

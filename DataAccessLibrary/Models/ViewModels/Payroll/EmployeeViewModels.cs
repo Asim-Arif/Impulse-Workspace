@@ -35,4 +35,23 @@ namespace DataAccessLibrary.Models.ViewModels.Payroll
         public string UserName { get; set; } = string.Empty;
         public string MachineName { get; set; } = string.Empty;
     }
+
+    public class DepartmentModel
+    {
+        public string DeptID { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public bool Active { get; set; }
+        public int? Color { get; set; }
+        public string? Dept_ID { get; set; }
+        public bool? TempDept { get; set; }
+        public string? AccruedAccNo { get; set; }
+        public string? SalaryAccNo { get; set; }
+        public string? AccruedFoodAccNo { get; set; }
+        public string? AccruedUnionAccNo { get; set; }
+        public string? SchAccNo { get; set; }
+        public string? AccruedEOBIAccNo { get; set; }
+        public string? TaxAccNo { get; set; }
+        public string? OnePercentAccNo { get; set; }
+    }
 }

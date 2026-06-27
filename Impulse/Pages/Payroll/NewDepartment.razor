@@ -1,0 +1,248 @@
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using DataAccessLibrary.Models.ViewModels
+@using Blazored.Typeahead
+
+
+@if (IsVisible)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" style="background-color: rgba(0,0,0,0.5); font-family: 'Calibri', 'Segoe UI', sans-serif;">
+        <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-primary text-white" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <h5 class="modal-title fw-bold">
+                        <i class="fas fa-building me-2"></i>
+                        @(isAdd ? "Add New Department" : $"Edit Department - {department.DeptID}")
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" aria-label="Close" @onclick="Cancel"></button>
+                </div>
+                <div class="modal-body p-4" style="max-height: 75vh; overflow-y: auto;">
+                    <form>
+                        <!-- Basic Info Section -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-secondary mb-1">Department ID</label>
+                                <input type="text" class="form-control" @bind="department.DeptID" readonly />
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label fw-bold text-secondary mb-1">Department Name</label>
+                                <input type="text" class="form-control" @bind="department.Name" placeholder="Enter department name" />
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label fw-bold text-secondary mb-1">Description</label>
+                                <textarea class="form-control" @bind="department.Description" rows="2" placeholder="Enter department description"></textarea>
+                            </div>
+                            <div class="col-md-6 d-flex align-items-center">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="chkTemp" @bind="department.TempDept" />
+                                    <label class="form-check-label fw-semibold text-dark-emphasis" for="chkTemp">Dept. of Temporary Employees</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex align-items-center gap-2">
+                                    <label class="form-label fw-bold text-secondary mb-0">Department Color</label>
+                                    <input type="color" class="form-control form-control-color border-0 p-0" style="width: 45px; height: 35px; cursor: pointer;"
+                                           value="@hexColor" @onchange="OnColorChanged" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Accounting Mappings Section (Only shown if NOT Temporary Department) -->
+                        @if (department.TempDept != true)
+                        {
+                            <hr class="my-3 text-secondary-subtle" />
+                            <h6 class="fw-bold text-primary mb-3"><i class="fas fa-calculator me-2"></i>Accounts Mapping</h6>
+
+                            <div class="row g-3">
+                                <!-- Salary Account -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-secondary mb-1">Salary Account</label>
+                                    <BlazoredTypeahead SearchMethod="SearchAccounts"
+                                                       EnableDropDown="true"
+                                                       Data="Accounts"
+                                                       TValue="ChartOfAccountsModel"
+                                                       TItem="ChartOfAccountsModel"
+                                                       Value="selectedSalaryAcc"
+                                                       ValueChanged="OnSalaryAccChanged"
+                                                       ValueExpression="@(() => selectedSalaryAcc)"
+                                                       Placeholder="Select Salary Account"
+                                                       MaximumSuggestions="1000">
+                                        <SelectedTemplate Context="selected">
+                                            @selected?.AccTitle
+                                        </SelectedTemplate>
+                                        <ResultTemplate Context="result">
+                                            @result.AccTitle
+                                        </ResultTemplate>
+                                    </BlazoredTypeahead>
+                                </div>
+
+                                <!-- Accrued Account -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-secondary mb-1">Accrued Account</label>
+                                    <BlazoredTypeahead SearchMethod="SearchAccounts"
+                                                       EnableDropDown="true"
+                                                       Data="Accounts"
+                                                       TValue="ChartOfAccountsModel"
+                                                       TItem="ChartOfAccountsModel"
+                                                       Value="selectedAccruedAcc"
+                                                       ValueChanged="OnAccruedAccChanged"
+                                                       ValueExpression="@(() => selectedAccruedAcc)"
+                                                       Placeholder="Select Accrued Account"
+                                                       MaximumSuggestions="1000">
+                                        <SelectedTemplate Context="selected">
+                                            @selected?.AccTitle
+                                        </SelectedTemplate>
+                                        <ResultTemplate Context="result">
+                                            @result.AccTitle
+                                        </ResultTemplate>
+                                    </BlazoredTypeahead>
+                                </div>
+
+                                <!-- Accrued Food Account -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-secondary mb-1">Accrued Food Account</label>
+                                    <BlazoredTypeahead SearchMethod="SearchAccounts"
+                                                       EnableDropDown="true"
+                                                       Data="Accounts"
+                                                       TValue="ChartOfAccountsModel"
+                                                       TItem="ChartOfAccountsModel"
+                                                       Value="selectedFoodAcc"
+                                                       ValueChanged="OnFoodAccChanged"
+                                                       ValueExpression="@(() => selectedFoodAcc)"
+                                                       Placeholder="Select Food Account"
+                                                       MaximumSuggestions="1000">
+                                        <SelectedTemplate Context="selected">
+                                            @selected?.AccTitle
+                                        </SelectedTemplate>
+                                        <ResultTemplate Context="result">
+                                            @result.AccTitle
+                                        </ResultTemplate>
+                                    </BlazoredTypeahead>
+                                </div>
+
+                                <!-- Over Time Account -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-secondary mb-1">Over Time Account</label>
+                                    <BlazoredTypeahead SearchMethod="SearchAccounts"
+                                                       EnableDropDown="true"
+                                                       Data="Accounts"
+                                                       TValue="ChartOfAccountsModel"
+                                                       TItem="ChartOfAccountsModel"
+                                                       Value="selectedUnionAcc"
+                                                       ValueChanged="OnUnionAccChanged"
+                                                       ValueExpression="@(() => selectedUnionAcc)"
+                                                       Placeholder="Select Over Time Account"
+                                                       MaximumSuggestions="1000">
+                                        <SelectedTemplate Context="selected">
+                                            @selected?.AccTitle
+                                        </SelectedTemplate>
+                                        <ResultTemplate Context="result">
+                                            @result.AccTitle
+                                        </ResultTemplate>
+                                    </BlazoredTypeahead>
+                                </div>
+
+                                <!-- Bonus Account -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-secondary mb-1">Bonus Account</label>
+                                    <BlazoredTypeahead SearchMethod="SearchAccounts"
+                                                       EnableDropDown="true"
+                                                       Data="Accounts"
+                                                       TValue="ChartOfAccountsModel"
+                                                       TItem="ChartOfAccountsModel"
+                                                       Value="selectedSchAcc"
+                                                       ValueChanged="OnSchAccChanged"
+                                                       ValueExpression="@(() => selectedSchAcc)"
+                                                       Placeholder="Select Bonus Account"
+                                                       MaximumSuggestions="1000">
+                                        <SelectedTemplate Context="selected">
+                                            @selected?.AccTitle
+                                        </SelectedTemplate>
+                                        <ResultTemplate Context="result">
+                                            @result.AccTitle
+                                        </ResultTemplate>
+                                    </BlazoredTypeahead>
+                                </div>
+
+                                <!-- Accrued EOBI Account -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-secondary mb-1">Accrued EOBI Account</label>
+                                    <BlazoredTypeahead SearchMethod="SearchAccounts"
+                                                       EnableDropDown="true"
+                                                       Data="Accounts"
+                                                       TValue="ChartOfAccountsModel"
+                                                       TItem="ChartOfAccountsModel"
+                                                       Value="selectedEOBIAcc"
+                                                       ValueChanged="OnEOBIAccChanged"
+                                                       ValueExpression="@(() => selectedEOBIAcc)"
+                                                       Placeholder="Select EOBI Account"
+                                                       MaximumSuggestions="1000">
+                                        <SelectedTemplate Context="selected">
+                                            @selected?.AccTitle
+                                        </SelectedTemplate>
+                                        <ResultTemplate Context="result">
+                                            @result.AccTitle
+                                        </ResultTemplate>
+                                    </BlazoredTypeahead>
+                                </div>
+
+                                <!-- Tax Account -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-secondary mb-1">Tax Account</label>
+                                    <BlazoredTypeahead SearchMethod="SearchAccounts"
+                                                       EnableDropDown="true"
+                                                       Data="Accounts"
+                                                       TValue="ChartOfAccountsModel"
+                                                       TItem="ChartOfAccountsModel"
+                                                       Value="selectedTaxAcc"
+                                                       ValueChanged="OnTaxAccChanged"
+                                                       ValueExpression="@(() => selectedTaxAcc)"
+                                                       Placeholder="Select Tax Account"
+                                                       MaximumSuggestions="1000">
+                                        <SelectedTemplate Context="selected">
+                                            @selected?.AccTitle
+                                        </SelectedTemplate>
+                                        <ResultTemplate Context="result">
+                                            @result.AccTitle
+                                        </ResultTemplate>
+                                    </BlazoredTypeahead>
+                                </div>
+
+                                <!-- Fine Account -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-secondary mb-1">Fine Account</label>
+                                    <BlazoredTypeahead SearchMethod="SearchAccounts"
+                                                       EnableDropDown="true"
+                                                       Data="Accounts"
+                                                       TValue="ChartOfAccountsModel"
+                                                       TItem="ChartOfAccountsModel"
+                                                       Value="selectedOnePercentAcc"
+                                                       ValueChanged="OnOnePercentAccChanged"
+                                                       ValueExpression="@(() => selectedOnePercentAcc)"
+                                                       Placeholder="Select Fine Account"
+                                                       MaximumSuggestions="1000">
+                                        <SelectedTemplate Context="selected">
+                                            @selected?.AccTitle
+                                        </SelectedTemplate>
+                                        <ResultTemplate Context="result">
+                                            @result.AccTitle
+                                        </ResultTemplate>
+                                    </BlazoredTypeahead>
+                                </div>
+                            </div>
+                        }
+                    </form>
+                </div>
+                <div class="modal-footer bg-light" style="border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
+                    <button type="button" class="btn btn-secondary" @onclick="Cancel">Cancel</button>
+                    @if (isAdd)
+                    {
+                        <button type="button" class="btn btn-info text-white" disabled="@isSaving" @onclick="SaveAndNew">Save & New</button>
+                    }
+                    <button type="button" class="btn btn-primary" disabled="@isSaving" @onclick="SaveAndClose">Save & Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}

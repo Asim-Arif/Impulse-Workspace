@@ -12,17 +12,17 @@
         </button> *@
     </div>
     <nav class="nav flex-column">
-        <div class="nav-item px-3">
+        <div class="nav-item">
             <NavLink class="nav-link" href="setup">
                 <i class="fas fa-cog me-2"></i> Setups
             </NavLink>
         </div>
-        <div class="nav-item px-3">
+        <div class="nav-item">
             <NavLink class="nav-link" href="/">
                 <i class="fas fa-plane me-2"></i> CIP
             </NavLink>
         </div>
-        <div class="nav-item px-2">
+        <div class="nav-item">
             <div class="nav-section-header" @onclick="ToggleFinancial">
                 <i class="fas fa-chart-line me-2"></i>
                 <span>Financial</span>
@@ -31,7 +31,7 @@
             @if (isFinancialExpanded)
             {
                 <div class="nav-sub-section">
-                    <div class="nav-sub-item px-3">
+                    <div class="nav-sub-item">
                         <div class="nav-sub-header" @onclick="ToggleAccountSetup">
                             <i class="fas fa-screwdriver-wrench me-2"></i>
                             <span>Account Setup</span>
@@ -39,7 +39,7 @@
                         </div>
                         @if (isAccountSetupExpanded)
                         {
-                            <div class="nav-sub-links px-2">
+                            <div class="nav-sub-links">
                                 <NavLink class="nav-link" href="/accounts/chartofaccounts">
                                     <i class="fas fa-file-invoice me-2"></i> Chart of Accounts
                                 </NavLink>
@@ -47,7 +47,7 @@
                         }
                     </div>
 @* BANK OPTIONS *@
-                    <div class="nav-sub-item px-4">
+                    <div class="nav-sub-item">
                         <div class="nav-sub-header" @onclick="ToggleBanks">
                             <i class="fas fa-user-tie me-2"></i>
                             <span>Bank Setup</span>
@@ -55,7 +55,7 @@
                         </div>
                         @if (isBankSetupExpanded)
                         {
-                            <div class="nav-sub-links px-3">
+                            <div class="nav-sub-links">
                                 <NavLink class="nav-link" href="/accounts/banklist">
                                     <i class="fa fa-university me-2"></i> Bank List
                                 </NavLink>
@@ -65,7 +65,7 @@
                             </div>
                         }
                     </div>
-                    <div class="nav-sub-item px-4">
+                    <div class="nav-sub-item">
                         <div class="nav-sub-header" @onclick="ToggleVouchers">
                             <i class="fas fa-file-alt me-2" ></i>
                             <span>Vouchers</span>
@@ -73,7 +73,7 @@
                         </div>
                         @if (isVouchersExpanded)
                         {
-                            <div class="nav-sub-links px-2">
+                            <div class="nav-sub-links">
                                 <NavLink class="nav-link" href="/customers/foreign-customer">
                                     <i class="fas fa-money-check-dollar me-2"></i> Cash Payment
                                 </NavLink>
@@ -112,7 +112,7 @@
                     </div>
 
 @* Reports *@
-                    <div class="nav-sub-item px-4">
+                    <div class="nav-sub-item">
                         <div class="nav-sub-header" @onclick="ToggleReports">
                             <i class="fas fa-user-tie me-2"></i>
                             <span>Reports</span>
@@ -120,7 +120,7 @@
                         </div>
                         @if (isReportsExpanded)
                         {
-                            <div class="nav-sub-links px-3">
+                            <div class="nav-sub-links">
                                 <NavLink class="nav-link" href="/accounts/accountsledger">
                                     <i class="fas fa-list me-2"></i> Accounts Ledgder
                                 </NavLink>
@@ -234,7 +234,7 @@
                     </div>
 
                     @* Financial Statments *@
-                    <div class="nav-sub-item px-4">
+                    <div class="nav-sub-item">
                         <div class="nav-sub-header" @onclick="ToggleStatements">
                             <i class="fa-solid fa-coins"></i>
                             <span>Financial Statements</span>
@@ -242,7 +242,7 @@
                         </div>
                         @if (isStatementsExpanded)
                         {
-                            <div class="nav-sub-links px-3">
+                            <div class="nav-sub-links">
                                 <NavLink class="nav-link" href="/accounts/definemainheads">
                                     <i class="fas fa-sitemap me-2"></i> Define Main Heads
                                 </NavLink>
@@ -363,12 +363,12 @@
                 </div>
             }
         </div>
-        <div class="nav-item px-3">
+        <div class="nav-item">
             <NavLink class="nav-link" href="billing">
                 <i class="fas fa-file-invoice-dollar me-2"></i> Billing
             </NavLink>
         </div>
-        <div class="nav-item px-2">
+        <div class="nav-item">
             <div class="nav-section-header" @onclick="ToggleExport">
                 <i class="fas fa-ship me-2"></i>
                 <span>Export</span>
@@ -377,7 +377,7 @@
             @if (isExportExpanded)
             {
                 <div class="nav-sub-section">
-                    <div class="nav-sub-links px-2">
+                    <div class="nav-sub-links">
                         <NavLink class="nav-link" href="/export/customers">
                             <i class="fas fa-users me-2"></i> Foreign Customers
                         </NavLink>
@@ -388,7 +388,7 @@
                 </div>
             }
         </div>
-        <div class="nav-item px-2">
+        <div class="nav-item">
             <div class="nav-section-header" @onclick="TogglePayroll">
                 <i class="fas fa-users-gear me-2"></i>
                 <span>Payroll</span>
@@ -397,18 +397,21 @@
             @if (isPayrollExpanded)
             {
                 <div class="nav-sub-section">
-                    <div class="nav-sub-links px-2">
+                    <div class="nav-sub-links">
                         <NavLink class="nav-link" href="/payroll/employeelist">
                             <i class="fas fa-user-tie me-2"></i> Employee List
                         </NavLink>
                         <NavLink class="nav-link" href="/payroll/employeelist?contractorsOnly=true">
                             <i class="fas fa-user-clock me-2"></i> Temp. Employee List
                         </NavLink>
+                        <NavLink class="nav-link" href="/payroll/deptlist">
+                            <i class="fas fa-building me-2"></i> Departments List
+                        </NavLink>
                     </div>
                 </div>
             }
         </div>
-        <div class="nav-item px-3 mt-auto">
+        <div class="nav-item mt-auto">
             <form method="post" action="/Identity/Account/Logout">
                 <button type="submit" class="nav-link text-danger w-100 text-start sign-out-button">
                     <i class="fas fa-sign-out-alt me-2"></i> Sign Out

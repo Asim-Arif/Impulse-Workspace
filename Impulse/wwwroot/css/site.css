@@ -138,34 +138,37 @@ main.collapsed navbar-toggler {
     letter-spacing: 1px;
 }
 
+/* ================================================================
+   GLOBAL NAV-LINK BASE (non-sidebar contexts)
+   ================================================================ */
 .nav-link {
     color: var(--text-color);
-    padding: 12px 20px;
+    padding: 10px 16px;
     font-size: 0.95rem;
     display: flex;
     align-items: center;
-    transition: all 0.3s ease;
+    transition: background-color 0.2s ease, color 0.2s ease;
     border-radius: 5px;
-    min-height: 44px; /* Touch-friendly */
+    min-height: 44px;
 }
 
     .nav-link i {
         margin-right: 12px;
         font-size: 1.1rem;
-        transition: color 0.3s;
+        transition: color 0.2s;
     }
 
     .nav-link:hover {
         color: var(--primary-color);
         background-color: var(--hover-color);
-        transform: translateX(5px);
+        transform: none; /* removed slide shift globally */
     }
 
     .nav-link.active {
         color: var(--primary-color);
-        background-color: rgba(74, 144, 226, 0.2);
+        background-color: rgba(74, 144, 226, 0.15);
         font-weight: 600;
-        box-shadow: inset 2px 0 0 var(--primary-color);
+        box-shadow: none;
     }
 
     .nav-link.text-danger {
@@ -182,12 +185,12 @@ main.collapsed navbar-toggler {
 }
 
 .nav-section-header {
-    padding: 12px 20px;
+    padding: 10px 16px;
     display: flex;
     align-items: center;
     cursor: pointer;
     font-weight: 500;
-    transition: all 0.3s ease;
+    transition: background-color 0.2s ease, color 0.2s ease;
     border-radius: 5px;
 }
 
@@ -196,27 +199,141 @@ main.collapsed navbar-toggler {
         color: var(--primary-color);
     }
 
-    .nav-section-header i.fa-chevron-down {
-        transition: transform 0.3s, color 0.3s;
+    .nav-section-header i.fa-chevron-down,
+    .nav-section-header .fa-chevron-down {
+        transition: transform 0.3s ease;
         font-size: 0.9rem;
-        color: var(--text-color);        
+        color: var(--text-color);
+        margin-left: auto;
     }
 
-        .nav-section-header i.fa-chevron-down.rotated {            
+        .nav-section-header i.fa-chevron-down.rotated,
+        .nav-section-header .fa-chevron-down.rotated {
             transform: rotate(180deg);
         }
 
     .nav-section-header:hover i.fa-chevron-down {
         color: var(--primary-color);
     }
-.nav-link .fas.fa-chevron-down {
-    color: #888888; /* A nice mid-gray */
-    transition: color 0.3s ease, transform 0.3s ease; /* Ensure smooth transition */
-}
+
 .fas.fa-chevron-down.rotated {
-    color: #007bff; /* Standard Bootstrap Blue */
-    /* Keep your existing rotation property here */
     transform: rotate(180deg);
+}
+
+/* ================================================================
+   MATERIAL DESIGN 3 SIDEBAR OVERRIDES
+   Scoped under .sidebar to avoid bleeding into page nav elements.
+   These rules win via higher specificity without needing ::deep.
+   ================================================================ */
+
+/* Base capsule shape for all sidebar links and headers */
+.sidebar .nav-link,
+.sidebar .nav-section-header,
+.sidebar .nav-sub-header {
+    display: flex !important;
+    align-items: center !important;
+    height: 48px !important;
+    border-radius: 28px !important;       /* MD3 stadium capsule */
+    padding: 0 24px !important;
+    margin: 4px 12px !important;          /* Detached float from sidebar edges */
+    color: #44474f !important;            /* MD3 On Surface Variant */
+    font-weight: 500 !important;
+    font-size: 0.875rem !important;
+    background-color: transparent !important;
+    transition: background-color 200ms cubic-bezier(0.2, 0, 0, 1),
+                color 200ms cubic-bezier(0.2, 0, 0, 1) !important;
+    text-decoration: none !important;
+    gap: 12px !important;
+    transform: none !important;           /* Block translateX from default rules */
+    box-shadow: none !important;          /* Block inset border from default rules */
+    box-sizing: border-box !important;
+    cursor: pointer !important;
+    letter-spacing: 0.1px !important;
+}
+
+/* Icon reset inside sidebar capsules */
+.sidebar .nav-link i,
+.sidebar .nav-section-header i,
+.sidebar .nav-sub-header i {
+    font-size: 1.25rem !important;
+    color: #44474f !important;
+    margin-right: 0 !important;
+    width: 24px !important;
+    text-align: center !important;
+    transition: color 200ms cubic-bezier(0.2, 0, 0, 1) !important;
+}
+
+/* Hover state layer - confined strictly within the capsule */
+.sidebar .nav-link:hover,
+.sidebar .nav-section-header:hover,
+.sidebar .nav-sub-header:hover {
+    background-color: rgba(27, 27, 31, 0.08) !important;
+    color: #1b1b1f !important;
+    transform: none !important;
+}
+
+.sidebar .nav-link:hover i,
+.sidebar .nav-section-header:hover i,
+.sidebar .nav-sub-header:hover i {
+    color: #1b1b1f !important;
+}
+
+/* Active capsule - MD3 Primary Container */
+.sidebar .nav-link.active {
+    background-color: #d3e3fd !important; /* MD3 Primary Container (soft pastel blue) */
+    color: #041e49 !important;            /* MD3 On Primary Container (dark) */
+    font-weight: 700 !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+.sidebar .nav-link.active i {
+    color: #041e49 !important;
+}
+
+.sidebar .nav-link.active:hover {
+    background-color: #c2d8fa !important;
+    transform: none !important;
+}
+
+/* Sub-links nested container - with indent guide-line */
+.sidebar .nav-sub-links {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    margin-left: 28px !important;
+    border-left: 1px dashed #c4c6d0 !important;
+    padding-left: 0 !important;
+    margin-top: 2px !important;
+    margin-bottom: 2px !important;
+}
+
+/* Slightly smaller capsule for sub-items */
+.sidebar .nav-sub-links .nav-link {
+    height: 40px !important;
+    margin: 2px 8px 2px 4px !important;
+    border-radius: 20px !important;
+    padding: 0 16px !important;
+}
+
+/* Chevron rotation */
+.sidebar .nav-section-header .fa-chevron-down,
+.sidebar .nav-sub-header .fa-chevron-down {
+    font-size: 0.875rem !important;
+    margin-left: auto !important;
+    color: #44474f !important;
+    transition: transform 200ms cubic-bezier(0.2, 0, 0, 1) !important;
+}
+
+.sidebar .nav-section-header .fa-chevron-down.rotated,
+.sidebar .nav-sub-header .fa-chevron-down.rotated {
+    transform: rotate(180deg) !important;
+}
+
+/* Sign-out button at the bottom */
+.sidebar .sign-out-button {
+    border: none !important;
+    background: transparent !important;
 }
 .nav-vouchers-links .nav-link i.fas {
     color: navy !important;

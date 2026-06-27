@@ -1,63 +1,42 @@
+/*
+ * NavMenu Isolated CSS
+ * -----------------------------------------------------------------------
+ * MD3 capsule-pill active state is handled in site.css under `.sidebar`
+ * to avoid Blazor CSS isolation scope issues with ::deep selectors.
+ *
+ * This file only handles the sidebar panel itself (layout / chrome).
+ * -----------------------------------------------------------------------
+ */
 
-.navbar-toggler {
-    background-color: rgba(255, 255, 255, 0.1);
+/* Sidebar panel chrome */
+.sidebar {
+    background-color: #f7f9fc;
+    background-image: none;
+    border-right: 1px solid #e0e2ec;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    font-family: 'Outfit', 'Segoe UI', sans-serif;
 }
 
-.top-row {
-    height: 3.5rem;
-    background-color: rgba(0,0,0,0.4);
+/* App title / branding area */
+.sidebar-header {
+    padding: 20px 16px 12px 28px;
 }
 
-.navbar-brand {
-    font-size: 1.1rem;
+.sidebar-header .navbar-brand {
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: #1b1b1f;
+    letter-spacing: 0.15px;
+    text-decoration: none;
 }
 
-.oi {
-    width: 2rem;
-    font-size: 1.1rem;
-    vertical-align: text-top;
-    top: -2px;
-}
-
-.nav-item {
-    font-size: 0.9rem;
-    padding-bottom: 0.5rem;
-}
-
-    .nav-item:first-of-type {
-        padding-top: 1rem;
-    }
-
-    .nav-item:last-of-type {
-        padding-bottom: 1rem;
-    }
-
-    .nav-item ::deep a {
-        color: #d7d7d7;
-        border-radius: 4px;
-        height: 3rem;
-        display: flex;
-        align-items: center;
-        line-height: 3rem;
-    }
-
-.nav-item ::deep a.active {
-    background-color: rgba(255,255,255,0.25);
-    color: white;
-}
-
-.nav-item ::deep a:hover {
-    background-color: rgba(255,255,255,0.1);
-    color: white;
-}
-
-@media (min-width: 641px) {
-    .navbar-toggler {
-        display: none;
-    }
-
-    .collapse {
-        /* Never collapse the sidebar for wide screens */
-        display: block;
-    }
+/* Nav scroll area */
+.nav-scrollable {
+    display: flex;
+    flex-direction: column;
+    padding: 0;          /* lateral spacing is on individual items via margin in site.css */
+    overflow-y: auto;
+    flex: 1;
 }

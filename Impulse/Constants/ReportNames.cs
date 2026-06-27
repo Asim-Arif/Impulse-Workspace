@@ -60,6 +60,7 @@ namespace Impulse.Constants
 
             // Employee List Reports
             public const string EmpList                = Folder + "rptEmpList.rpt";
+            public const string DeptList               = Folder + "rptDeptList.rpt";
             public const string EmpListWithOldID       = Folder + "rptEmpListWithOldID.rpt";
             public const string EmpListDesignationwise = Folder + "rptEmpListDesignationwise.rpt";
             public const string EmpListWithoutSal      = Folder + "rptEmpListWithoutSal.rpt";
