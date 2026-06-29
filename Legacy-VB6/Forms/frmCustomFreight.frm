@@ -1,0 +1,360 @@
+VERSION 5.00
+Object = "{0D452EE1-E08F-101A-852E-02608C4D0BB4}#2.0#0"; "FM20.DLL"
+Object = "{4FC0C304-31EA-42CE-83E4-E42C3EB6A6AC}#4.0#0"; "ComboList.ocx"
+Begin VB.Form frmCustomFreight 
+   BorderStyle     =   3  'Fixed Dialog
+   Caption         =   "Enter Reight And Insurance Rates."
+   ClientHeight    =   2715
+   ClientLeft      =   2760
+   ClientTop       =   3750
+   ClientWidth     =   6090
+   LinkTopic       =   "Form1"
+   LockControls    =   -1  'True
+   MaxButton       =   0   'False
+   MinButton       =   0   'False
+   ScaleHeight     =   2715
+   ScaleWidth      =   6090
+   ShowInTaskbar   =   0   'False
+   StartUpPosition =   2  'CenterScreen
+   Begin ComboList.Usercontrol1 cmbCust 
+      Height          =   285
+      Left            =   45
+      TabIndex        =   0
+      Top             =   375
+      Width           =   2220
+      _ExtentX        =   3916
+      _ExtentY        =   503
+      BeginProperty ListFont {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+         Name            =   "Tahoma"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      BeginProperty TextFont {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+         Name            =   "Tahoma"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      ListIndex       =   -1
+      Appearance      =   0
+   End
+   Begin VB.TextBox txtInsurance 
+      Appearance      =   0  'Flat
+      ForeColor       =   &H00800000&
+      Height          =   285
+      Left            =   2295
+      MaxLength       =   150
+      TabIndex        =   9
+      TabStop         =   0   'False
+      Top             =   1020
+      Width           =   1965
+   End
+   Begin VB.TextBox txtFreight 
+      Appearance      =   0  'Flat
+      ForeColor       =   &H00800000&
+      Height          =   285
+      Left            =   45
+      MaxLength       =   150
+      TabIndex        =   8
+      TabStop         =   0   'False
+      Top             =   1020
+      Width           =   2220
+   End
+   Begin VB.TextBox txtDollarRate 
+      Appearance      =   0  'Flat
+      ForeColor       =   &H00800000&
+      Height          =   285
+      Left            =   4275
+      MaxLength       =   150
+      TabIndex        =   7
+      TabStop         =   0   'False
+      Top             =   1020
+      Width           =   1740
+   End
+   Begin VB.TextBox txtFormE 
+      Appearance      =   0  'Flat
+      ForeColor       =   &H00800000&
+      Height          =   285
+      Left            =   4275
+      MaxLength       =   150
+      TabIndex        =   5
+      TabStop         =   0   'False
+      Top             =   375
+      Width           =   1740
+   End
+   Begin VB.Label Label1 
+      Appearance      =   0  'Flat
+      BackColor       =   &H00C5D1DC&
+      BorderStyle     =   1  'Fixed Single
+      Caption         =   " Freight (Rs.)                           Insurance (Rs.)              Exch. Rate"
+      BeginProperty Font 
+         Name            =   "Tahoma"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      ForeColor       =   &H00400000&
+      Height          =   255
+      Index           =   1
+      Left            =   45
+      TabIndex        =   6
+      Top             =   750
+      Width           =   5970
+   End
+   Begin VB.Line Line1 
+      BorderColor     =   &H00808080&
+      BorderStyle     =   6  'Inside Solid
+      Index           =   1
+      X1              =   405
+      X2              =   5969
+      Y1              =   2145
+      Y2              =   2145
+   End
+   Begin MSForms.ComboBox cmbCustomInvoice 
+      Height          =   285
+      Left            =   2295
+      TabIndex        =   1
+      Top             =   375
+      Width           =   1965
+      VariousPropertyBits=   679495707
+      BorderStyle     =   1
+      DisplayStyle    =   3
+      Size            =   "3466;503"
+      MatchEntry      =   1
+      ShowDropButtonWhen=   2
+      SpecialEffect   =   0
+      FontName        =   "Tahoma"
+      FontHeight      =   165
+      FontCharSet     =   0
+      FontPitchAndFamily=   2
+   End
+   Begin VB.Label Label1 
+      Appearance      =   0  'Flat
+      BackColor       =   &H00C5D1DC&
+      BorderStyle     =   1  'Fixed Single
+      Caption         =   " Customer                               Invoice                              Form E No."
+      BeginProperty Font 
+         Name            =   "Tahoma"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      ForeColor       =   &H00400000&
+      Height          =   255
+      Index           =   7
+      Left            =   45
+      TabIndex        =   4
+      Top             =   105
+      Width           =   5970
+   End
+   Begin VB.Image Image2 
+      Height          =   435
+      Left            =   4320
+      Picture         =   "frmCustomFreight.frx":0000
+      Top             =   1530
+      Width           =   480
+   End
+   Begin MSForms.CommandButton cmdClose 
+      CausesValidation=   0   'False
+      Height          =   390
+      Left            =   4245
+      TabIndex        =   3
+      Top             =   2280
+      Width           =   1755
+      ForeColor       =   0
+      Caption         =   "Cancel          "
+      PicturePosition =   327683
+      Size            =   "3096;688"
+      Picture         =   "frmCustomFreight.frx":05EF
+      Accelerator     =   67
+      FontName        =   "Tahoma"
+      FontEffects     =   1073741825
+      FontHeight      =   165
+      FontCharSet     =   0
+      FontPitchAndFamily=   2
+      ParagraphAlign  =   3
+      FontWeight      =   700
+   End
+   Begin MSForms.CommandButton cmdGenerate 
+      Height          =   390
+      Left            =   2445
+      TabIndex        =   2
+      Top             =   2280
+      Width           =   1755
+      ForeColor       =   0
+      Caption         =   "Save            "
+      PicturePosition =   327683
+      Size            =   "3096;688"
+      Accelerator     =   83
+      FontName        =   "Tahoma"
+      FontEffects     =   1073741825
+      FontHeight      =   165
+      FontCharSet     =   0
+      FontPitchAndFamily=   2
+      ParagraphAlign  =   3
+      FontWeight      =   700
+   End
+   Begin VB.Line Line1 
+      BorderColor     =   &H00FFFFFF&
+      BorderWidth     =   2
+      Index           =   0
+      X1              =   420
+      X2              =   5969
+      Y1              =   2160
+      Y2              =   2160
+   End
+End
+Attribute VB_Name = "frmCustomFreight"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
+Attribute VB_Exposed = False
+
+Private Sub cmbBankName_Change()
+    Call cmbBankName_Click
+End Sub
+
+Private Sub cmbBankName_Click()
+
+    On Error GoTo err
+    
+    If cmbBankName.MatchFound = False Then Exit Sub
+    
+    Dim rs As New ADODB.Recordset
+    With rs
+        .Open "Select BankID,Branch,AccNo From BankList Where Bank='" & cmbBankName & "'", con, adOpenForwardOnly, adLockReadOnly
+        cmbBranch.Clear
+        Do Until .EOF
+            cmbBranch.AddItem ![Branch] & ""
+            
+            cmbBranch.List(cmbBranch.ListCount - 1, 1) = ![AccNo] & ""
+            cmbBranch.List(cmbBranch.ListCount - 1, 2) = ![BankID] & ""
+            .MoveNext
+        Loop
+        .Close
+    End With
+    
+    Set rs = Nothing
+    
+    Exit Sub
+err:
+    MsgBox err.Description
+    
+End Sub
+
+Private Sub cmbBranch_Change()
+    Call cmbBranch_Click
+End Sub
+
+Private Sub cmbBranch_Click()
+    txtAccNo.Text = cmbBranch.List(cmbBranch.ListIndex, 1)
+End Sub
+
+Private Sub cmbCust_matched()
+    
+    On Error GoTo err
+    Dim rs As New ADODB.Recordset
+    With rs
+        .Open "Select CustomInvoice,FormE From VrptCustomInvoice Where CustCode='" & cmbCust.ID & "' And CustomInvoice Not In(Select CustomInvoice From CustomInvoiceFreight) Order By CustomInvoice", con, adOpenForwardOnly, adLockReadOnly
+        cmbCustomInvoice.Clear
+        Do Until .EOF
+            cmbCustomInvoice.AddItem .Fields(0) & ""
+            cmbCustomInvoice.List(cmbCustomInvoice.ListCount - 1, 1) = .Fields(1) & ""
+            .MoveNext
+        Loop
+        .Close
+    End With
+    
+    Set rs = Nothing
+    Exit Sub
+err:
+    MsgBox err.Description
+    
+End Sub
+
+
+Private Sub cmbCustomInvoice_Change()
+    Call cmbCustomInvoice_Click
+End Sub
+
+Private Sub cmbCustomInvoice_Click()
+    txtFormE.Text = cmbCustomInvoice.List(cmbCustomInvoice.ListIndex, 1)
+    
+End Sub
+
+Private Sub cmdClose_Click()
+    Unload Me
+End Sub
+
+Private Sub cmdGenerate_Click()
+    
+    On Error GoTo err
+    
+    Dim RecAffect As Long
+    
+    If cmbCustomInvoice.MatchFound = False Then
+        MsgBox "Select Valid Invoice.", vbInformation
+        
+        Exit Sub
+    End If
+    
+    If Val(txtFreight) = 0 And Val(txtInsurance) = 0 Then
+        MsgBox "You must enter either Freight Rate or Insurance Charges.", vbInformation
+        txtFreight.SetFocus
+        Exit Sub
+    End If
+    If Val(txtDollarRate) = 0 Then
+        MsgBox "What's about entering Dollar Rate ?", vbInformation
+        txtDollarRate.SetFocus
+        Exit Sub
+    End If
+    
+    Call StartTrans(con)
+    
+    con.Execute "Insert Into CustomInvoiceFreight(CustomInvoice,Freight,Insurance,DollarRate) Values('" & _
+     cmbCustomInvoice.Text & "'," & Val(txtFreight) & "," & Val(txtInsurance) & "," & Val(txtDollarRate) & ")"
+    
+    con.CommitTrans
+    
+    Unload Me
+    Exit Sub
+err:
+    MsgBox err.Description
+    
+End Sub
+
+Private Sub Form_Load()
+        
+    Call cmbCust.AddVals(con, "CustCode", "ForeignCustomers", "CustCode", " Where CustCode<>'HICO'")
+    
+    
+    
+    cmbCust.ListHeight = 2500
+    
+End Sub
+
+Public Sub ShowForm(CustCode As String, InvoiceNo As String)
+
+    On Error GoTo err
+    cmbCust.ID = CustCode
+    cmbCustomInvoice = InvoiceNo
+    txtFDBC.TabIndex = 0
+    Me.Show 1
+    Exit Sub
+err:
+    MsgBox err.Description
+End Sub
+
