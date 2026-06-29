@@ -1,0 +1,78 @@
+@using DataAccessLibrary.Models.ViewModels.Payroll
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Employee ID <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" @bind="Employee.EmpID" placeholder="Enter Employee ID" />
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Name <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" @bind="Employee.Name" placeholder="Full Name" />
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Father's / Husband's Name</label>
+        <div class="input-group">
+            <select class="form-select" @bind="Employee.Rel" style="max-width: 100px;">
+                <option value="S/O">S/O</option>
+                <option value="D/O">D/O</option>
+                <option value="W/O">W/O</option>
+            </select>
+            <input type="text" class="form-control" @bind="Employee.FName" placeholder="Name" />
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">CNIC</label>
+        <input type="text" class="form-control" @bind="Employee.NIC" placeholder="XXXXX-XXXXXXX-X" />
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">Date of Birth</label>
+        <input type="date" class="form-control" @bind="Employee.DOB" />
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">Gender</label>
+        <select class="form-select" @bind="Employee.Sex">
+            <option value="">Select...</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+        </select>
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">Religion</label>
+        <select class="form-select" @bind="Employee.Religion">
+            <option value="Islam">Islam</option>
+            <option value="Christian">Christian</option>
+            <option value="Other">Other</option>
+        </select>
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Phone 1</label>
+        <input type="text" class="form-control" @bind="Employee.Phone1" placeholder="Primary Phone" />
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Phone 2</label>
+        <input type="text" class="form-control" @bind="Employee.Phone2" placeholder="Secondary Phone" />
+    </div>
+
+    <div class="col-12">
+        <label class="form-label fw-bold text-secondary mb-1">Permanent Address</label>
+        <textarea class="form-control" rows="2" @bind="Employee.Address"></textarea>
+    </div>
+
+    <div class="col-12">
+        <label class="form-label fw-bold text-secondary mb-1">Temporary Address</label>
+        <textarea class="form-control" rows="2" @bind="Employee.TempAddress"></textarea>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EmployeeDto Employee { get; set; } = default!;
+}

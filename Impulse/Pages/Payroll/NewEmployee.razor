@@ -1,0 +1,95 @@
+@page "/payroll/newemployee"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Impulse.Components.Payroll.NewEmployeeTabs
+
+<PageTitle>New Employee</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <div class="row g-2 mb-3 align-items-end border-bottom pb-2">
+                <div class="col-auto d-flex align-items-end pb-1">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-user-plus text-primary me-2"></i>
+                        New Employee
+                    </h5>
+                </div>
+            </div>
+
+            <EditForm Model="Employee" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
+
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <!-- MD3 Tabs Navigation -->
+                        <ul class="nav nav-tabs md3-tabs" id="employeeTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "PersonalInfo" ? "active" : "")"
+                                        @onclick='() => ChangeTab("PersonalInfo")'
+                                        type="button" role="tab">Personal Info</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "GeneralInfo" ? "active" : "")"
+                                        @onclick='() => ChangeTab("GeneralInfo")'
+                                        type="button" role="tab">General Info</button>
+                            </li>
+                        </ul>
+
+                        <!-- Tab Content -->
+                        <div class="tab-content pt-4" id="employeeTabsContent">
+                            <div class="tab-pane fade @(ActiveTab == "PersonalInfo" ? "show active" : "")" role="tabpanel">
+                                <PersonalInfoTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "GeneralInfo" ? "show active" : "")" role="tabpanel">
+                                <GeneralInfoTab Employee="Employee" Departments="Departments" Designations="Designations" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 border-top pt-3 mt-4">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary" disabled="@IsSaving">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save me-1"></i> <span>Save & Close</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Material Design 3 style tabs */
+    .md3-tabs {
+        border-bottom: 1px solid #e0e2ec;
+        gap: 8px;
+    }
+    .md3-tabs .nav-link {
+        color: #44474f;
+        border: none;
+        border-bottom: 3px solid transparent;
+        padding: 0.75rem 1rem;
+        font-weight: 500;
+        border-radius: 0;
+        transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+    }
+    .md3-tabs .nav-link:hover {
+        background-color: rgba(60, 122, 82, 0.05); /* Match Impulse green tint */
+        color: #1a4731;
+    }
+    .md3-tabs .nav-link.active {
+        color: #0d6efd; /* Primary color */
+        border-bottom-color: #0d6efd;
+        background: transparent;
+    }
+</style>

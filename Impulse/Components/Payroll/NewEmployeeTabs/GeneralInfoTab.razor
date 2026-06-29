@@ -1,0 +1,85 @@
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Blazored.Typeahead
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Department</label>
+        <select class="form-select" @bind="Employee.DeptID">
+            <option value="">Select Department...</option>
+            @foreach (var dept in Departments)
+            {
+                <option value="@dept.DeptID">@dept.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Designation</label>
+        <select class="form-select" @bind="Employee.Designation">
+            <option value="">Select Designation...</option>
+            @foreach (var desig in Designations)
+            {
+                <option value="@desig">@desig</option>
+            }
+        </select>
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">Joining Date</label>
+        <input type="date" class="form-control" @bind="Employee.JoinDate" />
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">Employee Type</label>
+        <select class="form-select" @bind="Employee.EmpType">
+            <option value="0">Staff Member</option>
+            <option value="1">Director</option>
+        </select>
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">Status</label>
+        <select class="form-select" @bind="Employee.Status">
+            <option value="Salary">Salary</option>
+            <option value="Wages">Wages</option>
+        </select>
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Starting Salary</label>
+        <input type="number" class="form-control" @bind="Employee.StartingSalary" step="0.01" />
+    </div>
+
+    <div class="col-md-6 d-flex align-items-center mt-5">
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="bankPaymentCheck" @bind="Employee.BankPymt" />
+            <label class="form-check-label fw-bold text-secondary" for="bankPaymentCheck">Salary is Paid Through Bank</label>
+        </div>
+    </div>
+
+    @if (Employee.BankPymt == true)
+    {
+        <div class="col-md-6">
+            <label class="form-label fw-bold text-secondary mb-1">Bank Account Number</label>
+            <input type="text" class="form-control" @bind="Employee.EmpAccNo" placeholder="Account Number" />
+        </div>
+    }
+
+    <div class="col-12 mt-4">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="activeCheck" @bind="Employee.Active" />
+            <label class="form-check-label fw-bold text-secondary" for="activeCheck">Active Employee</label>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EmployeeDto Employee { get; set; } = default!;
+
+    [Parameter]
+    public List<DepartmentModel> Departments { get; set; } = new();
+
+    [Parameter]
+    public List<string> Designations { get; set; } = new();
+}

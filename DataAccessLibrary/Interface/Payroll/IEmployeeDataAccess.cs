@@ -11,5 +11,6 @@ namespace DataAccessLibrary.Interface.Payroll
         Task<List<EmployeeListItemModel>> GetEmployeesAsync(string deptId, bool showInactive, bool tempEmpOnly, string? selectedEmpId = null);
         Task<byte[]?> GetEmployeePictureAsync(string empId);
         Task SetEmployeeActiveStateAsync(string empId, bool active, DateTime? date = null, string? remarks = null, string? userName = null, string? machineName = null);
+        Task SaveEmployeeAsync(EmployeeDto employee, bool isAdd, string userName, string machineName);
     }
 }
