@@ -7,6 +7,7 @@ using DataAccessLibrary.Models.ViewModels.Payroll;
 using Impulse.Constants;
 using Impulse.Services;
 using Impulse.Services.Payroll;
+using BlazorContextMenu;
 
 namespace Impulse.Pages.Payroll
 {
@@ -17,6 +18,7 @@ namespace Impulse.Pages.Payroll
         [Inject] private INotificationService NotificationServiceManager { get; set; } = null!;
         [Inject] private NavigationManager NavigationManager { get; set; } = null!;
         [Inject] private IDBHelperService DbHelper { get; set; } = null!;
+        [Inject] private IBlazorContextMenuService BlazorContextMenuService { get; set; } = null!;
 
         [Parameter]
         [SupplyParameterFromQuery(Name = "contractorsOnly")]
@@ -198,6 +200,17 @@ namespace Impulse.Pages.Payroll
                 selectedEmployeePic = null;
                 selectedEmployeePicBase64 = string.Empty;
             }
+        }
+
+        private async Task OpenReportsMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs e)
+        {
+            await BlazorContextMenuService.ShowMenu("reportsMenu", (int)e.ClientX, (int)e.ClientY + 15);
+        }
+
+        private async Task OpenManageMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs e, EmployeeListItemModel emp)
+        {
+            highlightedEmployee = emp;
+            await BlazorContextMenuService.ShowMenu("manageEmployeeMenu", (int)e.ClientX, (int)e.ClientY + 15, emp);
         }
 
         private async Task LoadEmployeePicture(string empId)

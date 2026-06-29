@@ -3,6 +3,7 @@
 @using DataAccessLibrary.Models.ViewModels.Payroll
 @using Impulse.Services
 @using Blazored.Typeahead
+@using BlazorContextMenu
 
 <PageTitle>@(ContractorsOnly ? "Temp. Employee List" : "Employee List")</PageTitle>
 
@@ -89,32 +90,9 @@
                     <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="RefreshList" title="Refresh List">
                         <i class="fas fa-sync-alt"></i>
                     </button>
-                    <div class="dropdown">
-                        <button class="btn btn-primary btn-sm dropdown-toggle" type="button" id="reportsMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-print me-1"></i> Reports
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="reportsMenuButton">
-                            <li><h6 class="dropdown-header">Employee Lists</h6></li>
-                            <li><button class="dropdown-item" @onclick="() => PrintEmpList(false, false)"><i class="fas fa-file-invoice-dollar me-2 text-muted"></i>With Salary</button></li>
-                            <li><button class="dropdown-item" @onclick='() => PrintEmpListWithoutSal(false, ContractorsOnly ? "Temp. Employee List" : "Employee List")'><i class="fas fa-file-alt me-2 text-muted"></i>Without Salary</button></li>
-                            <li><button class="dropdown-item" @onclick='() => PrintEmpListWithoutSal(true, ContractorsOnly ? "Temp. Employee List (With DOB)" : "Employee List (With DOB)")'><i class="fas fa-calendar-alt me-2 text-muted"></i>With DOB</button></li>
-                            <li><button class="dropdown-item" @onclick="() => PrintEmpList(false, false, false, true)"><i class="fas fa-tags me-2 text-muted"></i>Designationwise</button></li>
-                            <li><button class="dropdown-item" @onclick="() => PrintEmpList(false, false, true, false)"><i class="fas fa-id-badge me-2 text-muted"></i>With Old ID</button></li>
-                            <li><button class="dropdown-item" @onclick="() => PrintEmpList(true, false)"><i class="fas fa-coins me-2 text-muted"></i>External Salary</button></li>
-                            <li><button class="dropdown-item" @onclick="PrintEmpListCF"><i class="fas fa-credit-card me-2 text-muted"></i>Card Fields</button></li>
-                            <li><button class="dropdown-item" @onclick="PrintEmpListWCardID"><i class="fas fa-barcode me-2 text-muted"></i>Card ID List</button></li>
-                            <li><button class="dropdown-item" @onclick="PrintEmpListSalaryPercentage"><i class="fas fa-percentage me-2 text-muted"></i>Salary Percentage</button></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><h6 class="dropdown-header">Special Filters</h6></li>
-                            <li><button class="dropdown-item" @onclick='() => PrintEmpListWithoutSal(false, "Mess Members", false)'><i class="fas fa-utensils me-2 text-muted"></i>Mess Members</button></li>
-                            <li><button class="dropdown-item" @onclick='() => PrintEmpListWithoutSal(false, "Union Members", false)'><i class="fas fa-handshake me-2 text-muted"></i>Union Members</button></li>
-                            <li><button class="dropdown-item" @onclick="PrintEmpListDeptSelection"><i class="fas fa-building me-2 text-muted"></i>Department Selection</button></li>
-                            @if (ContractorsOnly)
-                            {
-                                <li><button class="dropdown-item" @onclick='() => PrintEmpListWithoutSal(false, "Temporary Employee List", true)'><i class="fas fa-user-clock me-2 text-muted"></i>Temporary Employee List Report</button></li>
-                            }
-                        </ul>
-                    </div>
+                    <button type="button" class="btn btn-primary btn-sm" id="reportsMenuButton" @onclick="OpenReportsMenu" title="Reports">
+                        <i class="fas fa-print me-1"></i> Reports
+                    </button>
                 </div>
 
             </div>
@@ -191,22 +169,7 @@
                                                     <td class="text-end fw-bold">@emp.StartingSalary.ToString("N0")</td>
                                                     <td>@emp.JoinDate?.ToString("dd-MMM-yyyy")</td>
                                                     <td class="text-center" @onclick:stopPropagation="true">
-                                                        <div class="btn-group">
-                                                            <button type="button" class="btn btn-outline-secondary btn-xs dropdown-toggle py-0 px-2" style="font-size: 0.8rem;" data-bs-toggle="dropdown" aria-expanded="false">Manage</button>
-                                                            <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="font-size: 0.85rem;">
-                                                                <li><button class="dropdown-item text-primary" @onclick="() => PrintEmpDetail(emp.EmpID)"><i class="fas fa-file-user me-2"></i>Print Details</button></li>
-                                                                <li><button class="dropdown-item text-primary" @onclick="() => PrintEmpCard(emp.EmpID)"><i class="fas fa-id-badge me-2"></i>Print Card</button></li>
-                                                                <li><button class="dropdown-item" @onclick="() => ToggleActiveState(emp)">
-                                                                    @if (emp.Active) { <span class="text-danger"><i class="fas fa-user-slash me-2"></i>Make Inactive</span> }
-                                                                    else { <span class="text-success"><i class="fas fa-user-check me-2"></i>Make Active</span> }
-                                                                </button></li>
-                                                                @if (ContractorsOnly && emp.Active)
-                                                                {
-                                                                    <li><hr class="dropdown-divider"></li>
-                                                                    <li><button class="dropdown-item text-warning" @onclick="() => TransferToPermanent(emp)"><i class="fas fa-exchange-alt me-2"></i>Transfer to Permanent</button></li>
-                                                                }
-                                                            </ul>
-                                                        </div>
+                                                        <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2" style="font-size: 0.8rem;" @onclick="(e) => OpenManageMenu(e, emp)">Manage</button>
                                                     </td>
                                                 </tr>
                                             }
@@ -273,22 +236,7 @@
                                                             <td class="text-end fw-bold">@emp.StartingSalary.ToString("N0")</td>
                                                             <td>@emp.JoinDate?.ToString("dd-MMM-yyyy")</td>
                                                             <td class="text-center" @onclick:stopPropagation="true">
-                                                                <div class="btn-group">
-                                                                    <button type="button" class="btn btn-outline-secondary btn-xs dropdown-toggle py-0 px-2" style="font-size: 0.8rem;" data-bs-toggle="dropdown" aria-expanded="false">Manage</button>
-                                                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="font-size: 0.85rem;">
-                                                                        <li><button class="dropdown-item text-primary" @onclick="() => PrintEmpDetail(emp.EmpID)"><i class="fas fa-file-user me-2"></i>Print Details</button></li>
-                                                                        <li><button class="dropdown-item text-primary" @onclick="() => PrintEmpCard(emp.EmpID)"><i class="fas fa-id-badge me-2"></i>Print Card</button></li>
-                                                                        <li><button class="dropdown-item" @onclick="() => ToggleActiveState(emp)">
-                                                                            @if (emp.Active) { <span class="text-danger"><i class="fas fa-user-slash me-2"></i>Make Inactive</span> }
-                                                                            else { <span class="text-success"><i class="fas fa-user-check me-2"></i>Make Active</span> }
-                                                                        </button></li>
-                                                                        @if (ContractorsOnly && emp.Active)
-                                                                        {
-                                                                            <li><hr class="dropdown-divider"></li>
-                                                                            <li><button class="dropdown-item text-warning" @onclick="() => TransferToPermanent(emp)"><i class="fas fa-exchange-alt me-2"></i>Transfer to Permanent</button></li>
-                                                                        }
-                                                                    </ul>
-                                                                </div>
+                                                                <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2" style="font-size: 0.8rem;" @onclick="(e) => OpenManageMenu(e, emp)">Manage</button>
                                                             </td>
                                                         </tr>
                                                     }
@@ -377,6 +325,88 @@
     </div>
 }
 
+<!-- ── BlazorContextMenu: Reports Menu ── -->
+<ContextMenu Id="reportsMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <div class="win11-section-header">Employee Lists</div>
+    <Item class="win11-menu-item" OnClick="() => PrintEmpList(false, false)">
+        <i class="fas fa-file-invoice-dollar fa-fw win11-icon"></i> With Salary
+    </Item>
+    <Item class="win11-menu-item" OnClick='() => PrintEmpListWithoutSal(false, ContractorsOnly ? "Temp. Employee List" : "Employee List")'>
+        <i class="fas fa-file-alt fa-fw win11-icon"></i> Without Salary
+    </Item>
+    <Item class="win11-menu-item" OnClick='() => PrintEmpListWithoutSal(true, ContractorsOnly ? "Temp. Employee List (With DOB)" : "Employee List (With DOB)")'>
+        <i class="fas fa-calendar-alt fa-fw win11-icon"></i> With DOB
+    </Item>
+    <Item class="win11-menu-item" OnClick="() => PrintEmpList(false, false, false, true)">
+        <i class="fas fa-tags fa-fw win11-icon"></i> Designationwise
+    </Item>
+    <Item class="win11-menu-item" OnClick="() => PrintEmpList(false, false, true, false)">
+        <i class="fas fa-id-badge fa-fw win11-icon"></i> With Old ID
+    </Item>
+    <Item class="win11-menu-item" OnClick="() => PrintEmpList(true, false)">
+        <i class="fas fa-coins fa-fw win11-icon"></i> External Salary
+    </Item>
+    <Item class="win11-menu-item" OnClick="() => PrintEmpListCF()">
+        <i class="fas fa-credit-card fa-fw win11-icon"></i> Card Fields
+    </Item>
+    <Item class="win11-menu-item" OnClick="() => PrintEmpListWCardID()">
+        <i class="fas fa-barcode fa-fw win11-icon"></i> Card ID List
+    </Item>
+    <Item class="win11-menu-item" OnClick="() => PrintEmpListSalaryPercentage()">
+        <i class="fas fa-percentage fa-fw win11-icon"></i> Salary Percentage
+    </Item>
+
+    <div class="win11-divider"></div>
+    <div class="win11-section-header">Special Filters</div>
+
+    <Item class="win11-menu-item" OnClick='() => PrintEmpListWithoutSal(false, "Mess Members", false)'>
+        <i class="fas fa-utensils fa-fw win11-icon"></i> Mess Members
+    </Item>
+    <Item class="win11-menu-item" OnClick='() => PrintEmpListWithoutSal(false, "Union Members", false)'>
+        <i class="fas fa-handshake fa-fw win11-icon"></i> Union Members
+    </Item>
+    <Item class="win11-menu-item" OnClick="() => PrintEmpListDeptSelection()">
+        <i class="fas fa-building fa-fw win11-icon"></i> Department Selection
+    </Item>
+    @if (ContractorsOnly)
+    {
+        <Item class="win11-menu-item" OnClick='() => PrintEmpListWithoutSal(false, "Temporary Employee List", true)'>
+            <i class="fas fa-user-clock fa-fw win11-icon"></i> Temporary Employee List Report
+        </Item>
+    }
+</ContextMenu>
+
+<!-- ── BlazorContextMenu: Manage Employee Menu ── -->
+<ContextMenu Id="manageEmployeeMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    @if (context.Data is EmployeeListItemModel emp)
+    {
+        <div class="win11-section-header">Manage: @emp.Name</div>
+        <Item class="win11-menu-item" OnClick="@(() => PrintEmpDetail(emp.EmpID))">
+            <i class="fas fa-file-user fa-fw win11-icon"></i> Print Details
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintEmpCard(emp.EmpID))">
+            <i class="fas fa-id-badge fa-fw win11-icon"></i> Print Card
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => ToggleActiveState(emp))">
+            @if (emp.Active)
+            {
+                <span><i class="fas fa-user-slash fa-fw win11-icon text-danger"></i> Make Inactive</span>
+            }
+            else
+            {
+                <span><i class="fas fa-user-check fa-fw win11-icon text-success"></i> Make Active</span>
+            }
+        </Item>
+        @if (ContractorsOnly && emp.Active)
+        {
+            <div class="win11-divider"></div>
+            <Item class="win11-menu-item" OnClick="@(() => TransferToPermanent(emp))">
+                <i class="fas fa-exchange-alt fa-fw win11-icon text-warning"></i> Transfer to Permanent
+            </Item>
+        }
+    }
+</ContextMenu>
+
 <style>
     .clickable-row:hover {
         background-color: rgba(13, 110, 253, 0.05) !important;
@@ -387,3 +417,4 @@
         border-radius: 4px;
     }
 </style>
+
