@@ -1,0 +1,80 @@
+@using DataAccessLibrary.Models.ViewModels.Payroll
+
+<div class="row g-3 mb-3 align-items-end">
+    <div class="col-auto">
+        <label class="form-label fw-bold text-secondary mb-1">Sr #</label>
+        <input type="number" class="form-control form-control-sm" @bind="_newSrNo" style="width:70px;" />
+    </div>
+    <div class="col">
+        <label class="form-label fw-bold text-secondary mb-1">Asset Description</label>
+        <input type="text" class="form-control form-control-sm" @bind="_newDescription" placeholder="Asset description" />
+    </div>
+    <div class="col-auto">
+        <label class="form-label fw-bold text-secondary mb-1">Date</label>
+        <input type="date" class="form-control form-control-sm" @bind="_newDate" />
+    </div>
+    <div class="col">
+        <label class="form-label fw-bold text-secondary mb-1">Remarks</label>
+        <input type="text" class="form-control form-control-sm" @bind="_newRemarks" />
+    </div>
+    <div class="col-auto pb-0">
+        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddAsset">
+            <i class="fas fa-plus me-1"></i> Add
+        </button>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-bordered table-sm align-middle">
+        <thead class="table-light">
+            <tr>
+                <th style="width:60px;">Sr No</th>
+                <th>Asset Description</th>
+                <th style="width:120px;">Date</th>
+                <th>Remarks</th>
+                <th style="width:60px;"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var asset in Employee.Assets)
+            {
+                <tr>
+                    <td><input type="number" class="form-control form-control-sm" @bind="asset.SrNo" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="asset.AssetDescription" /></td>
+                    <td><input type="date" class="form-control form-control-sm" @bind="asset.AssetDT" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="asset.Remarks" /></td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => Employee.Assets.Remove(asset)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter]
+    public EmployeeDto Employee { get; set; } = default!;
+
+    private int _newSrNo = 1;
+    private string _newDescription = string.Empty;
+    private DateTime? _newDate = DateTime.Today;
+    private string _newRemarks = string.Empty;
+
+    private void AddAsset()
+    {
+        Employee.Assets.Add(new EmpAssetDto
+        {
+            SrNo = _newSrNo,
+            AssetDescription = _newDescription,
+            AssetDT = _newDate,
+            Remarks = _newRemarks
+        });
+        _newSrNo = Employee.Assets.Count + 1;
+        _newDescription = string.Empty;
+        _newDate = DateTime.Today;
+        _newRemarks = string.Empty;
+    }
+}

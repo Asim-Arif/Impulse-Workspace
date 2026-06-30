@@ -1,0 +1,66 @@
+@using DataAccessLibrary.Models.ViewModels.Payroll
+
+<div class="table-responsive mb-3">
+    <table class="table table-bordered table-sm align-middle">
+        <thead class="table-light">
+            <tr>
+                <th style="width:110px;">Date</th>
+                <th style="width:110px;">Type</th>
+                <th style="width:80px;">Rating</th>
+                <th>Reviewed By</th>
+                <th>Review</th>
+                <th style="width:60px;"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var review in Employee.Reviews)
+            {
+                <tr>
+                    <td><input type="date" class="form-control form-control-sm" @bind="review.DT" /></td>
+                    <td>
+                        <select class="form-select form-select-sm" @bind="review.ReviewType">
+                            <option value="Annual">Annual</option>
+                            <option value="Probation">Probation</option>
+                            <option value="Performance">Performance</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </td>
+                    <td>
+                        <select class="form-select form-select-sm" @bind="review.Rating">
+                            <option value="Excellent">Excellent</option>
+                            <option value="Good">Good</option>
+                            <option value="Average">Average</option>
+                            <option value="Below Average">Below Average</option>
+                            <option value="Poor">Poor</option>
+                        </select>
+                    </td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="review.ReviewedBy" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="review.Review" /></td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => Employee.Reviews.Remove(review)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <button type="button" class="btn btn-sm btn-outline-primary mt-2" @onclick="AddReview">
+        <i class="fas fa-plus me-1"></i> Add Review
+    </button>
+</div>
+
+@code {
+    [Parameter]
+    public EmployeeDto Employee { get; set; } = default!;
+
+    private void AddReview()
+    {
+        Employee.Reviews.Add(new EmpReviewDto
+        {
+            DT = DateTime.Today,
+            ReviewType = "Annual",
+            Rating = "Good"
+        });
+    }
+}

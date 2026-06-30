@@ -1,0 +1,44 @@
+@using DataAccessLibrary.Models.ViewModels.Payroll
+
+<div class="table-responsive">
+    <table class="table table-bordered table-sm align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>Name</th>
+                <th>Address</th>
+                <th>Phone No</th>
+                <th>Known By</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var guarantor in Employee.Guarantors)
+            {
+                <tr>
+                    <td><input type="text" class="form-control form-control-sm" @bind="guarantor.Name" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="guarantor.Address" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="guarantor.PhoneNo" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="guarantor.KnownBy" /></td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => Employee.Guarantors.Remove(guarantor)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <button type="button" class="btn btn-sm btn-outline-primary mt-2" @onclick="AddGuarantor">
+        <i class="fas fa-plus me-1"></i> Add Guarantor
+    </button>
+</div>
+
+@code {
+    [Parameter]
+    public EmployeeDto Employee { get; set; } = default!;
+
+    private void AddGuarantor()
+    {
+        Employee.Guarantors.Add(new EmpGuarantorDto());
+    }
+}

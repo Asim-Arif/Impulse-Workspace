@@ -1,0 +1,68 @@
+@using DataAccessLibrary.Models.ViewModels.Payroll
+
+<div class="row g-4 mb-4">
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Last Firm</label>
+        <input type="text" class="form-control" @bind="Employee.LastEmpFirm" />
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Last Designation</label>
+        <input type="text" class="form-control" @bind="Employee.LastEmpDesig" />
+    </div>
+
+    <div class="col-12">
+        <label class="form-label fw-bold text-secondary mb-1">Reason To Discontinue</label>
+        <textarea class="form-control" rows="2" @bind="Employee.LastEmpReason"></textarea>
+    </div>
+</div>
+
+<hr />
+
+<h6 class="fw-bold mt-4 mb-3">Employment History Grid</h6>
+<div class="table-responsive">
+    <table class="table table-bordered table-sm align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>From Date</th>
+                <th>To Date</th>
+                <th>Company</th>
+                <th>Designation</th>
+                <th>Industry</th>
+                <th>Responsibilities</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var history in Employee.EmploymentHistories)
+            {
+                <tr>
+                    <td><input type="date" class="form-control form-control-sm" @bind="history.FromDT" /></td>
+                    <td><input type="date" class="form-control form-control-sm" @bind="history.ToDT" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="history.Company" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="history.Designation" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="history.Industry" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="history.Responsibilities" /></td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => Employee.EmploymentHistories.Remove(history)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <button type="button" class="btn btn-sm btn-outline-primary mt-2" @onclick="AddHistory">
+        <i class="fas fa-plus me-1"></i> Add History Record
+    </button>
+</div>
+
+@code {
+    [Parameter]
+    public EmployeeDto Employee { get; set; } = default!;
+
+    private void AddHistory()
+    {
+        Employee.EmploymentHistories.Add(new EmpEmployementHistoryDto());
+    }
+}

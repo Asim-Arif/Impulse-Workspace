@@ -1,0 +1,49 @@
+@using DataAccessLibrary.Models.ViewModels.Payroll
+
+<div class="table-responsive">
+    <table class="table table-bordered table-sm align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>Sr No</th>
+                <th>Diploma/Degree/Certificate</th>
+                <th>Institute</th>
+                <th>Passing Year</th>
+                <th>Grade</th>
+                <th>Division</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var qual in Employee.Qualifications)
+            {
+                <tr>
+                    <td><input type="number" class="form-control form-control-sm" @bind="qual.SrNo" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="qual.Diploma" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="qual.Institute" /></td>
+                    <td><input type="number" class="form-control form-control-sm" @bind="qual.Year" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="qual.Grad" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="qual.Division" /></td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => Employee.Qualifications.Remove(qual)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <button type="button" class="btn btn-sm btn-outline-primary mt-2" @onclick="AddQualification">
+        <i class="fas fa-plus me-1"></i> Add Qualification
+    </button>
+</div>
+
+@code {
+    [Parameter]
+    public EmployeeDto Employee { get; set; } = default!;
+
+    private void AddQualification()
+    {
+        var nextSrNo = (byte)(Employee.Qualifications.Count + 1);
+        Employee.Qualifications.Add(new EmpQualificationDto { SrNo = nextSrNo });
+    }
+}

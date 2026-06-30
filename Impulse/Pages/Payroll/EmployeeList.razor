@@ -381,6 +381,9 @@
     @if (context.Data is EmployeeListItemModel emp)
     {
         <div class="win11-section-header">Manage: @emp.Name</div>
+        <Item class="win11-menu-item" OnClick="@(() => EditEmployee(emp.EmpID))">
+            <i class="fas fa-edit fa-fw win11-icon text-primary"></i> Edit Employee
+        </Item>
         <Item class="win11-menu-item" OnClick="@(() => PrintEmpDetail(emp.EmpID))">
             <i class="fas fa-file-user fa-fw win11-icon"></i> Print Details
         </Item>

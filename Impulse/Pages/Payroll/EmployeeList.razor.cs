@@ -213,6 +213,11 @@ namespace Impulse.Pages.Payroll
             await BlazorContextMenuService.ShowMenu("manageEmployeeMenu", (int)e.ClientX, (int)e.ClientY + 15, emp);
         }
 
+        private void EditEmployee(string empId)
+        {
+            NavigationManager.NavigateTo($"/payroll/new-employee/{empId}");
+        }
+
         private async Task LoadEmployeePicture(string empId)
         {
             try

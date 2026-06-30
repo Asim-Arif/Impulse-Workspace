@@ -1,0 +1,275 @@
+@page "/payroll/newemployee"
+@page "/payroll/new-employee/{EmployeeId?}"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Impulse.Components.Payroll.NewEmployeeTabs
+
+<PageTitle>New Employee</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <div class="row g-2 mb-3 align-items-end border-bottom pb-2">
+                <div class="col-auto d-flex align-items-end pb-1">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-user-plus text-primary me-2"></i>
+                        New Employee
+                    </h5>
+                </div>
+            </div>
+
+            <EditForm Model="Employee" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger mb-3" />
+
+                @* =====================================================
+                     GLOBAL DEPARTMENT PANEL (mirrors VB6 fCat frame)
+                     Sits OUTSIDE all tabs, always visible at the top.
+                   ===================================================== *@
+                <div class="card mb-3 border" style="background:#f8f9fb; border-radius:8px;">
+                    <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; border-radius:8px 8px 0 0; font-size:0.85rem; letter-spacing:0.03em;">
+                        <i class="fas fa-sitemap me-1 text-primary"></i> Department's Info
+                    </div>
+                    <div class="card-body py-2">
+                        <div class="row g-3 align-items-end">
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Department Name <span class="text-danger">*</span></label>
+                                <BlazoredTypeahead SearchMethod="SearchDepartments"
+                                                   EnableDropDown="true"
+                                                   Data="Departments"
+                                                   TValue="DepartmentModel"
+                                                   TItem="DepartmentModel"
+                                                   Value="SelectedDepartment"
+                                                   ValueChanged="OnDepartmentSelected"
+                                                   ValueExpression="@(() => SelectedDepartment)"
+                                                   Placeholder="Select Department"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="selectedDept">
+                                        @selectedDept?.Name
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="dept">
+                                        @dept.Name
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Department ID</label>
+                                <input type="text" class="form-control form-control-sm" value="@Employee.DeptID" readonly style="background:#f0f2f5;" />
+                            </div>
+
+                            <div class="col-md-3 d-flex align-items-center pb-1">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="exemptSettingsCheck" @bind="ExemptSettingsHelper" />
+                                    <label class="form-check-label fw-bold text-secondary" for="exemptSettingsCheck" style="font-size:0.82rem;">
+                                        Exempt from dept. settings
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Employee ID</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Employee.EmpID" placeholder="Auto-generated on dept select" />
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                        <ul class="nav nav-tabs md3-tabs" id="employeeTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "PersonalInfo" ? "active" : "")"
+                                        @onclick='() => ChangeTab("PersonalInfo")'
+                                        type="button" role="tab">Personal Info</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "GeneralInfo" ? "active" : "")"
+                                        @onclick='() => ChangeTab("GeneralInfo")'
+                                        type="button" role="tab">General Info</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "EmergencyContact" ? "active" : "")"
+                                        @onclick='() => ChangeTab("EmergencyContact")'
+                                        type="button" role="tab">Emergency Contact</button>
+                            </li>
+                            @if (ExemptSettingsHelper)
+                            {
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link @(ActiveTab == "PayrollSettings" ? "active" : "")"
+                                            @onclick='() => ChangeTab("PayrollSettings")'
+                                            type="button" role="tab">Settings</button>
+                                </li>
+                            }
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "References" ? "active" : "")"
+                                        @onclick='() => ChangeTab("References")'
+                                        type="button" role="tab">References</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "History" ? "active" : "")"
+                                        @onclick='() => ChangeTab("History")'
+                                        type="button" role="tab">Employment History</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "Qualification" ? "active" : "")"
+                                        @onclick='() => ChangeTab("Qualification")'
+                                        type="button" role="tab">Qualification</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "JobDuties" ? "active" : "")"
+                                        @onclick='() => ChangeTab("JobDuties")'
+                                        type="button" role="tab">Job Duties</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "MedicalInfo" ? "active" : "")"
+                                        @onclick='() => ChangeTab("MedicalInfo")'
+                                        type="button" role="tab">Medical Info</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "FamilyInfo" ? "active" : "")"
+                                        @onclick='() => ChangeTab("FamilyInfo")'
+                                        type="button" role="tab">Family Info</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "Guarantor" ? "active" : "")"
+                                        @onclick='() => ChangeTab("Guarantor")'
+                                        type="button" role="tab">Guarantor</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "Assets" ? "active" : "")"
+                                        @onclick='() => ChangeTab("Assets")'
+                                        type="button" role="tab">Assets</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "Successions" ? "active" : "")"
+                                        @onclick='() => ChangeTab("Successions")'
+                                        type="button" role="tab">Successions</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "Reviews" ? "active" : "")"
+                                        @onclick='() => ChangeTab("Reviews")'
+                                        type="button" role="tab">Reviews</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "Notices" ? "active" : "")"
+                                        @onclick='() => ChangeTab("Notices")'
+                                        type="button" role="tab">Notices</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "SalaryHistory" ? "active" : "")"
+                                        @onclick='() => ChangeTab("SalaryHistory")'
+                                        type="button" role="tab">Salary History</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "Targets" ? "active" : "")"
+                                        @onclick='() => ChangeTab("Targets")'
+                                        type="button" role="tab">Targets</button>
+                            </li>
+                        </ul>
+
+                        <!-- Tab Content -->
+                        <div class="tab-content pt-4" id="employeeTabsContent">
+                            <div class="tab-pane fade @(ActiveTab == "PersonalInfo" ? "show active" : "")" role="tabpanel">
+                                <PersonalInfoTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "GeneralInfo" ? "show active" : "")" role="tabpanel">
+                                <GeneralInfoTab Employee="Employee" Designations="Designations" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "EmergencyContact" ? "show active" : "")" role="tabpanel">
+                                <EmergencyContactTab Employee="Employee" />
+                            </div>
+                            @if (ExemptSettingsHelper)
+                            {
+                                <div class="tab-pane fade @(ActiveTab == "PayrollSettings" ? "show active" : "")" role="tabpanel">
+                                    <PayrollSettingsTab Employee="Employee" />
+                                </div>
+                            }
+                            <div class="tab-pane fade @(ActiveTab == "References" ? "show active" : "")" role="tabpanel">
+                                <ReferencesTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "History" ? "show active" : "")" role="tabpanel">
+                                <HistoryTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "Qualification" ? "show active" : "")" role="tabpanel">
+                                <QualificationTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "JobDuties" ? "show active" : "")" role="tabpanel">
+                                <JobDutiesTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "MedicalInfo" ? "show active" : "")" role="tabpanel">
+                                <MedicalInfoTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "FamilyInfo" ? "show active" : "")" role="tabpanel">
+                                <FamilyInfoTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "Guarantor" ? "show active" : "")" role="tabpanel">
+                                <GuarantorTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "Assets" ? "show active" : "")" role="tabpanel">
+                                <AssetsTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "Successions" ? "show active" : "")" role="tabpanel">
+                                <SuccessionsTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "Reviews" ? "show active" : "")" role="tabpanel">
+                                <ReviewsTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "Notices" ? "show active" : "")" role="tabpanel">
+                                <NoticesTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "SalaryHistory" ? "show active" : "")" role="tabpanel">
+                                <SalaryHistoryTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "Targets" ? "show active" : "")" role="tabpanel">
+                                <TargetsTab Employee="Employee" Processes="Processes" Groups="Groups" />
+                            </div>
+                        </div>
+
+                <div class="d-flex justify-content-end gap-2 border-top pt-3 mt-4">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary" disabled="@IsSaving">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save me-1"></i> <span>Save &amp; Close</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Material Design 3 style tabs */
+    .md3-tabs {
+        border-bottom: 1px solid #e0e2ec;
+        gap: 4px;
+        flex-wrap: wrap;
+    }
+    .md3-tabs .nav-link {
+        color: #44474f;
+        border: none;
+        border-bottom: 3px solid transparent;
+        padding: 0.5rem 0.75rem;
+        font-weight: 500;
+        font-size: 0.85rem;
+        border-radius: 0;
+        transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+    }
+    .md3-tabs .nav-link:hover {
+        background-color: rgba(60, 122, 82, 0.05); /* Match Impulse green tint */
+        color: #1a4731;
+    }
+    .md3-tabs .nav-link.active {
+        color: #0d6efd; /* Primary color */
+        border-bottom-color: #0d6efd;
+        background: transparent;
+    }
+</style>

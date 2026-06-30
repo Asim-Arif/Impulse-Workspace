@@ -1,0 +1,55 @@
+@using DataAccessLibrary.Models.ViewModels.Payroll
+
+<div class="row g-3 mb-3 align-items-end">
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">Successor Employee ID</label>
+        <input type="text" class="form-control form-control-sm" @bind="_newSuccessionEmpID" placeholder="Employee ID" />
+    </div>
+    <div class="col-auto pb-0">
+        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddSuccession">
+            <i class="fas fa-plus me-1"></i> Add
+        </button>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-bordered table-sm align-middle">
+        <thead class="table-light">
+            <tr>
+                <th style="width:60px;">Sr No</th>
+                <th>Successor Employee ID</th>
+                <th style="width:60px;"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @{int srNo = 1;}
+            @foreach (var succession in Employee.Successions)
+            {
+                var currentSrNo = srNo++;
+                <tr>
+                    <td class="text-center">@currentSrNo</td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="succession.SuccessionEmpID" /></td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => Employee.Successions.Remove(succession)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter]
+    public EmployeeDto Employee { get; set; } = default!;
+
+    private string _newSuccessionEmpID = string.Empty;
+
+    private void AddSuccession()
+    {
+        if (string.IsNullOrWhiteSpace(_newSuccessionEmpID)) return;
+        Employee.Successions.Add(new EmpSuccessionDto { SuccessionEmpID = _newSuccessionEmpID });
+        _newSuccessionEmpID = string.Empty;
+    }
+}

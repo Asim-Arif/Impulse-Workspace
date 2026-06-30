@@ -1,0 +1,243 @@
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Blazored.Typeahead
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Employee ID <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" @bind="Employee.EmpID" placeholder="Enter Employee ID" />
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Name <span class="text-danger">*</span></label>
+        <div class="input-group flex-nowrap">
+            <div style="width: 110px;">
+                <BlazoredTypeahead SearchMethod="SearchTitles"
+                                   EnableDropDown="true"
+                                   TValue="string"
+                                   TItem="string"
+                                   Value="Employee.StrTitle"
+                                   ValueChanged="@(val => Employee.StrTitle = val ?? string.Empty)"
+                                   ValueExpression="@(() => Employee.StrTitle)"
+                                   Placeholder="Title"
+                                   MaximumSuggestions="1000">
+                    <SelectedTemplate Context="selectedTitle">
+                        @selectedTitle
+                    </SelectedTemplate>
+                    <ResultTemplate Context="title">
+                        @title
+                    </ResultTemplate>
+                </BlazoredTypeahead>
+            </div>
+            <input type="text" class="form-control" @bind="Employee.Name" placeholder="Full Name" />
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Father's / Husband's Name</label>
+        <div class="input-group flex-nowrap">
+            <div style="width: 110px;">
+                <BlazoredTypeahead SearchMethod="SearchRelations"
+                                   EnableDropDown="true"
+                                   TValue="string"
+                                   TItem="string"
+                                   Value="Employee.Rel"
+                                   ValueChanged="@(val => Employee.Rel = val ?? string.Empty)"
+                                   ValueExpression="@(() => Employee.Rel)"
+                                   Placeholder="Relation"
+                                   MaximumSuggestions="1000">
+                    <SelectedTemplate Context="selectedRel">
+                        @selectedRel
+                    </SelectedTemplate>
+                    <ResultTemplate Context="relation">
+                        @relation
+                    </ResultTemplate>
+                </BlazoredTypeahead>
+            </div>
+            <input type="text" class="form-control" @bind="Employee.FName" placeholder="Name" />
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">CNIC</label>
+        <input type="text" class="form-control" @bind="Employee.NIC" placeholder="XXXXX-XXXXXXX-X" />
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">Date of Birth</label>
+        <input type="date" class="form-control" @bind="Employee.DOB" />
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">Gender</label>
+        <BlazoredTypeahead SearchMethod="SearchGenders"
+                           EnableDropDown="true"
+                           TValue="string"
+                           TItem="string"
+                           Value="Employee.Sex"
+                           ValueChanged="@(val => Employee.Sex = val ?? string.Empty)"
+                           ValueExpression="@(() => Employee.Sex)"
+                           Placeholder="Select Gender"
+                           MaximumSuggestions="1000">
+            <SelectedTemplate Context="selectedGender">
+                @selectedGender
+            </SelectedTemplate>
+            <ResultTemplate Context="gender">
+                @gender
+            </ResultTemplate>
+        </BlazoredTypeahead>
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">Religion / Maslak</label>
+        <div class="input-group">
+            <input type="text" class="form-control" @bind="Employee.Religion" placeholder="Religion" />
+            <input type="text" class="form-control" @bind="Employee.Maslak" placeholder="Maslak" />
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">Caste</label>
+        <input type="text" class="form-control" @bind="Employee.Caste" />
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">NTN</label>
+        <input type="text" class="form-control" @bind="Employee.NTN" />
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">Identity Mark</label>
+        <input type="text" class="form-control" @bind="Employee.IdentityMark" />
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Phone 1 / Phone 2</label>
+        <div class="input-group">
+            <input type="text" class="form-control" @bind="Employee.Phone1" placeholder="Primary" />
+            <input type="text" class="form-control" @bind="Employee.Phone2" placeholder="Secondary" />
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Email / Fax</label>
+        <div class="input-group">
+            <input type="email" class="form-control" @bind="Employee.StrEmail" placeholder="Email" />
+            <input type="text" class="form-control" @bind="Employee.StrFax" placeholder="Fax" />
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">City / Province</label>
+        <div class="input-group">
+            <input type="text" class="form-control" @bind="Employee.StrCity" placeholder="City" />
+            <input type="text" class="form-control" @bind="Employee.StrProvince" placeholder="Province" />
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="d-flex align-items-center mt-4">
+            <div class="form-check me-4">
+                <input class="form-check-input" type="checkbox" @bind="Employee.Pay_Full_Salary" id="fullSalary" />
+                <label class="form-check-label" for="fullSalary">Pay Full Salary</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="Employee.ArmyRetired" id="armyRetired" />
+                <label class="form-check-label" for="armyRetired">Army Retired</label>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <label class="form-label fw-bold text-secondary mb-1">Permanent Address</label>
+        <textarea class="form-control" rows="1" @bind="Employee.Address"></textarea>
+    </div>
+
+    <div class="col-12">
+        <label class="form-label fw-bold text-secondary mb-1">Temporary Address</label>
+        <textarea class="form-control" rows="1" @bind="Employee.TempAddress"></textarea>
+    </div>
+
+    <div class="col-12">
+        <label class="form-label fw-bold text-secondary mb-1">Remarks</label>
+        <textarea class="form-control" rows="2" @bind="Employee.Remarks"></textarea>
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">Employee Picture</label>
+        <InputFile OnChange="@(e => LoadFileAsync(e, nameof(Employee.EmpPic)))" class="form-control" accept=".jpg,.jpeg,.png,.gif" />
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">Thumb Expression</label>
+        <InputFile OnChange="@(e => LoadFileAsync(e, nameof(Employee.ThumbExp)))" class="form-control" accept=".jpg,.jpeg,.png,.gif" />
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">CNIC PDF</label>
+        <InputFile OnChange="@(e => LoadFileAsync(e, nameof(Employee.CNIC_PDF)))" class="form-control" accept=".pdf" />
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EmployeeDto Employee { get; set; } = default!;
+
+    private List<string> Titles = new() { "Mr.", "Ms.", "Mrs." };
+    private List<string> Relations = new() { "S/O", "D/O", "W/O" };
+    private List<string> Genders = new() { "Male", "Female" };
+
+    private async Task<IEnumerable<string>> SearchTitles(string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return Titles;
+        return await Task.FromResult(Titles.Where(t => t.Contains(searchText, StringComparison.OrdinalIgnoreCase)).ToList());
+    }
+
+    private async Task<IEnumerable<string>> SearchRelations(string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return Relations;
+        return await Task.FromResult(Relations.Where(r => r.Contains(searchText, StringComparison.OrdinalIgnoreCase)).ToList());
+    }
+
+    private async Task<IEnumerable<string>> SearchGenders(string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return Genders;
+        return await Task.FromResult(Genders.Where(g => g.Contains(searchText, StringComparison.OrdinalIgnoreCase)).ToList());
+    }
+
+    private async Task LoadFileAsync(InputFileChangeEventArgs e, string propertyName)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        var maxAllowedSize = 5 * 1024 * 1024;
+
+        try
+        {
+            using var stream = file.OpenReadStream(maxAllowedSize);
+            using var ms = new System.IO.MemoryStream();
+            await stream.CopyToAsync(ms);
+
+            var fileBytes = ms.ToArray();
+
+            if (propertyName == nameof(Employee.EmpPic))
+            {
+                Employee.EmpPic = fileBytes;
+            }
+            else if (propertyName == nameof(Employee.ThumbExp))
+            {
+                Employee.ThumbExp = fileBytes;
+            }
+            else if (propertyName == nameof(Employee.CNIC_PDF))
+            {
+                Employee.CNIC_PDF = fileBytes;
+                Employee.CNIC_PDF_FileName = file.Name;
+            }
+        }
+        catch (Exception)
+        {
+        }
+    }
+}

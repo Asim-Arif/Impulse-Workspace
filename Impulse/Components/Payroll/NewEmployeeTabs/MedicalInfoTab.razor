@@ -1,0 +1,130 @@
+@using DataAccessLibrary.Models.ViewModels.Payroll
+
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Blood Group</label>
+        <select class="form-select" @bind="Employee.BloodGroup">
+            <option value="Unknown">Unknown</option>
+            <option value="A+">A+</option>
+            <option value="A-">A-</option>
+            <option value="B+">B+</option>
+            <option value="B-">B-</option>
+            <option value="O+">O+</option>
+            <option value="O-">O-</option>
+            <option value="AB+">AB+</option>
+            <option value="AB-">AB-</option>
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">HBsAg</label>
+        <select class="form-select" @bind="Employee.MedicalHistory.HBsAg">
+            <option value="0">Positive</option>
+            <option value="1">Negative</option>
+            <option value="2">Unknown</option>
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">AntiHcv</label>
+        <select class="form-select" @bind="Employee.MedicalHistory.AntiHcv">
+            <option value="0">Positive</option>
+            <option value="1">Negative</option>
+            <option value="2">Unknown</option>
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Blood Sugar</label>
+        <select class="form-select" @bind="Employee.MedicalHistory.BloodSugar">
+            <option value="0">Normal</option>
+            <option value="1">High</option>
+            <option value="2">Unknown</option>
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Blood Pressure</label>
+        <select class="form-select" @bind="Employee.MedicalHistory.BloodPressure">
+            <option value="0">Normal</option>
+            <option value="1">High</option>
+            <option value="2">Unknown</option>
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <div class="form-check mt-4">
+            <input class="form-check-input" type="checkbox" id="allergyCheck" @bind="Employee.MedicalHistory.Allergy" />
+            <label class="form-check-label fw-bold text-secondary" for="allergyCheck">Allergy</label>
+        </div>
+    </div>
+
+    @if (Employee.MedicalHistory.Allergy == true)
+    {
+        <div class="col-md-6">
+            <label class="form-label fw-bold text-secondary mb-1">Allergy Description</label>
+            <input type="text" class="form-control" @bind="Employee.MedicalHistory.AllergyDescription" />
+        </div>
+    }
+</div>
+
+<hr />
+<h6 class="fw-bold mt-4 mb-3">Medical Check-Ups</h6>
+<div class="table-responsive">
+    <table class="table table-bordered table-sm align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>Sr No</th>
+                <th>Medical Test</th>
+                <th>Lab</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Treatment</th>
+                <th>Remarks</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var checkup in Employee.MedicalCheckUps)
+            {
+                <tr>
+                    <td><input type="number" class="form-control form-control-sm" @bind="checkup.SrNo" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="checkup.MedicalTest" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="checkup.Lab" /></td>
+                    <td><input type="date" class="form-control form-control-sm" @bind="checkup.DT" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="checkup.Status" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="checkup.Treatment" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="checkup.Remarks" /></td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => Employee.MedicalCheckUps.Remove(checkup)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <button type="button" class="btn btn-sm btn-outline-primary mt-2" @onclick="AddCheckUp">
+        <i class="fas fa-plus me-1"></i> Add Check-Up
+    </button>
+</div>
+
+@code {
+    [Parameter]
+    public EmployeeDto Employee { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        if (Employee.MedicalHistory == null)
+            Employee.MedicalHistory = new EmpMedicalHistoryDto();
+
+        if (string.IsNullOrEmpty(Employee.BloodGroup))
+            Employee.BloodGroup = "Unknown";
+    }
+
+    private void AddCheckUp()
+    {
+        var nextSrNo = (byte)(Employee.MedicalCheckUps.Count + 1);
+        Employee.MedicalCheckUps.Add(new EmpMedicalCheckUpDto { SrNo = nextSrNo, DT = DateTime.Today });
+    }
+}

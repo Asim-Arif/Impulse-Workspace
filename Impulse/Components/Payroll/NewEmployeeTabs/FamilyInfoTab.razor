@@ -1,0 +1,67 @@
+@using DataAccessLibrary.Models.ViewModels.Payroll
+
+<div class="table-responsive">
+    <table class="table table-bordered table-sm align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>Name</th>
+                <th>Relation</th>
+                <th>NIC No</th>
+                <th>Marital Status</th>
+                <th>Date Of Birth</th>
+                <th>Date of Marriage</th>
+                <th>Date of Death</th>
+                <th>Education</th>
+                <th>Occupation</th>
+                <th>Class</th>
+                <th>Institute</th>
+                <th>Male</th>
+                <th>Dependent</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var dep in Employee.Dependants)
+            {
+                <tr>
+                    <td><input type="text" class="form-control form-control-sm" @bind="dep.Name" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="dep.Relation" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="dep.NICNo" /></td>
+                    <td>
+                        <select class="form-select form-select-sm" @bind="dep.MaritalStatus">
+                            <option value="Single">Single</option>
+                            <option value="Married">Married</option>
+                        </select>
+                    </td>
+                    <td><input type="date" class="form-control form-control-sm" @bind="dep.DOB" /></td>
+                    <td><input type="date" class="form-control form-control-sm" @bind="dep.DOM" /></td>
+                    <td><input type="date" class="form-control form-control-sm" @bind="dep.DOD" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="dep.Education" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="dep.Occupation" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="dep.Class" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="dep.Institute" /></td>
+                    <td class="text-center"><input type="checkbox" class="form-check-input" @bind="dep.Male" /></td>
+                    <td class="text-center"><input type="checkbox" class="form-check-input" @bind="dep.Dependent" /></td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => Employee.Dependants.Remove(dep)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <button type="button" class="btn btn-sm btn-outline-primary mt-2" @onclick="AddDependant">
+        <i class="fas fa-plus me-1"></i> Add Family Member
+    </button>
+</div>
+
+@code {
+    [Parameter]
+    public EmployeeDto Employee { get; set; } = default!;
+
+    private void AddDependant()
+    {
+        Employee.Dependants.Add(new EmpDependantDto { Dependent = true });
+    }
+}
