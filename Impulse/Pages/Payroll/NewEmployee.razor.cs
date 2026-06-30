@@ -57,6 +57,27 @@ namespace Impulse.Pages.Payroll
             }
         }
 
+        private async Task HandleDepartmentChanged(string deptId)
+        {
+            if (!string.IsNullOrEmpty(deptId) && string.IsNullOrEmpty(Employee.EmpID))
+            {
+                try
+                {
+                    Employee.EmpID = await EmployeeService.GetNextEmpIDAsync(deptId);
+                }
+                catch (Exception ex)
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Error,
+                        Summary = "Error",
+                        Detail = $"Failed to generate Employee ID: {ex.Message}",
+                        Duration = 4000
+                    });
+                }
+            }
+        }
+
         private void ChangeTab(string tabName)
         {
             ActiveTab = tabName;
@@ -91,9 +112,7 @@ namespace Impulse.Pages.Payroll
             IsSaving = true;
             try
             {
-                // In a full implementation, we'd call EmployeeService.AddEmployeeAsync(Employee)
-                // For now, we simulate success since the DAC implementation for adding an Employee might be missing or incomplete.
-                await Task.Delay(500);
+                await EmployeeService.SaveEmployeeAsync(Employee, true);
 
                 NotificationService.Notify(new Radzen.NotificationMessage
                 {

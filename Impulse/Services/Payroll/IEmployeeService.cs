@@ -13,5 +13,6 @@ namespace Impulse.Services.Payroll
         Task SetEmployeeActiveStateAsync(string empId, bool active, DateTime? date = null, string? remarks = null);
         Task<string> GetCompanyNameAsync();
         Task SaveEmployeeAsync(EmployeeDto employee, bool isAdd);
+        Task<string> GetNextEmpIDAsync(string deptId);
     }
 }

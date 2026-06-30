@@ -4,7 +4,7 @@
 <div class="row g-4">
     <div class="col-md-6">
         <label class="form-label fw-bold text-secondary mb-1">Department</label>
-        <select class="form-select" @bind="Employee.DeptID">
+        <select class="form-select" value="@Employee.DeptID" @onchange="OnDepartmentChanged">
             <option value="">Select Department...</option>
             @foreach (var dept in Departments)
             {
@@ -82,4 +82,14 @@
 
     [Parameter]
     public List<string> Designations { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<string> DepartmentChanged { get; set; }
+
+    private async Task OnDepartmentChanged(ChangeEventArgs e)
+    {
+        var deptId = e.Value?.ToString() ?? string.Empty;
+        Employee.DeptID = deptId;
+        await DepartmentChanged.InvokeAsync(deptId);
+    }
 }

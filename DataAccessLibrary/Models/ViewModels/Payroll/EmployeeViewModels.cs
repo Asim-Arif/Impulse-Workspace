@@ -139,6 +139,168 @@ namespace DataAccessLibrary.Models.ViewModels.Payroll
         public string CNIC_PDF_FileName { get; set; } = string.Empty;
         public string Caste { get; set; } = string.Empty;
         public string Maslak { get; set; } = string.Empty;
+
+        // Related Collections
+        public List<EmpQualificationDto> Qualifications { get; set; } = new();
+        public List<EmpGuarantorDto> Guarantors { get; set; } = new();
+        public List<EmpMedicalCheckUpDto> MedicalCheckUps { get; set; } = new();
+        public EmpMedicalHistoryDto MedicalHistory { get; set; } = new();
+        public List<EmpEmployementHistoryDto> EmploymentHistories { get; set; } = new();
+        public List<EmpJobDto> Jobs { get; set; } = new();
+        public List<EmpDependantDto> Dependants { get; set; } = new();
+        public List<EmpSuccessionDto> Successions { get; set; } = new();
+        public List<EmpReviewDto> Reviews { get; set; } = new();
+        public List<EmpNoticeDto> Notices { get; set; } = new();
+        public List<EmpDailyTargetDto> DailyTargets { get; set; } = new();
+        public List<EmpAssetDto> Assets { get; set; } = new();
+        public EmpSettingsDto Settings { get; set; } = new();
+    }
+
+    public class EmpSettingsDto
+    {
+        public string EnterTime { get; set; } = "09:00";
+        public string ExitTime { get; set; } = "17:00";
+        public float? LunchTime { get; set; }
+        public float AbsAllowed { get; set; }
+        public float? TotalAbsAllowed { get; set; }
+        public float TimeAllowed { get; set; }
+        public float NTimes { get; set; }
+        public float OverTime { get; set; }
+        public float? SocialAmt { get; set; }
+        public float? DinnerAmt { get; set; }
+        public float ShortTermPer { get; set; }
+        public float? AdvSalPer { get; set; }
+        public float? LongTermTime { get; set; }
+        public string LongTermLimit { get; set; } = string.Empty;
+        public bool? BGHoliday { get; set; }
+        public bool? AGHoliday { get; set; }
+        public bool? BPHoliday { get; set; }
+        public bool? APHoliday { get; set; }
+        public float? WorkingHrs { get; set; }
+        public bool? AllowMultiple { get; set; }
+        public bool? DeductAbsents { get; set; }
+        public bool? DeductLHrs { get; set; }
+        public string LunchInTime { get; set; } = "12:30";
+        public string LunchOutTime { get; set; } = "13:30";
+    }
+
+    public class EmpQualificationDto
+    {
+        public byte SrNo { get; set; }
+        public string Diploma { get; set; } = string.Empty;
+        public string Institute { get; set; } = string.Empty;
+        public short? Year { get; set; }
+        public string Grad { get; set; } = string.Empty;
+        public string Division { get; set; } = string.Empty;
+    }
+
+    public class EmpGuarantorDto
+    {
+        public int EntryID { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Address { get; set; } = string.Empty;
+        public string PhoneNo { get; set; } = string.Empty;
+        public string KnownBy { get; set; } = string.Empty;
+    }
+
+    public class EmpMedicalCheckUpDto
+    {
+        public int EntryID { get; set; }
+        public byte? SrNo { get; set; }
+        public string MedicalTest { get; set; } = string.Empty;
+        public string Lab { get; set; } = string.Empty;
+        public DateTime? DT { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string Treatment { get; set; } = string.Empty;
+        public string Remarks { get; set; } = string.Empty;
+    }
+
+    public class EmpMedicalHistoryDto
+    {
+        public int? HBsAg { get; set; }
+        public int? AntiHcv { get; set; }
+        public int? BloodSugar { get; set; }
+        public int? BloodPressure { get; set; }
+        public bool? Allergy { get; set; }
+        public string AllergyDescription { get; set; } = string.Empty;
+    }
+
+    public class EmpEmployementHistoryDto
+    {
+        public int EntryID { get; set; }
+        public DateTime? FromDT { get; set; }
+        public DateTime? ToDT { get; set; }
+        public string Company { get; set; } = string.Empty;
+        public string Designation { get; set; } = string.Empty;
+        public string Industry { get; set; } = string.Empty;
+        public string Responsibilities { get; set; } = string.Empty;
+    }
+
+    public class EmpJobDto
+    {
+        public int JobID { get; set; }
+        public int? SrNo { get; set; }
+        public string JobDescription { get; set; } = string.Empty;
+    }
+
+    public class EmpDependantDto
+    {
+        public int EntryID { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Relation { get; set; } = string.Empty;
+        public string NICNo { get; set; } = string.Empty;
+        public string MaritalStatus { get; set; } = string.Empty;
+        public DateTime? DOB { get; set; }
+        public string Education { get; set; } = string.Empty;
+        public string Class { get; set; } = string.Empty;
+        public string Institute { get; set; } = string.Empty;
+        public string Occupation { get; set; } = string.Empty;
+        public bool? Male { get; set; }
+        public bool? Dependent { get; set; }
+        public DateTime? DOM { get; set; }
+        public DateTime? DOD { get; set; }
+    }
+
+    public class EmpSuccessionDto
+    {
+        public int EntryID { get; set; }
+        public string SuccessionEmpID { get; set; } = string.Empty;
+    }
+
+    public class EmpReviewDto
+    {
+        public int EntryID { get; set; }
+        public DateTime? DT { get; set; }
+        public string ReviewedBy { get; set; } = string.Empty;
+        public string Review { get; set; } = string.Empty;
+        public string ReviewType { get; set; } = string.Empty;
+        public string Rating { get; set; } = string.Empty;
+    }
+
+    public class EmpNoticeDto
+    {
+        public int EntryID { get; set; }
+        public DateTime? DT { get; set; }
+        public string NoticeBy { get; set; } = string.Empty;
+        public string Notice { get; set; } = string.Empty;
+    }
+
+    public class EmpDailyTargetDto
+    {
+        public int EntryID { get; set; }
+        public int GroupID { get; set; }
+        public int ProcessID { get; set; }
+        public int? Qty { get; set; }
+        public byte OverTime { get; set; }
+    }
+
+    public class EmpAssetDto
+    {
+        public int EntryID { get; set; }
+        public int? SrNo { get; set; }
+        public string AssetDescription { get; set; } = string.Empty;
+        public DateTime? AssetDT { get; set; }
+        public string Remarks { get; set; } = string.Empty;
     }
 
     public class DepartmentModel

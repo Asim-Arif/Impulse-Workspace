@@ -1,0 +1,62 @@
+@using DataAccessLibrary.Models.ViewModels.Payroll
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Check In Time</label>
+        <input type="text" class="form-control" @bind="Employee.Settings.EnterTime" placeholder="HH:mm" />
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Check Out Time</label>
+        <input type="text" class="form-control" @bind="Employee.Settings.ExitTime" placeholder="HH:mm" />
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Lunch Start Time</label>
+        <input type="text" class="form-control" @bind="Employee.Settings.LunchInTime" placeholder="HH:mm" />
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Lunch End Time</label>
+        <input type="text" class="form-control" @bind="Employee.Settings.LunchOutTime" placeholder="HH:mm" />
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">Late Minutes Allowed</label>
+        <input type="number" class="form-control" @bind="Employee.Settings.TimeAllowed" />
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">No. of Times Late Allowed</label>
+        <input type="number" class="form-control" @bind="Employee.Settings.NTimes" />
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">Absents Allowed</label>
+        <input type="number" class="form-control" @bind="Employee.Settings.AbsAllowed" />
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">Overtime Hrs Per Day</label>
+        <input type="number" class="form-control" @bind="Employee.Settings.OverTime" />
+    </div>
+
+    <div class="col-md-4">
+        <div class="form-check mt-4">
+            <input class="form-check-input" type="checkbox" id="deductAbsentsCheck" @bind="Employee.Settings.DeductAbsents" />
+            <label class="form-check-label fw-bold text-secondary" for="deductAbsentsCheck">Deduct Absents</label>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="form-check mt-4">
+            <input class="form-check-input" type="checkbox" id="deductLHrsCheck" @bind="Employee.Settings.DeductLHrs" />
+            <label class="form-check-label fw-bold text-secondary" for="deductLHrsCheck">Deduct Late Hours</label>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EmployeeDto Employee { get; set; } = default!;
+}

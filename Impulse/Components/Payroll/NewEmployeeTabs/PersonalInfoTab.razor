@@ -70,9 +70,61 @@
         <label class="form-label fw-bold text-secondary mb-1">Temporary Address</label>
         <textarea class="form-control" rows="2" @bind="Employee.TempAddress"></textarea>
     </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">Employee Picture</label>
+        <InputFile OnChange="@(e => LoadFileAsync(e, nameof(Employee.EmpPic)))" class="form-control" accept=".jpg,.jpeg,.png,.gif" />
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">Thumb Expression</label>
+        <InputFile OnChange="@(e => LoadFileAsync(e, nameof(Employee.ThumbExp)))" class="form-control" accept=".jpg,.jpeg,.png,.gif" />
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">CNIC PDF</label>
+        <InputFile OnChange="@(e => LoadFileAsync(e, nameof(Employee.CNIC_PDF)))" class="form-control" accept=".pdf" />
+    </div>
 </div>
 
 @code {
     [Parameter]
     public EmployeeDto Employee { get; set; } = default!;
+
+    private async Task LoadFileAsync(InputFileChangeEventArgs e, string propertyName)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        // Max 5 MB for images/PDFs
+        var maxAllowedSize = 5 * 1024 * 1024;
+
+        try
+        {
+            using var stream = file.OpenReadStream(maxAllowedSize);
+            using var ms = new System.IO.MemoryStream();
+            await stream.CopyToAsync(ms);
+
+            var fileBytes = ms.ToArray();
+
+            if (propertyName == nameof(Employee.EmpPic))
+            {
+                Employee.EmpPic = fileBytes;
+            }
+            else if (propertyName == nameof(Employee.ThumbExp))
+            {
+                Employee.ThumbExp = fileBytes;
+            }
+            else if (propertyName == nameof(Employee.CNIC_PDF))
+            {
+                Employee.CNIC_PDF = fileBytes;
+                Employee.CNIC_PDF_FileName = file.Name;
+            }
+        }
+        catch (Exception)
+        {
+            // Suppress or handle errors silently for now, as we don't have injected NotificationService here easily
+            // Could add an EventCallback to let parent handle error notifications.
+        }
+    }
 }

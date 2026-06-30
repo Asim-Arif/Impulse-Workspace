@@ -35,6 +35,46 @@
                                         @onclick='() => ChangeTab("GeneralInfo")'
                                         type="button" role="tab">General Info</button>
                             </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "EmergencyContact" ? "active" : "")"
+                                        @onclick='() => ChangeTab("EmergencyContact")'
+                                        type="button" role="tab">Emergency Contact</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "PayrollSettings" ? "active" : "")"
+                                        @onclick='() => ChangeTab("PayrollSettings")'
+                                        type="button" role="tab">Settings</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "References" ? "active" : "")"
+                                        @onclick='() => ChangeTab("References")'
+                                        type="button" role="tab">References</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "History" ? "active" : "")"
+                                        @onclick='() => ChangeTab("History")'
+                                        type="button" role="tab">Employment History</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "Qualification" ? "active" : "")"
+                                        @onclick='() => ChangeTab("Qualification")'
+                                        type="button" role="tab">Qualification</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "MedicalInfo" ? "active" : "")"
+                                        @onclick='() => ChangeTab("MedicalInfo")'
+                                        type="button" role="tab">Medical Info</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "FamilyInfo" ? "active" : "")"
+                                        @onclick='() => ChangeTab("FamilyInfo")'
+                                        type="button" role="tab">Family Info</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "Guarantor" ? "active" : "")"
+                                        @onclick='() => ChangeTab("Guarantor")'
+                                        type="button" role="tab">Guarantor</button>
+                            </li>
                         </ul>
 
                         <!-- Tab Content -->
@@ -43,7 +83,31 @@
                                 <PersonalInfoTab Employee="Employee" />
                             </div>
                             <div class="tab-pane fade @(ActiveTab == "GeneralInfo" ? "show active" : "")" role="tabpanel">
-                                <GeneralInfoTab Employee="Employee" Departments="Departments" Designations="Designations" />
+                                <GeneralInfoTab Employee="Employee" Departments="Departments" Designations="Designations" DepartmentChanged="HandleDepartmentChanged" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "EmergencyContact" ? "show active" : "")" role="tabpanel">
+                                <EmergencyContactTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "PayrollSettings" ? "show active" : "")" role="tabpanel">
+                                <PayrollSettingsTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "References" ? "show active" : "")" role="tabpanel">
+                                <ReferencesTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "History" ? "show active" : "")" role="tabpanel">
+                                <HistoryTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "Qualification" ? "show active" : "")" role="tabpanel">
+                                <QualificationTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "MedicalInfo" ? "show active" : "")" role="tabpanel">
+                                <MedicalInfoTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "FamilyInfo" ? "show active" : "")" role="tabpanel">
+                                <FamilyInfoTab Employee="Employee" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "Guarantor" ? "show active" : "")" role="tabpanel">
+                                <GuarantorTab Employee="Employee" />
                             </div>
                         </div>
                     </div>

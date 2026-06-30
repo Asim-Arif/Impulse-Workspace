@@ -52,5 +52,10 @@ namespace Impulse.Services.Payroll
             string machineName = _auditService.GetClientIpAddress();
             await _dataAccess.SaveEmployeeAsync(employee, isAdd, userName, machineName);
         }
+
+        public async Task<string> GetNextEmpIDAsync(string deptId)
+        {
+            return await _dataAccess.GetNextEmpIDAsync(deptId);
+        }
     }
 }

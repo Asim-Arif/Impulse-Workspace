@@ -1,0 +1,33 @@
+@using DataAccessLibrary.Models.ViewModels.Payroll
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Emergency Contact Name</label>
+        <input type="text" class="form-control" @bind="Employee.EmergencyName" />
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Emergency Contact Father/Husband Name</label>
+        <input type="text" class="form-control" @bind="Employee.EmergencyFName" />
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Emergency Phone 1</label>
+        <input type="text" class="form-control" @bind="Employee.EmergencyPhone1" />
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Emergency Phone 2</label>
+        <input type="text" class="form-control" @bind="Employee.EmergencyPhone2" />
+    </div>
+
+    <div class="col-12">
+        <label class="form-label fw-bold text-secondary mb-1">Emergency Address</label>
+        <textarea class="form-control" rows="2" @bind="Employee.EmergencyAddress"></textarea>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EmployeeDto Employee { get; set; } = default!;
+}
