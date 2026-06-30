@@ -1,0 +1,228 @@
+@page "/company/new-item"
+@page "/company/new-item/{ItemId?}"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Company
+@using Impulse.Components.Company.NewItemTabs
+@using Blazored.Typeahead
+
+
+<PageTitle>DMR — Device Master Record</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <div class="row g-2 mb-3 align-items-end border-bottom pb-2">
+                <div class="col-auto d-flex align-items-end pb-1">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-box text-primary me-2"></i>
+                        DMR — Device Master Record
+                    </h5>
+                </div>
+            </div>
+
+            <EditForm Model="Item" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger mb-3" />
+
+                @* ── Global Item Header Panel (always visible, mirrors VB6 fCat frame) ── *@
+                <div class="card mb-3 border" style="background:#f8f9fb; border-radius:8px;">
+                    <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; border-radius:8px 8px 0 0; font-size:0.85rem; letter-spacing:0.03em;">
+                        <i class="fas fa-tag me-1 text-primary"></i> Item Identity
+                    </div>
+                    <div class="card-body py-2">
+                        <div class="row g-3 align-items-end">
+
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Category</label>
+                                <BlazoredTypeahead SearchMethod="SearchCategories"
+                                                   EnableDropDown="true"
+                                                   Data="Categories"
+                                                   TValue="ItemCategoryModel"
+                                                   TItem="ItemCategoryModel"
+                                                   Value="SelectedCategory"
+                                                   ValueChanged="OnCategorySelected"
+                                                   ValueExpression="@(() => SelectedCategory)"
+                                                   Placeholder="Select category"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="cat">@cat?.Description</SelectedTemplate>
+                                    <ResultTemplate Context="cat">@cat.Description</ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Item Group <span class="text-danger">*</span></label>
+                                <BlazoredTypeahead SearchMethod="SearchItemGroups"
+                                                   EnableDropDown="true"
+                                                   Data="ItemGroups"
+                                                   TValue="ItemGroupModel"
+                                                   TItem="ItemGroupModel"
+                                                   Value="SelectedItemGroup"
+                                                   ValueChanged="OnGroupSelected"
+                                                   ValueExpression="@(() => SelectedItemGroup)"
+                                                   Placeholder="Select group"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="grp">@grp?.Description</SelectedTemplate>
+                                    <ResultTemplate Context="grp">@grp.Description</ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Additional Group (Main)</label>
+                                <BlazoredTypeahead SearchMethod="SearchMainGroups"
+                                                   EnableDropDown="true"
+                                                   Data="MainGroups"
+                                                   TValue="ItemMainGroupModel"
+                                                   TItem="ItemMainGroupModel"
+                                                   Value="SelectedMainGroup"
+                                                   ValueChanged="OnMainGroupSelected"
+                                                   ValueExpression="@(() => SelectedMainGroup)"
+                                                   Placeholder="Select main group"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="mg">@mg?.MainGroupName</SelectedTemplate>
+                                    <ResultTemplate Context="mg">@mg.MainGroupName</ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Item Type</label>
+                                <select class="form-select form-select-sm" @bind="ItemTypeHelper">
+                                    <option value="">— Select —</option>
+                                    @foreach (var t in ItemTypes)
+                                    {
+                                        <option value="@t.ID">@t.Description</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Item Code <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control form-control-sm"
+                                       @bind="Item.ItemID"
+                                       placeholder="e.g. 44506.16"
+                                       readonly="@(!IsAdd)"
+                                       style="@(!IsAdd ? "background:#f0f2f5;" : "")" />
+                            </div>
+
+                            <div class="col-md-3 d-flex align-items-end gap-3 pb-1">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="chkInActive" @bind="Item.InActive" />
+                                    <label class="form-check-label fw-bold text-secondary" for="chkInActive" style="font-size:0.82rem;">Inactive</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="chkSample" @bind="Item.Sample" />
+                                    <label class="form-check-label fw-bold text-secondary" for="chkSample" style="font-size:0.82rem;">Sample</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="chkECommerce" @bind="Item.AvailableForECommerce" />
+                                    <label class="form-check-label fw-bold text-secondary" for="chkECommerce" style="font-size:0.82rem;">E-Commerce</label>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                @* ── Tab Strip ── *@
+                <ul class="nav nav-tabs md3-tabs" id="itemTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "GeneralInfo" ? "active" : "")"
+                                @onclick='() => ChangeTab("GeneralInfo")'
+                                type="button" role="tab">General Info</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "Weight" ? "active" : "")"
+                                @onclick='() => ChangeTab("Weight")'
+                                type="button" role="tab">Weight</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "Pricing" ? "active" : "")"
+                                @onclick='() => ChangeTab("Pricing")'
+                                type="button" role="tab">Pricing</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "Processes" ? "active" : "")"
+                                @onclick='() => ChangeTab("Processes")'
+                                type="button" role="tab">Processes</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "Shipping" ? "active" : "")"
+                                @onclick='() => ChangeTab("Shipping")'
+                                type="button" role="tab">Shipping</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "References" ? "active" : "")"
+                                @onclick='() => ChangeTab("References")'
+                                type="button" role="tab">References</button>
+                    </li>
+                </ul>
+
+                @* ── Tab Content ── *@
+                <div class="tab-content pt-4" id="itemTabsContent">
+                    <div class="tab-pane fade @(ActiveTab == "GeneralInfo" ? "show active" : "")" role="tabpanel">
+                        <GeneralInfoTab Item="Item" Units="Units" />
+                    </div>
+                    <div class="tab-pane fade @(ActiveTab == "Weight" ? "show active" : "")" role="tabpanel">
+                        <WeightTab Item="Item" />
+                    </div>
+                    <div class="tab-pane fade @(ActiveTab == "Pricing" ? "show active" : "")" role="tabpanel">
+                        <PricingTab Item="Item" />
+                    </div>
+                    <div class="tab-pane fade @(ActiveTab == "Processes" ? "show active" : "")" role="tabpanel">
+                        <ProcessesTab Processes="Item.Processes" />
+                    </div>
+                    <div class="tab-pane fade @(ActiveTab == "Shipping" ? "show active" : "")" role="tabpanel">
+                        <ShippingTab Item="Item" />
+                    </div>
+                    <div class="tab-pane fade @(ActiveTab == "References" ? "show active" : "")" role="tabpanel">
+                        <ReferenceTab CatalogRefs="Item.CatalogRefs" />
+                    </div>
+                </div>
+
+                @* ── Footer Action Bar ── *@
+                <div class="d-flex justify-content-end gap-2 border-top pt-3 mt-4">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary" disabled="@IsSaving">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save me-1"></i> <span>Save &amp; Close</span>
+                        }
+                    </button>
+                </div>
+
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+<style>
+    .md3-tabs {
+        border-bottom: 1px solid #e0e2ec;
+        gap: 4px;
+        flex-wrap: wrap;
+    }
+    .md3-tabs .nav-link {
+        color: #44474f;
+        border: none;
+        border-bottom: 3px solid transparent;
+        padding: 0.5rem 0.75rem;
+        font-weight: 500;
+        font-size: 0.85rem;
+        border-radius: 0;
+        transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+    }
+    .md3-tabs .nav-link:hover {
+        background-color: rgba(60, 122, 82, 0.05);
+        color: #1a4731;
+    }
+    .md3-tabs .nav-link.active {
+        color: #0d6efd;
+        border-bottom-color: #0d6efd;
+        background: transparent;
+    }
+</style>

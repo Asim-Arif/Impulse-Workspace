@@ -1,0 +1,95 @@
+@using DataAccessLibrary.Models.ViewModels.Company
+
+<div class="row g-2 mb-3">
+    <div class="col-auto">
+        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddProcess">
+            <i class="bi bi-plus-circle me-1"></i> Add Process
+        </button>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-sm table-bordered table-hover align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>#</th>
+                <th>Process</th>
+                <th>Code</th>
+                <th>Scanning</th>
+                <th>Sort No.</th>
+                <th>Rate</th>
+                <th>Min Lvl</th>
+                <th>Max Lvl</th>
+                <th>Reorder Lvl</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var (proc, idx) in Processes.Select((p, i) => (p, i)))
+            {
+                <tr>
+                    <td>@(idx + 1)</td>
+                    <td>
+                        <input type="number" class="form-control form-control-sm"
+                               style="width:90px"
+                               @bind="proc.ProcessID"
+                               placeholder="ID" />
+                    </td>
+                    <td>
+                        <input type="text" class="form-control form-control-sm"
+                               style="width:80px"
+                               @bind="proc.Code" />
+                    </td>
+                    <td class="text-center">
+                        <input type="checkbox" class="form-check-input" @bind="proc.Scanning" />
+                    </td>
+                    <td>
+                        <input type="number" step="0.01" class="form-control form-control-sm"
+                               style="width:80px"
+                               @bind="proc.SNO" />
+                    </td>
+                    <td>
+                        <input type="number" step="0.0001" class="form-control form-control-sm"
+                               style="width:90px"
+                               @bind="proc.Rate" />
+                    </td>
+                    <td>
+                        <input type="number" class="form-control form-control-sm"
+                               style="width:80px"
+                               @bind="proc.MinLevel" />
+                    </td>
+                    <td>
+                        <input type="number" class="form-control form-control-sm"
+                               style="width:80px"
+                               @bind="proc.MaxLevel" />
+                    </td>
+                    <td>
+                        <input type="number" class="form-control form-control-sm"
+                               style="width:80px"
+                               @bind="proc.ReOrderLevel" />
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                @onclick="() => RemoveProcess(proc)">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public List<ItemProcessModel> Processes { get; set; } = default!;
+
+    private void AddProcess()
+    {
+        Processes.Add(new ItemProcessModel());
+    }
+
+    private void RemoveProcess(ItemProcessModel proc)
+    {
+        Processes.Remove(proc);
+    }
+}

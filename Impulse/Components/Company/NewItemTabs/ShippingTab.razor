@@ -1,0 +1,70 @@
+@using DataAccessLibrary.Models.ViewModels.Company
+
+<div class="row g-4">
+
+    <div class="col-12">
+        <h6 class="fw-bold text-secondary border-bottom pb-1">Carton Dimensions (cm)</h6>
+    </div>
+
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1">Master L</label>
+        <input type="number" step="0.01" class="form-control" @bind="Item.MasterCartonL" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1">Master W</label>
+        <input type="number" step="0.01" class="form-control" @bind="Item.MasterCartonW" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1">Master H</label>
+        <input type="number" step="0.01" class="form-control" @bind="Item.MasterCartonH" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1">Small L</label>
+        <input type="number" step="0.01" class="form-control" @bind="Item.SmallCartonL" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1">Small W</label>
+        <input type="number" step="0.01" class="form-control" @bind="Item.SmallCartonW" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1">Small H</label>
+        <input type="number" step="0.01" class="form-control" @bind="Item.SmallCartonH" />
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Small Box Pcs</label>
+        <input type="number" class="form-control" @bind="Item.SmallBoxPcs" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Master Carton Small Boxes</label>
+        <input type="number" class="form-control" @bind="Item.MasterCartonSmallBoxes" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Fixed Packing Unit</label>
+        <input type="number" class="form-control" @bind="Item.FixedPackingUnit" />
+    </div>
+
+    <div class="col-12">
+        <h6 class="fw-bold text-secondary border-bottom pb-1 mt-2">Packing Notes</h6>
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Packing Instructions</label>
+        <textarea class="form-control" rows="3" @bind="Item.PackingInstructions"></textarea>
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Poly Bag</label>
+        <input type="text" class="form-control" @bind="Item.PolyBag" />
+    </div>
+
+    <div class="col-12">
+        <label class="form-label fw-bold text-secondary mb-1">PO Instructions</label>
+        <textarea class="form-control" rows="3" @bind="Item.POInustructions"></textarea>
+    </div>
+
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ItemDto Item { get; set; } = default!;
+}

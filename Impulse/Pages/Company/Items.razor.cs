@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Components;
 using Impulse.Services;
 using Impulse.Constants;
 using BlazorContextMenu;
+using DataAccessLibrary.Models.ViewModels.Company;
 
 namespace Impulse.Pages.Company
 {
@@ -654,21 +655,5 @@ namespace Impulse.Pages.Company
         public int GrpColor { get; set; }
     }
 
-    public class ItemGroupModel
-    {
-        public int ID { get; set; }
-        public string Description { get; set; } = string.Empty;
-    }
-
-    public class ItemCategoryModel
-    {
-        public int CatID { get; set; }
-        public string Description { get; set; } = string.Empty;
-    }
-
-    public class ItemMainGroupModel
-    {
-        public int MainGroupID { get; set; }
-        public string MainGroupName { get; set; } = string.Empty;
-    }
+    
 }

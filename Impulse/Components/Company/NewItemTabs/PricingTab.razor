@@ -1,0 +1,81 @@
+@using DataAccessLibrary.Models.ViewModels.Company
+
+<div class="row g-4">
+
+    <div class="col-12">
+        <h6 class="fw-bold text-secondary border-bottom pb-1">Base Prices</h6>
+    </div>
+
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1">FOB <span class="text-danger">*</span></label>
+        <input type="number" step="0.01" class="form-control" @bind="Item.FOB" />
+    </div>
+
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1">CIF Sea</label>
+        <input type="number" step="0.01" class="form-control" @bind="Item.CIFSea" />
+    </div>
+
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1">CIF Air</label>
+        <input type="number" step="0.01" class="form-control" @bind="Item.CIFAir" />
+    </div>
+
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1">C&F Sea</label>
+        <input type="number" step="0.01" class="form-control" @bind="Item.CnFSea" />
+    </div>
+
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1">C&F Air</label>
+        <input type="number" step="0.01" class="form-control" @bind="Item.CnFAir" />
+    </div>
+
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1">Ex Works</label>
+        <input type="number" step="0.01" class="form-control" @bind="Item.ExWorks" />
+    </div>
+
+    <div class="col-12">
+        <h6 class="fw-bold text-secondary border-bottom pb-1 mt-2">Process Rates</h6>
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Plant Rate</label>
+        <input type="number" step="0.0001" class="form-control" @bind="Item.PlantRate" />
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Snaff Rate</label>
+        <input type="number" step="0.0001" class="form-control" @bind="Item.SnaffRate" />
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Stamp Rate</label>
+        <input type="number" step="0.0001" class="form-control" @bind="Item.StampRate" />
+    </div>
+
+    <div class="col-12">
+        <h6 class="fw-bold text-secondary border-bottom pb-1 mt-2">Cost Prices</h6>
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Ready Finish Price</label>
+        <input type="number" step="0.01" class="form-control" @bind="Item.ReadyFinishPrice" />
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Filling Price</label>
+        <input type="number" step="0.01" class="form-control" @bind="Item.FillingPrice" />
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Price For Cost</label>
+        <input type="number" step="0.01" class="form-control" @bind="Item.PriceForCost" />
+    </div>
+
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ItemDto Item { get; set; } = default!;
+}

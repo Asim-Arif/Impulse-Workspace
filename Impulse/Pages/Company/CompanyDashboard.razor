@@ -1,0 +1,41 @@
+@page "/company"
+@page "/company/dashboard"
+@attribute [Authorize]
+
+<PageTitle>Company Dashboard</PageTitle>
+
+<div class="dashboard-shell">
+    <div class="dashboard-hero">
+        <div class="dashboard-icon-wrap" style="background:#e8f0fe; color:#0b57d0;">
+            <i class="fas fa-building"></i>
+        </div>
+        <div>
+            <h1 class="dashboard-title">Company</h1>
+            <p class="dashboard-subtitle">Device master records, items &amp; configurations</p>
+        </div>
+    </div>
+
+    <div class="dashboard-modules">
+        <a href="/company/items" class="dash-card">
+            <i class="fas fa-boxes-stacked"></i>
+            <span>Items List</span>
+        </a>
+        <a href="/company/new-item" class="dash-card">
+            <i class="fas fa-plus-circle"></i>
+            <span>New Item</span>
+        </a>
+    </div>
+</div>
+
+<style>
+    .dashboard-shell { padding: 2rem; max-width: 1100px; }
+    .dashboard-hero { display: flex; align-items: center; gap: 1.25rem; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e0e2ec; }
+    .dashboard-icon-wrap { width: 64px; height: 64px; border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 1.75rem; flex-shrink: 0; }
+    .dashboard-title { font-size: 2rem; font-weight: 700; color: #1b1b1f; margin: 0; line-height: 1.2; }
+    .dashboard-subtitle { color: #44474f; margin: 0.25rem 0 0; font-size: 0.95rem; }
+    .dashboard-modules { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 1rem; }
+    .dash-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; padding: 1.5rem 1rem; background: #ffffff; border: 1px solid #e0e2ec; border-radius: 16px; text-decoration: none; color: #1b1b1f; font-weight: 500; font-size: 0.875rem; text-align: center; transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease; cursor: pointer; }
+    .dash-card i { font-size: 1.75rem; color: #0b57d0; }
+    .dash-card:hover { background: #e8f0fe; box-shadow: 0 4px 16px rgba(11, 87, 208, 0.12); transform: translateY(-2px); color: #004bbf; }
+    .dash-card:hover i { color: #004bbf; }
+</style>
