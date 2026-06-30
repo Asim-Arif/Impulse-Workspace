@@ -9,10 +9,13 @@
                 <th>NIC No</th>
                 <th>Marital Status</th>
                 <th>Date Of Birth</th>
+                <th>Date of Marriage</th>
+                <th>Date of Death</th>
                 <th>Education</th>
                 <th>Occupation</th>
                 <th>Class</th>
                 <th>Institute</th>
+                <th>Male</th>
                 <th>Dependent</th>
                 <th></th>
             </tr>
@@ -31,10 +34,13 @@
                         </select>
                     </td>
                     <td><input type="date" class="form-control form-control-sm" @bind="dep.DOB" /></td>
+                    <td><input type="date" class="form-control form-control-sm" @bind="dep.DOM" /></td>
+                    <td><input type="date" class="form-control form-control-sm" @bind="dep.DOD" /></td>
                     <td><input type="text" class="form-control form-control-sm" @bind="dep.Education" /></td>
                     <td><input type="text" class="form-control form-control-sm" @bind="dep.Occupation" /></td>
                     <td><input type="text" class="form-control form-control-sm" @bind="dep.Class" /></td>
                     <td><input type="text" class="form-control form-control-sm" @bind="dep.Institute" /></td>
+                    <td class="text-center"><input type="checkbox" class="form-check-input" @bind="dep.Male" /></td>
                     <td class="text-center"><input type="checkbox" class="form-check-input" @bind="dep.Dependent" /></td>
                     <td>
                         <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => Employee.Dependants.Remove(dep)">

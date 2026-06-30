@@ -1,59 +1,160 @@
 @using DataAccessLibrary.Models.ViewModels.Payroll
 
 <div class="row g-4">
-    <div class="col-md-6">
+
+    <div class="col-12">
+        <h6 class="fw-bold text-primary border-bottom pb-1 mb-0">Attendance Times</h6>
+    </div>
+
+    <div class="col-md-3">
         <label class="form-label fw-bold text-secondary mb-1">Check In Time</label>
-        <input type="text" class="form-control" @bind="Employee.Settings.EnterTime" placeholder="HH:mm" />
+        <input type="time" class="form-control" value="@Employee.Settings.EnterTime" @onchange="@(e => Employee.Settings.EnterTime = e.Value?.ToString() ?? string.Empty)" />
     </div>
 
-    <div class="col-md-6">
+    <div class="col-md-3">
         <label class="form-label fw-bold text-secondary mb-1">Check Out Time</label>
-        <input type="text" class="form-control" @bind="Employee.Settings.ExitTime" placeholder="HH:mm" />
+        <input type="time" class="form-control" value="@Employee.Settings.ExitTime" @onchange="@(e => Employee.Settings.ExitTime = e.Value?.ToString() ?? string.Empty)" />
     </div>
 
-    <div class="col-md-6">
+    <div class="col-md-3">
         <label class="form-label fw-bold text-secondary mb-1">Lunch Start Time</label>
-        <input type="text" class="form-control" @bind="Employee.Settings.LunchInTime" placeholder="HH:mm" />
+        <input type="time" class="form-control" value="@Employee.Settings.LunchInTime" @onchange="@(e => Employee.Settings.LunchInTime = e.Value?.ToString() ?? string.Empty)" />
     </div>
 
-    <div class="col-md-6">
+    <div class="col-md-3">
         <label class="form-label fw-bold text-secondary mb-1">Lunch End Time</label>
-        <input type="text" class="form-control" @bind="Employee.Settings.LunchOutTime" placeholder="HH:mm" />
+        <input type="time" class="form-control" value="@Employee.Settings.LunchOutTime" @onchange="@(e => Employee.Settings.LunchOutTime = e.Value?.ToString() ?? string.Empty)" />
     </div>
 
-    <div class="col-md-4">
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Working Hrs / Day</label>
+        <input type="number" class="form-control" @bind="Employee.Settings.WorkingHrs" step="0.5" />
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Lunch (hrs)</label>
+        <input type="number" class="form-control" @bind="Employee.Settings.LunchTime" step="0.25" />
+    </div>
+
+    <div class="col-12 mt-3">
+        <h6 class="fw-bold text-primary border-bottom pb-1 mb-0">Late &amp; Absence Rules</h6>
+    </div>
+
+    <div class="col-md-3">
         <label class="form-label fw-bold text-secondary mb-1">Late Minutes Allowed</label>
         <input type="number" class="form-control" @bind="Employee.Settings.TimeAllowed" />
     </div>
 
-    <div class="col-md-4">
+    <div class="col-md-3">
         <label class="form-label fw-bold text-secondary mb-1">No. of Times Late Allowed</label>
         <input type="number" class="form-control" @bind="Employee.Settings.NTimes" />
     </div>
 
-    <div class="col-md-4">
+    <div class="col-md-3">
         <label class="form-label fw-bold text-secondary mb-1">Absents Allowed</label>
         <input type="number" class="form-control" @bind="Employee.Settings.AbsAllowed" />
     </div>
 
-    <div class="col-md-4">
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Total Absents Allowed</label>
+        <input type="number" class="form-control" @bind="Employee.Settings.TotalAbsAllowed" />
+    </div>
+
+    <div class="col-md-3">
         <label class="form-label fw-bold text-secondary mb-1">Overtime Hrs Per Day</label>
         <input type="number" class="form-control" @bind="Employee.Settings.OverTime" />
     </div>
 
-    <div class="col-md-4">
-        <div class="form-check mt-4">
-            <input class="form-check-input" type="checkbox" id="deductAbsentsCheck" @bind="Employee.Settings.DeductAbsents" />
-            <label class="form-check-label fw-bold text-secondary" for="deductAbsentsCheck">Deduct Absents</label>
+    <div class="col-12">
+        <div class="row g-3">
+            <div class="col-auto">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="deductAbsentsCheck" @bind="Employee.Settings.DeductAbsents" />
+                    <label class="form-check-label fw-bold text-secondary" for="deductAbsentsCheck">Deduct Absents</label>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="deductLHrsCheck" @bind="Employee.Settings.DeductLHrs" />
+                    <label class="form-check-label fw-bold text-secondary" for="deductLHrsCheck">Deduct Late Hours</label>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="allowMultipleCheck" @bind="Employee.Settings.AllowMultiple" />
+                    <label class="form-check-label fw-bold text-secondary" for="allowMultipleCheck">Allow Multiple Entries</label>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="col-md-4">
-        <div class="form-check mt-4">
-            <input class="form-check-input" type="checkbox" id="deductLHrsCheck" @bind="Employee.Settings.DeductLHrs" />
-            <label class="form-check-label fw-bold text-secondary" for="deductLHrsCheck">Deduct Late Hours</label>
+    <div class="col-12 mt-3">
+        <h6 class="fw-bold text-primary border-bottom pb-1 mb-0">Holiday Deduction Rules</h6>
+    </div>
+
+    <div class="col-12">
+        <div class="row g-3">
+            <div class="col-auto">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="bgHolidayCheck" @bind="Employee.Settings.BGHoliday" />
+                    <label class="form-check-label fw-bold text-secondary" for="bgHolidayCheck">Deduct Absent Before Sunday</label>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="agHolidayCheck" @bind="Employee.Settings.AGHoliday" />
+                    <label class="form-check-label fw-bold text-secondary" for="agHolidayCheck">Deduct Absent After Sunday</label>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="bpHolidayCheck" @bind="Employee.Settings.BPHoliday" />
+                    <label class="form-check-label fw-bold text-secondary" for="bpHolidayCheck">Deduct Absent Before Public Holiday</label>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="apHolidayCheck" @bind="Employee.Settings.APHoliday" />
+                    <label class="form-check-label fw-bold text-secondary" for="apHolidayCheck">Deduct Absent After Public Holiday</label>
+                </div>
+            </div>
         </div>
     </div>
+
+    <div class="col-12 mt-3">
+        <h6 class="fw-bold text-primary border-bottom pb-1 mb-0">Loan &amp; Social Amounts</h6>
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Social Amt</label>
+        <input type="number" class="form-control" @bind="Employee.Settings.SocialAmt" step="0.01" />
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Dinner Amt</label>
+        <input type="number" class="form-control" @bind="Employee.Settings.DinnerAmt" step="0.01" />
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Short Term % (Advance Sal.)</label>
+        <input type="number" class="form-control" @bind="Employee.Settings.ShortTermPer" step="0.01" />
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Adv. Sal %</label>
+        <input type="number" class="form-control" @bind="Employee.Settings.AdvSalPer" step="0.01" />
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Long Term Time (months)</label>
+        <input type="number" class="form-control" @bind="Employee.Settings.LongTermTime" step="0.1" />
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Long Term Limit</label>
+        <input type="text" class="form-control" @bind="Employee.Settings.LongTermLimit" />
+    </div>
+
 </div>
 
 @code {

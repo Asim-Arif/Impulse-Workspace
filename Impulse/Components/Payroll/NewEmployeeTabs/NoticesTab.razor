@@ -1,0 +1,45 @@
+@using DataAccessLibrary.Models.ViewModels.Payroll
+
+<div class="table-responsive mb-3">
+    <table class="table table-bordered table-sm align-middle">
+        <thead class="table-light">
+            <tr>
+                <th style="width:110px;">Date</th>
+                <th>Notice By</th>
+                <th>Notice</th>
+                <th style="width:60px;"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var notice in Employee.Notices)
+            {
+                <tr>
+                    <td><input type="date" class="form-control form-control-sm" @bind="notice.DT" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="notice.NoticeBy" /></td>
+                    <td><input type="text" class="form-control form-control-sm" @bind="notice.Notice" /></td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => Employee.Notices.Remove(notice)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <button type="button" class="btn btn-sm btn-outline-primary mt-2" @onclick="AddNotice">
+        <i class="fas fa-plus me-1"></i> Add Notice
+    </button>
+</div>
+
+@code {
+    [Parameter]
+    public EmployeeDto Employee { get; set; } = default!;
+
+    private void AddNotice()
+    {
+        Employee.Notices.Add(new EmpNoticeDto
+        {
+            DT = DateTime.Today
+        });
+    }
+}

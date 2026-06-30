@@ -1,0 +1,31 @@
+@using DataAccessLibrary.Models.ViewModels.Payroll
+
+<div class="alert alert-info d-flex align-items-center gap-2 mb-4">
+    <i class="fas fa-info-circle fs-5"></i>
+    <span>Salary change history is populated automatically after the first save. No entries exist yet for this new employee.</span>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-bordered table-sm align-middle">
+        <thead class="table-light">
+            <tr>
+                <th style="width:60px;">S No.</th>
+                <th style="width:130px;">Date</th>
+                <th>Description</th>
+                <th style="width:120px;" class="text-end">Salary</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td colspan="4" class="text-center text-muted py-3">
+                    <i class="fas fa-history me-2"></i> No salary history available yet.
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter]
+    public EmployeeDto Employee { get; set; } = default!;
+}

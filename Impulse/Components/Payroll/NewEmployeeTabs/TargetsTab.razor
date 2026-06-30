@@ -1,0 +1,169 @@
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Blazored.Typeahead
+
+<div class="row g-3 mb-3 align-items-end">
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Process</label>
+        <BlazoredTypeahead SearchMethod="SearchProcesses"
+                           EnableDropDown="true"
+                           TValue="ProcessLookupModel"
+                           TItem="ProcessLookupModel"
+                           Value="SelectedNewProcess"
+                           ValueChanged="OnNewProcessChanged"
+                           ValueExpression="@(() => SelectedNewProcess)"
+                           Placeholder="Select Process"
+                           MaximumSuggestions="1000">
+            <SelectedTemplate Context="selectedProc">
+                @selectedProc?.Description
+            </SelectedTemplate>
+            <ResultTemplate Context="proc">
+                @proc.Description
+            </ResultTemplate>
+        </BlazoredTypeahead>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Group ID</label>
+        <BlazoredTypeahead SearchMethod="SearchGroups"
+                           EnableDropDown="true"
+                           TValue="GroupLookupModel"
+                           TItem="GroupLookupModel"
+                           Value="SelectedNewGroup"
+                           ValueChanged="OnNewGroupChanged"
+                           ValueExpression="@(() => SelectedNewGroup)"
+                           Placeholder="Select Group"
+                           MaximumSuggestions="1000">
+            <SelectedTemplate Context="selectedGroup">
+                @selectedGroup?.Description
+            </SelectedTemplate>
+            <ResultTemplate Context="grp">
+                @grp.Description
+            </ResultTemplate>
+        </BlazoredTypeahead>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1">Qty</label>
+        <input type="number" class="form-control form-control-sm" @bind="_newQty" />
+    </div>
+    <div class="col-md-2 d-flex align-items-center mt-4">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" @bind="_newOverTime" id="otCheck" />
+            <label class="form-check-label" for="otCheck">Over Time</label>
+        </div>
+    </div>
+    <div class="col-auto pb-0">
+        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddTarget">
+            <i class="fas fa-plus me-1"></i> Add
+        </button>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-bordered table-sm align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>Process</th>
+                <th>Group ID</th>
+                <th style="width:90px;" class="text-end">Qty</th>
+                <th style="width:90px;" class="text-center">Over Time</th>
+                <th style="width:60px;"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var target in Employee.DailyTargets)
+            {
+                <tr>
+                    <td>
+                        <BlazoredTypeahead SearchMethod="SearchProcesses"
+                                           EnableDropDown="true"
+                                           TValue="ProcessLookupModel"
+                                           TItem="ProcessLookupModel"
+                                           Value="@(Processes.FirstOrDefault(p => p.ProcessID == target.ProcessID))"
+                                           ValueChanged="@(val => target.ProcessID = val?.ProcessID ?? 0)"
+                                           ValueExpression="@(() => _dummyProcessForGrid)"
+                                           Placeholder="Select Process"
+                                           MaximumSuggestions="1000">
+                            <SelectedTemplate Context="selectedProc">
+                                @selectedProc?.Description
+                            </SelectedTemplate>
+                            <ResultTemplate Context="proc">
+                                @proc.Description
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </td>
+                    <td><input type="number" class="form-control form-control-sm" @bind="target.GroupID" /></td>
+                    <td><input type="number" class="form-control form-control-sm text-end" @bind="target.Qty" /></td>
+                    <td class="text-center">
+                        <input type="checkbox" class="form-check-input"
+                               checked="@(target.OverTime == 1)"
+                               @onchange="e => target.OverTime = ((bool?)e.Value == true) ? (byte)1 : (byte)0" />
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => Employee.DailyTargets.Remove(target)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter]
+    public EmployeeDto Employee { get; set; } = default!;
+
+    [Parameter]
+    public List<ProcessLookupModel> Processes { get; set; } = new();
+
+    [Parameter]
+    public List<GroupLookupModel> Groups { get; set; } = new();
+
+    private int _newProcessID;
+    private int _newGroupID;
+    private int? _newQty;
+    private bool _newOverTime;
+    
+    private ProcessLookupModel? _dummyProcessForGrid = new();
+
+    private ProcessLookupModel? SelectedNewProcess => Processes.FirstOrDefault(p => p.ProcessID == _newProcessID);
+    private GroupLookupModel? SelectedNewGroup => Groups.FirstOrDefault(g => g.GroupID == _newGroupID);
+
+    private void OnNewProcessChanged(ProcessLookupModel? val)
+    {
+        _newProcessID = val?.ProcessID ?? 0;
+    }
+
+    private void OnNewGroupChanged(GroupLookupModel? val)
+    {
+        _newGroupID = val?.GroupID ?? 0;
+    }
+
+    private async Task<IEnumerable<ProcessLookupModel>> SearchProcesses(string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return Processes;
+        return await Task.FromResult(Processes.Where(p => p.Description.Contains(searchText, StringComparison.OrdinalIgnoreCase)).ToList());
+    }
+
+    private async Task<IEnumerable<GroupLookupModel>> SearchGroups(string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return Groups;
+        return await Task.FromResult(Groups.Where(g => g.Description.Contains(searchText, StringComparison.OrdinalIgnoreCase)).ToList());
+    }
+
+    private void AddTarget()
+    {
+        Employee.DailyTargets.Add(new EmpDailyTargetDto
+        {
+            ProcessID = _newProcessID,
+            GroupID = _newGroupID,
+            Qty = _newQty,
+            OverTime = _newOverTime ? (byte)1 : (byte)0
+        });
+        _newProcessID = 0;
+        _newGroupID = 0;
+        _newQty = null;
+        _newOverTime = false;
+    }
+}

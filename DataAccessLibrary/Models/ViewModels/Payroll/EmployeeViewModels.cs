@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace DataAccessLibrary.Models.ViewModels.Payroll
 {
@@ -36,10 +38,14 @@ namespace DataAccessLibrary.Models.ViewModels.Payroll
         public string MachineName { get; set; } = string.Empty;
     }
 
-    public class EmployeeDto
+    public class EmployeeDto : IValidatableObject
     {
         public string EmpID { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Invalid Department Name.")]
         public string DeptID { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Invalid Employee Name.")]
         public string Name { get; set; } = string.Empty;
         public int? EmpType { get; set; }
         public string Rel { get; set; } = string.Empty;
@@ -53,7 +59,10 @@ namespace DataAccessLibrary.Models.ViewModels.Payroll
         public string NTN { get; set; } = string.Empty;
         public string Phone1 { get; set; } = string.Empty;
         public string Phone2 { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Please Select Designation from the List.")]
         public string Designation { get; set; } = string.Empty;
+
         public string RefName { get; set; } = string.Empty;
         public string RefFName { get; set; } = string.Empty;
         public string RefPhone1 { get; set; } = string.Empty;
@@ -87,7 +96,10 @@ namespace DataAccessLibrary.Models.ViewModels.Payroll
         public bool Transport { get; set; }
         public bool? ExemptSettings { get; set; }
         public int EmployeeID { get; set; }
+
+        [Required(ErrorMessage = "Please Select Blood Group.")]
         public string BloodGroup { get; set; } = string.Empty;
+
         public string ProcessID { get; set; } = string.Empty;
         public bool? BankPymt { get; set; }
         public bool? ShowInExternal { get; set; }
@@ -122,6 +134,36 @@ namespace DataAccessLibrary.Models.ViewModels.Payroll
         public int? IntDepartmentId { get; set; }
         public int? IntJobTitleId { get; set; }
         public int? IntGenderId { get; set; }
+        public int? IntGroupid { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (DOB.HasValue)
+            {
+                var computedAge = DateTime.Today.Year - DOB.Value.Year;
+                if (DOB.Value.Date > DateTime.Today.AddYears(-computedAge)) computedAge--;
+                if (computedAge < 18)
+                {
+                    yield return new ValidationResult("Employee's age must be at least 18 years.", new[] { nameof(DOB) });
+                }
+            }
+            else
+            {
+                yield return new ValidationResult("Employee's age must be at least 18 years.", new[] { nameof(DOB) });
+            }
+
+            var currentSalary = Salary ?? StartingSalary ?? 0;
+            if (TaxPayee && currentSalary <= 0)
+            {
+                yield return new ValidationResult("Tax Amount Can't Be Zero. A valid salary amount must be provided when taxable.", new[] { nameof(TaxPayee) });
+            }
+
+            if (currentSalary <= 0)
+            {
+                yield return new ValidationResult("Must Enter Salary Amount.", new[] { nameof(Salary), nameof(StartingSalary) });
+            }
+        }
+
         public int? IntGuarantorId { get; set; }
         public int? EmpCodes { get; set; }
         public int? IntMeritalStatusId { get; set; }
@@ -320,5 +362,17 @@ namespace DataAccessLibrary.Models.ViewModels.Payroll
         public string? AccruedEOBIAccNo { get; set; }
         public string? TaxAccNo { get; set; }
         public string? OnePercentAccNo { get; set; }
+    }
+
+    public class ProcessLookupModel
+    {
+        public int ProcessID { get; set; }
+        public string Description { get; set; } = string.Empty;
+    }
+
+    public class GroupLookupModel
+    {
+        public int GroupID { get; set; }
+        public string Description { get; set; } = string.Empty;
     }
 }

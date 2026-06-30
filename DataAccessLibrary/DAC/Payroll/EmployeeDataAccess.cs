@@ -173,17 +173,17 @@ namespace DataAccessLibrary.DAC.Payroll
             {
                 using (IDbConnection db = new SqlConnection(_connectionString))
                 {
-                    string sql = "SELECT MAX(CAST(RIGHT(empid, LEN(empid) - CHARINDEX('-', empid)) AS INT)) FROM Employees WHERE deptid = @DeptID AND empid LIKE @DeptID + '-%'";
-                    var maxId = await db.ExecuteScalarAsync<int?>(sql, new { DeptID = deptId });
+                    string sql = "SELECT MAX(CAST(SUBSTRING(empid, CHARINDEX('-', empid) + 1, 10) AS INT)) FROM Employees WHERE empid LIKE 'EMR-%'";
+                    var maxId = await db.ExecuteScalarAsync<int?>(sql);
 
                     int nextNum = (maxId ?? 0) + 1;
-                    return $"{deptId}-{nextNum:D3}";
+                    return $"EMR-{nextNum:D5}";
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting next employee ID for department {DeptID}", deptId);
-                return string.Empty;
+                _logger.LogError(ex, "Error getting next employee ID");
+                return "EMR-00001";
             }
         }
 
@@ -518,6 +518,82 @@ namespace DataAccessLibrary.DAC.Payroll
                     string sql = "INSERT INTO EmpAssets (EmpID, SrNo, AssetDescription, AssetDT, Remarks) VALUES (@EmpID, @SrNo, @AssetDescription, @AssetDT, @Remarks)";
                     await db.ExecuteAsync(sql, new { employee.EmpID, a.SrNo, a.AssetDescription, a.AssetDT, a.Remarks }, transaction: trans);
                 }
+            }
+        }
+
+        public async Task<EmployeeDto?> GetEmployeeByIdAsync(string empId)
+        {
+            try
+            {
+                using (IDbConnection db = new SqlConnection(_connectionString))
+                {
+                    string sql = "SELECT * FROM Employees WHERE EmpID = @EmpID";
+                    var emp = await db.QuerySingleOrDefaultAsync<EmployeeDto>(sql, new { EmpID = empId });
+
+                    if (emp != null)
+                    {
+                        emp.Qualifications = (await db.QueryAsync<EmpQualificationDto>("SELECT * FROM EmpQualification WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
+                        emp.Guarantors = (await db.QueryAsync<EmpGuarantorDto>("SELECT * FROM EmpGuarantors WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
+                        emp.MedicalCheckUps = (await db.QueryAsync<EmpMedicalCheckUpDto>("SELECT * FROM EmpMedicalCheckUps WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
+                        
+                        var medHist = await db.QuerySingleOrDefaultAsync<EmpMedicalHistoryDto>("SELECT * FROM EmpMedicalHistory WHERE EmpID = @EmpID", new { EmpID = empId });
+                        if (medHist != null) emp.MedicalHistory = medHist;
+                        
+                        emp.EmploymentHistories = (await db.QueryAsync<EmpEmployementHistoryDto>("SELECT * FROM EmpEmployementHistory WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
+                        emp.Jobs = (await db.QueryAsync<EmpJobDto>("SELECT * FROM EmpJobs WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
+                        emp.Dependants = (await db.QueryAsync<EmpDependantDto>("SELECT * FROM EmpDependants WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
+                        emp.Successions = (await db.QueryAsync<EmpSuccessionDto>("SELECT * FROM EmpSuccessions WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
+                        emp.Reviews = (await db.QueryAsync<EmpReviewDto>("SELECT * FROM EmpReviews WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
+                        emp.Notices = (await db.QueryAsync<EmpNoticeDto>("SELECT * FROM EmpNotices WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
+                        emp.DailyTargets = (await db.QueryAsync<EmpDailyTargetDto>("SELECT * FROM EmpDailyTargets WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
+                        emp.Assets = (await db.QueryAsync<EmpAssetDto>("SELECT * FROM EmpAssets WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
+                        
+                        var settings = await db.QuerySingleOrDefaultAsync<EmpSettingsDto>("SELECT * FROM EmpSettings WHERE EmpID = @EmpID", new { EmpID = empId });
+                        if (settings != null) emp.Settings = settings;
+                    }
+                    return emp;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching employee {EmpID}", empId);
+                throw;
+            }
+        }
+
+        public async Task<List<GroupLookupModel>> GetGroupsAsync()
+        {
+            try
+            {
+                using (IDbConnection db = new SqlConnection(_connectionString))
+                {
+                    string sql = "SELECT ID AS GroupID, Description FROM ItemGroups ORDER BY Description";
+                    var result = await db.QueryAsync<GroupLookupModel>(sql);
+                    return result.ToList();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching groups");
+                throw;
+            }
+        }
+
+        public async Task<List<ProcessLookupModel>> GetProcessesAsync()
+        {
+            try
+            {
+                using (IDbConnection db = new SqlConnection(_connectionString))
+                {
+                    string sql = "SELECT ProcessID, Description FROM Processes ORDER BY ProcessID";
+                    var result = await db.QueryAsync<ProcessLookupModel>(sql);
+                    return result.ToList();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching processes");
+                throw;
             }
         }
     }

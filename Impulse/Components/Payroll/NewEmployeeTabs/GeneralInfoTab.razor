@@ -2,58 +2,91 @@
 @using Blazored.Typeahead
 
 <div class="row g-4">
-    <div class="col-md-6">
-        <label class="form-label fw-bold text-secondary mb-1">Department</label>
-        <select class="form-select" value="@Employee.DeptID" @onchange="OnDepartmentChanged">
-            <option value="">Select Department...</option>
-            @foreach (var dept in Departments)
-            {
-                <option value="@dept.DeptID">@dept.Name</option>
-            }
-        </select>
+
+
+    <div class="col-12">
+        <h6 class="fw-bold text-primary border-bottom pb-1 mb-0">Employment Details</h6>
     </div>
 
     <div class="col-md-6">
         <label class="form-label fw-bold text-secondary mb-1">Designation</label>
-        <select class="form-select" @bind="Employee.Designation">
-            <option value="">Select Designation...</option>
-            @foreach (var desig in Designations)
-            {
-                <option value="@desig">@desig</option>
-            }
-        </select>
+        <BlazoredTypeahead SearchMethod="SearchDesignations"
+                           EnableDropDown="true"
+                           TValue="string"
+                           TItem="string"
+                           Value="Employee.Designation"
+                           ValueChanged="@(val => Employee.Designation = val)"
+                           ValueExpression="@(() => Employee.Designation)"
+                           Placeholder="Select Designation"
+                           MaximumSuggestions="1000">
+            <SelectedTemplate Context="selectedDesig">
+                @selectedDesig
+            </SelectedTemplate>
+            <ResultTemplate Context="desig">
+                @desig
+            </ResultTemplate>
+        </BlazoredTypeahead>
     </div>
 
-    <div class="col-md-4">
+    <div class="col-md-6">
         <label class="form-label fw-bold text-secondary mb-1">Joining Date</label>
         <input type="date" class="form-control" @bind="Employee.JoinDate" />
     </div>
 
-    <div class="col-md-4">
+    <div class="col-md-6">
         <label class="form-label fw-bold text-secondary mb-1">Employee Type</label>
-        <select class="form-select" @bind="Employee.EmpType">
-            <option value="0">Staff Member</option>
-            <option value="1">Director</option>
-        </select>
-    </div>
-
-    <div class="col-md-4">
-        <label class="form-label fw-bold text-secondary mb-1">Status</label>
-        <select class="form-select" @bind="Employee.Status">
-            <option value="Salary">Salary</option>
-            <option value="Wages">Wages</option>
-        </select>
+        <BlazoredTypeahead SearchMethod="SearchEmpTypes"
+                           EnableDropDown="true"
+                           TValue="EmpTypeLookup"
+                           TItem="EmpTypeLookup"
+                           Value="SelectedEmpType"
+                           ValueChanged="OnEmpTypeChanged"
+                           ValueExpression="@(() => SelectedEmpType)"
+                           Placeholder="Select Employee Type"
+                           MaximumSuggestions="1000">
+            <SelectedTemplate Context="selectedType">
+                @selectedType?.Name
+            </SelectedTemplate>
+            <ResultTemplate Context="type">
+                @type.Name
+            </ResultTemplate>
+        </BlazoredTypeahead>
     </div>
 
     <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1">Status</label>
+        <BlazoredTypeahead SearchMethod="SearchStatuses"
+                           EnableDropDown="true"
+                           TValue="string"
+                           TItem="string"
+                           Value="Employee.Status"
+                           ValueChanged="@(val => Employee.Status = val)"
+                           ValueExpression="@(() => Employee.Status)"
+                           Placeholder="Select Status"
+                           MaximumSuggestions="1000">
+            <SelectedTemplate Context="selectedStatus">
+                @selectedStatus
+            </SelectedTemplate>
+            <ResultTemplate Context="status">
+                @status
+            </ResultTemplate>
+        </BlazoredTypeahead>
+    </div>
+
+    <div class="col-md-4">
         <label class="form-label fw-bold text-secondary mb-1">Starting Salary</label>
         <input type="number" class="form-control" @bind="Employee.StartingSalary" step="0.01" />
     </div>
 
-    <div class="col-md-6 d-flex align-items-center mt-5">
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1">Probation Period (months)</label>
+        <input type="number" class="form-control" @bind="Employee.ProbationPeriod" />
+    </div>
+
+    <div class="col-md-4 d-flex align-items-center mt-3">
         <div class="form-check form-switch">
             <input class="form-check-input" type="checkbox" id="bankPaymentCheck" @bind="Employee.BankPymt" />
-            <label class="form-check-label fw-bold text-secondary" for="bankPaymentCheck">Salary is Paid Through Bank</label>
+            <label class="form-check-label fw-bold text-secondary" for="bankPaymentCheck">Salary Via Bank</label>
         </div>
     </div>
 
@@ -65,12 +98,163 @@
         </div>
     }
 
-    <div class="col-12 mt-4">
+
+    <div class="col-12 mt-3">
+        <h6 class="fw-bold text-primary border-bottom pb-1 mb-0">Allowances &amp; Deductions</h6>
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Fix Allowance</label>
+        <input type="number" class="form-control" @bind="Employee.FixAllowance" />
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">EOBI Amount</label>
+        <input type="number" class="form-control" @bind="Employee.EOBIAmt" />
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Social Security Amt</label>
+        <input type="number" class="form-control" @bind="Employee.SocialSecurityAmt" />
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Lunch Amount</label>
+        <input type="number" class="form-control" @bind="Employee.EmpLunchAmt" />
+    </div>
+
+
+    <div class="col-12 mt-3">
+        <h6 class="fw-bold text-primary border-bottom pb-1 mb-0">Tax, EOBI &amp; Social Security</h6>
+    </div>
+
+    <div class="col-md-3 d-flex align-items-center mt-2">
         <div class="form-check">
-            <input class="form-check-input" type="checkbox" id="activeCheck" @bind="Employee.Active" />
-            <label class="form-check-label fw-bold text-secondary" for="activeCheck">Active Employee</label>
+            <input class="form-check-input" type="checkbox" id="taxPayeeCheck" @bind="Employee.TaxPayee" />
+            <label class="form-check-label fw-bold text-secondary" for="taxPayeeCheck">Tax Payee</label>
         </div>
     </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Tax Amount</label>
+        <input type="number" class="form-control" @bind="Employee.TaxAmt" />
+    </div>
+
+    <div class="col-md-3 d-flex align-items-center mt-2">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="oldAgeCheck" @bind="Employee.OldAge" />
+            <label class="form-check-label fw-bold text-secondary" for="oldAgeCheck">Old Age (EOBI)</label>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Old Age Sal.</label>
+        <input type="number" class="form-control" @bind="Employee.OldAgeSal" step="0.01" />
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Old Age No.</label>
+        <input type="text" class="form-control" @bind="Employee.OldAgeNo" />
+    </div>
+
+    <div class="col-md-3 d-flex align-items-center mt-2">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="socialCheck" @bind="Employee.Social" />
+            <label class="form-check-label fw-bold text-secondary" for="socialCheck">Social Security</label>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Social Sal.</label>
+        <input type="number" class="form-control" @bind="Employee.SocialSal" step="0.01" />
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Social No.</label>
+        <input type="text" class="form-control" @bind="Employee.SocialNo" />
+    </div>
+
+
+    <div class="col-12 mt-3">
+        <h6 class="fw-bold text-primary border-bottom pb-1 mb-0">Productivity &amp; Piece Rate</h6>
+    </div>
+
+    <div class="col-md-3 d-flex align-items-center mt-2">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="otByQtyCheck" @bind="Employee.OTByQty" />
+            <label class="form-check-label fw-bold text-secondary" for="otByQtyCheck">OT By Quantity</label>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Min Qty</label>
+        <input type="number" class="form-control" @bind="Employee.MinQty" step="0.01" />
+    </div>
+
+    <div class="col-md-3 d-flex align-items-center mt-2">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="perPieceRateCheck" @bind="Employee.PerPieceRate" />
+            <label class="form-check-label fw-bold text-secondary" for="perPieceRateCheck">Per Piece Rate</label>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Rate</label>
+        <input type="number" class="form-control" @bind="Employee.Rate" step="0.01" />
+    </div>
+
+
+    <div class="col-12 mt-3">
+        <h6 class="fw-bold text-primary border-bottom pb-1 mb-0">Options</h6>
+    </div>
+
+    <div class="col-12">
+        <div class="row g-3">
+            <div class="col-auto">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="activeCheck" @bind="Employee.Active" />
+                    <label class="form-check-label fw-bold text-secondary" for="activeCheck">Active Employee</label>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="bonusCheck" @bind="Employee.Bonus" />
+                    <label class="form-check-label fw-bold text-secondary" for="bonusCheck">Bonus Eligible</label>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="transportCheck" @bind="Employee.Transport" />
+                    <label class="form-check-label fw-bold text-secondary" for="transportCheck">Transport</label>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="lunchCheck" @bind="Employee.Lunch" />
+                    <label class="form-check-label fw-bold text-secondary" for="lunchCheck">Lunch</label>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="unionFundCheck" @bind="Employee.UnionFund" />
+                    <label class="form-check-label fw-bold text-secondary" for="unionFundCheck">Union Fund</label>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="tempEmpCheck" @bind="Employee.TempEmp" />
+                    <label class="form-check-label fw-bold text-secondary" for="tempEmpCheck">Temp Employee</label>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="showExternalCheck" @bind="Employee.ShowInExternal" />
+                    <label class="form-check-label fw-bold text-secondary" for="showExternalCheck">Show in External</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 @code {
@@ -78,18 +262,47 @@
     public EmployeeDto Employee { get; set; } = default!;
 
     [Parameter]
-    public List<DepartmentModel> Departments { get; set; } = new();
-
-    [Parameter]
     public List<string> Designations { get; set; } = new();
 
-    [Parameter]
-    public EventCallback<string> DepartmentChanged { get; set; }
-
-    private async Task OnDepartmentChanged(ChangeEventArgs e)
+    public class EmpTypeLookup
     {
-        var deptId = e.Value?.ToString() ?? string.Empty;
-        Employee.DeptID = deptId;
-        await DepartmentChanged.InvokeAsync(deptId);
+        public int Value { get; set; }
+        public string Name { get; set; } = string.Empty;
+    }
+
+    private List<EmpTypeLookup> EmpTypes = new()
+    {
+        new() { Value = 0, Name = "Staff Member" },
+        new() { Value = 1, Name = "Director" }
+    };
+
+    private EmpTypeLookup? SelectedEmpType => EmpTypes.FirstOrDefault(e => e.Value == Employee.EmpType);
+
+    private void OnEmpTypeChanged(EmpTypeLookup? val)
+    {
+        Employee.EmpType = val?.Value;
+    }
+
+    private List<string> Statuses = new() { "Salary", "Wages" };
+
+    private async Task<IEnumerable<string>> SearchDesignations(string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return Designations;
+        return await Task.FromResult(Designations.Where(d => d.Contains(searchText, StringComparison.OrdinalIgnoreCase)).ToList());
+    }
+
+    private async Task<IEnumerable<EmpTypeLookup>> SearchEmpTypes(string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return EmpTypes;
+        return await Task.FromResult(EmpTypes.Where(t => t.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase)).ToList());
+    }
+
+    private async Task<IEnumerable<string>> SearchStatuses(string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return Statuses;
+        return await Task.FromResult(Statuses.Where(s => s.Contains(searchText, StringComparison.OrdinalIgnoreCase)).ToList());
     }
 }

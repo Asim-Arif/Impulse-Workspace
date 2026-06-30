@@ -57,5 +57,20 @@ namespace Impulse.Services.Payroll
         {
             return await _dataAccess.GetNextEmpIDAsync(deptId);
         }
+
+        public async Task<List<ProcessLookupModel>> GetProcessesAsync()
+        {
+            return await _dataAccess.GetProcessesAsync();
+        }
+
+        public async Task<EmployeeDto?> GetEmployeeByIdAsync(string empId)
+        {
+            return await _dataAccess.GetEmployeeByIdAsync(empId);
+        }
+
+        public async Task<List<GroupLookupModel>> GetGroupsAsync()
+        {
+            return await _dataAccess.GetGroupsAsync();
+        }
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using DataAccessLibrary.Models.ViewModels.Payroll;
@@ -9,6 +10,9 @@ namespace Impulse.Pages.Payroll
 {
     public partial class NewEmployee
     {
+        [Parameter]
+        public string? EmployeeId { get; set; }
+
         [Inject]
         public IEmployeeService EmployeeService { get; set; } = default!;
 
@@ -24,17 +28,57 @@ namespace Impulse.Pages.Payroll
         public EmployeeDto Employee { get; set; } = new EmployeeDto();
         public List<DepartmentModel> Departments { get; set; } = new List<DepartmentModel>();
         public List<string> Designations { get; set; } = new List<string>();
+        public List<ProcessLookupModel> Processes { get; set; } = new List<ProcessLookupModel>();
+        public List<GroupLookupModel> Groups { get; set; } = new List<GroupLookupModel>();
 
         public string ActiveTab { get; set; } = "PersonalInfo";
         public bool IsSaving { get; set; } = false;
+
+        public DepartmentModel? SelectedDepartment { get; set; }
+
+        public bool ExemptSettingsHelper
+        {
+            get => Employee.ExemptSettings ?? false;
+            set
+            {
+                Employee.ExemptSettings = value;
+                if (!value && ActiveTab == "PayrollSettings")
+                {
+                    ActiveTab = "PersonalInfo";
+                }
+            }
+        }
 
         protected override async Task OnInitializedAsync()
         {
             await LoadLookups();
 
-            // Default values
-            Employee.JoinDate = DateTime.Today;
-            Employee.Active = true;
+            if (!string.IsNullOrEmpty(EmployeeId))
+            {
+                var emp = await EmployeeService.GetEmployeeByIdAsync(EmployeeId);
+                if (emp != null)
+                {
+                    Employee = emp;
+                    SelectedDepartment = Departments.FirstOrDefault(d => d.DeptID == Employee.DeptID);
+                }
+                else
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Error,
+                        Summary = "Error",
+                        Detail = $"Employee not found.",
+                        Duration = 4000
+                    });
+                }
+            }
+            else
+            {
+                // Default values
+                Employee.JoinDate = DateTime.Today;
+                Employee.Active = true;
+                Employee.ExemptSettings = false;
+            }
         }
 
         private async Task LoadLookups()
@@ -42,8 +86,14 @@ namespace Impulse.Pages.Payroll
             try
             {
                 Departments = await DepartmentService.GetDepartmentsListAsync(true);
-                // To fetch designations, we would normally use a service, but for now we initialize an empty list or hardcode common ones to match VB6 if a service is missing.
                 Designations = new List<string> { "Manager", "Supervisor", "Staff", "Worker" };
+                Processes = await EmployeeService.GetProcessesAsync();
+                Groups = await EmployeeService.GetGroupsAsync();
+
+                if (!string.IsNullOrEmpty(Employee.DeptID))
+                {
+                    SelectedDepartment = Departments.FirstOrDefault(d => d.DeptID == Employee.DeptID);
+                }
             }
             catch (Exception ex)
             {
@@ -57,22 +107,56 @@ namespace Impulse.Pages.Payroll
             }
         }
 
+        private async Task OnDepartmentSelected(DepartmentModel? dept)
+        {
+            await InvokeAsync(async () =>
+            {
+                SelectedDepartment = dept;
+                if (dept != null)
+                {
+                    Employee.DeptID = dept.DeptID;
+                    await HandleDepartmentChanged(dept.DeptID);
+                }
+                else
+                {
+                    Employee.DeptID = string.Empty;
+                }
+                StateHasChanged();
+            });
+        }
+
+        private async Task<IEnumerable<DepartmentModel>> SearchDepartments(string searchText)
+        {
+            if (string.IsNullOrWhiteSpace(searchText))
+                return Departments;
+            return await Task.FromResult(Departments.Where(d => d.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase)).ToList());
+        }
+
         private async Task HandleDepartmentChanged(string deptId)
         {
             if (!string.IsNullOrEmpty(deptId) && string.IsNullOrEmpty(Employee.EmpID))
             {
                 try
                 {
-                    Employee.EmpID = await EmployeeService.GetNextEmpIDAsync(deptId);
+                    var newEmpId = await EmployeeService.GetNextEmpIDAsync(deptId);
+                    await InvokeAsync(() =>
+                    {
+                        Employee.EmpID = newEmpId;
+                        StateHasChanged();
+                    });
                 }
                 catch (Exception ex)
                 {
-                    NotificationService.Notify(new Radzen.NotificationMessage
+                    await InvokeAsync(() =>
                     {
-                        Severity = Radzen.NotificationSeverity.Error,
-                        Summary = "Error",
-                        Detail = $"Failed to generate Employee ID: {ex.Message}",
-                        Duration = 4000
+                        NotificationService.Notify(new Radzen.NotificationMessage
+                        {
+                            Severity = Radzen.NotificationSeverity.Error,
+                            Summary = "Error",
+                            Detail = $"Failed to generate Employee ID: {ex.Message}",
+                            Duration = 4000
+                        });
+                        StateHasChanged();
                     });
                 }
             }
@@ -112,7 +196,8 @@ namespace Impulse.Pages.Payroll
             IsSaving = true;
             try
             {
-                await EmployeeService.SaveEmployeeAsync(Employee, true);
+                bool isAdd = string.IsNullOrEmpty(EmployeeId);
+                await EmployeeService.SaveEmployeeAsync(Employee, isAdd);
 
                 NotificationService.Notify(new Radzen.NotificationMessage
                 {
