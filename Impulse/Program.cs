@@ -124,6 +124,9 @@ builder.Services.AddScoped<IReportManagerService, ReportManagerService>();
 builder.Services.AddScoped<IForeignCustomerDataAccess, ForeignCustomerDataAccess>();
 builder.Services.AddScoped<Impulse.Services.IForeignCustomerService, Impulse.Services.ForeignCustomerService>();
 
+builder.Services.AddScoped<DataAccessLibrary.Interface.Export.ICustomerOrderDataAccess, DataAccessLibrary.DAC.Export.CustomerOrderDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Export.ICustomerOrderService, Impulse.Services.Export.CustomerOrderService>();
+
 
 builder.Services.AddScoped<LoadingService>();
 builder.Services.AddScoped<SecurityService>();

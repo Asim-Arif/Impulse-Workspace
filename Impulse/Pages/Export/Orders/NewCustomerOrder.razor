@@ -1,0 +1,326 @@
+@page "/export/newcustomerorder"
+@page "/export/new-customer-order/{OrderNo?}"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Export
+@using Impulse.Components.Export.NewCustomerOrderTabs
+
+<PageTitle>New Customer Order</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <!-- Title Header -->
+            <div class="row g-2 mb-3 align-items-end border-bottom pb-2">
+                <div class="col-auto d-flex align-items-end pb-1">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-file-invoice text-primary me-2"></i>
+                        New Customer Order
+                    </h5>
+                </div>
+            </div>
+
+            <EditForm Model="Order" OnValidSubmit="SaveOrderAndClose">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger mb-3" />
+
+                <!-- Master Order Header Panel -->
+                <div class="card mb-4 border" style="background: #f8f9fb; border-radius: 8px;">
+                    <div class="card-header py-2 fw-bold text-secondary" style="background: #eef0f7; border-radius: 8px 8px 0 0; font-size: 0.85rem; letter-spacing: 0.03em;">
+                        <i class="fas fa-ship me-1 text-primary"></i> Order Header Information
+                    </div>
+                    <div class="card-body py-3">
+                        <div class="row g-3">
+                            <!-- Company -->
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Company <span class="text-danger">*</span></label>
+                                <BlazoredTypeahead SearchMethod="SearchCompanies"
+                                                   EnableDropDown="true"
+                                                   Data="Companies"
+                                                   TValue="CompanyLookupModel"
+                                                   TItem="CompanyLookupModel"
+                                                   Value="SelectedCompany"
+                                                   ValueChanged="OnCompanySelected"
+                                                   ValueExpression="@(() => SelectedCompany)"
+                                                   Placeholder="Select Company">
+                                    <SelectedTemplate Context="selectedComp">
+                                        @selectedComp?.CompanyName
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="comp">
+                                        @comp.CompanyName
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+
+                            <!-- Customer -->
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Customer <span class="text-danger">*</span></label>
+                                <BlazoredTypeahead SearchMethod="SearchCustomers"
+                                                   EnableDropDown="true"
+                                                   Data="Customers"
+                                                   TValue="CustomerLookupModel"
+                                                   TItem="CustomerLookupModel"
+                                                   Value="SelectedCustomer"
+                                                   ValueChanged="OnCustomerSelected"
+                                                   ValueExpression="@(() => SelectedCustomer)"
+                                                   Placeholder="Select Customer">
+                                    <SelectedTemplate Context="selectedCust">
+                                        @selectedCust?.Name
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="cust">
+                                        @cust.Name
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+
+                            <!-- Country -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Country</label>
+                                <select class="form-select form-select-sm" value="@Order.Country" @onchange="OnCountryChangedArgs">
+                                    <option value="">Select Country</option>
+                                    @foreach (var country in Countries)
+                                    {
+                                        <option value="@country">@country</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <!-- Currency -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Currency</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Order.Currency" readonly style="background: #f0f2f5;" placeholder="Auto-filled" />
+                            </div>
+
+                            <!-- Order No -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Order No <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control form-control-sm text-center fw-bold text-danger" @bind="Order.OrderNo" />
+                            </div>
+
+                            <!-- Order Date -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Order Date</label>
+                                <input type="date" class="form-control form-control-sm" @bind="Order.DT" />
+                            </div>
+
+                            <!-- Trade Terms -->
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Trade Terms</label>
+                                <select class="form-select form-select-sm" @bind="Order.TradeTerms">
+                                    @foreach (var term in TradeTermsList)
+                                    {
+                                        <option value="@term.DropDownValue_Description">@term.DropDownValue_Description</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <!-- Payment Terms -->
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Payment Terms</label>
+                                <select class="form-select form-select-sm" @bind="Order.PaymentTerms">
+                                    <option value="">Select Payment Terms</option>
+                                    @foreach (var pt in PaymentTermsList)
+                                    {
+                                        <option value="@pt.DropDownValue_Description">@pt.DropDownValue_Description</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <!-- Delivery Date -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Delivery Date</label>
+                                <input type="date" class="form-control form-control-sm" @bind="Order.DeliveryDT" />
+                            </div>
+
+                            <!-- Internal Ref No -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Internal Ref #</label>
+                                <input type="text" class="form-control form-control-sm text-center fw-bold text-primary" @bind="Order.InternalRefNo" readonly style="background: #f0f2f5;" />
+                            </div>
+
+                            <!-- Quality -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Quality</label>
+                                <select class="form-select form-select-sm" @bind="Order.Quality">
+                                    <option value="">Select Quality</option>
+                                    @foreach (var q in Qualities)
+                                    {
+                                        <option value="@q.DropDownValue_Description">@q.DropDownValue_Description</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <!-- Shipping Mode -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Shipping Mode</label>
+                                <select class="form-select form-select-sm" @bind="Order.ShippingMode">
+                                    <option value="">Select Mode</option>
+                                    @foreach (var mode in ShippingMethods)
+                                    {
+                                        <option value="@mode.DropDownValue_Description">@mode.DropDownValue_Description</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <!-- Trans-Shipment -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Trans-Shipment</label>
+                                <select class="form-select form-select-sm" @bind="Order.TransShipment">
+                                    <option value="Allowed">Allowed</option>
+                                    <option value="Not Allowed">Not Allowed</option>
+                                </select>
+                            </div>
+
+                            <!-- Partial Shipment -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Partial Shipment</label>
+                                <select class="form-select form-select-sm" @bind="Order.PartialShipment">
+                                    <option value="Allowed">Allowed</option>
+                                    <option value="Not Allowed">Not Allowed</option>
+                                </select>
+                            </div>
+
+                            <!-- Stamps -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Stamps</label>
+                                <input type="text" class="form-control form-control-sm text-center" @bind="Order.StampDT" />
+                            </div>
+
+                            <!-- Order Rcvd Via -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Order Rcvd Via</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Order.OrderRcvdVia" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabs Navigation -->
+                <ul class="nav nav-tabs md3-tabs" id="orderTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "ArticleDetail" ? "active" : "")"
+                                @onclick='() => ChangeTab("ArticleDetail")'
+                                type="button" role="tab">Article Detail</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "OtherDetail" ? "active" : "")"
+                                @onclick='() => ChangeTab("OtherDetail")'
+                                type="button" role="tab">Other Detail</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "ImportExcel" ? "active" : "")"
+                                @onclick='() => ChangeTab("ImportExcel")'
+                                type="button" role="tab">Import From Excel</button>
+                    </li>
+                </ul>
+
+                <!-- Tab Content panes -->
+                <div class="tab-content pt-4" id="orderTabsContent">
+                    <div class="tab-pane fade @(ActiveTab == "ArticleDetail" ? "show active" : "")" role="tabpanel">
+                        <ArticleDetailTab Order="Order"
+                                          CatalogItems="CatalogItems"
+                                          Qualities="FinishingQualities"
+                                          QuotationsList="QuotationsList"
+                                          SelectedQuotationNo="@SelectedQuotationNo"
+                                          SelectedQuotationNoChanged="(val) => SelectedQuotationNo = val"
+                                          OnLoadQuotation="LoadQuotation"
+                                          OnItemAdded="AddLineItem"
+                                          OnItemDeleted="RemoveLineItem"
+                                          OnCatalogItemChanged="OnCatalogItemChanged"
+                                          OnFinishingTypeChanged="OnFinishingTypeChanged"
+                                          NewItemInput="NewItemInput" />
+                    </div>
+                    <div class="tab-pane fade @(ActiveTab == "OtherDetail" ? "show active" : "")" role="tabpanel">
+                        <OtherDetailTab Order="Order" />
+                    </div>
+                    <div class="tab-pane fade @(ActiveTab == "ImportExcel" ? "show active" : "")" role="tabpanel">
+                        <ImportExcelTab Order="Order"
+                                        ExcelNICompany="ExcelNICompany"
+                                        ExcelNICustomer="ExcelNICustomer"
+                                        ExcelOK="ExcelOK"
+                                        OnImportTrigger="ImportExcelMock"
+                                        OnAddToOrder="AppendExcelOkItems" />
+                    </div>
+                </div>
+
+                <!-- Bottom Sticky Footer Actions -->
+                <div class="row align-items-center border-top pt-3 mt-4">
+                    <div class="col-md-6 d-flex align-items-center gap-3">
+                        <!-- Print check -->
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="printOnSaveCheck" />
+                            <label class="form-check-label fw-bold text-secondary" for="printOnSaveCheck" style="font-size: 0.85rem;">
+                                Print On Save
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="showPictureCheck" />
+                            <label class="form-check-label fw-bold text-secondary" for="showPictureCheck" style="font-size: 0.85rem;">
+                                Show Item Picture
+                            </label>
+                        </div>
+
+                        <!-- Revision inputs -->
+                        <div class="d-flex align-items-center gap-2 ms-3">
+                            <span class="fw-bold text-secondary" style="font-size: 0.82rem; white-space: nowrap;">Order Revision</span>
+                            <input type="text" class="form-control form-control-sm text-center fw-bold text-dark" readonly style="width: 50px; background: #f0f2f5;" @bind="Order.OrderRevisionNo" />
+                            <input type="date" class="form-control form-control-sm" readonly style="width: 130px; background: #f0f2f5;" @bind="Order.OrderRevisionDT" />
+                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddRevision">
+                                Add Revision
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">Cancel</button>
+                        <button type="button" class="btn btn-outline-success" @onclick="SaveOrderAndStay" disabled="@IsSaving">
+                            <i class="fas fa-save me-1"></i> Save &amp; Stay
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" @onclick="SaveOrderAndNew" disabled="@IsSaving">
+                            <i class="fas fa-plus me-1"></i> Save &amp; New
+                        </button>
+                        <button type="submit" class="btn btn-primary" disabled="@IsSaving">
+                            @if (IsSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <span>Saving...</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-check me-1"></i> <span>Save &amp; Close</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Material Design 3 style tabs */
+    .md3-tabs {
+        border-bottom: 1px solid #e0e2ec;
+        gap: 4px;
+        flex-wrap: wrap;
+    }
+    .md3-tabs .nav-link {
+        color: #44474f;
+        border: none;
+        border-bottom: 3px solid transparent;
+        padding: 0.5rem 0.75rem;
+        font-weight: 500;
+        font-size: 0.85rem;
+        border-radius: 0;
+        transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+    }
+    .md3-tabs .nav-link:hover {
+        background-color: rgba(192, 88, 0, 0.05); /* Match Export orange tint */
+        color: #7a3000;
+    }
+    .md3-tabs .nav-link.active {
+        color: #c05800; /* Export Theme Color */
+        border-bottom-color: #c05800;
+        background: transparent;
+    }
+</style>
