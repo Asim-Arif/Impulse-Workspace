@@ -1,0 +1,29 @@
+@using DataAccessLibrary.Models.ViewModels.Company
+
+<div class="row g-4">
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Unit Weight</label>
+        <input type="text" class="form-control" @bind="Item.UnitWeight" placeholder="e.g. 125g" />
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Finished Weight (g)</label>
+        <input type="number" step="0.0001" class="form-control" @bind="Item.FinishedWeight" />
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Forging Weight (g)</label>
+        <input type="number" step="0.0001" class="form-control" @bind="Item.ForgingWeight" />
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1">Waste Visible (g)</label>
+        <input type="number" step="0.0001" class="form-control" @bind="Item.WasteVisible" />
+    </div>
+
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ItemDto Item { get; set; } = default!;
+}

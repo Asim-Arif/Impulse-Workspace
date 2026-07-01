@@ -101,6 +101,8 @@ builder.Services.AddScoped<IEmployeeDataAccess, EmployeeDataAccess>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IDepartmentDataAccess, DepartmentDataAccess>();
 builder.Services.AddScoped<IDepartmentService, DepartmentService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Company.IItemDataAccess, DataAccessLibrary.DAC.Company.ItemDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Company.IItemService, Impulse.Services.Company.ItemService>();
 builder.Services.AddScoped<ICommonServices, CommonServices>();
 builder.Services.AddScoped<IDBHelperService, DBHelperService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
@@ -121,6 +123,9 @@ builder.Services.AddScoped<IReportManagerService, ReportManagerService>();
 
 builder.Services.AddScoped<IForeignCustomerDataAccess, ForeignCustomerDataAccess>();
 builder.Services.AddScoped<Impulse.Services.IForeignCustomerService, Impulse.Services.ForeignCustomerService>();
+
+builder.Services.AddScoped<DataAccessLibrary.Interface.Export.ICustomerOrderDataAccess, DataAccessLibrary.DAC.Export.CustomerOrderDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Export.ICustomerOrderService, Impulse.Services.Export.CustomerOrderService>();
 
 
 builder.Services.AddScoped<LoadingService>();

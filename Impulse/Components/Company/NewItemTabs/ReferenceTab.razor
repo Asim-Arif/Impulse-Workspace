@@ -1,0 +1,53 @@
+@using DataAccessLibrary.Models.ViewModels.Company
+
+<div class="row g-2 mb-3">
+    <div class="col-auto">
+        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddRef">
+            <i class="bi bi-plus-circle me-1"></i> Add Reference
+        </button>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-sm table-bordered table-hover align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>#</th>
+                <th>Catalog Name</th>
+                <th>Reference</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var (refRow, idx) in CatalogRefs.Select((r, i) => (r, i)))
+            {
+                <tr>
+                    <td>@(idx + 1)</td>
+                    <td>
+                        <input type="text" class="form-control form-control-sm"
+                               @bind="refRow.CatalogName"
+                               placeholder="Catalog name" />
+                    </td>
+                    <td>
+                        <input type="text" class="form-control form-control-sm"
+                               @bind="refRow.Reference"
+                               placeholder="Reference no." />
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                @onclick="() => RemoveRef(refRow)">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public List<ItemCatalogRefModel> CatalogRefs { get; set; } = default!;
+
+    private void AddRef() => CatalogRefs.Add(new ItemCatalogRefModel());
+    private void RemoveRef(ItemCatalogRefModel r) => CatalogRefs.Remove(r);
+}

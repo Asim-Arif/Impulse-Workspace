@@ -1,0 +1,380 @@
+@using DataAccessLibrary.Models.ViewModels
+@using DataAccessLibrary.Models.ViewModels.Export
+
+<div class="card border-0 shadow-sm mb-4" style="background: #ffffff; border-radius: 8px;">
+    <div class="card-body p-3">
+        <!-- Quotation Loader Header -->
+        <div class="row g-3 align-items-center mb-3 border-bottom pb-3">
+            <div class="col-md-4">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light fw-bold text-secondary" style="font-size: 0.8rem;">Quotation No</span>
+                    <select class="form-select" value="@SelectedQuotationNo" @onchange="OnQuotationNoChanged">
+                        <option value="">Select Quotation</option>
+                        @foreach (var q in QuotationsList)
+                        {
+                            <option value="@q">@q</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="OnLoadQuotation" disabled="@(string.IsNullOrEmpty(SelectedQuotationNo))">
+                    <i class="fas fa-file-import me-1"></i> Add Items from Quotation
+                </button>
+            </div>
+        </div>
+
+        <h6 class="fw-bold text-dark mb-3">
+            <i class="fas fa-list text-primary me-2"></i> Line Item Details
+        </h6>
+
+        <!-- Grid of Added Items -->
+        <div class="table-responsive mb-4" style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-sm table-bordered table-hover align-middle mb-0" style="font-size: 0.85rem;">
+                <thead class="table-light sticky-top">
+                    <tr>
+                        <th style="width: 50px;" class="text-center">S.No</th>
+                        <th>Cust Item ID</th>
+                        <th>Item ID</th>
+                        <th>Description</th>
+                        <th class="text-center">P. Unit</th>
+                        <th class="text-end">Price</th>
+                        <th class="text-center">Qty</th>
+                        <th class="text-end">Amount</th>
+                        <th class="text-center">Delivery Date</th>
+                        <th>Finishing Quality</th>
+                        <th>Stamps</th>
+                        <th>Remarks</th>
+                        <th class="text-end">Weight</th>
+                        <th>Finishing Type</th>
+                        <th>IW Order No</th>
+                        <th>IW Batch No</th>
+                        <th style="width: 70px;" class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Order.OrderItems == null || !Order.OrderItems.Any())
+                    {
+                        <tr>
+                            <td colspan="17" class="text-center text-muted py-3">No items added to this order. Use the form below to add items.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        int index = 1;
+                        @foreach (var item in Order.OrderItems)
+                        {
+                            var currentItem = item;
+                            <tr>
+                                <td class="text-center">@item.SortNo</td>
+                                <td>@item.ItemCode</td>
+                                <td>@item.CompItemCode</td>
+                                <td>@item.Description</td>
+                                <td class="text-center">@item.Unit</td>
+                                <td class="text-end">@item.Price.ToString("F4")</td>
+                                <td class="text-center">@item.Qty</td>
+                                <td class="text-end">@((item.Price * item.Qty).ToString("N2"))</td>
+                                <td class="text-center">@(item.DeliveryDT == new DateTime(1900, 1, 1) ? "" : item.DeliveryDT.ToString("dd-MMM-yyyy"))</td>
+                                <td>@item.Quality</td>
+                                <td>@item.Stamps</td>
+                                <td>@item.Remarks</td>
+                                <td class="text-end">@item.Weight.ToString("F4")</td>
+                                <td>@item.Item_Finishing_Type_Text</td>
+                                <td>@item.IW_OrderNo</td>
+                                <td>@item.IW_BatchNo</td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-outline-danger border-0 p-1" title="Remove Item" @onclick="() => OnItemDeleted.InvokeAsync(currentItem)">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Add New Item Section (mirrors VB6 FNew Panel) -->
+        <div class="card border mb-3" style="background: #f8f9fb; border-radius: 8px;">
+            <div class="card-header py-2 fw-bold text-secondary" style="background: #eef0f7; border-radius: 8px 8px 0 0; font-size: 0.85rem;">
+                <i class="fas fa-plus-circle me-1 text-primary"></i> Add/Edit Item Row
+            </div>
+            <div class="card-body py-3">
+                <div class="row g-3">
+                    <!-- Cust Item ID selector -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Cust Item ID</label>
+                        <select class="form-select form-select-sm" value="@NewItemInput.ItemCode" @onchange="OnItemCodeSelected">
+                            <option value="">Select Customer Item ID</option>
+                            @foreach (var cat in CatalogItems)
+                            {
+                                <option value="@cat.ItemCode">@cat.ItemCode</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Item ID selector -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Item ID</label>
+                        <select class="form-select form-select-sm" value="@NewItemInput.CompItemCode" @onchange="OnCompItemCodeSelected">
+                            <option value="">Select Item ID</option>
+                            @foreach (var cat in CatalogItems)
+                            {
+                                <option value="@cat.CompItemCode">@cat.CompItemCode</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Description selector -->
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Description</label>
+                        <select class="form-select form-select-sm" value="@NewItemInput.Description" @onchange="OnDescriptionSelected">
+                            <option value="">Select Description</option>
+                            @foreach (var cat in CatalogItems)
+                            {
+                                <option value="@cat.Description">@cat.Description</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Finishing Type -->
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Finishing Type</label>
+                        <select class="form-select form-select-sm" value="@NewItemInput.Item_Finishing_Type" @onchange="OnFinishingTypeLocalChanged">
+                            <option value="0">Finished</option>
+                            <option value="1">Temper Inspection</option>
+                            <option value="2">First Inspection</option>
+                        </select>
+                    </div>
+
+                    <!-- Finishing Quality -->
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Finishing Quality</label>
+                        <select class="form-select form-select-sm" @bind="NewItemInput.Quality">
+                            <option value="">Select Quality</option>
+                            @foreach (var q in Qualities)
+                            {
+                                <option value="@q.DropDownValue_Description">@q.DropDownValue_Description</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- IW Order No -->
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">IW Order No</label>
+                        <input type="text" class="form-control form-control-sm text-center" @bind="NewItemInput.IW_OrderNo" />
+                    </div>
+
+                    <!-- IW Batch No -->
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">IW Batch No</label>
+                        <input type="text" class="form-control form-control-sm text-center" @bind="NewItemInput.IW_BatchNo" />
+                    </div>
+
+                    <!-- Stamps -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Stamps</label>
+                        <input type="text" class="form-control form-control-sm" @bind="NewItemInput.Stamps" placeholder="Stamping details" />
+                    </div>
+
+                    <!-- Remarks -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Remarks</label>
+                        <input type="text" class="form-control form-control-sm" @bind="NewItemInput.Remarks" placeholder="Special line remarks" />
+                    </div>
+
+                    <!-- Delivery Date -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Delivery Date</label>
+                        <input type="date" class="form-control form-control-sm" @bind="NewItemInput.DeliveryDT" />
+                    </div>
+
+                    <!-- Price -->
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Price</label>
+                        <input type="number" step="0.0001" class="form-control form-control-sm text-end" @bind="NewItemInput.Price" />
+                    </div>
+
+                    <!-- Qty -->
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Qty</label>
+                        <input type="number" class="form-control form-control-sm text-center" @bind="NewItemInput.Qty" />
+                    </div>
+
+                    <!-- Weight -->
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Weight</label>
+                        <input type="number" step="0.0001" class="form-control form-control-sm text-end" @bind="NewItemInput.Weight" />
+                    </div>
+
+                    <!-- Calculated Amount -->
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Amount</label>
+                        <input type="text" class="form-control form-control-sm text-end" readonly style="background: #f0f2f5;" value="@((NewItemInput.Price * NewItemInput.Qty).ToString("N2"))" />
+                    </div>
+
+                    <!-- Add Button -->
+                    <div class="col-md-1 d-flex align-items-end justify-content-end">
+                        <button type="button" class="btn btn-sm btn-primary w-100 py-1" style="height: 31px;" @onclick="OnItemAdded">
+                            <i class="fas fa-plus"></i> Add
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Totals Banner -->
+        <div class="row mt-3 p-3 bg-light rounded g-2 border">
+            <div class="col-md-3 d-flex align-items-center">
+                <span class="fw-bold text-secondary" style="font-size: 0.85rem;">Amount (In Words):</span>
+            </div>
+            <div class="col-md-6 d-flex align-items-center">
+                <span class="fw-bold text-primary" style="font-size: 0.9rem;">@GetTotalInWords()</span>
+            </div>
+            <div class="col-md-3 d-flex align-items-center justify-content-end gap-2">
+                <span class="fw-bold text-secondary" style="font-size: 0.85rem;">Total Amount:</span>
+                <span class="fs-5 fw-bold text-dark">@GetTotalAmount().ToString("N2")</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public CustomerOrderViewModel Order { get; set; } = default!;
+
+    [Parameter]
+    public List<CustomerOrderItemViewModel> CatalogItems { get; set; } = new();
+
+    [Parameter]
+    public List<GenericDropDownModel> Qualities { get; set; } = new();
+
+    [Parameter]
+    public List<string> QuotationsList { get; set; } = new();
+
+    [Parameter]
+    public string SelectedQuotationNo { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> SelectedQuotationNoChanged { get; set; }
+
+    [Parameter]
+    public EventCallback OnLoadQuotation { get; set; }
+
+    [Parameter]
+    public EventCallback OnItemAdded { get; set; }
+
+    [Parameter]
+    public EventCallback<CustomerOrderItemViewModel> OnItemDeleted { get; set; }
+
+    [Parameter]
+    public EventCallback<CustomerOrderItemViewModel?> OnCatalogItemChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnFinishingTypeChanged { get; set; }
+
+    [Parameter]
+    public CustomerOrderItemViewModel NewItemInput { get; set; } = default!;
+
+    private async Task OnQuotationNoChanged(ChangeEventArgs e)
+    {
+        SelectedQuotationNo = e.Value?.ToString() ?? string.Empty;
+        await SelectedQuotationNoChanged.InvokeAsync(SelectedQuotationNo);
+    }
+
+    private async Task OnItemCodeSelected(ChangeEventArgs e)
+    {
+        var itemCode = e.Value?.ToString() ?? string.Empty;
+        var match = CatalogItems.FirstOrDefault(c => c.ItemCode == itemCode);
+        await OnCatalogItemChanged.InvokeAsync(match);
+    }
+
+    private async Task OnCompItemCodeSelected(ChangeEventArgs e)
+    {
+        var compItemCode = e.Value?.ToString() ?? string.Empty;
+        var match = CatalogItems.FirstOrDefault(c => c.CompItemCode == compItemCode);
+        await OnCatalogItemChanged.InvokeAsync(match);
+    }
+
+    private async Task OnDescriptionSelected(ChangeEventArgs e)
+    {
+        var desc = e.Value?.ToString() ?? string.Empty;
+        var match = CatalogItems.FirstOrDefault(c => c.Description == desc);
+        await OnCatalogItemChanged.InvokeAsync(match);
+    }
+
+    private async Task OnFinishingTypeLocalChanged(ChangeEventArgs e)
+    {
+        int index = int.TryParse(e.Value?.ToString(), out int val) ? val : 0;
+        await OnFinishingTypeChanged.InvokeAsync(index);
+    }
+
+    private decimal GetTotalAmount()
+    {
+        if (Order == null || Order.OrderItems == null) return 0;
+        return Order.OrderItems.Sum(i => i.Price * i.Qty);
+    }
+
+    private string GetTotalInWords()
+    {
+        decimal amount = GetTotalAmount();
+        if (amount <= 0) return "Zero Dollars Only";
+        
+        string currency = Order?.Currency ?? "USD";
+        string suffix = currency == "USD" ? "Dollars" : (currency == "EUR" ? "Euros" : "Pounds");
+
+        long integral = (long)Math.Truncate(amount);
+        int fractional = (int)Math.Round((amount - integral) * 100);
+
+        string word = NumberToWords(integral) + " " + suffix;
+        if (fractional > 0)
+        {
+            word += " and Cents " + NumberToWords(fractional);
+        }
+        return word + " Only";
+    }
+
+    private string NumberToWords(long number)
+    {
+        if (number == 0) return "Zero";
+        if (number < 0) return "Minus " + NumberToWords(Math.Abs(number));
+
+        string words = "";
+
+        if ((number / 1000000) > 0)
+        {
+            words += NumberToWords(number / 1000000) + " Million ";
+            number %= 1000000;
+        }
+
+        if ((number / 1000) > 0)
+        {
+            words += NumberToWords(number / 1000) + " Thousand ";
+            number %= 1000;
+        }
+
+        if ((number / 100) > 0)
+        {
+            words += NumberToWords(number / 100) + " Hundred ";
+            number %= 100;
+        }
+
+        if (number > 0)
+        {
+            if (words != "") words += "and ";
+            var unitsMap = new[] { "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen" };
+            var tensMap = new[] { "Zero", "Ten", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety" };
+
+            if (number < 20)
+                words += unitsMap[number];
+            else
+            {
+                words += tensMap[number / 10];
+                if ((number % 10) > 0)
+                    words += "-" + unitsMap[number % 10];
+            }
+        }
+
+        return words.Trim();
+    }
+}
