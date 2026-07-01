@@ -83,6 +83,9 @@
                                 <td>@item.IW_OrderNo</td>
                                 <td>@item.IW_BatchNo</td>
                                 <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-outline-primary border-0 p-1 me-1" title="Edit Item" @onclick="() => OnItemEdit.InvokeAsync(currentItem)">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
                                     <button type="button" class="btn btn-sm btn-outline-danger border-0 p-1" title="Remove Item" @onclick="() => OnItemDeleted.InvokeAsync(currentItem)">
                                         <i class="fas fa-trash-alt"></i>
                                     </button>
@@ -213,10 +216,16 @@
                         <input type="text" class="form-control form-control-sm text-end" readonly style="background: #f0f2f5;" value="@((NewItemInput.Price * NewItemInput.Qty).ToString("N2"))" />
                     </div>
 
-                    <!-- Add Button -->
-                    <div class="col-md-1 d-flex align-items-end justify-content-end">
+                    <!-- Add/Update Button -->
+                    <div class="col-md-2 d-flex align-items-end justify-content-end gap-1">
+                        @if (IsEditing)
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-secondary w-50 py-1" style="height: 31px;" @onclick="OnCancelEdit">
+                                Cancel
+                            </button>
+                        }
                         <button type="button" class="btn btn-sm btn-primary w-100 py-1" style="height: 31px;" @onclick="OnItemAdded">
-                            <i class="fas fa-plus"></i> Add
+                            <i class="fas @(IsEditing ? "fa-save" : "fa-plus")"></i> @(IsEditing ? "Update" : "Add")
                         </button>
                     </div>
                 </div>
@@ -266,6 +275,15 @@
 
     [Parameter]
     public EventCallback<CustomerOrderItemViewModel> OnItemDeleted { get; set; }
+
+    [Parameter]
+    public EventCallback<CustomerOrderItemViewModel> OnItemEdit { get; set; }
+
+    [Parameter]
+    public bool IsEditing { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancelEdit { get; set; }
 
     [Parameter]
     public EventCallback<CustomerOrderItemViewModel?> OnCatalogItemChanged { get; set; }

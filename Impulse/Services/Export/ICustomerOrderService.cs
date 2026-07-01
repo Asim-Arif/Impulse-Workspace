@@ -31,6 +31,12 @@ namespace Impulse.Services.Export
         Task<string> GetNextInternalRefNoAsync(int companyId);
         Task<bool> IsOrderNoExistsAsync(string orderNo);
         Task<bool> IsOrderUsedInProformaAsync(string orderNo);
+        Task<bool> DeleteCustomerOrderAsync(string orderNo);
+
+        Task<List<CustomerOrderListItemModel>> GetOrderListAsync(DateTime dtFrom, DateTime dtTo, string custCode, string country, int companyRefID, string orderType, int statusFilter, bool filterByDeliveryDT, int viewType);
+        Task<List<string>> GetAllCountriesAsync();
+        Task<bool> UpdateOrderFinalStatusAsync(string orderNo, string custCode, string country, int cancelledStatus, string remarks, string userName, string machineName);
+        Task<bool> DeleteOrderFinalStatusAsync(string orderNo);
 
         Task<bool> ClearExcelImportTableAsync();
         Task<bool> InsertExcelImportRowAsync(string itemId, string itemName, decimal qty, string unit, decimal rate, decimal weight, string steelType, string udms);

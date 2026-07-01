@@ -151,7 +151,7 @@ namespace DataAccessLibrary.DAC.Export
 
             const string itemsSql = @"
                 SELECT ID, OrderNo, ItemCode, CompItemCode, Price, Qty, InvQty, CustomPrice, SortNo, DeliveryDT, 
-                       Stamps, Quality, DeliveryStatus, Remarks, Weight, Item_Finishing_Type, IW_OrderNo, IW_BatchNo, 
+                       StampsItem AS Stamps, Quality, DeliveryStatus, Remarks, Weight, Item_Finishing_Type, IW_OrderNo, IW_BatchNo, 
                        ItemName, Description, Unit, Item_Finishing_Type_Text
                 FROM VrptOrders 
                 WHERE OrderNo = @OrderNo 
@@ -393,6 +393,192 @@ namespace DataAccessLibrary.DAC.Export
                 WHERE CustCode = @CustCode AND Country = @Country 
                 ORDER BY Import_Excel_CustomerOrder.EntryID";
             return (await db.QueryAsync<CustomerOrderItemViewModel>(sql, new { CustCode = custCode, Country = country })).ToList();
+        }
+
+        public async Task<bool> DeleteCustomerOrderAsync(string orderNo)
+        {
+            using IDbConnection db = new SqlConnection(_connectionString);
+            const string checkSql = "SELECT COUNT(*) FROM FProformaOrders WHERE OrderEntryID IN (SELECT ID FROM FOrderItems WHERE OrderNo = @OrderNo)";
+            int count = await db.QueryFirstOrDefaultAsync<int>(checkSql, new { OrderNo = orderNo });
+            if (count > 0)
+            {
+                return false;
+            }
+
+            const string deleteSql = "DELETE FROM FCustomerOrders WHERE OrderNo = @OrderNo";
+            await db.ExecuteAsync(deleteSql, new { OrderNo = orderNo });
+            return true;
+        }
+
+        public async Task<List<CustomerOrderListItemModel>> GetOrderListAsync(
+            DateTime dtFrom, 
+            DateTime dtTo, 
+            string custCode, 
+            string country, 
+            int companyRefID, 
+            string orderType, 
+            int statusFilter, 
+            bool filterByDeliveryDT, 
+            int viewType)
+        {
+            using IDbConnection db = new SqlConnection(_connectionString);
+            var parameters = new DynamicParameters();
+            parameters.Add("@DtFrom", dtFrom);
+            parameters.Add("@DtTo", dtTo);
+
+            string dateField = filterByDeliveryDT ? "DeliveryDT" : "DT";
+            string cond = $"WHERE {dateField} BETWEEN @DtFrom AND @DtTo";
+
+            if (custCode != "0" && !string.IsNullOrEmpty(custCode))
+            {
+                cond += " AND CustCode = @CustCode";
+                parameters.Add("@CustCode", custCode);
+            }
+
+            if (!string.IsNullOrEmpty(country) && country != "<All Countries>")
+            {
+                cond += " AND Country = @Country";
+                parameters.Add("@Country", country);
+            }
+
+            if (companyRefID > 0)
+            {
+                cond += " AND CompanyRefID = @CompanyRefID";
+                parameters.Add("@CompanyRefID", companyRefID);
+            }
+
+            if (!string.IsNullOrEmpty(orderType) && orderType != "<All Types>")
+            {
+                cond += " AND OrderType = @OrderType";
+                parameters.Add("@OrderType", orderType);
+            }
+
+            if (viewType == 1)
+            {
+                cond += " AND CustCode NOT IN ('Parts','Stock')";
+            }
+            else if (viewType == 2)
+            {
+                cond += " AND CustCode IN ('Parts','Stock')";
+            }
+
+            string statusCond = "";
+            if (statusFilter == 0) // Unshipped
+            {
+                statusCond = " (UnShippedOrderNo IS NOT NULL)";
+            }
+            else if (statusFilter == 1) // Shipped
+            {
+                statusCond = " (UnShippedOrderNo IS NULL AND Cancelled = 0)";
+            }
+            else if (statusFilter == 2) // Cancelled
+            {
+                statusCond = " Cancelled = 1";
+            }
+            else if (statusFilter == 3) // Hold
+            {
+                statusCond = " Cancelled = 2";
+            }
+
+            if (!string.IsNullOrEmpty(statusCond))
+            {
+                cond += " AND " + statusCond;
+            }
+
+            string sql = $"SELECT * FROM VFOrderList {cond} ORDER BY DT DESC";
+            var list = (await db.QueryAsync<CustomerOrderListItemModel>(sql, parameters)).ToList();
+
+            foreach (var item in list)
+            {
+                if (item.TotalShippedQty == 0 || item.TotalShippedQty == null)
+                {
+                    item.OrderStatus = "UnShipped";
+                }
+                else if (item.TotalOrderQty > item.TotalShippedQty)
+                {
+                    item.OrderStatus = "Partialy Shipped";
+                }
+                else
+                {
+                    item.OrderStatus = "Shipped";
+                }
+
+                if (item.Cancelled == 1)
+                {
+                    item.OrderStatus = "Cancelled";
+                }
+                else if (item.Cancelled == 2)
+                {
+                    item.OrderStatus = "Hold";
+                }
+                else
+                {
+                    if (item.UnshippedOrderNo == null)
+                    {
+                        item.OrderStatus = "Shipped";
+                    }
+                    else
+                    {
+                        item.OrderStatus = "UnShipped";
+                    }
+                }
+
+                if (item.OrderPlanApproved == true)
+                {
+                    item.PurchasePlanStatus = "Approved";
+                }
+                else if (item.TotalPlannedQty > 0)
+                {
+                    item.PurchasePlanStatus = "Planned";
+                }
+                else
+                {
+                    item.PurchasePlanStatus = "-";
+                }
+            }
+
+            return list;
+        }
+
+        public async Task<List<string>> GetAllCountriesAsync()
+        {
+            using IDbConnection db = new SqlConnection(_connectionString);
+            const string sql = "SELECT DISTINCT Country FROM ForeignCustomers WHERE Country IS NOT NULL AND Country <> '' ORDER BY Country";
+            return (await db.QueryAsync<string>(sql)).ToList();
+        }
+
+        public async Task<bool> UpdateOrderFinalStatusAsync(
+            string orderNo, 
+            string custCode, 
+            string country, 
+            int cancelledStatus, 
+            string remarks, 
+            string userName, 
+            string machineName)
+        {
+            using IDbConnection db = new SqlConnection(_connectionString);
+            const string sql = @"
+                IF EXISTS (SELECT 1 FROM FCustomerFinalOrders WHERE OrderNo = @OrderNo)
+                BEGIN
+                    UPDATE FCustomerFinalOrders 
+                    SET CustCode = @CustCode, Country = @Country, Cancelled = @Cancelled, Remarks = @Remarks, UserName = @UserName, MachineName = @MachineName, DTEntry = GETDATE()
+                    WHERE OrderNo = @OrderNo
+                END
+                ELSE
+                BEGIN
+                    INSERT INTO FCustomerFinalOrders (CustCode, Country, OrderNo, UserName, MachineName, Cancelled, Remarks, DTEntry)
+                    VALUES (@CustCode, @Country, @OrderNo, @UserName, @MachineName, @Cancelled, @Remarks, GETDATE())
+                END";
+            await db.ExecuteAsync(sql, new { OrderNo = orderNo, CustCode = custCode, Country = country, Cancelled = cancelledStatus, Remarks = remarks, UserName = userName, MachineName = machineName });
+            return true;
+        }
+
+        public async Task<bool> DeleteOrderFinalStatusAsync(string orderNo)
+        {
+            using IDbConnection db = new SqlConnection(_connectionString);
+            const string sql = "DELETE FROM FCustomerFinalOrders WHERE OrderNo = @OrderNo";
+            await db.ExecuteAsync(sql, new { OrderNo = orderNo });
+            return true;
         }
     }
 }

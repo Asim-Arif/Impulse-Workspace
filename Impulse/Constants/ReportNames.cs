@@ -71,5 +71,47 @@ namespace Impulse.Constants
             public const string EmpListPercentage      = Folder + "rptEmpListPercentage.rpt";
             public const string AppForm                = Folder + "rptAppForm.rpt";
         }
+
+        // Export Subfolder
+        public static class Export
+        {
+            private const string Folder = ""; // Since legacy reports are usually flat in RptPath
+            public const string PartShippedItemwise = Folder + "rptPartiallyShippedOrdersItemwise.rpt";
+            public const string CombinedOrderItemwise = Folder + "CombinedOrderReportItemwise.rpt";
+            public const string PartShippedOrders = Folder + "rptPartiallyShippedOrders.rpt";
+            public const string ProductionExportCost = Folder + "OrderwiseProductionExportCost.rpt";
+            public const string FOrderList = Folder + "rptFOrderList.rpt";
+            public const string PTCQEL = Folder + "PTCQEL.rpt";
+            public const string PTC = Folder + "PTC.rpt";
+            public const string CustOrderStatus = Folder + "rptCustOrderStatus.rpt";
+            public const string ProdOrderMakerwise = Folder + "rptProductionOrderMakerwise.rpt";
+            public const string ProdOrderGroupWise = Folder + "rptProductionOrderWranglerGroupWise.rpt";
+            public const string ProdOrderWrangler1 = Folder + "rptProductionOrderWrangler_1.rpt";
+            public const string ProdOrderWrangler = Folder + "rptProductionOrderWrangler.rpt";
+            public const string ProductionOrder = Folder + "rptProductionOrder.rpt";
+            public const string ProdOrderBalanceQty = Folder + "rptProductionOrderBalanceQty.rpt";
+            public const string ProdOrderMarkingPlan = Folder + "rptProductionOrderWranglerMarkingPlan.rpt";
+            public const string ProdOrderWValue = Folder + "rptProductionOrderWValueWrangler.rpt";
+            public const string ProdOrderRM = Folder + "ProductionOrder_RM.rpt";
+            public const string ProdOrderPacking = Folder + "ProductionOrder_Packing.rpt";
+            public const string ProdOrderStatus = Folder + "rptProductionOrder_Status.rpt";
+            public const string ProdOrderDetails = Folder + "rptProductionOrder_Details.rpt";
+            public const string ProdOrderBalance = Folder + "Production_Order_Balance.rpt";
+            public const string PrintOrderSlip = Folder + "Print_Order_Slip.rpt";
+            public const string PrintOrderPictures = Folder + "Print_Order_Pictures.rpt";
+            public const string CustomerPO = Folder + "CustomerPO.rpt";
+            public const string OrderItemList = Folder + "OrderItemList.rpt";
+            public const string ProductionTimeLine = Folder + "ProductionTimeLineReport.rpt";
+            public const string UrgentItemsForm = Folder + "UrgetItemsRequestForm.rpt";
+            public const string SemiFinishStock = Folder + "Order_SemiFinishStock.rpt";
+            public const string FinishStock = Folder + "Order_FinishStock.rpt";
+            public const string ScoreBoard = Folder + "ScoreBoard.rpt";
+            public const string OrdersLogSheet = Folder + "Orders_Log_Sheet.rpt";
+            public const string BalanceOrdersCT = Folder + "Balance_Orders_CT.rpt";
+            public const string OrderStatusLog = Folder + "OrderStatusLog.rpt";
+            public const string OrderStatusLogEx = Folder + "OrderStatusLog_Ex.rpt";
+            public const string OrderPurchasePlanningLog = Folder + "OrderPurchasePlanningLog.rpt";
+            public const string UrgentRequest = Folder + "UrgentRequest.rpt";
+        }
     }
 }

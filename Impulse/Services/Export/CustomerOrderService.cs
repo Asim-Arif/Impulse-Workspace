@@ -39,6 +39,14 @@ namespace Impulse.Services.Export
         public async Task<string> GetNextInternalRefNoAsync(int companyId) => await _dac.GetNextInternalRefNoAsync(companyId);
         public async Task<bool> IsOrderNoExistsAsync(string orderNo) => await _dac.IsOrderNoExistsAsync(orderNo);
         public async Task<bool> IsOrderUsedInProformaAsync(string orderNo) => await _dac.IsOrderUsedInProformaAsync(orderNo);
+        public async Task<bool> DeleteCustomerOrderAsync(string orderNo) => await _dac.DeleteCustomerOrderAsync(orderNo);
+
+        public async Task<List<CustomerOrderListItemModel>> GetOrderListAsync(DateTime dtFrom, DateTime dtTo, string custCode, string country, int companyRefID, string orderType, int statusFilter, bool filterByDeliveryDT, int viewType) =>
+            await _dac.GetOrderListAsync(dtFrom, dtTo, custCode, country, companyRefID, orderType, statusFilter, filterByDeliveryDT, viewType);
+        public async Task<List<string>> GetAllCountriesAsync() => await _dac.GetAllCountriesAsync();
+        public async Task<bool> UpdateOrderFinalStatusAsync(string orderNo, string custCode, string country, int cancelledStatus, string remarks, string userName, string machineName) =>
+            await _dac.UpdateOrderFinalStatusAsync(orderNo, custCode, country, cancelledStatus, remarks, userName, machineName);
+        public async Task<bool> DeleteOrderFinalStatusAsync(string orderNo) => await _dac.DeleteOrderFinalStatusAsync(orderNo);
 
         public async Task<bool> ClearExcelImportTableAsync() => await _dac.ClearExcelImportTableAsync();
         public async Task<bool> InsertExcelImportRowAsync(string itemId, string itemName, decimal qty, string unit, decimal rate, decimal weight, string steelType, string udms) =>

@@ -52,6 +52,7 @@ namespace Impulse.Pages.Export.Orders
         // Helpers for typeahead selectors
         public CompanyLookupModel? SelectedCompany { get; set; }
         public CustomerLookupModel? SelectedCustomer { get; set; }
+        public CustomerOrderItemViewModel? EditingItem { get; set; } = null;
 
         // Line-Item Add inputs
         public CustomerOrderItemViewModel NewItemInput { get; set; } = new();
@@ -78,7 +79,7 @@ namespace Impulse.Pages.Export.Orders
                     if (SelectedCustomer != null)
                     {
                         Countries = await CustomerOrderService.GetCountriesForCustomerAsync(SelectedCustomer.CustCode);
-                        await HandleCustomerCountryChanged();
+                        await HandleCustomerCountryChanged(isEdit: true);
                     }
                 }
                 else
@@ -205,14 +206,14 @@ namespace Impulse.Pages.Export.Orders
             await OnCountryChanged(e.Value?.ToString() ?? string.Empty);
         }
 
-        private async Task HandleCustomerCountryChanged()
+        private async Task HandleCustomerCountryChanged(bool isEdit = false)
         {
             if (!string.IsNullOrEmpty(Order.CustCode) && !string.IsNullOrEmpty(Order.Country))
             {
                 Order.Currency = await CustomerOrderService.GetCurrencyForCustomerAsync(Order.CustCode, Order.Country);
 
                 var defaults = await CustomerOrderService.GetCustomerDefaultsAsync(Order.CustCode, Order.Country);
-                if (defaults != null)
+                if (defaults != null && !isEdit)
                 {
                     Order.PaymentTerms = defaults.PaymentTerms;
                     Order.TradeTerms = defaults.TradeTerms;
@@ -267,6 +268,37 @@ namespace Impulse.Pages.Export.Orders
             }
         }
 
+        public void SelectForEdit(CustomerOrderItemViewModel item)
+        {
+            EditingItem = item;
+
+            // Copy values to input fields
+            NewItemInput.ItemCode = item.ItemCode;
+            NewItemInput.CompItemCode = item.CompItemCode;
+            NewItemInput.Description = item.Description;
+            NewItemInput.Unit = item.Unit;
+            NewItemInput.Price = item.Price;
+            NewItemInput.Qty = item.Qty;
+            NewItemInput.Quality = item.Quality;
+            NewItemInput.Stamps = item.Stamps;
+            NewItemInput.Remarks = item.Remarks;
+            NewItemInput.Weight = item.Weight;
+            NewItemInput.Item_Finishing_Type = item.Item_Finishing_Type;
+            NewItemInput.IW_OrderNo = item.IW_OrderNo;
+            NewItemInput.IW_BatchNo = item.IW_BatchNo;
+            NewItemInput.DeliveryDT = item.DeliveryDT;
+
+            // Set catalog item selection
+            SelectedCatalogItem = CatalogItems.FirstOrDefault(c => c.CompItemCode == item.CompItemCode);
+        }
+
+        public void CancelEdit()
+        {
+            EditingItem = null;
+            NewItemInput = new();
+            SelectedCatalogItem = null;
+        }
+
         public void AddLineItem()
         {
             if (string.IsNullOrEmpty(NewItemInput.CompItemCode))
@@ -293,29 +325,55 @@ namespace Impulse.Pages.Export.Orders
                 return;
             }
 
-            var line = new CustomerOrderItemViewModel
+            if (EditingItem != null)
             {
-                ItemCode = NewItemInput.ItemCode,
-                CompItemCode = NewItemInput.CompItemCode,
-                Description = NewItemInput.Description,
-                Price = NewItemInput.Price,
-                Qty = NewItemInput.Qty,
-                InvQty = NewItemInput.Qty,
-                CustomPrice = NewItemInput.Price,
-                Unit = NewItemInput.Unit,
-                Quality = NewItemInput.Quality,
-                Stamps = NewItemInput.Stamps,
-                Remarks = NewItemInput.Remarks,
-                Weight = NewItemInput.Weight,
-                Item_Finishing_Type = NewItemInput.Item_Finishing_Type,
-                Item_Finishing_Type_Text = NewItemInput.Item_Finishing_Type == 1 ? "Temper Inspection" : (NewItemInput.Item_Finishing_Type == 2 ? "First Inspection" : "Finished"),
-                IW_OrderNo = NewItemInput.IW_OrderNo,
-                IW_BatchNo = NewItemInput.IW_BatchNo,
-                DeliveryDT = NewItemInput.DeliveryDT,
-                SortNo = Order.OrderItems.Count + 1
-            };
+                // Update existing item values
+                EditingItem.ItemCode = NewItemInput.ItemCode;
+                EditingItem.CompItemCode = NewItemInput.CompItemCode;
+                EditingItem.Description = NewItemInput.Description;
+                EditingItem.Price = NewItemInput.Price;
+                EditingItem.Qty = NewItemInput.Qty;
+                EditingItem.InvQty = NewItemInput.Qty;
+                EditingItem.CustomPrice = NewItemInput.Price;
+                EditingItem.Unit = NewItemInput.Unit;
+                EditingItem.Quality = NewItemInput.Quality;
+                EditingItem.Stamps = NewItemInput.Stamps;
+                EditingItem.Remarks = NewItemInput.Remarks;
+                EditingItem.Weight = NewItemInput.Weight;
+                EditingItem.Item_Finishing_Type = NewItemInput.Item_Finishing_Type;
+                EditingItem.Item_Finishing_Type_Text = NewItemInput.Item_Finishing_Type == 1 ? "Temper Inspection" : (NewItemInput.Item_Finishing_Type == 2 ? "First Inspection" : "Finished");
+                EditingItem.IW_OrderNo = NewItemInput.IW_OrderNo;
+                EditingItem.IW_BatchNo = NewItemInput.IW_BatchNo;
+                EditingItem.DeliveryDT = NewItemInput.DeliveryDT;
 
-            Order.OrderItems.Add(line);
+                EditingItem = null;
+            }
+            else
+            {
+                // Create and add new item
+                var line = new CustomerOrderItemViewModel
+                {
+                    ItemCode = NewItemInput.ItemCode,
+                    CompItemCode = NewItemInput.CompItemCode,
+                    Description = NewItemInput.Description,
+                    Price = NewItemInput.Price,
+                    Qty = NewItemInput.Qty,
+                    InvQty = NewItemInput.Qty,
+                    CustomPrice = NewItemInput.Price,
+                    Unit = NewItemInput.Unit,
+                    Quality = NewItemInput.Quality,
+                    Stamps = NewItemInput.Stamps,
+                    Remarks = NewItemInput.Remarks,
+                    Weight = NewItemInput.Weight,
+                    Item_Finishing_Type = NewItemInput.Item_Finishing_Type,
+                    Item_Finishing_Type_Text = NewItemInput.Item_Finishing_Type == 1 ? "Temper Inspection" : (NewItemInput.Item_Finishing_Type == 2 ? "First Inspection" : "Finished"),
+                    IW_OrderNo = NewItemInput.IW_OrderNo,
+                    IW_BatchNo = NewItemInput.IW_BatchNo,
+                    DeliveryDT = NewItemInput.DeliveryDT,
+                    SortNo = Order.OrderItems.Count + 1
+                };
+                Order.OrderItems.Add(line);
+            }
 
             // Reset inputs
             NewItemInput = new();
