@@ -11,18 +11,18 @@
     <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
         <div class="card-body pt-3">
 
-            <!-- ── Filter Toolbar ── -->
-            <div class="row g-2 mb-3 align-items-end">
-                <!-- Title -->
-                <div class="col-auto d-flex align-items-end pb-1">
-                    <h5 class="mb-0 fw-bold text-dark-emphasis">
-                        <i class="fas fa-list-alt text-primary me-2"></i>
-                        Order List
-                    </h5>
-                </div>
+            <!-- Title -->
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <h5 class="mb-0 fw-bold text-dark-emphasis">
+                    <i class="fas fa-list-alt text-primary me-2"></i>
+                    Order List
+                </h5>
+            </div>
 
+            <!-- "?"? Filter Toolbar Row 1 "?"? -->
+            <div class="row g-2 mb-2 align-items-end">
                 <!-- Company -->
-                <div class="col-md-2">
+                <div class="col-md-3">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Company</label>
                     <BlazoredTypeahead SearchMethod="SearchCompanies"
                                        EnableDropDown="true"
@@ -44,7 +44,7 @@
                 </div>
 
                 <!-- Customer -->
-                <div class="col-md-2">
+                <div class="col-md-3">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Customer</label>
                     <BlazoredTypeahead SearchMethod="SearchCustomers"
                                        EnableDropDown="true"
@@ -66,7 +66,7 @@
                 </div>
 
                 <!-- Country -->
-                <div class="col-md-1">
+                <div class="col-md-2">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Country</label>
                     <select class="form-select form-select-sm" value="@selectedCountryFilter" @onchange="OnCountryChanged">
                         <option value="<All Countries>">&lt;All Countries&gt;</option>
@@ -78,7 +78,7 @@
                 </div>
 
                 <!-- Order Type -->
-                <div class="col-md-1">
+                <div class="col-md-2">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Order Type</label>
                     <select class="form-select form-select-sm" value="@selectedOrderType" @onchange="OnOrderTypeChanged">
                         <option value="<All Types>">&lt;All Types&gt;</option>
@@ -90,7 +90,7 @@
                 </div>
 
                 <!-- Status Filter -->
-                <div class="col-md-1">
+                <div class="col-md-2">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Status</label>
                     <select class="form-select form-select-sm" value="@selectedStatusFilter" @onchange="OnStatusFilterChanged">
                         <option value="0">&lt;Unshipped&gt;</option>
@@ -100,21 +100,38 @@
                         <option value="4">&lt;All Orders&gt;</option>
                     </select>
                 </div>
+            </div>
+
+            <!-- "?"? Filter Toolbar Row 2 "?"? -->
+            <div class="row g-2 mb-3 align-items-end">
+                <!-- Date Range Selection -->
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Date Range</label>
+                    <select class="form-select form-select-sm" value="@selectedDateRange" @onchange="OnDateRangeChanged" style="height: 31px;">
+                        <option value="0">Today</option>
+                        <option value="1">Last 15 Days</option>
+                        <option value="2">Last 30 Days</option>
+                        <option value="3">Last 60 Days</option>
+                        <option value="4">Last 90 Days</option>
+                        <option value="5">Last 180 Days</option>
+                        <option value="6">Custom</option>
+                    </select>
+                </div>
 
                 <!-- Date Range picker -->
-                <div class="col-md-2 d-flex gap-1">
+                <div class="col-auto d-flex gap-2">
                     <div>
                         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">From</label>
-                        <input type="date" class="form-control form-control-sm" @bind="dtFrom" />
+                        <input type="date" class="form-control form-control-sm" @bind="dtFrom" disabled="@(!isCustomDateRange)" style="height: 31px;" />
                     </div>
                     <div>
                         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">To</label>
-                        <input type="date" class="form-control form-control-sm" @bind="dtTo" />
+                        <input type="date" class="form-control form-control-sm" @bind="dtTo" disabled="@(!isCustomDateRange)" style="height: 31px;" />
                     </div>
                 </div>
 
                 <!-- Date Filter Switch Check -->
-                <div class="col-auto d-flex align-items-center gap-2 pb-1">
+                <div class="col-auto d-flex align-items-center ms-3 pb-1" style="height: 31px;">
                     <div class="form-check form-switch mb-0">
                         <input class="form-check-input" type="checkbox" role="switch" id="filterByDeliveryDTCheck" checked="@filterByDeliveryDT" @onchange="OnFilterByDeliveryDTChanged">
                         <label class="form-check-label text-dark-emphasis fw-semibold" for="filterByDeliveryDTCheck" style="font-size:0.82rem;">Filter by Delivery Date</label>
@@ -122,12 +139,12 @@
                 </div>
 
                 <!-- Search and Options -->
-                <div class="col-md-2">
+                <div class="col ms-3">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;"><i class="fas fa-search me-1"></i>Search</label>
-                    <input type="text" class="form-control form-control-sm" placeholder="Order No, internal ref, company..." @bind="searchText" @bind:event="oninput" />
+                    <input type="text" class="form-control form-control-sm" placeholder="Order No, internal ref, company..." @bind="searchText" @bind:event="oninput" style="height: 31px;" />
                 </div>
 
-                <div class="col-auto d-flex align-items-end gap-1 pb-1">
+                <div class="col-auto d-flex align-items-end justify-content-end gap-1 pb-1" style="height: 31px;">
                     <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="RefreshList" title="Refresh List">
                         <i class="fas fa-sync-alt"></i>
                     </button>
@@ -433,5 +450,28 @@
         padding: 0.15rem 0.4rem;
         font-size: 0.75rem;
         border-radius: 4px;
+    }
+    /* Fix Blazored Typeahead height to match .form-control-sm */
+    .blazored-typeahead {
+        height: 31px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 29px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important; /* Adjust padding instead of hiding to prevent height pushing */
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    /* Prevent Context Menu from getting cut off by ensuring it mathematically fits the viewport */
+    .win11-context-menu-container, .blazor-context-menu {
+        max-height: 40vh !important;
+        overflow-y: auto !important;
     }
 </style>

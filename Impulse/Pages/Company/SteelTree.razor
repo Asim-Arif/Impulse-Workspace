@@ -1,0 +1,255 @@
+@page "/company/steel-list"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Company
+@using BlazorContextMenu
+
+<PageTitle>Steel List</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+            <!-- Toolbar -->
+            <div class="row g-2 mb-3 align-items-end">
+                <div class="col-auto d-flex align-items-end pb-1">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-layer-group text-primary me-2"></i>
+                        Steel List
+                    </h5>
+                </div>
+                
+                <div class="col-md-4 ms-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;"><i class="fas fa-search me-1"></i>Search</label>
+                    <input type="text" class="form-control form-control-sm" placeholder="Search steel or gages..." @bind="searchText" @bind:event="oninput" />
+                </div>
+
+                <div class="col d-flex align-items-end justify-content-end gap-2 pb-1">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="RefreshTree" title="Refresh List">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ExpandAll">
+                        <i class="fas fa-expand-arrows-alt me-1"></i> Expand All
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CollapseAll">
+                        <i class="fas fa-compress-arrows-alt me-1"></i> Collapse All
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm ms-2" @onclick="PrintReport" title="Print Report">
+                        <i class="fas fa-print me-1"></i> Print
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm ms-2" @onclick="AddNewSteelType">
+                        <i class="fas fa-plus me-1"></i> Add Steel Type
+                    </button>
+                </div>
+            </div>
+
+            <!-- Main Workspace (Custom TreeView) -->
+            @if (isLoading)
+            {
+                <div class="d-flex align-items-center justify-content-center py-5">
+                    <div class="spinner-border text-primary me-2" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <span class="text-secondary fw-semibold">Loading data...</span>
+                </div>
+            }
+            else
+            {
+                <div class="card border border-light-subtle rounded-3 overflow-auto shadow-xs" style="max-height: 65vh; background: #fff;">
+                    <ul class="tree-list p-3 mb-0">
+                        @foreach (var steel in FilteredTreeData)
+                        {
+                            <li class="tree-node">
+                                <div class="node-content d-flex align-items-center" @oncontextmenu="(e) => ShowSteelMenu(e, steel)" @oncontextmenu:preventDefault="true">
+                                    <span class="toggle-icon me-2" @onclick="() => ToggleSteel(steel)">
+                                        <i class="fas @(steel.IsExpanded ? "fa-chevron-down" : "fa-chevron-right") text-muted" style="font-size: 0.8rem; width: 14px;"></i>
+                                    </span>
+                                    <i class="fas fa-layer-group text-primary me-2"></i>
+                                    <span class="fw-bold text-dark">@steel.SteelType</span>
+                                    @if (!string.IsNullOrEmpty(steel.Description))
+                                    {
+                                        <span class="text-muted ms-2" style="font-size: 0.85rem;">(@steel.Description)</span>
+                                    }
+                                </div>
+                                
+                                @if (steel.IsExpanded)
+                                {
+                                    <ul class="tree-list child-list">
+                                        @foreach (var gage in steel.Gages)
+                                        {
+                                            <li class="tree-node">
+                                                <div class="node-content d-flex align-items-center" @oncontextmenu="(e) => ShowGageMenu(e, gage)" @oncontextmenu:preventDefault="true">
+                                                    <span class="toggle-icon me-2" style="width: 14px;"></span>
+                                                    <i class="fas fa-ruler-horizontal text-secondary me-2"></i>
+                                                    <span class="fw-semibold text-secondary">@gage.Gage @gage.GageUnit</span>
+                                                </div>
+                                            </li>
+                                        }
+                                        @if (!steel.Gages.Any())
+                                        {
+                                            <li class="tree-node text-muted" style="font-style: italic; font-size: 0.85rem; padding-left: 2rem;">No gages defined.</li>
+                                        }
+                                    </ul>
+                                }
+                            </li>
+                        }
+                        @if (!FilteredTreeData.Any())
+                        {
+                            <li class="text-muted text-center py-3">No data available matching your search.</li>
+                        }
+                    </ul>
+                </div>
+            }
+            
+            <div class="mt-4 pt-3 border-top d-flex justify-content-end">
+                <button type="button" class="btn btn-secondary px-4 rounded-pill shadow-sm" @onclick="NavigateToDashboard">
+                    <i class="fas fa-times me-2"></i> Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Dynamic Modal for Add/Edit Steel Type -->
+@if (showSteelModal && currentSteelModal != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-light border-bottom-0 py-3" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <h6 class="modal-title fw-bold text-dark">
+                        <i class="fas @(isEditing ? "fa-edit" : "fa-plus-circle") text-primary me-2"></i>
+                        @modalTitle
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="CloseModals"></button>
+                </div>
+                <div class="modal-body py-3 bg-white" style="max-height: 60vh; overflow-y: auto;">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary" style="font-size:0.85rem;">Steel Type Name</label>
+                            <input type="text" class="form-control form-control-sm" @bind="currentSteelModal.SteelType" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary" style="font-size:0.85rem;">Description</label>
+                            <input type="text" class="form-control form-control-sm" @bind="currentSteelModal.Description" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary" style="font-size:0.85rem;">Stripe Min Width</label>
+                            <input type="number" class="form-control form-control-sm" @bind="currentSteelModal.StripeMinW" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary" style="font-size:0.85rem;">Stripe Max Width</label>
+                            <input type="number" class="form-control form-control-sm" @bind="currentSteelModal.StripeMaxW" />
+                        </div>
+                    </div>
+                    
+                    <h6 class="fw-bold text-dark-emphasis mt-4 mb-2"><i class="fas fa-flask me-2 text-info"></i>Chemical Compositions</h6>
+                    <div class="table-responsive border rounded">
+                        <table class="table table-sm table-hover mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="font-size:0.85rem; width:150px;">Symbol</th>
+                                    <th style="font-size:0.85rem;">Name</th>
+                                    <th style="font-size:0.85rem; width:120px;">Min Val (LVal)</th>
+                                    <th style="font-size:0.85rem; width:120px;">Max Val (UVal)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach(var comp in currentSteelModal.Compositions)
+                                {
+                                    <tr>
+                                        <td class="fw-bold text-secondary">@comp.Symbol</td>
+                                        <td class="text-muted">@comp.Name</td>
+                                        <td>
+                                            <input type="number" step="any" class="form-control form-control-sm" @bind="comp.MinValue" placeholder="Min" />
+                                        </td>
+                                        <td>
+                                            <input type="number" step="any" class="form-control form-control-sm" @bind="comp.MaxValue" placeholder="Max" />
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0 pb-3 bg-white">
+                    <button type="button" class="btn btn-secondary btn-sm rounded-pill px-4" @onclick="CloseModals">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm rounded-pill px-4" @onclick="SaveSteelTypeRecord">
+                        <i class="fas fa-save me-1"></i> Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Dynamic Modal for Add/Edit Gage -->
+@if (showGageModal && currentGageModal != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-light border-bottom-0 py-3" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <h6 class="modal-title fw-bold text-dark">
+                        <i class="fas @(isEditing ? "fa-edit" : "fa-plus-circle") text-primary me-2"></i>
+                        @modalTitle
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="CloseModals"></button>
+                </div>
+                <div class="modal-body py-4 bg-white">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-secondary" style="font-size:0.85rem;">Gage Value</label>
+                        <input type="text" class="form-control" @bind="currentGageModal.Gage" placeholder="e.g. 5, 1/4, 2.5" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-secondary" style="font-size:0.85rem;">Unit</label>
+                        <select class="form-select" @bind="currentGageModal.GageUnit">
+                            <option value="">-- Select Unit --</option>
+                            @foreach(var u in availableUnits)
+                            {
+                                <option value="@u">@u</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0 pb-3 bg-white">
+                    <button type="button" class="btn btn-secondary btn-sm rounded-pill px-4" @onclick="CloseModals">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm rounded-pill px-4" @onclick="SaveGageRecord">
+                        <i class="fas fa-save me-1"></i> Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Context Menus -->
+<ContextMenu Id="steelContextMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <Item class="win11-menu-item" OnClick="@(() => AddNewGage((SteelTypeNodeModel)context.Data))">
+        <i class="fas fa-plus fa-fw win11-icon text-success"></i> Add New Gage
+    </Item>
+    <div class="win11-divider"></div>
+    <Item class="win11-menu-item" OnClick="@(() => EditSteelType((SteelTypeNodeModel)context.Data))">
+        <i class="fas fa-edit fa-fw win11-icon text-primary"></i> Edit Steel Type
+    </Item>
+    <Item class="win11-menu-item" OnClick="@(() => ConfirmDeleteSteelType((SteelTypeNodeModel)context.Data))">
+        <i class="fas fa-trash fa-fw win11-icon text-danger"></i> Delete Steel Type
+    </Item>
+</ContextMenu>
+
+<ContextMenu Id="gageContextMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <Item class="win11-menu-item" OnClick="@(() => EditGage((SteelGageNodeModel)context.Data))">
+        <i class="fas fa-edit fa-fw win11-icon text-primary"></i> Edit Gage
+    </Item>
+    <div class="win11-divider"></div>
+    <Item class="win11-menu-item" OnClick="@(() => ConfirmDeleteGage((SteelGageNodeModel)context.Data))">
+        <i class="fas fa-trash fa-fw win11-icon text-danger"></i> Delete Gage
+    </Item>
+</ContextMenu>
+
+<style>
+    .tree-list { list-style-type: none; padding-left: 0; }
+    .child-list { padding-left: 1.5rem; border-left: 1px dashed #dee2e6; margin-left: 0.5rem; margin-top: 0.25rem; }
+    .tree-node { margin-bottom: 0.25rem; }
+    .node-content { padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; transition: background-color 0.15s ease-in-out; }
+    .node-content:hover { background-color: rgba(13, 110, 253, 0.05); }
+    .toggle-icon { cursor: pointer; display: inline-block; text-align: center; }
+</style>

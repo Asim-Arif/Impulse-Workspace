@@ -1,0 +1,114 @@
+@page "/company/currency-exchange-rates"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Company
+
+<PageTitle>Exchange Rates</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+            <!-- Toolbar -->
+            <div class="row g-2 mb-3 align-items-end">
+                <div class="col-auto d-flex align-items-end pb-1">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-money-bill-wave text-success me-2"></i>
+                        Exchange Rates
+                    </h5>
+                </div>
+                
+                <div class="col-md-3 ms-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Date</label>
+                    <input type="date" class="form-control form-control-sm" @bind="SelectedDate" @bind:after="LoadDataAsync" />
+                </div>
+
+                <div class="col d-flex align-items-end justify-content-end gap-2 pb-1">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="RefreshData" title="Refresh">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Data Grid -->
+            @if (isLoading)
+            {
+                <div class="d-flex align-items-center justify-content-center py-5">
+                    <div class="spinner-border text-primary me-2" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <span class="text-secondary fw-semibold">Loading rates...</span>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive rounded shadow-sm border border-light-subtle">
+                    <table class="table table-hover table-bordered mb-0 align-middle bg-white">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-center" style="width: 80px; color: #495057;">S #</th>
+                                <th style="color: #495057;">Currency</th>
+                                <th class="text-end" style="width: 200px; color: #495057;">Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (ratesData != null && ratesData.Any())
+                            {
+                                int index = 1;
+                                foreach (var item in ratesData)
+                                {
+                                    <tr>
+                                        <td class="text-center text-muted fw-semibold">@index</td>
+                                        <td class="fw-bold text-dark">
+                                            <i class="fas fa-coins text-warning me-2"></i> @item.Currency
+                                        </td>
+                                        <td class="text-end" style="cursor: pointer;" @onclick="() => StartEdit(item)">
+                                            @if (item.IsEditing)
+                                            {
+                                                <div class="input-group input-group-sm">
+                                                    <input type="number" 
+                                                           step="0.01"
+                                                           class="form-control text-end" 
+                                                           @bind="item.EditRate" 
+                                                           @bind:event="oninput"
+                                                           @onkeydown="@(e => HandleKeyDown(e, item))"
+                                                           @onblur="() => SaveRateAsync(item)"
+                                                           autofocus />
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge @(item.EntryID == 0 ? "bg-warning text-dark" : "bg-success") rounded-pill px-3 py-2 fs-6">
+                                                    @item.ExchRate.ToString("N4")
+                                                </span>
+                                            }
+                                        </td>
+                                    </tr>
+                                    index++;
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted py-4">
+                                        No active currencies found.
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="mt-2 text-muted" style="font-size: 0.8rem;">
+                    <i class="fas fa-info-circle me-1"></i> Click on any rate to edit it. Press Enter or click away to save. 
+                    <span class="badge bg-warning text-dark ms-2">Yellow</span> = Default Rate, 
+                    <span class="badge bg-success ms-1">Green</span> = Saved for selected date.
+                </div>
+            }
+            
+            <div class="mt-4 pt-3 border-top d-flex justify-content-end">
+                <button type="button" class="btn btn-secondary px-4 rounded-pill shadow-sm" @onclick="NavigateToDashboard">
+                    <i class="fas fa-times me-2"></i> Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

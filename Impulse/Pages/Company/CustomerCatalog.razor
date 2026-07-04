@@ -1,0 +1,746 @@
+@page "/company/customer-catalog"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Company
+@using DataAccessLibrary.Models.ViewModels.Export
+@using Blazored.Typeahead
+@using BlazorContextMenu
+@using Microsoft.AspNetCore.Components.Forms
+
+<PageTitle>Customer Catalog</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <!-- ── Title Header ── -->
+            <div class="row g-2 mb-3 align-items-end border-bottom pb-2">
+                <div class="col-auto d-flex align-items-end pb-1">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-address-book text-primary me-2"></i>
+                        Customer Catalog
+                    </h5>
+                </div>
+            </div>
+
+            @if (isLoading)
+            {
+                <div class="d-flex align-items-center justify-content-center py-5">
+                    <div class="spinner-border text-primary me-2" role="status"><span class="visually-hidden">Loading...</span></div>
+                    <span class="text-secondary fw-semibold">Loading setups...</span>
+                </div>
+            }
+            else
+            {
+                <!-- ── Filters Toolbar ── -->
+                <div class="row g-2 mb-3 align-items-end bg-light p-3 rounded-3 border">
+                    <!-- Customer -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Customer <span class="text-danger">*</span></label>
+                        <BlazoredTypeahead SearchMethod="SearchCustomers"
+                                           EnableDropDown="true"
+                                           Data="customers"
+                                           TValue="CustomerLookupModel"
+                                           TItem="CustomerLookupModel"
+                                           Value="selectedCustomer"
+                                           ValueChanged="OnCustomerSelected"
+                                           ValueExpression="@(() => selectedCustomer)"
+                                           Placeholder="Select Customer"
+                                           MaximumSuggestions="500">
+                            <SelectedTemplate Context="c">@c?.Name (@c?.CustCode)</SelectedTemplate>
+                            <ResultTemplate Context="c">@c.Name <small class="text-secondary">(@c.CustCode)</small></ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+
+                    <!-- Country -->
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Country</label>
+                        <BlazoredTypeahead SearchMethod="SearchCountries"
+                                           EnableDropDown="true"
+                                           Data="countries"
+                                           TValue="string"
+                                           TItem="string"
+                                           Value="selectedCountry"
+                                           ValueChanged="OnCountrySelected"
+                                           ValueExpression="@(() => selectedCountry)"
+                                           Placeholder="Select Country"
+                                           Disabled="@(selectedCustomer == null || !countries.Any())"
+                                           MaximumSuggestions="200">
+                            <SelectedTemplate Context="c">@c</SelectedTemplate>
+                            <ResultTemplate Context="c">@c</ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+
+                    <!-- Item Group -->
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Item Group</label>
+                        <BlazoredTypeahead SearchMethod="SearchItemGroups"
+                                           EnableDropDown="true"
+                                           Data="itemGroups"
+                                           TValue="ItemGroupLookupModel"
+                                           TItem="ItemGroupLookupModel"
+                                           Value="selectedItemGroup"
+                                           ValueChanged="OnItemGroupSelected"
+                                           ValueExpression="@(() => selectedItemGroup)"
+                                           Placeholder="All Groups"
+                                           Disabled="@(string.IsNullOrEmpty(selectedCountry))"
+                                           MaximumSuggestions="500">
+                            <SelectedTemplate Context="g">@g?.Description</SelectedTemplate>
+                            <ResultTemplate Context="g">@g.Description</ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+
+                    <!-- Catalog Item Quick Search -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;"><i class="fas fa-magnifying-glass me-1"></i>Jump to Item</label>
+                        <BlazoredTypeahead SearchMethod="SearchCatalogItems"
+                                           EnableDropDown="true"
+                                           Data="catalogItems"
+                                           TValue="CustomerCatalogItemViewModel"
+                                           TItem="CustomerCatalogItemViewModel"
+                                           Value="selectedCatalogItem"
+                                           ValueChanged="OnItemSearchSelected"
+                                           ValueExpression="@(() => selectedCatalogItem)"
+                                           Placeholder="Search by Code/Name..."
+                                           Disabled="@(catalogItems.Count == 0)"
+                                           MaximumSuggestions="500">
+                            <SelectedTemplate Context="i">@i?.ItemID</SelectedTemplate>
+                            <ResultTemplate Context="i"><strong>@i.ItemID</strong> <small class="text-secondary">@i.Description</small></ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+
+                    <!-- Max Discount -->
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Max Discount</label>
+                        <input type="text" class="form-control form-control-sm text-center fw-bold text-primary" style="background:#f0f2f5;" value="@(maxDiscount.ToString("N2") + "%")" readonly />
+                    </div>
+                </div>
+
+                <!-- ── Action Toolbar ── -->
+                <div class="row g-2 mb-3 align-items-end justify-content-between">
+                    <!-- Assign Controls -->
+                    <div class="col-md-7 d-flex align-items-end gap-2 flex-wrap">
+                        <div style="flex-grow:1; max-width:320px;">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Assign New Item</label>
+                            <BlazoredTypeahead SearchMethod="SearchUnassignedItems"
+                                               EnableDropDown="true"
+                                               Data="unassignedItems"
+                                               TValue="ItemLookupModel"
+                                               TItem="ItemLookupModel"
+                                               Value="selectedUnassignedItem"
+                                               ValueChanged="(ItemLookupModel val) => selectedUnassignedItem = val"
+                                               ValueExpression="@(() => selectedUnassignedItem)"
+                                               Placeholder="Select Item to Assign"
+                                               Disabled="@(selectedCustomer == null || string.IsNullOrEmpty(selectedCountry))"
+                                               MaximumSuggestions="1000">
+                                <SelectedTemplate Context="i">@i?.ItemID</SelectedTemplate>
+                                <ResultTemplate Context="i">@i.ItemName</ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+                        <button type="button" class="btn btn-outline-primary btn-sm mb-1" @onclick="AssignSelectedItem" disabled="@(selectedUnassignedItem == null)">
+                            <i class="fas fa-plus me-1"></i>Assign
+                        </button>
+                        <button type="button" class="btn btn-outline-success btn-sm mb-1" @onclick="AssignAllItems" disabled="@(selectedCustomer == null || string.IsNullOrEmpty(selectedCountry))">
+                            <i class="fas fa-check-double me-1"></i>Assign All
+                        </button>
+                        <button type="button" class="btn btn-outline-danger btn-sm mb-1" @onclick="UnassignAllItems" disabled="@(selectedCustomer == null || string.IsNullOrEmpty(selectedCountry))">
+                            <i class="fas fa-trash-can me-1"></i>UnAssign All
+                        </button>
+                    </div>
+
+                    <!-- Toggles & Refresh -->
+                    <div class="col-auto d-flex align-items-center gap-3 pb-1">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" role="switch" id="chkShowTop" checked="@showTopQuality" @onchange="OnShowTopQualityChanged" disabled="@(string.IsNullOrEmpty(selectedCountry))" />
+                            <label class="form-check-label fw-bold text-dark-emphasis" for="chkShowTop" style="font-size:0.85rem;">Top Quality Prices</label>
+                        </div>
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" role="switch" id="chkShowPicture" checked="@showPicture" @onchange="OnShowPictureChanged" disabled="@(string.IsNullOrEmpty(selectedCountry))" />
+                            <label class="form-check-label fw-bold text-dark-emphasis" for="chkShowPicture" style="font-size:0.85rem;">Show Picture</label>
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="RefreshGrid" disabled="@(string.IsNullOrEmpty(selectedCountry))" title="Refresh">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Text filter -->
+                <div class="row g-2 mb-3">
+                    <div class="col-md-4">
+                        <input type="text" class="form-control form-control-sm" placeholder="Filter list by code, name, OCR..." @bind="searchText" @bind:event="oninput" disabled="@(catalogItems.Count == 0)" />
+                    </div>
+                </div>
+
+                <!-- ── Grid + Picture Panel ── -->
+                <div class="row g-3">
+                    <div class="@(showPicture && !string.IsNullOrEmpty(selectedItemPicBase64) ? "col-lg-9" : "col-12")">
+                        @if (isGridLoading)
+                        {
+                            <div class="d-flex align-items-center justify-content-center py-5 border rounded bg-white">
+                                <div class="spinner-border text-primary me-2" role="status"><span class="visually-hidden">Loading...</span></div>
+                                <span class="text-secondary fw-semibold">Loading catalog...</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="card border border-light-subtle rounded-3 overflow-hidden shadow-xs">
+                                <div class="table-responsive" style="max-height:520px; overflow-y:auto;">
+                                    <table class="table table-hover table-sm align-middle mb-0" style="font-size:0.85rem;">
+                                        <thead class="table-light text-secondary sticky-top" style="font-size:0.75rem; text-transform:uppercase; z-index:2; box-shadow:0 1px 0 #dee2e6;">
+                                            <tr>
+                                                <th class="ps-2">Cust. Item Code</th>
+                                                <th>Comp. Item Code</th>
+                                                <th>Description</th>
+                                                <th>Unit</th>
+                                                <th class="text-end">FOB</th>
+                                                <th class="text-end">ExWorks</th>
+                                                <th class="text-end">CnI Sea</th>
+                                                <th class="text-end">CnI Air</th>
+                                                <th class="text-end">CIF Sea</th>
+                                                <th class="text-end">CIF Air</th>
+                                                <th class="text-end">CnF Sea</th>
+                                                <th class="text-end">CnF Air</th>
+                                                <th class="text-center">Packing</th>
+                                                <th class="text-center">Lots</th>
+                                                <th class="text-center">Lots Qty</th>
+                                                <th>Item Group</th>
+                                                <th class="text-center" style="width:70px;">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @if (!GetFilteredItems().Any())
+                                            {
+                                                <tr><td colspan="17" class="text-center text-muted py-4">No catalog items for these selections.</td></tr>
+                                            }
+                                            else
+                                            {
+                                                int counter = 1;
+                                                @foreach (var item in GetFilteredItems())
+                                                {
+                                                    var currentItem = item;
+                                                    bool isSelected = selectedCatalogItem?.EntryID == item.EntryID;
+                                                    string rowColor = counter % 2 == 1 ? "text-primary" : "text-dark";
+                                                    counter++;
+                                                    <tr @onclick="() => HighlightItem(currentItem)"
+                                                        @oncontextmenu="(e) => OpenRowMenu(e, currentItem)"
+                                                        @oncontextmenu:preventDefault="true"
+                                                        class="clickable-row @(isSelected ? "table-primary" : "")"
+                                                        style="cursor:pointer; transition:background 0.15s ease;">
+                                                        <td class="ps-2 fw-semibold @rowColor">@item.ItemID</td>
+                                                        <td class="fw-semibold text-secondary">@item.CompItemID</td>
+                                                        <td class="@rowColor">
+                                                            @item.Description
+                                                            @if (!string.IsNullOrEmpty(item.TipSize)) { <span> - @item.TipSize</span> }
+                                                            @if (!string.IsNullOrEmpty(item.ItemSize)) { <span> @item.ItemSize @item.SizeUnit</span> }
+                                                        </td>
+                                                        <td class="@rowColor">@item.Unit</td>
+                                                        <td class="text-end @rowColor font-monospace">@((showTopQuality ? item.FOBTop : item.FOB).ToString("N4"))</td>
+                                                        <td class="text-end @rowColor font-monospace">@((showTopQuality ? item.ExWorksTop : item.ExWorks).ToString("N4"))</td>
+                                                        <td class="text-end @rowColor font-monospace">@((showTopQuality ? item.CnISeaTop : item.CnISea).ToString("N4"))</td>
+                                                        <td class="text-end @rowColor font-monospace">@((showTopQuality ? item.CnIAirTop : item.CnIAir).ToString("N4"))</td>
+                                                        <td class="text-end @rowColor font-monospace">@((showTopQuality ? item.CIFSeaTop : item.CIFSea).ToString("N4"))</td>
+                                                        <td class="text-end @rowColor font-monospace">@((showTopQuality ? item.CIFAirTop : item.CIFAir).ToString("N4"))</td>
+                                                        <td class="text-end @rowColor font-monospace">@((showTopQuality ? item.CnFSeaTop : item.CnFSea).ToString("N4"))</td>
+                                                        <td class="text-end @rowColor font-monospace">@((showTopQuality ? item.CnFAirTop : item.CnFAir).ToString("N4"))</td>
+                                                        <td class="text-center @rowColor">@item.PackingMode</td>
+                                                        <td class="text-center @rowColor">@item.Running_Lots_No</td>
+                                                        <td class="text-center @rowColor font-monospace">@item.Running_Lots_Qty.ToString("N0")</td>
+                                                        <td class="@rowColor">@item.ItemGroup</td>
+                                                        <td class="text-center" @onclick:stopPropagation="true">
+                                                            <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2" style="font-size:0.72rem;" @onclick="(e) => OpenRowMenu(e, currentItem)">Manage</button>
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    @if (showPicture && !string.IsNullOrEmpty(selectedItemPicBase64))
+                    {
+                        <div class="col-lg-3">
+                            <div class="card border rounded-3 shadow-xs bg-white text-center p-3">
+                                <div class="fw-bold text-secondary mb-2" style="font-size:0.82rem; border-bottom:1px solid #eee; padding-bottom:4px;">
+                                    Product Preview: @selectedCatalogItem?.CompItemID
+                                </div>
+                                <div class="d-flex align-items-center justify-content-center border rounded bg-light" style="height:250px; overflow:hidden;">
+                                    <img src="data:image/jpeg;base64,@selectedItemPicBase64" alt="Product Image" style="max-width:100%; max-height:100%; object-fit:contain;" />
+                                </div>
+                                <div class="mt-2 text-muted fw-semibold" style="font-size:0.75rem;">@selectedCatalogItem?.Description</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <!-- ── Print Buttons ── -->
+                <div class="row align-items-center justify-content-between border-top pt-3 mt-4">
+                    <div class="col-md-9 d-flex flex-wrap align-items-center gap-2">
+                        <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" @onclick="() => PrintPriceList(false)" disabled="@(selectedCustomer == null)">
+                            <i class="fas fa-print me-1"></i>Print Price List
+                        </button>
+                        <button type="button" class="btn btn-outline-success btn-sm rounded-pill" @onclick="() => PrintPriceList(true)" disabled="@(selectedCustomer == null)">
+                            <i class="fas fa-crown me-1 text-warning"></i>Price List (Top)
+                        </button>
+                        <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" @onclick="() => PrintCatalog(false)" disabled="@(selectedCustomer == null)">
+                            <i class="fas fa-book me-1"></i>Print Catalog
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill" @onclick="() => PrintCatalog(true)" disabled="@(selectedCustomer == null)">
+                            <i class="fas fa-file-invoice me-1"></i>Catalog Details
+                        </button>
+                        <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" @onclick="() => PrintStockList(false)" disabled="@(selectedCustomer == null)">
+                            <i class="fas fa-warehouse me-1"></i>Cust. Stock List
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill" @onclick="() => PrintStockList(true)" disabled="@(selectedCustomer == null)">
+                            <i class="fas fa-cubes me-1"></i>Combined Stock List
+                        </button>
+                    </div>
+                    <div class="col-md-3 d-flex justify-content-end">
+                        <button type="button" class="btn btn-secondary btn-sm rounded-pill px-4" @onclick="ClosePage">Close</button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     RATE ADJUSTMENT MODAL
+════════════════════════════════════════════════════════════════ -->
+@if (showRateAdjustmentModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,0.45); backdrop-filter:blur(4px); z-index:1050;">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg" style="border-radius:12px;">
+                <div class="modal-header @(rateAdjustmentIsIncrease ? "bg-success" : "bg-danger") text-white border-0 py-2" style="border-radius:12px 12px 0 0;">
+                    <h6 class="modal-title fw-bold">
+                        <i class="fas fa-percentage me-2"></i>@(rateAdjustmentIsIncrease ? "Increase Rates" : "Decrease Rates")
+                    </h6>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showRateAdjustmentModal = false"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <p class="text-muted mb-2" style="font-size:0.8rem;">
+                        This applies to <strong>all countries</strong> under customer <strong>@selectedCustomer?.Name</strong>.
+                    </p>
+                    <div class="input-group input-group-sm">
+                        <input type="number" step="0.01" class="form-control text-center fw-bold" @bind="rateAdjustmentPercentage" placeholder="0.00" />
+                        <span class="input-group-text">%</span>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => showRateAdjustmentModal = false">Cancel</button>
+                    <button type="button" class="btn @(rateAdjustmentIsIncrease ? "btn-success" : "btn-danger") btn-sm" @onclick="SaveRateAdjustment">Apply</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════
+     EDIT ITEM MODAL — DMR (Device Master Record) — 3 Tabs
+════════════════════════════════════════════════════════════════ -->
+@if (showEditModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,0.45); backdrop-filter:blur(4px); z-index:1040; overflow-y:auto;">
+        <div class="modal-dialog modal-dialog-centered" style="max-width:1000px; margin:1rem auto;">
+            <div class="modal-content border-0 shadow-lg" style="border-radius:12px;">
+
+                <!-- Modal Header -->
+                <div class="modal-header bg-primary text-white border-0 py-2" style="border-radius:12px 12px 0 0;">
+                    <div>
+                        <h6 class="modal-title fw-bold mb-0"><i class="fas fa-file-medical me-2"></i>DMR — Device Master Record</h6>
+                        <small style="opacity:0.85; font-size:0.76rem;">
+                            Customer: <strong>@editingItem.CustCode</strong> &nbsp;|&nbsp; Country: <strong>@editingItem.Country</strong> &nbsp;|&nbsp; Item: <strong>@editingItem.CompItemID</strong>
+                        </small>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showEditModal = false"></button>
+                </div>
+
+                <!-- Tab Navigation -->
+                <div class="border-bottom px-3 pt-2 bg-white" style="border-radius:0;">
+                    <ul class="nav nav-tabs border-0" style="gap:4px;">
+                        <li class="nav-item">
+                            <button class="nav-link fw-semibold @(activeEditTab == 0 ? "active" : "")" style="font-size:0.83rem; border-radius:6px 6px 0 0;" @onclick="() => activeEditTab = 0">
+                                <i class="fas fa-microchip me-1"></i>Device Info.
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link fw-semibold @(activeEditTab == 1 ? "active" : "")" style="font-size:0.83rem; border-radius:6px 6px 0 0;" @onclick="() => activeEditTab = 1">
+                                <i class="fas fa-circle-info me-1"></i>Other Info.
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link fw-semibold @(activeEditTab == 2 ? "active" : "")" style="font-size:0.83rem; border-radius:6px 6px 0 0;" @onclick="() => activeEditTab = 2">
+                                <i class="fas fa-barcode me-1"></i>Barcode
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="modal-body py-3 px-4" style="font-size:0.83rem;">
+
+                    <!-- ════════ TAB 1: DEVICE INFO ════════ -->
+                    @if (activeEditTab == 0)
+                    {
+                        <!-- Row 1: Item codes + Unit + Barcode# -->
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-2">
+                                <label class="form-label text-secondary mb-0">Company Code</label>
+                                <input type="text" class="form-control form-control-sm" value="@editingItem.CompItemID" readonly style="background:#f0f2f5;" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-secondary mb-0">Customer Ref. Code</label>
+                                <input type="text" class="form-control form-control-sm" @bind="editingItem.ItemID" />
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-secondary mb-0">Unit</label>
+                                <BlazoredTypeahead SearchMethod="SearchUnits"
+                                                   EnableDropDown="true"
+                                                   Data="units"
+                                                   TValue="string"
+                                                   TItem="string"
+                                                   Value="editingItem.Unit"
+                                                   ValueChanged="(string v) => editingItem.Unit = v"
+                                                   ValueExpression="@(() => editingItem.Unit)"
+                                                   Placeholder="Select Unit"
+                                                   MaximumSuggestions="200">
+                                    <SelectedTemplate Context="u">@u</SelectedTemplate>
+                                    <ResultTemplate Context="u">@u</ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-secondary mb-0">Barcode #</label>
+                                <input type="text" class="form-control form-control-sm" @bind="editingItem.BarcodeNo" />
+                            </div>
+                        </div>
+
+                        <!-- Row 2: Description (full width) -->
+                        <div class="row g-2 mb-3">
+                            <div class="col-12">
+                                <label class="form-label text-secondary mb-0">Device Description (Customer)</label>
+                                <input type="text" class="form-control form-control-sm" @bind="editingItem.Description" disabled="@isShowingHistoricPrices" />
+                            </div>
+                        </div>
+
+                        <!-- Row 3: Packing Mode + Color -->
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-2">
+                                <label class="form-label text-secondary mb-0">Packing Mode</label>
+                                <input type="number" class="form-control form-control-sm text-center" @bind="editingItem.PackingMode" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-secondary mb-0">Color</label>
+                                <input type="text" class="form-control form-control-sm" @bind="editingItem.ItemColor" />
+                            </div>
+                        </div>
+
+                        <!-- Row 4: ILO + OCR 1 + OCR 2 -->
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-3">
+                                <label class="form-label text-secondary mb-0">Import License # (ILO)</label>
+                                <input type="text" class="form-control form-control-sm" @bind="editingItem.ILO" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-secondary mb-0">OCR 1</label>
+                                <input type="text" class="form-control form-control-sm" @bind="editingItem.OCR" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-secondary mb-0">OCR 2</label>
+                                <input type="text" class="form-control form-control-sm" @bind="editingItem.OCR2" />
+                            </div>
+                        </div>
+
+                        <!-- Pricing Frames + Revisions -->
+                        <div class="row g-3">
+                            <!-- Pricing Column -->
+                            <div class="col-md-8">
+                                <!-- Regular Prices Frame -->
+                                <fieldset class="border rounded p-2 mb-2">
+                                    <legend class="fw-bold text-primary" style="font-size:0.78rem; float:none; width:auto; padding:0 6px;">Regular :</legend>
+                                    <div class="row g-1">
+                                        @{
+                                            void PriceCol(string label, double val, System.Linq.Expressions.Expression<Func<double>> expr)
+                                            {
+                                                <div class="col-3">
+                                                    <label class="mb-0 text-secondary" style="font-size:0.71rem;">@label</label>
+                                                    <input type="number" step="0.0001" class="form-control form-control-sm text-end font-monospace" @bind="@val" disabled="@isShowingHistoricPrices" style="font-size:0.8rem;" />
+                                                </div>;
+                                            }
+                                        }
+                                        <div class="col-3">
+                                            <label class="mb-0 text-secondary" style="font-size:0.71rem;">FOB Karachi</label>
+                                            <input type="number" step="0.0001" class="form-control form-control-sm text-end font-monospace" @bind="editingItem.FOB" disabled="@isShowingHistoricPrices" style="font-size:0.8rem;" />
+                                        </div>
+                                        <div class="col-3">
+                                            <label class="mb-0 text-secondary" style="font-size:0.71rem;">FOB Sialkot</label>
+                                            <input type="number" step="0.0001" class="form-control form-control-sm text-end font-monospace" @bind="editingItem.ExWorks" disabled="@isShowingHistoricPrices" style="font-size:0.8rem;" />
+                                        </div>
+                                        <div class="col-3">
+                                            <label class="mb-0 text-secondary" style="font-size:0.71rem;">C &amp; I (Sea)</label>
+                                            <input type="number" step="0.0001" class="form-control form-control-sm text-end font-monospace" @bind="editingItem.CnISea" disabled="@isShowingHistoricPrices" style="font-size:0.8rem;" />
+                                        </div>
+                                        <div class="col-3">
+                                            <label class="mb-0 text-secondary" style="font-size:0.71rem;">C &amp; I (Air)</label>
+                                            <input type="number" step="0.0001" class="form-control form-control-sm text-end font-monospace" @bind="editingItem.CnIAir" disabled="@isShowingHistoricPrices" style="font-size:0.8rem;" />
+                                        </div>
+                                        <div class="col-3">
+                                            <label class="mb-0 text-secondary" style="font-size:0.71rem;">CIF (Sea)</label>
+                                            <input type="number" step="0.0001" class="form-control form-control-sm text-end font-monospace" @bind="editingItem.CIFSea" disabled="@isShowingHistoricPrices" style="font-size:0.8rem;" />
+                                        </div>
+                                        <div class="col-3">
+                                            <label class="mb-0 text-secondary" style="font-size:0.71rem;">CIF (Air)</label>
+                                            <input type="number" step="0.0001" class="form-control form-control-sm text-end font-monospace" @bind="editingItem.CIFAir" disabled="@isShowingHistoricPrices" style="font-size:0.8rem;" />
+                                        </div>
+                                        <div class="col-3">
+                                            <label class="mb-0 text-secondary" style="font-size:0.71rem;">C &amp; F (Sea)</label>
+                                            <input type="number" step="0.0001" class="form-control form-control-sm text-end font-monospace" @bind="editingItem.CnFSea" disabled="@isShowingHistoricPrices" style="font-size:0.8rem;" />
+                                        </div>
+                                        <div class="col-3">
+                                            <label class="mb-0 text-secondary" style="font-size:0.71rem;">C &amp; F (Air)</label>
+                                            <input type="number" step="0.0001" class="form-control form-control-sm text-end font-monospace" @bind="editingItem.CnFAir" disabled="@isShowingHistoricPrices" style="font-size:0.8rem;" />
+                                        </div>
+                                    </div>
+                                </fieldset>
+
+                                <!-- Top Quality Prices Frame -->
+                                <fieldset class="border rounded p-2 mb-2">
+                                    <legend class="fw-bold text-success" style="font-size:0.78rem; float:none; width:auto; padding:0 6px;">Top :</legend>
+                                    <div class="row g-1">
+                                        <div class="col-3">
+                                            <label class="mb-0 text-secondary" style="font-size:0.71rem;">FOB Karachi</label>
+                                            <input type="number" step="0.0001" class="form-control form-control-sm text-end font-monospace" @bind="editingItem.FOBTop" disabled="@isShowingHistoricPrices" style="font-size:0.8rem;" />
+                                        </div>
+                                        <div class="col-3">
+                                            <label class="mb-0 text-secondary" style="font-size:0.71rem;">FOB Sialkot</label>
+                                            <input type="number" step="0.0001" class="form-control form-control-sm text-end font-monospace" @bind="editingItem.ExWorksTop" disabled="@isShowingHistoricPrices" style="font-size:0.8rem;" />
+                                        </div>
+                                        <div class="col-3">
+                                            <label class="mb-0 text-secondary" style="font-size:0.71rem;">C &amp; I (Sea)</label>
+                                            <input type="number" step="0.0001" class="form-control form-control-sm text-end font-monospace" @bind="editingItem.CnISeaTop" disabled="@isShowingHistoricPrices" style="font-size:0.8rem;" />
+                                        </div>
+                                        <div class="col-3">
+                                            <label class="mb-0 text-secondary" style="font-size:0.71rem;">C &amp; I (Air)</label>
+                                            <input type="number" step="0.0001" class="form-control form-control-sm text-end font-monospace" @bind="editingItem.CnIAirTop" disabled="@isShowingHistoricPrices" style="font-size:0.8rem;" />
+                                        </div>
+                                        <div class="col-3">
+                                            <label class="mb-0 text-secondary" style="font-size:0.71rem;">CIF (Sea)</label>
+                                            <input type="number" step="0.0001" class="form-control form-control-sm text-end font-monospace" @bind="editingItem.CIFSeaTop" disabled="@isShowingHistoricPrices" style="font-size:0.8rem;" />
+                                        </div>
+                                        <div class="col-3">
+                                            <label class="mb-0 text-secondary" style="font-size:0.71rem;">CIF (Air)</label>
+                                            <input type="number" step="0.0001" class="form-control form-control-sm text-end font-monospace" @bind="editingItem.CIFAirTop" disabled="@isShowingHistoricPrices" style="font-size:0.8rem;" />
+                                        </div>
+                                        <div class="col-3">
+                                            <label class="mb-0 text-secondary" style="font-size:0.71rem;">C &amp; F (Sea)</label>
+                                            <input type="number" step="0.0001" class="form-control form-control-sm text-end font-monospace" @bind="editingItem.CnFSeaTop" disabled="@isShowingHistoricPrices" style="font-size:0.8rem;" />
+                                        </div>
+                                        <div class="col-3">
+                                            <label class="mb-0 text-secondary" style="font-size:0.71rem;">C &amp; F (Air)</label>
+                                            <input type="number" step="0.0001" class="form-control form-control-sm text-end font-monospace" @bind="editingItem.CnFAirTop" disabled="@isShowingHistoricPrices" style="font-size:0.8rem;" />
+                                        </div>
+                                    </div>
+                                </fieldset>
+
+                                <!-- Temper Rate + First Inspection Rate -->
+                                <div class="row g-2">
+                                    <div class="col-md-3">
+                                        <label class="form-label text-secondary mb-0">Temper Rate</label>
+                                        <input type="number" step="0.01" class="form-control form-control-sm text-end font-monospace" @bind="editingItem.Temper_Rate" />
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label text-secondary mb-0">First Inspection Rate</label>
+                                        <input type="number" step="0.01" class="form-control form-control-sm text-end font-monospace" @bind="editingItem.First_Inspection_Rate" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Revisions Panel -->
+                            <div class="col-md-4">
+                                <fieldset class="border rounded p-2 h-100 d-flex flex-column">
+                                    <legend class="fw-bold text-secondary" style="font-size:0.78rem; float:none; width:auto; padding:0 6px;">Revisions :</legend>
+                                    <div class="overflow-auto flex-grow-1" style="max-height:260px;">
+                                        <div class="list-group list-group-flush" style="font-size:0.75rem;">
+                                            <!-- Current Prices entry (always first, like VB6 lstRev) -->
+                                            <button type="button"
+                                                    class="list-group-item list-group-item-action @(selectedRevision == null ? "active" : "")"
+                                                    style="font-size:0.74rem; padding:4px 8px;"
+                                                    @onclick="() => SelectRevision(null)">
+                                                <em>&lt;Current Prices&gt;</em>
+                                            </button>
+                                            @foreach (var rev in revisions)
+                                            {
+                                                var currentRev = rev;
+                                                bool isRevSelected = selectedRevision?.EntryID == rev.EntryID;
+                                                <button type="button"
+                                                        class="list-group-item list-group-item-action @(isRevSelected ? "active" : "")"
+                                                        style="font-size:0.74rem; padding:4px 8px;"
+                                                        @onclick="() => SelectRevision(currentRev)">
+                                                    (@rev.UserName) @rev.DT.ToString("dd-MMM-yyyy HH:mm")
+                                                </button>
+                                            }
+                                        </div>
+                                    </div>
+                                    @if (isShowingHistoricPrices)
+                                    {
+                                        <div class="mt-2 text-center">
+                                            <span class="badge bg-warning text-dark" style="font-size:0.7rem;"><i class="fas fa-eye me-1"></i>Viewing historic prices (read-only)</span>
+                                        </div>
+                                    }
+                                </fieldset>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- ════════ TAB 2: OTHER INFO ════════ -->
+                    @if (activeEditTab == 1)
+                    {
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-3">
+                                <label class="form-label text-secondary mb-0">Customer Catalog Page #</label>
+                                <input type="text" class="form-control form-control-sm" @bind="editingItem.PageNo" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-secondary mb-0">Finishing</label>
+                                <select class="form-select form-select-sm" @bind="editingItem.FinQuality">
+                                    <option value="">-- Select --</option>
+                                    @foreach (var fq in finQualityList)
+                                    {
+                                        <option value="@fq.Description">@fq.Description</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label text-secondary mb-0 fw-semibold">Special Instructions</label>
+                            <textarea class="form-control form-control-sm" rows="3" @bind="editingItem.SpecialInstructions"></textarea>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label text-secondary mb-0 fw-semibold">Stamp Instructions</label>
+                            <textarea class="form-control form-control-sm" rows="3" @bind="editingItem.StampInstructions"></textarea>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label text-secondary mb-0 fw-semibold">Packing Instructions</label>
+                            <textarea class="form-control form-control-sm" rows="3" @bind="editingItem.PackingInstructions"></textarea>
+                        </div>
+
+                        <div class="row g-2 mt-1">
+                            <div class="col-12">
+                                <label class="form-label text-secondary mb-0">Medical Devices Marketing Authorization (MDMA)</label>
+                                <input type="text" class="form-control form-control-sm" @bind="editingItem.MDMA" />
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label text-secondary mb-0">SFDA Listing Number</label>
+                                <input type="text" class="form-control form-control-sm" @bind="editingItem.SFDA_Listing_No" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-secondary mb-0">Medical Devices Group</label>
+                                @if (mdGroups.Any())
+                                {
+                                    <select class="form-select form-select-sm" @bind="editingItem.MD_Group">
+                                        <option value="">-- Select --</option>
+                                        @foreach (var mg in mdGroups)
+                                        {
+                                            <option value="@mg">@mg</option>
+                                        }
+                                    </select>
+                                }
+                                else
+                                {
+                                    <input type="text" class="form-control form-control-sm" @bind="editingItem.MD_Group" placeholder="Type MD Group..." />
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <!-- ════════ TAB 3: BARCODE ════════ -->
+                    @if (activeEditTab == 2)
+                    {
+                        <!-- Barcode File Path -->
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold text-secondary mb-1" style="font-size:0.85rem;">
+                                <i class="fas fa-barcode me-1"></i>Barcode File Path
+                            </label>
+                            <div class="d-flex gap-2 align-items-center">
+                                <input type="text" class="form-control form-control-sm" value="@barcodeFilePath" readonly placeholder="No file selected" style="background:#f0f2f5;" />
+                                <label class="btn btn-outline-secondary btn-sm mb-0" style="cursor:pointer; white-space:nowrap;">
+                                    <i class="fas fa-folder-open me-1"></i>Browse...
+                                    <InputFile OnChange="OnBarcodeFileSelected" style="display:none;" />
+                                </label>
+                            </div>
+                            <small class="text-muted">Select the barcode file to associate with this item.</small>
+                        </div>
+
+                        <!-- PDF Path to Attach -->
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold text-secondary mb-1" style="font-size:0.85rem;">
+                                <i class="fas fa-file-pdf me-1 text-danger"></i>PDF Path to Attach
+                            </label>
+                            <div class="d-flex gap-2 align-items-center">
+                                <input type="text" class="form-control form-control-sm" value="@artworkPDFFileName" readonly placeholder="No PDF selected" style="background:#f0f2f5;" />
+                                <label class="btn btn-outline-danger btn-sm mb-0" style="cursor:pointer; white-space:nowrap;">
+                                    <i class="fas fa-file-arrow-up me-1"></i>Browse PDF...
+                                    <InputFile OnChange="OnArtworkPDFSelected" accept=".pdf" style="display:none;" />
+                                </label>
+                            </div>
+                            @if (artworkPDFBytes != null && artworkPDFBytes.Length > 0)
+                            {
+                                <div class="mt-1 d-flex align-items-center gap-2">
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="fas fa-check me-1"></i>PDF Ready — @(artworkPDFFileName)</span>
+                                    <button type="button" class="btn btn-link btn-sm text-danger p-0" @onclick="() => { artworkPDFBytes = null; artworkPDFFileName = string.Empty; }">
+                                        <i class="fas fa-times"></i> Clear
+                                    </button>
+                                </div>
+                            }
+                            <small class="text-muted">Select a PDF file to upload and attach to this catalog item's ArtworkPDF field.</small>
+                        </div>
+                    }
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="modal-footer border-0 pt-0 pb-3 bg-light" style="border-radius:0 0 12px 12px;">
+                    <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-4" @onclick="() => showEditModal = false">Cancel</button>
+                    @if (!isShowingHistoricPrices)
+                    {
+                        <button type="button" class="btn btn-primary btn-sm rounded-pill px-4" @onclick="SaveItemEdits">
+                            <i class="fas fa-floppy-disk me-1"></i>Save
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════
+     CONTEXT MENUS
+════════════════════════════════════════════════════════════════ -->
+<ContextMenu Id="catalogRowMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    @if (context.Data is CustomerCatalogItemViewModel row)
+    {
+        <div class="win11-section-header">Item: @row.ItemID</div>
+        <Item class="win11-menu-item" OnClick="@(() => OpenEditModal(row))">
+            <i class="fas fa-edit fa-fw win11-icon text-primary"></i> Edit Details
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => TriggerRateAdjustment(row, true))">
+            <i class="fas fa-arrow-trend-up fa-fw win11-icon text-success"></i> Increase Rates (All Items)
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => TriggerRateAdjustment(row, false))">
+            <i class="fas fa-arrow-trend-down fa-fw win11-icon text-danger"></i> Decrease Rates (All Items)
+        </Item>
+        <div class="win11-divider"></div>
+        <Item class="win11-menu-item" OnClick="@(() => UnassignCatalogItem(row))">
+            <i class="fas fa-trash-alt fa-fw win11-icon text-danger"></i> Remove from Catalog
+        </Item>
+    }
+</ContextMenu>
+
+<style>
+    .win11-section-header { font-size:0.72rem; font-weight:700; text-transform:uppercase; color:#888; padding:4px 12px; }
+    .win11-menu-item { color:#333; padding:6px 12px; font-size:0.82rem; border-radius:4px; display:flex; align-items:center; transition:background-color 0.1s ease; }
+    .win11-menu-item:hover { background-color:#e5e5e5 !important; color:#000 !important; cursor:pointer; }
+    .win11-divider { height:1px; background-color:#e0e0e0; margin:4px 0; }
+    .win11-icon { margin-right:8px; width:16px; text-align:center; }
+</style>

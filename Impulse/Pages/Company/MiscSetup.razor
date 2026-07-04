@@ -1,0 +1,146 @@
+@page "/company/misc-setup/{ConfigKey}"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Company
+@using BlazorContextMenu
+
+<PageTitle>@PageTitle</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+            <!-- Toolbar -->
+            <div class="row g-2 mb-3 align-items-end">
+                <div class="col-auto d-flex align-items-end pb-1">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-list-ul text-primary me-2"></i>
+                        @PageTitle
+                    </h5>
+                </div>
+                
+                <div class="col-md-4 ms-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;"><i class="fas fa-search me-1"></i>Search</label>
+                    <input type="text" class="form-control form-control-sm" placeholder="Search by description..." @bind="searchText" @bind:event="oninput" />
+                </div>
+
+                <div class="col d-flex align-items-end justify-content-end gap-2 pb-1">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="RefreshList" title="Refresh List">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" @onclick="AddNewRecord" disabled="@(!IsValidConfig)">
+                        <i class="fas fa-plus me-1"></i> Add New
+                    </button>
+                </div>
+            </div>
+
+            <!-- Main Workspace (Grid) -->
+            @if (isLoading)
+            {
+                <div class="d-flex align-items-center justify-content-center py-5">
+                    <div class="spinner-border text-primary me-2" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <span class="text-secondary fw-semibold">Loading data...</span>
+                </div>
+            }
+            else if (!IsValidConfig)
+            {
+                <div class="alert alert-danger" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Invalid setup configuration key provided.
+                </div>
+            }
+            else
+            {
+                <div class="card border border-light-subtle rounded-3 overflow-hidden shadow-xs">
+                    <div class="table-responsive" style="max-height: 65vh;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.9rem;">
+                            <thead class="text-secondary bg-light" style="font-size: 0.8rem; text-transform: uppercase; position: sticky; top: 0; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                <tr>
+                                    <th class="ps-3" style="width: 80px;">S No.</th>
+                                    <th>Description</th>
+                                    <th class="text-center" style="width: 100px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{ int index = 1; }
+                                @foreach (var item in FilteredData)
+                                {
+                                    var currentItem = item;
+                                    <tr class="clickable-row">
+                                        <td class="ps-3 text-secondary">@(index++)</td>
+                                        <td class="fw-semibold text-dark">@currentItem.Description</td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2" style="font-size: 0.8rem;" @onclick="(e) => OpenManageMenu(e, currentItem)">Options</button>
+                                        </td>
+                                    </tr>
+                                }
+                                @if (!FilteredData.Any())
+                                {
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted py-3">No records found.</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+            
+            <!-- Bottom Actions -->
+            <div class="mt-4 pt-3 border-top d-flex justify-content-end">
+                <button type="button" class="btn btn-secondary px-4 rounded-pill shadow-sm" @onclick="NavigateToDashboard">
+                    <i class="fas fa-times me-2"></i> Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Add/Edit -->
+@if (showModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-light border-bottom-0 py-3" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <h6 class="modal-title fw-bold text-dark">
+                        <i class="fas @(editingModel.Id == 0 ? "fa-plus-circle" : "fa-edit") text-primary me-2"></i>
+                        @(editingModel.Id == 0 ? $"Add {PageTitle}" : $"Edit {PageTitle}")
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body py-4 bg-white">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-secondary" style="font-size:0.85rem;">Description</label>
+                        <input type="text" class="form-control" @bind="editingModel.Description" placeholder="Enter description..." />
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0 pb-3 bg-white">
+                    <button type="button" class="btn btn-secondary btn-sm rounded-pill px-4" @onclick="CloseModal">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm rounded-pill px-4" @onclick="SaveRecord">
+                        <i class="fas fa-save me-1"></i> Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Row Context Menu -->
+<ContextMenu Id="miscRowContextMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    @if (context.Data is GenericLookupModel itemCtx)
+    {
+        <Item class="win11-menu-item" OnClick="@(() => EditRecord(itemCtx))">
+            <i class="fas fa-edit fa-fw win11-icon text-primary"></i> Edit
+        </Item>
+        <div class="win11-divider"></div>
+        <Item class="win11-menu-item" OnClick="@(() => ConfirmDelete(itemCtx))">
+            <i class="fas fa-trash fa-fw win11-icon text-danger"></i> Delete
+        </Item>
+    }
+</ContextMenu>
+
+<style>
+    .clickable-row:hover { background-color: rgba(13, 110, 253, 0.05) !important; }
+    .btn-xs { padding: 0.15rem 0.4rem; font-size: 0.75rem; border-radius: 4px; }
+</style>

@@ -30,8 +30,11 @@ namespace Impulse.Pages.Export.Orders
         private string searchText = string.Empty;
 
         // Filters state
-        private DateTime dtFrom = DateTime.Today.AddYears(-5);
+        private DateTime dtFrom = DateTime.Today.AddDays(-180);
         private DateTime dtTo = DateTime.Today;
+        private string selectedDateRange = "5"; // 5 = Last 180 Days
+        private bool isCustomDateRange = false;
+
         private bool filterByDeliveryDT = false;
         private string selectedOrderType = "<All Types>";
         private int selectedStatusFilter = 0; // default <Unshipped>
@@ -213,6 +216,27 @@ namespace Impulse.Pages.Export.Orders
             await RefreshList();
         }
 
+        public async Task OnDateRangeChanged(ChangeEventArgs e)
+        {
+            selectedDateRange = e.Value?.ToString() ?? "6";
+            isCustomDateRange = selectedDateRange == "6";
+
+            dtTo = DateTime.Today;
+            switch (selectedDateRange)
+            {
+                case "0": dtFrom = DateTime.Today; break;
+                case "1": dtFrom = DateTime.Today.AddDays(-15); break;
+                case "2": dtFrom = DateTime.Today.AddDays(-30); break;
+                case "3": dtFrom = DateTime.Today.AddDays(-60); break;
+                case "4": dtFrom = DateTime.Today.AddDays(-90); break;
+                case "5": dtFrom = DateTime.Today.AddDays(-180); break;
+            }
+            // Auto refresh list when selecting predefined range (matching status filter behavior)
+            if (!isCustomDateRange) {
+                await RefreshList();
+            }
+        }
+
         public async Task OnFilterByDeliveryDTChanged(ChangeEventArgs e)
         {
             filterByDeliveryDT = (bool)(e.Value ?? false);
@@ -227,12 +251,13 @@ namespace Impulse.Pages.Export.Orders
         private async Task OpenRowMenu(MouseEventArgs e, CustomerOrderListItemModel order)
         {
             highlightedOrder = order;
-            await BlazorContextMenuService.ShowMenu("rowContextMenu", (int)e.ClientX, (int)e.ClientY + 15, order);
+            // Use ClientX/ClientY without offset to allow the library to accurately detect boundaries
+            await BlazorContextMenuService.ShowMenu("rowContextMenu", (int)e.ClientX, (int)e.ClientY, order);
         }
 
         private async Task OpenOptionsBarMenu(MouseEventArgs e)
         {
-            await BlazorContextMenuService.ShowMenu("optionsBarMenu", (int)e.ClientX, (int)e.ClientY + 15);
+            await BlazorContextMenuService.ShowMenu("optionsBarMenu", (int)e.ClientX, (int)e.ClientY);
         }
 
         // ── Password Protection Check Helper ──

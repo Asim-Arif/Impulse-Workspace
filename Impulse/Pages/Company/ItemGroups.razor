@@ -1,0 +1,176 @@
+@page "/company/item-groups"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Company
+@using Blazored.Typeahead
+@using BlazorContextMenu
+
+<PageTitle>Item Groups (Components)</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+            <!-- Toolbar -->
+            <div class="row g-2 mb-3 align-items-end">
+                <div class="col-auto d-flex align-items-end pb-1">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-layer-group text-primary me-2"></i>
+                        Item Groups
+                    </h5>
+                </div>
+                
+                <div class="col-md-4 ms-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;"><i class="fas fa-search me-1"></i>Search</label>
+                    <input type="text" class="form-control form-control-sm" placeholder="Search by description..." @bind="searchText" @bind:event="oninput" />
+                </div>
+
+                <div class="col d-flex align-items-end justify-content-end gap-2 pb-1">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="RefreshList" title="Refresh List">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" @onclick="AddNewItemGroup">
+                        <i class="fas fa-plus me-1"></i> Add New
+                    </button>
+                </div>
+            </div>
+
+            <!-- Main Workspace (Grid) -->
+            @if (isLoading)
+            {
+                <div class="d-flex align-items-center justify-content-center py-5">
+                    <div class="spinner-border text-primary me-2" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <span class="text-secondary fw-semibold">Loading data...</span>
+                </div>
+            }
+            else
+            {
+                <div class="card border border-light-subtle rounded-3 overflow-hidden shadow-xs">
+                    <div class="table-responsive" style="max-height: 65vh;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.9rem;">
+                            <thead class="text-secondary bg-light" style="font-size: 0.8rem; text-transform: uppercase; position: sticky; top: 0; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                <tr>
+                                    <th class="ps-3" style="width: 80px;">S No.</th>
+                                    <th>Component Description</th>
+                                    <th style="width: 120px;">Color</th>
+                                    <th>Purchaser</th>
+                                    <th class="text-center" style="width: 100px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{ int index = 1; }
+                                @foreach (var group in FilteredGroups)
+                                {
+                                    var currentGroup = group;
+                                    <tr class="clickable-row">
+                                        <td class="ps-3 text-secondary">@(index++)</td>
+                                        <td class="fw-semibold text-dark">@currentGroup.Description</td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <span class="badge border shadow-sm" style="background-color: @ConvertWin32ColorToHex(currentGroup.GrpColor); width: 30px; height: 16px; display: inline-block;"></span>
+                                                <span class="text-secondary ms-2" style="font-size: 0.75rem;">@ConvertWin32ColorToHex(currentGroup.GrpColor)</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            @if (!string.IsNullOrEmpty(currentGroup.PurchaserName))
+                                            {
+                                                <span class="badge bg-light-subtle border text-dark-emphasis">@currentGroup.PurchaserName</span>
+                                            }
+                                        </td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2" style="font-size: 0.8rem;" @onclick="(e) => OpenManageMenu(e, currentGroup)">Options</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+            
+            <!-- Bottom Actions -->
+            <div class="mt-4 pt-3 border-top d-flex justify-content-end">
+                <button type="button" class="btn btn-secondary px-4 rounded-pill shadow-sm" @onclick="NavigateToDashboard">
+                    <i class="fas fa-times me-2"></i> Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Add/Edit -->
+@if (showModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-light border-bottom-0 py-3" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <h6 class="modal-title fw-bold text-dark">
+                        <i class="fas @(editingModel.ID == 0 ? "fa-plus-circle" : "fa-edit") text-primary me-2"></i>
+                        @(editingModel.ID == 0 ? "Add Item Group" : "Edit Item Group")
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body py-4 bg-white">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-secondary" style="font-size:0.85rem;">Description</label>
+                        <input type="text" class="form-control" @bind="editingModel.Description" placeholder="Enter component description..." />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-secondary" style="font-size:0.85rem;">Group Color</label>
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="color" class="form-control form-control-color border-0 shadow-sm p-1" style="width: 50px; height: 38px; cursor: pointer;" 
+                                   value="@hexColor" @onchange="OnColorChanged" title="Choose color">
+                            <input type="text" class="form-control text-uppercase" style="width: 100px; font-family: monospace;" 
+                                   value="@hexColor" @onchange="OnColorChanged" />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-secondary" style="font-size:0.85rem;">Purchaser</label>
+                        <BlazoredTypeahead SearchMethod="SearchPurchasers"
+                                           Data="purchasers"
+                                           TValue="PurchaserLookupModel"
+                                           TItem="PurchaserLookupModel"
+                                           Value="selectedPurchaser"
+                                           ValueChanged="OnPurchaserSelected"
+                                           ValueExpression="@(() => selectedPurchaser)"
+                                           Placeholder="Select a purchaser..."
+                                           EnableDropDown="true">
+                            <SelectedTemplate Context="selectedCtx">
+                                @selectedCtx?.Name (@selectedCtx?.EmpID)
+                            </SelectedTemplate>
+                            <ResultTemplate Context="resultCtx">
+                                @resultCtx.Name (@resultCtx.EmpID)
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0 pb-3 bg-white">
+                    <button type="button" class="btn btn-secondary btn-sm rounded-pill px-4" @onclick="CloseModal">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm rounded-pill px-4" @onclick="SaveItemGroup">
+                        <i class="fas fa-save me-1"></i> Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Row Context Menu -->
+<ContextMenu Id="rowContextMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    @if (context.Data is ItemGroupsViewModel groupCtx)
+    {
+        <Item class="win11-menu-item" OnClick="@(() => EditItemGroup(groupCtx))">
+            <i class="fas fa-edit fa-fw win11-icon text-primary"></i> Edit Group
+        </Item>
+        <div class="win11-divider"></div>
+        <Item class="win11-menu-item" OnClick="@(() => ConfirmDelete(groupCtx))">
+            <i class="fas fa-trash fa-fw win11-icon text-danger"></i> Delete Group
+        </Item>
+    }
+</ContextMenu>
+
+<style>
+    .clickable-row:hover { background-color: rgba(13, 110, 253, 0.05) !important; }
+    .btn-xs { padding: 0.15rem 0.4rem; font-size: 0.75rem; border-radius: 4px; }
+</style>
