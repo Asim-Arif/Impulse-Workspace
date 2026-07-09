@@ -1,0 +1,298 @@
+@page "/export/proformas/new-proforma/{PInvoice?}"
+@using Impulse.Components.Export.NewProformaInvoiceTabs
+@using DataAccessLibrary.Models.ViewModels.Export
+@using Blazored.Typeahead
+@inject NavigationManager NavManager
+
+<PageTitle>@(IsEditMode ? $"Edit Proforma Invoice: {Proforma.PInvoice}" : "New Proforma Invoice")</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+            
+            <!-- Title Header and Actions -->
+            <div class="row g-2 mb-3 align-items-end border-bottom pb-2">
+                <div class="col-auto d-flex align-items-end pb-1">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-file-invoice text-primary me-2"></i>
+                        @(IsEditMode ? $"Edit Proforma Invoice: {Proforma.PInvoice}" : "New Proforma Invoice")
+                    </h5>
+                    @if (IsLoading)
+                    {
+                        <span class="spinner-border spinner-border-sm text-primary ms-3 mb-1" role="status" aria-hidden="true"></span>
+                    }
+                </div>
+                <div class="col text-end d-flex justify-content-end align-items-center gap-2">
+                    <div class="form-check form-switch m-0 d-flex align-items-center me-2">
+                        <input class="form-check-input mt-0" type="checkbox" role="switch" id="printOnSaveSwitch" @bind="Proforma.PrintOnSave" style="cursor:pointer; margin-right: 0.5rem;">
+                        <label class="form-check-label fw-bold text-secondary mb-0" for="printOnSaveSwitch" style="font-size:0.8rem; cursor:pointer;">
+                            Print On Save
+                        </label>
+                    </div>
+                    @if (IsEditMode)
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="DeleteProforma" disabled="@IsLoading">
+                            <i class="fas fa-trash-alt me-1"></i>Delete
+                        </button>
+                    }
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="GoBack">
+                        <i class="fas fa-arrow-left me-1"></i>Back
+                    </button>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-sm btn-primary fw-bold px-3" @onclick="SaveAndStay" disabled="@IsLoading">
+                            <i class="fas fa-save me-1"></i>Save
+                        </button>
+                        <button type="button" class="btn btn-sm btn-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false" disabled="@IsLoading">
+                            <span class="visually-hidden">Toggle Dropdown</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0" style="font-size: 0.85rem;">
+                            <li><a class="dropdown-item" href="javascript:void(0)" @onclick="SaveAndNew"><i class="fas fa-plus me-2 text-success"></i>Save & New</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" @onclick="SaveAndClose"><i class="fas fa-check-double me-2 text-primary"></i>Save & Close</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Master Header Panel -->
+            <div class="card mb-4 border" style="background: #f8f9fb; border-radius: 8px;">
+                <div class="card-header py-2 fw-bold text-secondary" style="background: #eef0f7; border-radius: 8px 8px 0 0; font-size: 0.85rem; letter-spacing: 0.03em;">
+                    <i class="fas fa-file-invoice me-1 text-primary"></i> Proforma Header Information
+                </div>
+                <div class="card-body py-3">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Company <span class="text-danger">*</span></label>
+                            <select class="form-select form-select-sm" @bind="Proforma.CompanyRefID" @bind:after="OnCompanyChanged" disabled="@(IsEditMode || LineItems.Any())">
+                                @foreach (var c in Companies)
+                                {
+                                    <option value="@c.DropDownValue_ID">@c.DropDownValue_Description</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Customer <span class="text-danger">*</span></label>
+                                <BlazoredTypeahead SearchMethod="SearchCustomers"
+                                                   EnableDropDown="true"
+                                                   TValue="CustomerLookupModel"
+                                                   TItem="CustomerLookupModel"
+                                                   Value="SelectedCustomer"
+                                                   ValueChanged="OnCustomerChanged"
+                                                   ValueExpression="@(() => SelectedCustomer)"
+                                                   Placeholder="Select Customer"
+                                                   disabled="@(IsEditMode || LineItems.Any())">
+                                    <SelectedTemplate Context="selectedCust">
+                                        @selectedCust?.Name
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="cust">
+                                        @cust.Name
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Country <span class="text-danger">*</span></label>
+                            <select class="form-select form-select-sm" @bind="Proforma.Country" @bind:after="OnCountryChanged" disabled="@(IsEditMode || LineItems.Any())">
+                                <option value="">— Select —</option>
+                                @foreach (var c in Countries)
+                                {
+                                    <option value="@c">@c</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Proforma Invoice #</label>
+                            <input type="text" class="form-control form-control-sm text-center fw-bold text-danger" @bind="Proforma.PInvoice" disabled="@IsEditMode" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Date</label>
+                            <input type="date" class="form-control form-control-sm" @bind="Proforma.DT" />
+                        </div>
+
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Trade Terms</label>
+                            <select class="form-select form-select-sm" @bind="Proforma.TradeTerms" @bind:after="OnTradeTermsChanged">
+                                @foreach (var t in TradeTermsList)
+                                {
+                                    <option value="@t.DropDownValue_Description">@t.DropDownValue_Description</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Payment Terms</label>
+                            <select class="form-select form-select-sm" @bind="Proforma.PaymentTerms">
+                                @foreach (var p in PaymentTermsList)
+                                {
+                                    <option value="@p.DropDownValue_Description">@p.DropDownValue_Description</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Trans-Shipment</label>
+                            <select class="form-select form-select-sm" @bind="Proforma.TransShipment">
+                                <option value="Allowed">Allowed</option>
+                                <option value="Not Allowed">Not Allowed</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Partial Shipment</label>
+                            <select class="form-select form-select-sm" @bind="Proforma.PartialShipment">
+                                <option value="Allowed">Allowed</option>
+                                <option value="Not Allowed">Not Allowed</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Shipping Method</label>
+                            <select class="form-select form-select-sm" @bind="Proforma.SMethod">
+                                @foreach (var sm in ShippingMethods)
+                                {
+                                    <option value="@sm.DropDownValue_Description">@sm.DropDownValue_Description</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Currency</label>
+                            <input type="text" class="form-control form-control-sm text-center fw-bold" @bind="Proforma.Currency" readonly style="background:#f0f2f5;" placeholder="Auto-filled" />
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Packaging</label>
+                            <input type="text" class="form-control form-control-sm" @bind="Proforma.Packaging" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">LC No.</label>
+                            <input type="text" class="form-control form-control-sm" @bind="Proforma.LCNo" disabled="@(Proforma.PaymentTerms != "Letter of Credit")" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Delivery Date</label>
+                            <input type="date" class="form-control form-control-sm" @bind="Proforma.DeliveryDT" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Order Rcvd Via (Batch No)</label>
+                            <input type="text" class="form-control form-control-sm" @bind="Proforma.BatchNo" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TABS AREA -->
+            <ul class="nav nav-tabs md3-tabs mb-3" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link @(ActiveTab == 1 ? "active" : "")" style="cursor:pointer;" @onclick="() => ActiveTab = 1">
+                        <i class="fas fa-list me-1"></i>Details
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link @(ActiveTab == 2 ? "active" : "")" style="cursor:pointer;" @onclick="() => ActiveTab = 2">
+                        <i class="fas fa-info-circle me-1"></i>Other Info
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link @(ActiveTab == 3 ? "active" : "")" style="cursor:pointer;" @onclick="() => ActiveTab = 3">
+                        <i class="fas fa-plus-square me-1"></i>New Items
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link @(ActiveTab == 4 ? "active" : "")" style="cursor:pointer;" @onclick="() => ActiveTab = 4">
+                        <i class="fas fa-file-invoice-dollar me-1"></i>Other Charges
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link @(ActiveTab == 5 ? "active" : "")" style="cursor:pointer;" @onclick="() => ActiveTab = 5">
+                        <i class="fas fa-sticky-note me-1"></i>Notes
+                    </a>
+                </li>
+            </ul>
+
+            <!-- Tab Content -->
+            <div class="tab-content" style="min-height: 400px;">
+                <div style="display: @(ActiveTab == 1 ? "block" : "none")">
+                    <DetailsTab @ref="DetailsTabRef"
+                                Proforma="Proforma"
+                                LineItems="LineItems"
+                                OnTotalsChanged="OnTotalsChanged"
+                                OnRemoveItem="HandleRemoveItem" />
+                </div>
+                <div style="display: @(ActiveTab == 2 ? "block" : "none")">
+                    <OtherInfoTab @ref="OtherInfoTabRef"
+                                  Proforma="Proforma"
+                                  InsuranceAgentDisabled="@(Proforma.TradeTerms != "CIF" && Proforma.TradeTerms != "CIP")"
+                                  ShippingAgents="ShippingAgents"
+                                  InsuranceAgents="InsuranceAgents"
+                                  CustomerBanks="CustomerBanks"
+                                  CompanyBankAccounts="CompanyBankAccounts"
+                                  ShippingAddressPresets="ShippingAddressPresets"
+                                  InvoiceToPresets="InvoiceToPresets"
+                                  OnCalcSteelWeight="HandleCalcSteelWeight" />
+                </div>
+                <div style="display: @(ActiveTab == 3 ? "block" : "none")">
+                    <NewItemsTab @ref="NewItemsTabRef"
+                                 CompanyRefID="Proforma.CompanyRefID"
+                                 CustCode="Proforma.CustCode"
+                                 Country="Proforma.Country"
+                                 OnAddItems="HandleAddItems" />
+                </div>
+                <div style="display: @(ActiveTab == 4 ? "block" : "none")">
+                    <OtherChargesTab OtherCharges="Proforma.OtherCharges"
+                                     OnChargesUpdated="OnTotalsChanged" />
+                </div>
+                <div style="display: @(ActiveTab == 5 ? "block" : "none")">
+                    <NotesTab Proforma="Proforma" />
+                </div>
+            </div>
+            
+            <!-- Bottom Total Display -->
+            <div class="mt-3 text-end" style="font-size:0.8rem; color:#44474f;">
+                <span class="fw-bold me-1">Amount in Words:</span>
+                <span class="fst-italic text-primary fw-bold">@Proforma.AmountInWords</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Material Design 3 style tabs */
+    .md3-tabs {
+        border-bottom: 1px solid #e0e2ec;
+        gap: 4px;
+        flex-wrap: wrap;
+    }
+    .md3-tabs .nav-link {
+        color: #44474f;
+        border: none;
+        border-bottom: 3px solid transparent;
+        padding: 0.5rem 0.75rem;
+        font-weight: 500;
+        font-size: 0.85rem;
+        border-radius: 0;
+        transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+    }
+    .md3-tabs .nav-link:hover {
+        background-color: rgba(192, 88, 0, 0.05); /* Match Export orange tint */
+        color: #7a3000;
+    }
+    .md3-tabs .nav-link.active {
+        color: #c05800; /* Export Theme Color */
+        border-bottom-color: #c05800;
+        background: transparent;
+    }
+    .blazored-typeahead {
+        height: 31px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 29px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    .form-control-sm, .form-select-sm {
+        height: 31px !important;
+        font-size: 0.875rem !important;
+    }
+</style>

@@ -1,0 +1,251 @@
+@using DataAccessLibrary.Models.ViewModels.Export
+
+<div class="row g-3">
+
+    <!-- ═══════════════════════ LEFT COLUMN ═══════════════════════ -->
+    <div class="col-md-6">
+
+        <!-- Port of Loading -->
+        <div class="card mb-3 border" style="border-radius:8px;">
+            <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; font-size:0.8rem; border-radius:8px 8px 0 0;">
+                <i class="fas fa-anchor me-1 text-primary"></i> Port of Loading
+            </div>
+            <div class="card-body py-2">
+                <div class="row g-2">
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Country</label>
+                        <select class="form-select form-select-sm" @bind="LoadCountry" @bind:after="OnLoadCountryChanged">
+                            @foreach (var c in LoadCountries)
+                            {
+                                <option value="@c">@c</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">City</label>
+                        <select class="form-select form-select-sm" @bind="SelectedLoadCityId" @bind:after="OnLoadCityChanged">
+                            <option value="0">Select City</option>
+                            @foreach (var city in LoadCities)
+                            {
+                                <option value="@city.CityID">@city.CityName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Port</label>
+                        <select class="form-select form-select-sm" @bind="Proforma.LoadPort">
+                            <option value="">Select Port</option>
+                            @foreach (var p in LoadPorts)
+                            {
+                                <option value="@p.PortID">@p.Port</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Port of Discharge -->
+        <div class="card mb-3 border" style="border-radius:8px;">
+            <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; font-size:0.8rem; border-radius:8px 8px 0 0;">
+                <i class="fas fa-ship me-1 text-primary"></i> Port of Discharge
+            </div>
+            <div class="card-body py-2">
+                <div class="row g-2">
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Country</label>
+                        <input type="text" class="form-control form-control-sm" @bind="DisCountry" @oninput="OnDisCountryInput" list="dis-countries-list" />
+                        <datalist id="dis-countries-list">
+                            @foreach (var c in DisCountries)
+                            {
+                                <option value="@c"></option>
+                            }
+                        </datalist>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">City</label>
+                        <select class="form-select form-select-sm" @bind="SelectedDisCityId" @bind:after="OnDisCityChanged">
+                            <option value="0">Select City</option>
+                            @foreach (var city in DisCities)
+                            {
+                                <option value="@city.CityID">@city.CityName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Port</label>
+                        <select class="form-select form-select-sm" @bind="Proforma.DischargePort">
+                            <option value="">Select Port</option>
+                            @foreach (var p in DisPorts)
+                            {
+                                <option value="@p.PortID">@p.Port</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Weights & Packages -->
+        <div class="card mb-3 border" style="border-radius:8px;">
+            <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; font-size:0.8rem; border-radius:8px 8px 0 0;">
+                <i class="fas fa-weight-hanging me-1 text-primary"></i> Weights &amp; Packages
+            </div>
+            <div class="card-body py-2">
+                <div class="row g-2">
+                    <div class="col-4">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Gross Weight</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Proforma.GrossWeight" />
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Net Weight</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Proforma.NetWeight" />
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Packages</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Proforma.Packages" />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Steel Weight</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" class="form-control form-control-sm text-end"
+                                   @bind="Proforma.SteelWeight" />
+                            <button type="button" class="btn btn-outline-secondary" @onclick="CalcSteelWeight">
+                                <i class="fas fa-calculator"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════ RIGHT COLUMN ═══════════════════════ -->
+    <div class="col-md-6">
+
+        <!-- Banking Info -->
+        <div class="card mb-3 border" style="border-radius:8px;">
+            <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; font-size:0.8rem; border-radius:8px 8px 0 0;">
+                <i class="fas fa-university me-1 text-primary"></i> Banking Information
+            </div>
+            <div class="card-body py-2">
+                <div class="row g-2">
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Customer Bank (Through)</label>
+                        <select class="form-select form-select-sm" @bind="Proforma.BankID" @bind:after="OnCustomerBankChanged">
+                            <option value="">Select Bank</option>
+                            @foreach (var bank in CustomerBanks)
+                            {
+                                <option value="@bank.BankID">@bank.BankName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Bank Address</label>
+                        <textarea class="form-control form-control-sm" rows="2" @bind="BankAddress"
+                                  style="font-size:0.78rem; resize:none;"></textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Our Bank</label>
+                        <select class="form-select form-select-sm" @bind="SelectedOurBankName">
+                            <option value="">Select Bank</option>
+                            @foreach (var bankName in CompanyBankAccounts.Select(a => a.BankName).Where(n => !string.IsNullOrEmpty(n)).Distinct())
+                            {
+                                <option value="@bankName">@bankName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Our Bank Account</label>
+                        <select class="form-select form-select-sm" @bind="Proforma.OurBankID">
+                            <option value="0">Select Account</option>
+                            @foreach (var acc in CompanyBankAccounts.Where(a => a.BankName == SelectedOurBankName))
+                            {
+                                <option value="@acc.BankID">@acc.DisplayText</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Agents & Declarations -->
+        <div class="card mb-3 border" style="border-radius:8px;">
+            <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; font-size:0.8rem; border-radius:8px 8px 0 0;">
+                <i class="fas fa-user-tie me-1 text-primary"></i> Agents &amp; Declarations
+            </div>
+            <div class="card-body py-2">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Shipping Agent</label>
+                        <select class="form-select form-select-sm" @bind="Proforma.ShippingAgentID">
+                            <option value="">None</option>
+                            @foreach (var a in ShippingAgents)
+                            {
+                                <option value="@a.EntryID">@a.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Insurance Agent</label>
+                        <select class="form-select form-select-sm" @bind="Proforma.InsuranceAgentID" disabled="@InsuranceAgentDisabled">
+                            <option value="">None</option>
+                            @foreach (var a in InsuranceAgents)
+                            {
+                                <option value="@a.EntryID">@a.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Declarations</label>
+                        <textarea class="form-control form-control-sm" rows="2" @bind="Proforma.Declarations"
+                                  style="font-size:0.78rem; resize:none;"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Invoice Of / Delivery / Shipping Address / Invoice To -->
+        <div class="card border" style="border-radius:8px;">
+            <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; font-size:0.8rem; border-radius:8px 8px 0 0;">
+                <i class="fas fa-file-alt me-1 text-primary"></i> Invoice &amp; Delivery Details
+            </div>
+            <div class="card-body py-2">
+                <div class="row g-2">
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Invoice Of</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Proforma.InvoiceOf" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Delivery</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Proforma.DeliveryDetail" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Shipping Address</label>
+                        <select class="form-select form-select-sm mb-1" @onchange="OnShippingAddressPresetChanged">
+                            <option value="">— Select Preset —</option>
+                            @foreach (var sa in ShippingAddressPresets)
+                            {
+                                <option value="@sa.EntryID">@sa.ShippingAddress[..(Math.Min(50, sa.ShippingAddress.Length))]...</option>
+                            }
+                        </select>
+                        <textarea class="form-control form-control-sm" rows="2" @bind="Proforma.ShippingAddress"
+                                  style="font-size:0.78rem; resize:none;"></textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Invoice To</label>
+                        <select class="form-select form-select-sm mb-1" @onchange="OnInvoiceToPresetChanged">
+                            <option value="">— Select Preset —</option>
+                            @foreach (var it in InvoiceToPresets)
+                            {
+                                <option value="@it.EntryID">@it.InvoiceTo[..(Math.Min(50, it.InvoiceTo.Length))]...</option>
+                            }
+                        </select>
+                        <textarea class="form-control form-control-sm" rows="2" @bind="Proforma.InvoiceTo"
+                                  style="font-size:0.78rem; resize:none;"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

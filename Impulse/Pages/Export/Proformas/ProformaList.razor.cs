@@ -21,6 +21,7 @@ namespace Impulse.Pages.Export.Proformas
         [Inject] private IDBHelperService DbHelper { get; set; } = null!;
         [Inject] private IBlazorContextMenuService BlazorContextMenuService { get; set; } = null!;
         [Inject] private IJSRuntime JS { get; set; } = null!;
+        [Inject] private NavigationManager NavManager { get; set; } = null!;
 
         private bool isLoading = true;
         private string searchText = string.Empty;
@@ -203,6 +204,12 @@ namespace Impulse.Pages.Export.Proformas
         }
 
         // --- Row Actions ---
+        private void EditProforma(ItemClickEventArgs e)
+        {
+            if (contextMenuRowItem == null) return;
+            NavManager.NavigateTo($"/export/proformas/new-proforma/{contextMenuRowItem.PInvoice}");
+        }
+
         private async Task DeleteProforma(ItemClickEventArgs e)
         {
             if (contextMenuRowItem == null) return;

@@ -1,0 +1,265 @@
+@using DataAccessLibrary.Models.ViewModels.Export
+
+<div class="row g-0">
+    <!-- Details Grid -->
+    <div class="col-12">
+        <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+            <table class="table table-sm table-bordered mb-0 proforma-grid" id="proformaDetailsGrid">
+                <thead class="table-header-sticky">
+                    <tr style="background: #eef0f7; font-size: 0.78rem; font-weight: 700; color: #44474f;">
+                        <th style="width:40px;" class="text-center">#</th>
+                        <th style="width:100px;">Order #</th>
+                        <th style="width:110px;">Item ID</th>
+                        <th>Description</th>
+                        <th style="width:55px;">Unit</th>
+                        <th style="width:90px;" class="text-end">Price</th>
+                        <th style="width:80px;" class="text-end">Qty</th>
+                        <th style="width:100px;" class="text-end">Amount</th>
+                        <th style="width:32px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < LineItems.Count; i++)
+                    {
+                        var item = LineItems[i];
+                        int idx = i;
+                        <tr class="@(item.IsHighlighted ? "table-warning" : "") proforma-row"
+                            @oncontextmenu="(e) => OnRowRightClick(e, item)"
+                            @oncontextmenu:preventDefault="true"
+                            style="cursor: default; font-size: 0.8rem;">
+                            <td class="text-center text-muted">@(i + 1)</td>
+                            <td class="text-muted" style="font-size:0.75rem;">@item.OrderNo</td>
+                            <td style="font-size:0.75rem; color:#c05800; font-weight:600;">@item.ItemCode</td>
+                            <!-- Description: double-click to edit -->
+                            <td @ondblclick="() => StartEditDescription(idx)" style="cursor:text;">
+                                @if (EditingDescriptionIdx == idx)
+                                {
+                                    <input type="text"
+                                           class="form-control form-control-sm py-0"
+                                           style="font-size:0.78rem; height:22px;"
+                                           value="@item.Description"
+                                           @onchange="(e) => CommitDescription(idx, e.Value?.ToString() ?? item.Description)"
+                                           @onblur="CancelEdit"
+                                           @onkeydown="(e) => HandleDescKeyDown(e, idx)"
+                                           autofocus />
+                                }
+                                else
+                                {
+                                    @item.Description
+                                }
+                            </td>
+                            <td>@item.Unit</td>
+                            <!-- Price: double-click to edit -->
+                            <td class="text-end" @ondblclick="() => StartEditPrice(idx)" style="cursor:text;">
+                                @if (EditingPriceIdx == idx)
+                                {
+                                    <input type="number"
+                                           class="form-control form-control-sm py-0 text-end"
+                                           style="font-size:0.78rem; height:22px; width:80px;"
+                                           value="@item.Price"
+                                           @onchange="(e) => CommitPrice(idx, e.Value?.ToString())"
+                                           @onblur="CancelEdit"
+                                           @onkeydown="(e) => HandlePriceKeyDown(e, idx)"
+                                           autofocus />
+                                }
+                                else
+                                {
+                                    @item.Price.ToString("0.0000")
+                                }
+                            </td>
+                            <!-- Qty: double-click to edit -->
+                            <td class="text-end fw-bold" @ondblclick="() => StartEditQty(idx)" style="cursor:text; color:#1565c0;">
+                                @if (EditingQtyIdx == idx)
+                                {
+                                    <input type="number"
+                                           class="form-control form-control-sm py-0 text-end"
+                                           style="font-size:0.78rem; height:22px; width:70px;"
+                                           value="@item.Qty"
+                                           @onchange="(e) => CommitQty(idx, e.Value?.ToString())"
+                                           @onblur="CancelEdit"
+                                           @onkeydown="(e) => HandleQtyKeyDown(e, idx)"
+                                           autofocus />
+                                }
+                                else
+                                {
+                                    @item.Qty
+                                }
+                            </td>
+                            <td class="text-end fw-bold">@item.Amount.ToString("N4")</td>
+                            <td class="text-center">
+                                <button type="button"
+                                        class="btn btn-link btn-sm p-0 text-danger"
+                                        title="Remove"
+                                        @onclick="() => RemoveItem(idx)">
+                                    <i class="fas fa-times" style="font-size:0.7rem;"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <!-- Sub-detail row: delivery / quality / stamps -->
+                        @if (!string.IsNullOrWhiteSpace(item.QualityItem) ||
+                             !string.IsNullOrWhiteSpace(item.StampsItem) ||
+                             item.DeliveryDTItem.HasValue)
+                        {
+                            <tr style="background: #f8f9fb;">
+                                <td colspan="9" style="font-size:0.73rem; color:#666; padding: 1px 8px 2px 60px;">
+                                    @if (item.DeliveryDTItem.HasValue)
+                                    { <span class="me-3"><i class="fas fa-truck me-1 text-muted"></i>Delivery: @item.DeliveryDTItem.Value.ToString("dd-MMM-yyyy")</span> }
+                                    @if (!string.IsNullOrWhiteSpace(item.QualityItem))
+                                    { <span class="me-3"><i class="fas fa-star me-1 text-muted"></i>Fin: @item.QualityItem</span> }
+                                    @if (!string.IsNullOrWhiteSpace(item.StampsItem))
+                                    { <span><i class="fas fa-stamp me-1 text-muted"></i>Stamps: @item.StampsItem</span> }
+                                </td>
+                            </tr>
+                        }
+                    }
+                    @if (!LineItems.Any())
+                    {
+                        <tr>
+                            <td colspan="9" class="text-center text-muted py-4" style="font-size:0.82rem;">
+                                <i class="fas fa-inbox me-2"></i>No items added yet. Go to "New Items" tab to add items.
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Totals Section -->
+<div class="row g-2 mt-2 justify-content-end align-items-end">
+    <div class="col-md-5">
+        <!-- Price Update row -->
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="fw-bold" style="font-size:0.8rem; color:#0000cc; white-space:nowrap;">Price Update (%) :</span>
+            <input type="number" class="form-control form-control-sm text-center"
+                   style="width:80px;" @bind="PriceUpdatePct" />
+            <button type="button" class="btn btn-sm btn-outline-warning" @onclick="ApplyPriceUpdate">
+                <i class="fas fa-sync-alt me-1"></i>Update Prices
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-danger" @onclick="RemoveAllItems">
+                <i class="fas fa-trash me-1"></i>Remove All
+            </button>
+        </div>
+    </div>
+    <div class="col-md-7">
+        <div class="card border" style="background:#f8f9fb; border-radius:8px;">
+            <div class="card-body py-2 px-3">
+                <!-- Total Pcs -->
+                <div class="d-flex justify-content-between align-items-center mb-1" style="font-size:0.82rem;">
+                    <span class="text-muted">Total Pcs :</span>
+                    <span class="fw-bold text-dark">@TotalPcs</span>
+                </div>
+                <!-- Total Amount row (editable label) -->
+                <div class="d-flex gap-2 align-items-center mb-1">
+                    <input type="text" class="form-control form-control-sm"
+                           style="width:130px; font-size:0.78rem;"
+                           @bind="Proforma.TotalDescription" />
+                    <input type="text" class="form-control form-control-sm text-end fw-bold"
+                           style="width:120px; font-size:0.82rem; background:#eef0f7;"
+                           value="@Proforma.TotalAmount.ToString("N4")" readonly />
+                </div>
+                <!-- Discount row -->
+                <div class="d-flex gap-2 align-items-center mb-1">
+                    <span class="text-muted" style="font-size:0.78rem; white-space:nowrap;">Dis (%) :</span>
+                    <input type="number" class="form-control form-control-sm text-center"
+                           style="width:60px; font-size:0.78rem;"
+                           @bind="Proforma.DiscountPer"
+                           @oninput="OnDiscountPerChanged" />
+                    <input type="number" class="form-control form-control-sm text-end"
+                           style="width:90px; font-size:0.78rem;"
+                           @bind="Proforma.DiscountAmount"
+                           @oninput="OnDiscountAmtChanged" />
+                    <input type="text" class="form-control form-control-sm"
+                           style="width:130px; font-size:0.78rem;"
+                           @bind="Proforma.DiscountDescription" />
+                </div>
+                <!-- Freight row -->
+                <div class="d-flex gap-2 align-items-center mb-1">
+                    <input type="number" class="form-control form-control-sm text-end"
+                           style="width:90px; font-size:0.78rem; margin-left:84px;"
+                           @bind="Proforma.InsuranceFreightAmount"
+                           @oninput="RecalcGrandTotal" />
+                    <input type="text" class="form-control form-control-sm"
+                           style="width:130px; font-size:0.78rem;"
+                           @bind="Proforma.InsuranceDescription" />
+                </div>
+                <!-- Other Amount row -->
+                <div class="d-flex gap-2 align-items-center mb-1">
+                    <input type="number" class="form-control form-control-sm text-end"
+                           style="width:90px; font-size:0.78rem; margin-left:84px;"
+                           @bind="Proforma.InsuranceFreightAmountII"
+                           @oninput="RecalcGrandTotal" />
+                    <input type="text" class="form-control form-control-sm"
+                           style="width:130px; font-size:0.78rem;"
+                           @bind="Proforma.InsuranceDescriptionII" />
+                </div>
+                <!-- Grand Total row -->
+                <div class="d-flex gap-2 align-items-center border-top pt-2 mt-1">
+                    <input type="text" class="form-control form-control-sm"
+                           style="width:130px; font-size:0.78rem; font-weight:700;"
+                           @bind="Proforma.CIFDescription" />
+                    <input type="text" class="form-control form-control-sm text-end fw-bold"
+                           style="width:120px; font-size:0.85rem; background:#e3f2fd; color:#1565c0;"
+                           value="@Proforma.GrandTotal.ToString("N4")" readonly />
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Search -->
+<div class="row g-2 mt-2 align-items-center">
+    <div class="col-auto">
+        <span style="font-size:0.8rem; font-weight:700; color:#c00000;">Search Item :</span>
+    </div>
+    <div class="col-md-4">
+        <input type="text" class="form-control form-control-sm"
+               placeholder="Type item code or description..."
+               @bind="SearchTerm"
+               @oninput="OnSearchChanged" />
+    </div>
+</div>
+
+<!-- Right-click Context Menu -->
+@if (ContextMenuVisible)
+{
+    <div class="win11-context-menu" id="proformaContextMenu"
+         style="position:fixed; left:@(ContextX)px; top:@(ContextY)px; z-index:9999;"
+         @onmouseleave="HideContextMenu">
+        <ul class="list-unstyled m-0 p-1">
+            <li class="ctx-item @(ContextItem?.IsHighlighted == true ? "" : "")"
+                @onclick="ToggleHighlight">
+                <i class="fas @(ContextItem?.IsHighlighted == true ? "fa-star-half-alt" : "fa-star") me-2"></i>
+                @(ContextItem?.IsHighlighted == true ? "Un-Highlight Item" : "Highlight Item")
+            </li>
+        </ul>
+    </div>
+    <div style="position:fixed;inset:0;z-index:9998;" @onclick="HideContextMenu"></div>
+}
+
+<style>
+    .proforma-grid th { position: sticky; top: 0; z-index: 2; }
+    .table-header-sticky { background: #eef0f7 !important; }
+    .proforma-row:hover { background-color: rgba(192,88,0,0.06) !important; }
+    .win11-context-menu {
+        background: #fff;
+        border: 1px solid #e0e2ec;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        min-width: 180px;
+        padding: 4px 0;
+    }
+    .win11-context-menu .ctx-item {
+        padding: 6px 16px;
+        font-size: 0.82rem;
+        cursor: pointer;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+    }
+    .win11-context-menu .ctx-item:hover {
+        background: #f3f4fa;
+        color: #c05800;
+    }
+</style>

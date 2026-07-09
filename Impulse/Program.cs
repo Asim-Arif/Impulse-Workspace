@@ -164,6 +164,9 @@ builder.Services.AddScoped<Impulse.Services.Export.IAdvancePaymentService, Impul
 builder.Services.AddScoped<DataAccessLibrary.Interface.Export.IOrderItemListDataAccess, DataAccessLibrary.DAC.Export.OrderItemListDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Export.IOrderItemListService, Impulse.Services.Export.OrderItemListService>();
 
+builder.Services.AddScoped<DataAccessLibrary.Interface.Export.IProformaInvoiceDataAccess, DataAccessLibrary.DAC.Export.ProformaInvoiceDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Export.IProformaInvoiceService, Impulse.Services.Export.ProformaInvoiceService>();
+
 
 builder.Services.AddScoped<LoadingService>();
 builder.Services.AddScoped<SecurityService>();

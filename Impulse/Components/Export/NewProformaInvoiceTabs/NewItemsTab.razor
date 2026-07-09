@@ -1,0 +1,108 @@
+@using DataAccessLibrary.Models.ViewModels.Export
+
+<div class="row g-2 mb-2 align-items-center">
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Order No.</label>
+        <select class="form-select form-select-sm" @bind="SelectedOrderNo" @bind:after="OnOrderNoChanged">
+            <option value="">— Select Order —</option>
+            @foreach (var order in AvailableOrders)
+            {
+                <option value="@order">@order</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-4 d-flex align-items-end gap-2" style="padding-top: 18px;">
+        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddSelectedItems" disabled="@(!HasSelectedItems)">
+            <i class="fas fa-plus me-1"></i>Add
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-success" @onclick="AddAllItems" disabled="@(!HasItems)">
+            <i class="fas fa-plus-double me-1"></i>Add All
+        </button>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Search Item</label>
+        <input type="text" class="form-control form-control-sm" placeholder="Type item code or description..." @bind="SearchTerm" @bind:event="oninput" @onkeyup="OnSearchKeyUp" />
+    </div>
+</div>
+
+<div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+    <table class="table table-sm table-bordered table-hover mb-0" style="font-size: 0.8rem;">
+        <thead class="table-header-sticky">
+            <tr style="background: #eef0f7; font-size: 0.78rem; font-weight: 700; color: #44474f;">
+                <th style="width:40px;" class="text-center">
+                    <input type="checkbox" class="form-check-input" @bind="SelectAllChecked" @bind:after="OnSelectAllChanged" />
+                </th>
+                <th style="width:40px;" class="text-center">#</th>
+                <th style="width:100px;">Order #</th>
+                <th style="width:110px;">Item ID</th>
+                <th>Description</th>
+                <th style="width:55px;">Unit</th>
+                <th style="width:80px;" class="text-end">Price</th>
+                <th style="width:80px;" class="text-end">Qty</th>
+                <th style="width:90px;" class="text-end">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (FilteredOrderItems != null && FilteredOrderItems.Any())
+            {
+                @for (int i = 0; i < FilteredOrderItems.Count; i++)
+                {
+                    var item = FilteredOrderItems[i];
+                    int idx = i;
+                    <tr>
+                        <td class="text-center">
+                            <input type="checkbox" class="form-check-input" @bind="item.IsSelected" @bind:after="OnItemSelectionChanged" />
+                        </td>
+                        <td class="text-center text-muted">@(i + 1)</td>
+                        <td class="text-muted" style="font-size:0.75rem;">@item.OrderNo</td>
+                        <td style="font-size:0.75rem; color:#c05800; font-weight:600;">@item.ItemCode</td>
+                        <td>@item.Description</td>
+                        <td>@item.Unit</td>
+                        <td class="text-end">@item.Price.ToString("N4")</td>
+                        <td class="text-end" @ondblclick="() => StartEditQty(idx)" style="cursor:text; color:#1565c0; font-weight:bold;">
+                            @if (EditingQtyIdx == idx)
+                            {
+                                <input type="number" class="form-control form-control-sm py-0 text-end"
+                                       style="font-size:0.78rem; height:22px;"
+                                       value="@item.QtyToAdd"
+                                       @onchange="(e) => CommitQty(idx, e.Value?.ToString())"
+                                       @onblur="CancelEdit"
+                                       autofocus />
+                            }
+                            else
+                            {
+                                @item.QtyToAdd
+                            }
+                        </td>
+                        <td class="text-end fw-bold">@item.Amount.ToString("N4")</td>
+                    </tr>
+                    @if (!string.IsNullOrWhiteSpace(item.QualityItem) || !string.IsNullOrWhiteSpace(item.StampsItem) || item.DeliveryDTItem.HasValue)
+                    {
+                        <tr style="background: #f8f9fb;">
+                            <td colspan="9" style="font-size:0.73rem; color:#666; padding: 1px 8px 2px 60px;">
+                                @if (item.DeliveryDTItem.HasValue)
+                                { <span class="me-3"><i class="fas fa-truck me-1 text-muted"></i>Delivery: @item.DeliveryDTItem.Value.ToString("dd-MMM-yyyy")</span> }
+                                @if (!string.IsNullOrWhiteSpace(item.QualityItem))
+                                { <span class="me-3"><i class="fas fa-star me-1 text-muted"></i>Fin: @item.QualityItem</span> }
+                                @if (!string.IsNullOrWhiteSpace(item.StampsItem))
+                                { <span><i class="fas fa-stamp me-1 text-muted"></i>Stamps: @item.StampsItem</span> }
+                            </td>
+                        </tr>
+                    }
+                }
+            }
+            else
+            {
+                <tr>
+                    <td colspan="9" class="text-center text-muted py-4" style="font-size:0.82rem;">
+                        <i class="fas fa-search me-2"></i>No items found for the selected order.
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<style>
+    .table-header-sticky th { position: sticky; top: 0; z-index: 2; background: #eef0f7 !important; }
+</style>
