@@ -1,0 +1,310 @@
+@page "/export/invoices/{InvoiceTypeString}"
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.ViewModels.Company
+@using DataAccessLibrary.Models.ViewModels.Export
+@attribute [Authorize]
+
+<PageTitle>@GetPageTitle()</PageTitle>
+
+<style>
+    .clickable-row:hover {
+        background-color: rgba(192, 88, 0, 0.05) !important;
+    }
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    /* Fix Blazored Typeahead height to match .form-control-sm */
+    .blazored-typeahead {
+        height: 31px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 29px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    /* Prevent Context Menu from getting cut off */
+    .win11-context-menu-container, .blazor-context-menu {
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+    }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+            <!-- Title -->
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <h5 class="mb-0 fw-bold text-dark-emphasis">
+                    <i class="fas fa-file-invoice-dollar text-primary me-2"></i>
+                    @GetPageTitle()
+                </h5>
+            </div>
+
+            <!-- Filter Row 1 -->
+            <div class="row g-2 mb-3 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Company</label>
+                    <select class="form-select" value="@selectedCompanyId" @onchange="OnCompanyChanged" style="height: 31px;">
+                        <option value="0">&lt;All Companies&gt;</option>
+                        @foreach (var comp in companies)
+                        {
+                            <option value="@comp.EntryID">@comp.CompanyName</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Customer</label>
+                    <BlazoredTypeahead SearchMethod="SearchCustomers"
+                                       EnableDropDown="true"
+                                       Data="customers"
+                                       TValue="CustomerLookupModel"
+                                       TItem="CustomerLookupModel"
+                                       Value="selectedCustomer"
+                                       ValueChanged="OnCustomerChanged"
+                                       ValueExpression="@(() => selectedCustomer)"
+                                       Placeholder="<All Customers>"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="selectedCust">
+                            @selectedCust?.CustCode
+                        </SelectedTemplate>
+                        <ResultTemplate Context="cust">
+                            @cust.CustCode
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Country</label>
+                    <select class="form-select" value="@selectedCountry" @onchange="OnCountryChanged" style="height: 31px;">
+                        <option value="">&lt;All Countries&gt;</option>
+                        @foreach (var c in countries)
+                        {
+                            <option value="@c">@c</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Date Range</label>
+                    <select class="form-select" @bind="selectedDateRange" style="height: 31px;" @bind:after="OnDateRangeChanged">
+                        <option value="15">Last 15 Days</option>
+                        <option value="30">Last 30 Days</option>
+                        <option value="60">Last 60 Days</option>
+                        <option value="90">Last 90 Days</option>
+                        <option value="180">Last 180 Days</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">From Date</label>
+                    <input type="date" class="form-control form-control-sm" style="height: 31px;" @bind="fromDate" disabled="@(selectedDateRange != "custom")" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">To Date</label>
+                    <input type="date" class="form-control form-control-sm" style="height: 31px;" @bind="toDate" disabled="@(selectedDateRange != "custom")" />
+                </div>
+            </div>
+
+            <!-- Filter Row 2 -->
+            <div class="row g-2 mb-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;"><i class="fas fa-search me-1"></i>Search List</label>
+                    <input type="text" class="form-control form-control-sm" placeholder="Search..." @bind="searchText" @bind:event="oninput" style="height: 31px;" />
+                </div>
+                <div class="col d-flex align-items-end justify-content-end gap-2 pb-1" style="height: 31px;">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="LoadData" title="Refresh">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" title="Reports Options">
+                        <i class="fas fa-print me-1"></i> Reports
+                    </button>
+                </div>
+            </div>
+
+            <!-- Grid -->
+            @if (isLoading)
+            {
+                <div class="d-flex align-items-center justify-content-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="card border border-light-subtle rounded-3 overflow-hidden shadow-xs">
+                    <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                <tr>
+                                    <th>S. #</th>
+                                    <th>Customer</th>
+                                    <th>Country</th>
+                                    <th>Invoice #</th>
+                                    <th>Invoice DT</th>
+                                    <th class="text-end">Invoice Amt</th>
+                                    <th>Ship. Mode</th>
+                                    <th>GP Date</th>
+                                    <th>Maturity</th>
+                                    <th>Orders</th>
+                                    <th>D.P Nos</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (allItems.Any())
+                                {
+                                    int index = 1;
+                                    @foreach (var item in allItems)
+                                    {
+                                        var rowItem = item;
+                                        <tr @key="rowItem.CustomInvoice" class="cursor-pointer" @oncontextmenu="@(e => OpenRowContextMenu(e, rowItem))" @oncontextmenu:preventDefault="true">
+                                            <td>@(index++)</td>
+                                            <td>@rowItem.CustCode</td>
+                                            <td>@rowItem.Country</td>
+                                            <td>@rowItem.CustomInvoice</td>
+                                            <td>@rowItem.DT?.ToString("dd-MMM-yyyy")</td>
+                                            <td class="text-end">@($"{rowItem.Curr} {rowItem.TotalAmt:N2}")</td>
+                                            <td>@rowItem.ShippingMode</td>
+                                            <td>@rowItem.GatePassDT?.ToString("dd-MMM-yyyy")</td>
+                                            <td>@rowItem.DTMaturity?.ToString("dd-MMM-yyyy")</td>
+                                            <td class="text-truncate" style="max-width: 150px;" title="@rowItem.InvoiceOrders">@rowItem.InvoiceOrders</td>
+                                            <td class="text-truncate" style="max-width: 100px;" title="@rowItem.DispatchListNos">@rowItem.DispatchListNos</td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="11" class="text-center py-4 text-muted">
+                                            <i class="fas fa-inbox fa-2x mb-2 text-light"></i>
+                                            <p class="mb-0">No invoices found matching your filters.</p>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="card-footer bg-white border-0 py-2 text-muted" style="font-size: 0.8rem;">
+                        Total Records: @allItems.Count
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<ContextMenu Id="rowContextMenu" Template="Win11Style" UseDefaultEventHandlers="true">
+    @if (invoiceType == 0 || invoiceType == 1)
+    {
+        <Item class="win11-menu-item" OnClick="AddInvoice"><i class="fas fa-plus win11-icon"></i> Add New Custom Invoice</Item>
+        <Seperator />
+        <Item class="win11-menu-item" OnClick="EditInvoice"><i class="fas fa-edit win11-icon"></i> Edit This Invoice</Item>
+        <Item class="win11-menu-item text-danger" OnClick="DeleteInvoice"><i class="fas fa-trash-alt win11-icon"></i> Delete Invoice</Item>
+        <Seperator />
+        <Item class="win11-menu-item" OnClick="UpdateRebateRates"><i class="fas fa-percentage win11-icon"></i> Update Rebate Rates</Item>
+        <Item class="win11-menu-item" OnClick="GenerateBatches"><i class="fas fa-layer-group win11-icon"></i> Generate Batches</Item>
+        <Seperator />
+    }
+
+    @if (invoiceType == 2)
+    {
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptInvoice"))"><i class="fas fa-file-invoice win11-icon"></i> Print Invoice</Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptCustomPListDetailed"))"><i class="fas fa-box win11-icon"></i> Print Packing List</Item>
+        <Seperator />
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptLetterToBank"))"><i class="fas fa-university win11-icon"></i> Letter to Bank</Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptLetterToBankSimple"))"><i class="fas fa-envelope win11-icon"></i> Letter to Bank (Simple)</Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptBankSalesContract"))"><i class="fas fa-file-signature win11-icon"></i> Bank Sales Contract</Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptReasonForDelay"))"><i class="fas fa-clock win11-icon"></i> Reason For Delay</Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptReasonForDelaySBP"))"><i class="fas fa-clock win11-icon"></i> Reason For Delay (SBP)</Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptLabReport"))"><i class="fas fa-flask win11-icon"></i> Lab Report</Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptBankUnderTaking1"))"><i class="fas fa-handshake win11-icon"></i> Bank Undertaking 1</Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptBankUnderTaking2"))"><i class="fas fa-handshake win11-icon"></i> Bank Undertaking 2</Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptBankUnderTaking3"))"><i class="fas fa-handshake win11-icon"></i> Bank Undertaking 3</Item>
+        <Seperator />
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptList"))"><i class="fas fa-list win11-icon"></i> Print List</Item>
+    }
+    else
+    {
+        @if (invoiceType == 0)
+        {
+            <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptCustomInvoice"))"><i class="fas fa-print win11-icon"></i> Print Actual Invoice</Item>
+        }
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptInvoice"))"><i class="fas fa-file-invoice win11-icon"></i> Print Invoice</Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptCustomInvoice_USA"))"><i class="fas fa-flag-usa win11-icon"></i> Print USA Invoice</Item>
+        
+        @if (invoiceType == 1)
+        {
+            <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptInvoiceasHandTools"))"><i class="fas fa-tools win11-icon"></i> Print Invoice as Hand Tools</Item>
+        }
+        
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptInvoiceWOCustomerAddress"))"><i class="fas fa-print win11-icon"></i> Print Invoice (W/O Customer Address)</Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptInvoiceDiscount"))"><i class="fas fa-tags win11-icon"></i> Print Invoice (Discount)</Item>
+        
+        @if (invoiceType == 1)
+        {
+            <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptComInvoice_Pay"))"><i class="fas fa-money-check win11-icon"></i> Print Payment Invoice</Item>
+            <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptUSAPaymentInvoice"))"><i class="fas fa-flag-usa win11-icon"></i> Print USA Payment Invoice</Item>
+            <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptComInvoice_Docs"))"><i class="fas fa-file-contract win11-icon"></i> Print Payment Docs</Item>
+        }
+
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptCustomPListDetailed"))"><i class="fas fa-box win11-icon"></i> Print Packing List</Item>
+        
+        @if (invoiceType == 1)
+        {
+            <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptGSP"))"><i class="fas fa-globe win11-icon"></i> Print GSP Invoice</Item>
+        }
+
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptCustomPListCombined"))"><i class="fas fa-boxes win11-icon"></i> Packing List Combined</Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptCustomPListCombinedCustom"))"><i class="fas fa-boxes win11-icon"></i> Packing List Combined (Custom)</Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptBillOfExchange"))"><i class="fas fa-money-bill win11-icon"></i> Print Bill of Exchange</Item>
+        <Seperator />
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptInvPListComparison"))"><i class="fas fa-balance-scale win11-icon"></i> Print Invoice / Packing List Comparison</Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptLabLetter"))"><i class="fas fa-flask win11-icon"></i> Print Lab Test Letter</Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptBankSlipLabTest"))"><i class="fas fa-university win11-icon"></i> Print Bank Slip for Lab Test</Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptUnderTaking"))"><i class="fas fa-handshake win11-icon"></i> Print Undertaking</Item>
+        <Seperator />
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptList"))"><i class="fas fa-list win11-icon"></i> Print List</Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptInvoiceExport"))"><i class="fas fa-file-export win11-icon"></i> Print Invoice (Export)</Item>
+        
+        @if (invoiceType == 1)
+        {
+            <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptDeclarationOfConformity"))"><i class="fas fa-file-signature win11-icon"></i> Print Declaration of Conformity</Item>
+            <Item class="win11-menu-item" OnClick="@(() => PrintReport("rptCertificateOfCompliance"))"><i class="fas fa-certificate win11-icon"></i> Print Certificate of Compliance</Item>
+        }
+    }
+</ContextMenu>
+
+@if (showPasswordModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.45); backdrop-filter: blur(4px);">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-light text-dark py-2" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <h6 class="modal-title fw-bold"><i class="fas fa-lock text-warning me-2"></i>Authorization Required</h6>
+                    <button type="button" class="btn-close" @onclick="() => showPasswordModal = false"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <p class="mb-2" style="font-size:0.85rem;">Please enter the password to proceed:</p>
+                    <input type="password" class="form-control form-control-sm mb-2" @bind="enteredPassword" placeholder="Password" />
+                    @if (!string.IsNullOrEmpty(passwordError))
+                    {
+                        <div class="text-danger" style="font-size:0.8rem;"><i class="fas fa-exclamation-circle me-1"></i>@passwordError</div>
+                    }
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => showPasswordModal = false">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm" @onclick="VerifyPasswordAndExecute">Submit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

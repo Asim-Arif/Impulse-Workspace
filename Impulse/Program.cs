@@ -108,6 +108,9 @@ builder.Services.AddScoped<IArticlewiseShippedStatusDataAccess, ArticlewiseShipp
 builder.Services.AddScoped<IArticlewiseShippedStatusService, ArticlewiseShippedStatusService>();
 builder.Services.AddScoped<IProformaListDataAccess, ProformaListDataAccess>();
 builder.Services.AddScoped<IProformaListService, ProformaListService>();
+
+builder.Services.AddScoped<IInvoiceListDataAccess, InvoiceListDataAccess>();
+builder.Services.AddScoped<IInvoiceListService, InvoiceListService>();
 builder.Services.AddScoped<IEmployeeDataAccess, EmployeeDataAccess>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IDepartmentDataAccess, DepartmentDataAccess>();
