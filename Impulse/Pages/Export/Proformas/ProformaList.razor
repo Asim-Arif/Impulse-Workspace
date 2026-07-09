@@ -1,0 +1,308 @@
+@page "/export/proformas/proforma-list"
+@using DataAccessLibrary.Models.ViewModels.Export
+@using DataAccessLibrary.Models.ViewModels.Company
+@using Blazored.Typeahead
+@using BlazorContextMenu
+
+<PageTitle>Proforma List</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+            
+            <!-- Title -->
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <h5 class="mb-0 fw-bold text-dark-emphasis">
+                    <i class="fas fa-file-invoice text-primary me-2"></i>
+                    Proforma List
+                </h5>
+            </div>
+
+            <!-- Filter Row 1 -->
+            <div class="row g-2 mb-3 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Company</label>
+                    <select class="form-select" value="@selectedCompanyId" @onchange="OnCompanyChanged" style="height: 31px;">
+                        <option value="0">&lt;All Companies&gt;</option>
+                        @foreach (var comp in companies)
+                        {
+                            <option value="@comp.EntryID">@comp.CompanyName</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Customer</label>
+                    <BlazoredTypeahead SearchMethod="SearchCustomers"
+                                       EnableDropDown="true"
+                                       Data="customers"
+                                       TValue="CustomerLookupModel"
+                                       TItem="CustomerLookupModel"
+                                       Value="selectedCustomer"
+                                       ValueChanged="OnCustomerChanged"
+                                       ValueExpression="@(() => selectedCustomer)"
+                                       Placeholder="<All Customers>"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="selectedCust">
+                            @selectedCust?.CustCode
+                        </SelectedTemplate>
+                        <ResultTemplate Context="cust">
+                            @cust.CustCode
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Country</label>
+                    <select class="form-select" value="@selectedCountry" @onchange="OnCountryChanged" style="height: 31px;">
+                        <option value="">&lt;All Countries&gt;</option>
+                        @foreach (var c in countries)
+                        {
+                            <option value="@c">@c</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Date Range</label>
+                    <select class="form-select" @bind="selectedDateRange" style="height: 31px;" @bind:after="OnDateRangeChanged">
+                        <option value="15">Last 15 Days</option>
+                        <option value="30">Last 30 Days</option>
+                        <option value="60">Last 60 Days</option>
+                        <option value="90">Last 90 Days</option>
+                        <option value="180">Last 180 Days</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">From Date</label>
+                    <input type="date" class="form-control form-control-sm" style="height: 31px;" @bind="fromDate" disabled="@(selectedDateRange != "custom")" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">To Date</label>
+                    <input type="date" class="form-control form-control-sm" style="height: 31px;" @bind="toDate" disabled="@(selectedDateRange != "custom")" />
+                </div>
+            </div>
+
+            <!-- Filter Row 2 -->
+            <div class="row g-2 mb-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;"><i class="fas fa-search me-1"></i>Search List</label>
+                    <input type="text" class="form-control form-control-sm" placeholder="Search..." @bind="searchText" @bind:event="oninput" style="height: 31px;" />
+                </div>
+                <div class="col d-flex align-items-end justify-content-end gap-2 pb-1" style="height: 31px;">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="LoadData" title="Refresh">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" id="optionsBarMenuButton" @onclick="OpenOptionsBarMenu" title="Reports Options">
+                        <i class="fas fa-print me-1"></i> Reports
+                    </button>
+                </div>
+            </div>
+
+            <!-- Grid -->
+            @if (isLoading)
+            {
+                <div class="d-flex align-items-center justify-content-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="card border border-light-subtle rounded-3 overflow-hidden shadow-xs">
+                    <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                <tr>
+                                    <th>S. #</th>
+                                    <th>Company</th>
+                                    <th>Customer</th>
+                                    <th>Country</th>
+                                    <th>Proforma #</th>
+                                    <th>Proforma DT</th>
+                                    <th class="text-end">Proforma Amt</th>
+                                    <th>Order(s)</th>
+                                    <th>Internal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (FilteredItems.Any())
+                                {
+                                    int sno = 1;
+                                    foreach (var item in FilteredItems)
+                                    {
+                                        var rowItem = item;
+                                        <tr @key="rowItem.PInvoice" 
+                                            class="clickable-row @GetRowCssClass(rowItem)" 
+                                            @oncontextmenu="@(e => ShowRowContextMenu(e, rowItem))" 
+                                            @oncontextmenu:preventDefault="true">
+                                            <td>@(sno++)</td>
+                                            <td>@rowItem.CompanyName</td>
+                                            <td>@rowItem.CustCode</td>
+                                            <td>@rowItem.Country</td>
+                                            <td>@rowItem.PInvoice</td>
+                                            <td>@rowItem.DT.ToString("dd-MMM-yyyy")</td>
+                                            <td class="text-end">@($"{rowItem.Curr} {rowItem.CalculatedProformaAmt:N2}")</td>
+                                            <td>@rowItem.Orders</td>
+                                            <td>@rowItem.InternalOrders</td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="9" class="text-center text-muted py-4">
+                                            <i class="fas fa-folder-open mb-2 text-secondary opacity-50" style="font-size: 2rem;"></i><br />
+                                            No records found.
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .clickable-row:hover {
+        background-color: rgba(192, 88, 0, 0.05) !important;
+    }
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    /* Fix Blazored Typeahead height to match .form-control-sm */
+    .blazored-typeahead {
+        height: 31px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 29px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important; 
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    /* Prevent Context Menu from getting cut off by ensuring it mathematically fits the viewport */
+    .win11-context-menu-container, .blazor-context-menu {
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+    }
+</style>
+
+<!-- Context Menu: Row Options -->
+<BlazorContextMenu.ContextMenu Id="rowContextMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <div class="win11-section-header">Record Actions</div>
+    <BlazorContextMenu.Item class="win11-menu-item" OnClick="@DeleteProforma">
+        <i class="fas fa-trash fa-fw win11-icon text-danger"></i> Delete Proforma
+    </BlazorContextMenu.Item>
+    <div class="win11-divider"></div>
+    <div class="win11-section-header">Proforma Printing</div>
+    <BlazorContextMenu.Item class="win11-menu-item" OnClick="@(() => PrintProforma())">
+        <i class="fas fa-print fa-fw win11-icon text-primary"></i> Print Proforma
+    </BlazorContextMenu.Item>
+    <BlazorContextMenu.Item class="win11-menu-item" OnClick="@PrintUSAProforma">
+        <i class="fas fa-file-invoice-dollar fa-fw win11-icon text-primary"></i> Print USA Proforma
+    </BlazorContextMenu.Item>
+    <BlazorContextMenu.Item class="win11-menu-item" OnClick="@ShowCompanyOverrideModal">
+        <i class="fas fa-building fa-fw win11-icon text-primary"></i> Print Proforma (Company Selection)
+    </BlazorContextMenu.Item>
+    <BlazorContextMenu.Item class="win11-menu-item" OnClick="@ShowDiscountModal">
+        <i class="fas fa-tags fa-fw win11-icon text-primary"></i> Print Proforma (Discount)
+    </BlazorContextMenu.Item>
+    <BlazorContextMenu.Item class="win11-menu-item" OnClick="@PrintProformaWD">
+        <i class="fas fa-file-alt fa-fw win11-icon text-primary"></i> Print Proforma Without Details
+    </BlazorContextMenu.Item>
+</BlazorContextMenu.ContextMenu>
+
+<!-- Context Menu: Options Bar Menu (Reports) -->
+<BlazorContextMenu.ContextMenu Id="optionsBarMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <div class="win11-section-header">General Reports</div>
+    <BlazorContextMenu.Item class="win11-menu-item" OnClick="@PrintList">
+        <i class="fas fa-list fa-fw win11-icon"></i> Print List
+    </BlazorContextMenu.Item>
+</BlazorContextMenu.ContextMenu>
+
+<!-- Modals -->
+@if (showCompanyModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.45); backdrop-filter: blur(4px);">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-light text-dark py-2" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <h6 class="modal-title fw-bold">Select Company</h6>
+                    <button type="button" class="btn-close" @onclick="() => showCompanyModal = false"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <select class="form-select form-select-sm" @bind="overrideCompanyId">
+                        <option value="0">&lt;Select Company&gt;</option>
+                        @foreach (var comp in companies)
+                        {
+                            <option value="@comp.EntryID">@comp.CompanyName</option>
+                        }
+                    </select>
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => showCompanyModal = false">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm" @onclick="PrintProformaCompanySelection" disabled="@(overrideCompanyId == 0)">Print</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showDiscountModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.45); backdrop-filter: blur(4px);">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-light text-dark py-2" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <h6 class="modal-title fw-bold">Enter Discount</h6>
+                    <button type="button" class="btn-close" @onclick="() => showDiscountModal = false"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <input type="number" class="form-control form-control-sm" @bind="overrideDiscount" placeholder="0.00" />
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => showDiscountModal = false">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm" @onclick="PrintProformaDiscount">Print</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showPasswordModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.45); backdrop-filter: blur(4px);">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-light text-dark py-2" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <h6 class="modal-title fw-bold"><i class="fas fa-lock text-warning me-2"></i>Authorization Required</h6>
+                    <button type="button" class="btn-close" @onclick="() => showPasswordModal = false"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <p class="mb-2" style="font-size:0.85rem;">Please enter the password to proceed:</p>
+                    <input type="password" class="form-control form-control-sm mb-2" @bind="enteredPassword" placeholder="Password" />
+                    @if (!string.IsNullOrEmpty(passwordError))
+                    {
+                        <div class="text-danger" style="font-size:0.8rem;"><i class="fas fa-exclamation-circle me-1"></i>@passwordError</div>
+                    }
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => showPasswordModal = false">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm" @onclick="VerifyPasswordAndExecute">Submit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

@@ -1,0 +1,373 @@
+@page "/export/orders/articlewise-shipped-status"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Export
+@using DataAccessLibrary.Models.ViewModels.Company
+@using Blazored.Typeahead
+@using BlazorContextMenu
+
+<PageTitle>Articlewise Shipped Status</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+            
+            <!-- Title -->
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <h5 class="mb-0 fw-bold text-dark-emphasis">
+                    <i class="fas fa-boxes text-primary me-2"></i>
+                    Articlewise Shipped Status
+                </h5>
+            </div>
+
+            <!-- Filter Row -->
+            <div class="row g-2 mb-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Customer</label>
+                    <BlazoredTypeahead SearchMethod="SearchCustomers"
+                                       EnableDropDown="true"
+                                       Data="customers"
+                                       TValue="CustomerLookupModel"
+                                       TItem="CustomerLookupModel"
+                                       Value="selectedCustomer"
+                                       ValueChanged="OnCustomerChanged"
+                                       ValueExpression="@(() => selectedCustomer)"
+                                       Placeholder="<All Customers>"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="selectedCust">
+                            @selectedCust?.CustCode
+                        </SelectedTemplate>
+                        <ResultTemplate Context="cust">
+                            @cust.CustCode
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Country</label>
+                    <select class="form-select" value="@selectedCountry" @onchange="OnCountryChanged" disabled="@(selectedCustomer == null || selectedCustomer.CustCode == "0")">
+                        <option value="">&lt;All Countries&gt;</option>
+                        @foreach (var c in countries)
+                        {
+                            <option value="@c">@c</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Article</label>
+                    <BlazoredTypeahead SearchMethod="SearchArticles"
+                                       EnableDropDown="true"
+                                       Data="articles"
+                                       TValue="ItemLookupModel"
+                                       TItem="ItemLookupModel"
+                                       Value="selectedArticle"
+                                       ValueChanged="OnArticleChanged"
+                                       ValueExpression="@(() => selectedArticle)"
+                                       Placeholder="<Select Article>"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="selectedItem">
+                            @selectedItem?.ItemID - @selectedItem?.ItemName
+                        </SelectedTemplate>
+                        <ResultTemplate Context="item">
+                            @item.ItemID - @item.ItemName
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col d-flex align-items-end justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="LoadData" title="Refresh" disabled="@(selectedArticle == null)">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                    <button type="button" class="btn btn-primary" id="optionsBarMenuButton" @onclick="OpenOptionsBarMenu" title="Reports Options" disabled="@(selectedArticle == null)">
+                        <i class="fas fa-print me-1"></i> Reports
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <ul class="nav nav-tabs mb-3" id="shippedStatusTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="shipped-tab" data-bs-toggle="tab" data-bs-target="#shipped" type="button" role="tab" aria-controls="shipped" aria-selected="true">
+                        Shipped Status
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="unshipped-tab" data-bs-toggle="tab" data-bs-target="#unshipped" type="button" role="tab" aria-controls="unshipped" aria-selected="false">
+                        Unshipped Status
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="prices-tab" data-bs-toggle="tab" data-bs-target="#prices" type="button" role="tab" aria-controls="prices" aria-selected="false">
+                        Customer Prices
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="quotations-tab" data-bs-toggle="tab" data-bs-target="#quotations" type="button" role="tab" aria-controls="quotations" aria-selected="false">
+                        Quotations
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="shippedStatusTabsContent">
+                
+                <!-- Tab 1: Shipped Status -->
+                <div class="tab-pane fade show active" id="shipped" role="tabpanel" aria-labelledby="shipped-tab">
+                    <div class="card border border-light-subtle rounded-3 overflow-hidden shadow-xs">
+                        <div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                    <tr>
+                                        <th>Sr. No.</th>
+                                        <th>Invoice #</th>
+                                        <th>Date</th>
+                                        <th class="text-end">Qty</th>
+                                        <th class="text-end">Price</th>
+                                        <th class="text-end">Amount</th>
+                                        <th>Order No.</th>
+                                        <th class="text-center">Days</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (shippedInvoices == null || !shippedInvoices.Any())
+                                    {
+                                        <tr><td colspan="8" class="text-center text-muted py-3">No shipped records found.</td></tr>
+                                    }
+                                    else
+                                    {
+                                        int sNo = 1;
+                                        @foreach (var inv in shippedInvoices)
+                                        {
+                                            <tr>
+                                                <td>@(sNo++)</td>
+                                                <td>@inv.CustomInvoice</td>
+                                                <td>@(inv.GatePassDT?.ToString("dd-MMM-yyyy") ?? "-")</td>
+                                                <td class="text-end">@inv.Qty.ToString("N0")</td>
+                                                <td class="text-end">@inv.Price.ToString("N2")</td>
+                                                <td class="text-end">@inv.Amount.ToString("N2")</td>
+                                                <td>@inv.OrderNo</td>
+                                                <td class="text-center">@inv.Days</td>
+                                            </tr>
+                                        }
+                                        <tr class="table-light fw-bold">
+                                            <td colspan="3" class="text-end">Total:</td>
+                                            <td class="text-end">@shippedInvoices.Sum(x => x.Qty).ToString("N0")</td>
+                                            <td colspan="4"></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Unshipped Status -->
+                <div class="tab-pane fade" id="unshipped" role="tabpanel" aria-labelledby="unshipped-tab">
+                    <div class="card border border-light-subtle rounded-3 overflow-hidden shadow-xs">
+                        <div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                    <tr>
+                                        <th>Sr. No.</th>
+                                        <th>Customer</th>
+                                        <th>Order No.</th>
+                                        <th>Proforma</th>
+                                        <th class="text-end">Qty Ordered</th>
+                                        <th class="text-end">Qty Shipped</th>
+                                        <th class="text-end">Balance</th>
+                                        <th class="text-end">Price</th>
+                                        <th class="text-end">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (unshippedOrders == null || !unshippedOrders.Any())
+                                    {
+                                        <tr><td colspan="9" class="text-center text-muted py-3">No unshipped orders found.</td></tr>
+                                    }
+                                    else
+                                    {
+                                        int sNo = 1;
+                                        @foreach (var ord in unshippedOrders)
+                                        {
+                                            <tr>
+                                                <td>@(sNo++)</td>
+                                                <td>@ord.CustCode</td>
+                                                <td>@ord.OrderNo</td>
+                                                <td>@ord.Proformas</td>
+                                                <td class="text-end">@ord.Qty.ToString("N0")</td>
+                                                <td class="text-end">@ord.ShippedQty.ToString("N0")</td>
+                                                <td class="text-end fw-bold">@ord.BalanceQty.ToString("N0")</td>
+                                                <td class="text-end">@ord.Price.ToString("N2")</td>
+                                                <td class="text-end">@ord.Amount.ToString("N2")</td>
+                                            </tr>
+                                        }
+                                        <tr class="table-light fw-bold">
+                                            <td colspan="6" class="text-end">Total Unshipped Balance:</td>
+                                            <td class="text-end">@unshippedOrders.Sum(x => x.BalanceQty).ToString("N0")</td>
+                                            <td colspan="2"></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Customer Prices -->
+                <div class="tab-pane fade" id="prices" role="tabpanel" aria-labelledby="prices-tab">
+                    <div class="card border border-light-subtle rounded-3 overflow-hidden shadow-xs">
+                        <div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                    <tr>
+                                        <th>Cust Code</th>
+                                        <th class="text-end">FOB-KHI</th>
+                                        <th class="text-end">FOB-SKT</th>
+                                        <th class="text-end">C&I Sea</th>
+                                        <th class="text-end">C&I Air</th>
+                                        <th class="text-end">CIF Sea</th>
+                                        <th class="text-end">CIF Air</th>
+                                        <th class="text-end">CnF Sea</th>
+                                        <th class="text-end">CnF Air</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (customerPrices == null || !customerPrices.Any())
+                                    {
+                                        <tr><td colspan="9" class="text-center text-muted py-3">No custom prices found.</td></tr>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var cp in customerPrices)
+                                        {
+                                            <tr>
+                                                <td>@cp.CustCode</td>
+                                                @RenderPriceCell(cp, "FOB", cp.FOB)
+                                                @RenderPriceCell(cp, "ExWorks", cp.ExWorks)
+                                                @RenderPriceCell(cp, "CnISea", cp.CnISea)
+                                                @RenderPriceCell(cp, "CnIAir", cp.CnIAir)
+                                                @RenderPriceCell(cp, "CIFSea", cp.CIFSea)
+                                                @RenderPriceCell(cp, "CIFAir", cp.CIFAir)
+                                                @RenderPriceCell(cp, "CnFSea", cp.CnFSea)
+                                                @RenderPriceCell(cp, "CnFAir", cp.CnFAir)
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-muted" style="font-size: 0.8rem;">
+                        <i class="fas fa-info-circle me-1"></i>Double-click a price cell to edit its value.
+                    </div>
+                </div>
+
+                <!-- Tab 4: Quotations -->
+                <div class="tab-pane fade" id="quotations" role="tabpanel" aria-labelledby="quotations-tab">
+                    <div class="card border border-light-subtle rounded-3 overflow-hidden shadow-xs">
+                        <div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                    <tr>
+                                        <th>Sr. No.</th>
+                                        <th>Customer</th>
+                                        <th>Quot #</th>
+                                        <th class="text-end">Qty</th>
+                                        <th class="text-end">Price</th>
+                                        <th class="text-end">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (quotations == null || !quotations.Any())
+                                    {
+                                        <tr><td colspan="6" class="text-center text-muted py-3">No quotations found.</td></tr>
+                                    }
+                                    else
+                                    {
+                                        int sNo = 1;
+                                        @foreach (var q in quotations)
+                                        {
+                                            <tr>
+                                                <td>@(sNo++)</td>
+                                                <td>@q.CustCode</td>
+                                                <td>@q.QuotationNo</td>
+                                                <td class="text-end">@q.Qty.ToString("N0")</td>
+                                                <td class="text-end">@q.Price.ToString("N2")</td>
+                                                <td class="text-end">@q.Amount.ToString("N2")</td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+</div>
+
+<!-- Password Prompt Modal -->
+<style>
+    /* Prevent Context Menu from getting cut off by ensuring it mathematically fits the viewport */
+    .win11-context-menu-container, .blazor-context-menu {
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+    }
+</style>
+
+@if (showPasswordModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.45); backdrop-filter: blur(4px);">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-warning text-dark border-0 py-2" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <h6 class="modal-title fw-bold"><i class="fas fa-lock me-2"></i>Authorization Required</h6>
+                    <button type="button" class="btn-close" @onclick="() => showPasswordModal = false"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <p class="text-secondary" style="font-size: 0.85rem;">Enter password to edit price:</p>
+                    <input type="password" class="form-control form-control-sm" @bind="enteredPassword" placeholder="Password..." @onkeyup="@(async (e) => { if (e.Key == "Enter") await VerifyPasswordAndSave(); })" />
+                    @if (!string.IsNullOrEmpty(passwordError))
+                    {
+                        <div class="text-danger mt-1" style="font-size: 0.75rem;">@passwordError</div>
+                    }
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelEdit">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm" @onclick="VerifyPasswordAndSave">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<BlazorContextMenu.ContextMenu Id="optionsMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <div class="win11-section-header">Reports</div>
+    <BlazorContextMenu.Item class="win11-menu-item" OnClick="@PrintShipped">
+        <i class="fas fa-print fa-fw win11-icon text-primary"></i> Print Shipped
+    </BlazorContextMenu.Item>
+    <BlazorContextMenu.Item class="win11-menu-item" OnClick="@PrintUnShipped">
+        <i class="fas fa-print fa-fw win11-icon text-primary"></i> Print Unshipped
+    </BlazorContextMenu.Item>
+</BlazorContextMenu.ContextMenu>
+
+@code {
+    private RenderFragment RenderPriceCell(ArticleCustomerPriceModel cp, string columnName, double value)
+    {
+        return @<td class="text-end" @ondblclick="() => BeginEditPrice(cp, columnName, value)" style="cursor: pointer;">
+            @if (cp.IsEditing && cp.EditingColumn == columnName)
+            {
+                <input type="number" class="form-control form-control-sm text-end" style="width: 80px; display: inline-block;"
+                       @bind="cp.EditPrice"
+                       @onkeyup="@(async (e) => await HandlePriceKeyUp(e, cp))"
+                       @onblur="CancelEdit"
+                       id="editPrice_@(cp.EntryID)_@(columnName)" />
+            }
+            else
+            {
+                <span class="text-primary text-decoration-underline">@value.ToString("N2")</span>
+            }
+        </td>;
+    }
+}

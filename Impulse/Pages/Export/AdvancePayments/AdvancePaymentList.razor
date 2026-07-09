@@ -1,0 +1,345 @@
+@page "/export/advance-payment-list"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Export
+@using Impulse.Services
+@using Blazored.Typeahead
+@using BlazorContextMenu
+
+<style>
+    .clickable-row:hover {
+        background-color: rgba(192, 88, 0, 0.05) !important;
+    }
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    input.form-control-sm, select.form-select-sm {
+        height: 31px !important;
+    }
+    .blazored-typeahead {
+        height: 31px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 29px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    .win11-context-menu-container, .blazor-context-menu {
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+    }
+</style>
+
+<PageTitle>Advance Payment List</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <!-- Title -->
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <h5 class="mb-0 fw-bold text-dark-emphasis">
+                    <i class="fas fa-money-check-alt text-primary me-2"></i>
+                    Advance Payment List
+                </h5>
+            </div>
+
+            <!-- Filter Toolbar -->
+            <div class="row g-2 mb-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Customer</label>
+                    <BlazoredTypeahead SearchMethod="SearchCustomers"
+                                       Data="Customers"
+                                       TValue="CustomerLookupModel"
+                                       TItem="CustomerLookupModel"
+                                       Value="SelectedCustomer"
+                                       ValueChanged="OnCustomerSelected"
+                                       ValueExpression="@(() => SelectedCustomer)"
+                                       EnableDropDown="true"
+                                       Placeholder="All Customers">
+                        <SelectedTemplate Context="cust">
+                            @cust.CustCode
+                        </SelectedTemplate>
+                        <ResultTemplate Context="cust">
+                            @cust.CustCode
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Country</label>
+                    <select class="form-select form-select-sm" @bind="SelectedCountry" @bind:after="LoadData">
+                        <option value="<All Countries>">&lt;All Countries&gt;</option>
+                        @foreach (var c in Countries)
+                        {
+                            <option value="@c">@c</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Range</label>
+                    <select class="form-select form-select-sm" @bind="SelectedRange" @bind:after="OnRangeChanged">
+                        <option value="0">Today</option>
+                        <option value="1">Last 15 Days</option>
+                        <option value="2">Last 30 Days</option>
+                        <option value="3">Last 60 Days</option>
+                        <option value="4">Custom Range</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Date From</label>
+                    <input type="date" class="form-control form-control-sm" @bind="DtFrom" disabled="@(!IsCustomRange)" @bind:after="LoadData" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Date To</label>
+                    <input type="date" class="form-control form-control-sm" @bind="DtTo" disabled="@(!IsCustomRange)" @bind:after="LoadData" />
+                </div>
+            </div>
+
+            <!-- Actions Bar -->
+            <div class="d-flex justify-content-between mb-3">
+                <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm" @onclick="AddNew">
+                    <i class="fas fa-plus me-1"></i> Add Advance Payment
+                </button>
+                <div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 me-2 shadow-sm" @onclick="LoadData">
+                        <i class="fas fa-sync-alt me-1"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Data Grid -->
+            <div class="table-responsive" style="max-height: 60vh; border-radius: 8px;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                    <thead class="table-light text-secondary sticky-top" style="z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th class="text-center" style="width: 50px;">S#</th>
+                            <th>Cust Code</th>
+                            <th>Entry ID</th>
+                            <th>Country</th>
+                            <th>Advice No</th>
+                            <th>Date</th>
+                            <th class="text-end">Amount</th>
+                            <th class="text-end">Exch. Rate</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="10" class="text-center py-5">
+                                    <div class="spinner-border text-primary spinner-border-sm" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <span class="ms-2 text-muted">Loading Data...</span>
+                                </td>
+                            </tr>
+                        }
+                        else if (!Payments.Any())
+                        {
+                            <tr>
+                                <td colspan="10" class="text-center text-muted py-4">No records found.</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            int sno = 1;
+                            foreach (var item in Payments)
+                            {
+                                var current = item;
+                                <ContextMenuTrigger MenuId="contextMenu" Data="current" WrapperTag="tr" CssClass="clickable-row">
+
+                                        <td class="text-center text-muted">@(sno++)</td>
+                                        <td class="text-nowrap fw-semibold text-primary">@item.CustCode</td>
+                                        <td>@item.EntryID</td>
+                                        <td>@item.Country</td>
+                                        <td>@item.AdviceNo</td>
+                                        <td>@(item.DT?.ToString("dd-MMM-yyyy"))</td>
+                                        <td class="text-end text-success fw-semibold">@item.Amount.ToString("N2")</td>
+                                        <td class="text-end">
+                                            @if (EditingExchRateEntryID == item.EntryID)
+                                            {
+                                                <input type="number" step="0.01" class="form-control form-control-sm d-inline-block text-end" 
+                                                       style="width: 80px;" @bind="NewExchRate" 
+                                                       @onkeyup="@(e => HandleExchRateKeyUp(e, current))" 
+                                                       @onblur="@(() => SaveExchangeRate(current))"
+                                                       id="@($"exch_{item.EntryID}")" />
+                                            }
+                                            else
+                                            {
+                                                @item.ExchRate.ToString("N4")
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (item.Status == "Ready to Post")
+                                            {
+                                                <span class="badge bg-info text-dark">Ready to Post</span>
+                                            }
+                                            else if (item.Status == "Update Exchange Rate")
+                                            {
+                                                <span class="badge bg-warning text-dark">Update Exchange Rate</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-success">@item.Status</span>
+                                            }
+                                        </td>
+
+                                </ContextMenuTrigger>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<ContextMenu Id="contextMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    @if (context.Data is AdvancePaymentListViewModel item)
+    {
+        <div class="win11-section-header">Advance Payment: @item.EntryID</div>
+        
+        <Item class="win11-menu-item" OnClick="@(() => Edit(item))" Disabled="@(item.Status == "Posted to Financial")">
+            <i class="fas fa-edit fa-fw win11-icon text-primary"></i> Edit
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => Print(item))">
+            <i class="fas fa-print fa-fw win11-icon"></i> Print
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => ShowUsageDetail(item))">
+            <i class="fas fa-list fa-fw win11-icon text-info"></i> Show Usage Detail
+        </Item>
+
+        <div class="win11-divider"></div>
+        <div class="win11-section-header">Actions</div>
+
+        @if (item.Status == "Update Exchange Rate")
+        {
+            <Item class="win11-menu-item" OnClick="@(() => BeginEditExchangeRate(item))">
+                <i class="fas fa-exchange-alt fa-fw win11-icon text-warning"></i> Update Exchange Rate
+            </Item>
+        }
+        else if (item.Status == "Ready to Post")
+        {
+            <Item class="win11-menu-item" OnClick="@(() => PostToFinancial(item))">
+                <i class="fas fa-share-square fa-fw win11-icon text-success"></i> Post to Financial
+            </Item>
+        }
+    }
+</ContextMenu>
+
+<style>
+    .clickable-row { display: table-row; cursor: context-menu; }
+    .clickable-row:hover { background-color: rgba(0, 123, 255, 0.05) !important; }
+    /* Win11 Context Menu Styles */
+    .win11-section-header {
+        padding: 4px 12px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: #8c8c8c;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .win11-divider {
+        height: 1px;
+        background-color: #e5e5e5;
+        margin: 4px 0;
+    }
+    .win11-menu-item {
+        padding: 6px 16px;
+        font-size: 0.85rem;
+        color: #333;
+        display: flex;
+        align-items: center;
+        transition: background-color 0.1s;
+        cursor: pointer;
+    }
+    .win11-menu-item:hover {
+        background-color: rgba(0, 120, 212, 0.1);
+        border-radius: 4px;
+        margin: 0 4px;
+        padding: 6px 12px;
+    }
+    .win11-menu-item.blazor-context-menu--disabled {
+        color: #a0a0a0;
+        cursor: not-allowed;
+    }
+    .win11-menu-item.blazor-context-menu--disabled:hover {
+        background-color: transparent;
+    }
+    .win11-icon {
+        margin-right: 12px;
+        font-size: 1rem;
+        opacity: 0.8;
+    }
+</style>
+
+@if (ShowUsageModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Usage Details</h5>
+                    <button type="button" class="btn-close" @onclick="CloseUsageModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (UsageDetails == null)
+                    {
+                        <div class="text-center py-3">
+                            <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+                            <span class="ms-2">Loading...</span>
+                        </div>
+                    }
+                    else if (!UsageDetails.Any())
+                    {
+                        <div class="alert alert-info mb-0">No usage details found.</div>
+                    }
+                    else
+                    {
+                        <table class="table table-sm table-bordered mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>S#</th>
+                                    <th>Invoice No</th>
+                                    <th class="text-end">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{ int usageSno = 1; decimal usageTotal = 0; }
+                                @foreach (var detail in UsageDetails)
+                                {
+                                    usageTotal += detail.Amount;
+                                    <tr>
+                                        <td>@(usageSno++)</td>
+                                        <td>@detail.CustomInvoice</td>
+                                        <td class="text-end">@detail.Amount.ToString("N2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <th colspan="2" class="text-end">Total:</th>
+                                    <th class="text-end text-danger">@usageTotal.ToString("N2")</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    }
+                </div>
+                <div class="modal-footer py-1">
+                    <button type="button" class="btn btn-secondary btn-sm" @onclick="CloseUsageModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

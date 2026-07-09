@@ -14,7 +14,7 @@ You are an expert .NET/Blazor developer working on a legacy VB6 ERP migration pr
 ## 3. UI/UX & Design System
 - **Design Tokens:** Adhere strictly to the Material Design 3 (MD3) styling established in our layout files. Maintain consistent spacing, padding, and border radiuses.
 - **Form Fields:** Use `BlazorTypeahead` for lookups, dropdown selectors, and search fields.
-- **Context Menus:** Use `BlazorContextMenu`. If a context menu is triggered via a top action button ("Options"), override the default mouse-click coordinate auto-flip logic by passing a fixed vertical Y-coordinate offset to force the menu to open downwards cleanly.
+- **Context Menus:** Always use `BlazorContextMenu` with `Template="Win11Style"`. Include the necessary CSS classes (`win11-section-header`, `win11-menu-item`, `win11-icon`) and the scoped `<style>` block for `max-height: 40vh` to prevent cutoff. If a context menu is triggered via a top action button ("Options"), override the default mouse-click coordinate auto-flip logic by passing a fixed vertical Y-coordinate offset to force the menu to open downwards cleanly.
 
 ## 4. Verification
 - All code must compile cleanly using a standard `dotnet build` without runtime errors or missing references.
@@ -49,4 +49,8 @@ When a new page or form is introduced, you must completely wire it into the appl
 - **Child Tab Components:** Every individual tab must be extracted into its own completely separate, isolated child component file (e.g., `GeneralTab.razor`, `PricingTab.razor`). 
 - **State Communication:** Pass the master data model down from the parent shell to these child tab components using cascading parameters or standard component data binding, ensuring all data updates feed back cleanly into the unified master state.
 
-- **Code-Behind & C# Logic Reference:** If there is any structural or architectural confusion when writing the backend logic, use `EmployeeList.razor.cs` (or `EmployeeList.cs`) and `Customer.cs` as your definitive reference guides for service consumption, error handling, and data mapping.
+- **Code-Behind & C# Logic Reference:** If there is any structural or architectural confusion when writing the backend logic, use `EmployeeList.razor.cs` (or `EmployeeList.cs`) and `Customer.cs` as your definitive reference guides for service consumption, error handling, and data mapping.## 11. Consistent Form Inputs and Feature Parity
+- **Input Sizing:** Always use small variants for form controls (orm-control-sm, orm-select-sm, tn-sm) to match the legacy density.
+- **BlazoredTypeahead Sizing:** Ensure BlazoredTypeahead elements have a forced height of 31px via scoped CSS (e.g., <style>.blazored-typeahead { height: 31px !important; } ...</style>) to perfectly align with standard .form-control-sm.
+- **Right-Click / Context Menus:** Always carefully review the legacy VB6 .frm files for MouseDown events or Menu definitions (e.g., mnuShowUsageDetail) to guarantee no context menu actions are missed during migration.
+- **Table Wrapper Bug:** When using BlazorContextMenu's <ContextMenuTrigger> inside a table 	body, you MUST use WrapperTag="tr" and omit the internal HTML <tr> tag to prevent breaking the table grid layout.

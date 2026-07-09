@@ -16,7 +16,10 @@ using Impulse.Areas.Identity;
 using Impulse.Configurations;
 using Impulse.Data;
 using Impulse.Services;
+using Impulse.Services.Export;
 using Impulse.Services.Integrations;
+using DataAccessLibrary.Interface.Export;
+using DataAccessLibrary.DAC.Export;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -97,6 +100,14 @@ builder.Services.AddRadzenComponents();
 builder.Services.AddScoped<Radzen.NotificationService>();
 
 builder.Services.AddScoped<IVoucherService, VoucherService>();
+builder.Services.AddTransient<ICustomerOrderDataAccess, CustomerOrderDataAccess>();
+builder.Services.AddTransient<ICustomerOrderService, CustomerOrderService>();
+builder.Services.AddTransient<ICustomerItemBalancesDataAccess, CustomerItemBalancesDataAccess>();
+builder.Services.AddScoped<ICustomerItemBalancesService, CustomerItemBalancesService>();
+builder.Services.AddScoped<IArticlewiseShippedStatusDataAccess, ArticlewiseShippedStatusDataAccess>();
+builder.Services.AddScoped<IArticlewiseShippedStatusService, ArticlewiseShippedStatusService>();
+builder.Services.AddScoped<IProformaListDataAccess, ProformaListDataAccess>();
+builder.Services.AddScoped<IProformaListService, ProformaListService>();
 builder.Services.AddScoped<IEmployeeDataAccess, EmployeeDataAccess>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IDepartmentDataAccess, DepartmentDataAccess>();
@@ -140,6 +151,15 @@ builder.Services.AddScoped<Impulse.Services.IForeignCustomerService, Impulse.Ser
 
 builder.Services.AddScoped<DataAccessLibrary.Interface.Export.ICustomerOrderDataAccess, DataAccessLibrary.DAC.Export.CustomerOrderDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Export.ICustomerOrderService, Impulse.Services.Export.CustomerOrderService>();
+
+builder.Services.AddScoped<DataAccessLibrary.Interface.Export.ICustomerQuotationDataAccess, DataAccessLibrary.DAC.Export.CustomerQuotationDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Export.ICustomerQuotationService, Impulse.Services.Export.CustomerQuotationService>();
+
+builder.Services.AddScoped<DataAccessLibrary.Interface.Export.IAdvancePaymentDataAccess, DataAccessLibrary.DAC.Export.AdvancePaymentDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Export.IAdvancePaymentService, Impulse.Services.Export.AdvancePaymentService>();
+
+builder.Services.AddScoped<DataAccessLibrary.Interface.Export.IOrderItemListDataAccess, DataAccessLibrary.DAC.Export.OrderItemListDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Export.IOrderItemListService, Impulse.Services.Export.OrderItemListService>();
 
 
 builder.Services.AddScoped<LoadingService>();

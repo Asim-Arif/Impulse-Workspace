@@ -1,0 +1,328 @@
+@page "/export/order-item-list"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Export
+@using Impulse.Services.Export
+@using Microsoft.AspNetCore.Components.Authorization
+
+<PageTitle>Order Item List</PageTitle>
+
+<style>
+    .clickable-row:hover { background-color: rgba(13, 110, 253, 0.05) !important; }
+    .clickable-row { cursor: pointer; }
+    input.form-control-sm, select.form-select-sm { height: 31px !important; }
+    .filter-check-group { gap: 1rem; }
+    .urgent-row { background-color: rgba(220, 53, 69, 0.08) !important; }
+    .overdue-text { color: #dc3545; font-weight: 600; }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255,255,255,0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <!-- Title -->
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <h5 class="mb-0 fw-bold text-dark-emphasis">
+                    <i class="fas fa-clipboard-list text-primary me-2"></i>
+                    Order Item List
+                </h5>
+                @if (!isLoading)
+                {
+                    <span class="badge bg-secondary ms-3">@allItems.Count item(s)</span>
+                }
+            </div>
+
+            <!-- Filter Row 1: Customer / Country / Item Group / Order No -->
+            <div class="row g-2 mb-2 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Customer</label>
+                    <BlazoredTypeahead SearchMethod="SearchCustomers"
+                                       EnableDropDown="true"
+                                       Data="customers"
+                                       TValue="CustomerLookupModel"
+                                       TItem="CustomerLookupModel"
+                                       Value="selectedCustomer"
+                                       ValueChanged="OnCustomerChanged"
+                                       ValueExpression="@(() => selectedCustomer)"
+                                       Placeholder="<All Customers>"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="selectedCust">
+                            @selectedCust?.CustCode
+                        </SelectedTemplate>
+                        <ResultTemplate Context="cust">
+                            @cust.CustCode
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Country</label>
+                    <select class="form-select form-select-sm" @onchange="OnCountryChanged">
+                        <option value="<All Countries>">&lt;All Countries&gt;</option>
+                        @foreach (var c in countries)
+                        {
+                            <option value="@c">@c</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Item Group</label>
+                    <BlazoredTypeahead SearchMethod="SearchItemGroups"
+                                       EnableDropDown="true"
+                                       Data="itemGroups"
+                                       TValue="OrderItemGroupLookupModel"
+                                       TItem="OrderItemGroupLookupModel"
+                                       Value="selectedItemGroup"
+                                       ValueChanged="OnGroupChanged"
+                                       ValueExpression="@(() => selectedItemGroup)"
+                                       Placeholder="<All Groups>"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="selectedGroup">
+                            @selectedGroup?.Description
+                        </SelectedTemplate>
+                        <ResultTemplate Context="group">
+                            @group.Description
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Order No</label>
+                    <BlazoredTypeahead SearchMethod="SearchOrderNos"
+                                       EnableDropDown="true"
+                                       Data="orderNos"
+                                       TValue="OrderNoLookupModel"
+                                       TItem="OrderNoLookupModel"
+                                       Value="selectedOrderNo"
+                                       ValueChanged="OnOrderNoChanged"
+                                       ValueExpression="@(() => selectedOrderNo)"
+                                       Placeholder="<All Orders>"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="selectedOrd">
+                            @selectedOrd?.DisplayText
+                        </SelectedTemplate>
+                        <ResultTemplate Context="ord">
+                            @ord.DisplayText
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <!-- Checkboxes -->
+                <div class="col-md-4 d-flex align-items-center filter-check-group pb-1">
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkNoDelivery" checked="@filterNoDelivery" @onchange="OnNoDeliveryChanged" />
+                        <label class="form-check-label" for="chkNoDelivery" style="font-size:0.82rem;">No Delivery Date</label>
+                    </div>
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkBoth" checked="@filterBoth" @onchange="OnBothChanged" />
+                        <label class="form-check-label" for="chkBoth" style="font-size:0.82rem;">Both</label>
+                    </div>
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkUrgent" checked="@filterUrgent" @onchange="OnUrgentChanged" />
+                        <label class="form-check-label text-danger fw-semibold" for="chkUrgent" style="font-size:0.82rem;">Urgent</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter Row 2: Date Range / Dates / Refresh / Reports -->
+            <div class="row g-2 mb-3 align-items-end">
+                <div class="col-auto">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Date Range</label>
+                    <select class="form-select form-select-sm" value="@filterRange" @onchange="OnDateRangeChanged">
+                        <option value="0">Next 15 Days</option>
+                        <option value="1">Next 30 Days</option>
+                        <option value="2">Next 45 Days</option>
+                        <option value="3">Custom</option>
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">From</label>
+                    <input type="date" class="form-control form-control-sm" @bind="dtFrom" disabled="@(!isCustomRange)" @bind:after="LoadData" />
+                </div>
+                <div class="col-auto">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">To</label>
+                    <input type="date" class="form-control form-control-sm" @bind="dtTo" disabled="@(!isCustomRange)" @bind:after="LoadData" />
+                </div>
+                <div class="col d-flex align-items-end justify-content-end gap-2 pb-1">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="LoadData" title="Refresh">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" id="optionsBarMenuButton" @onclick="OpenOptionsBarMenu" title="Reports Options">
+                        <i class="fas fa-print me-1"></i> Reports
+                    </button>
+                </div>
+            </div>
+
+            <!-- Grid -->
+            @if (isLoading)
+            {
+                <div class="d-flex align-items-center justify-content-center py-5">
+                    <div class="spinner-border text-primary me-2" role="status"></div>
+                    <span class="text-secondary fw-semibold">Loading items...</span>
+                </div>
+            }
+            else
+            {
+                <div class="card border border-light-subtle rounded-3 overflow-hidden shadow-xs">
+                    <div class="table-responsive" style="max-height: 620px; overflow-y: auto;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.82rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.76rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                <tr>
+                                    <th class="text-center" style="width: 40px;">S#</th>
+                                    <th>Customer</th>
+                                    <th>Country</th>
+                                    <th>Order #</th>
+                                    <th>Int. Ord</th>
+                                    <th>Item Code</th>
+                                    <th>Item Name</th>
+                                    <th class="text-center">Delivery DT</th>
+                                    <th class="text-end">Qty (Bal)</th>
+                                    <th class="text-end"># Days</th>
+                                    <th>Remarks</th>
+                                    <th>Dispatch #</th>
+                                    <th class="text-end">Disp. Qty</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (!allItems.Any())
+                                {
+                                    <tr>
+                                        <td colspan="13" class="text-center text-muted py-4">No order items found for the selected filters.</td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    int sno = 1;
+                                    @foreach (var item in allItems)
+                                    {
+                                        var currentItem = item;
+                                        bool isUrgent = item.DeliveryStatus == 2 || !string.IsNullOrEmpty(item.Remarks);
+                                        bool isOverdue = item.DaysOverdue.HasValue && item.DaysOverdue.Value < 0;
+                                        <tr @ondblclick="@(() => OnRowDoubleClick(currentItem))"
+                                            class="clickable-row @(isUrgent ? "urgent-row" : "")"
+                                            style="transition: background 0.15s ease;">
+                                            <td class="text-center text-muted">@(sno++)</td>
+                                            <td class="fw-semibold text-primary">@item.CustCode</td>
+                                            <td>@item.Country</td>
+                                            <td class="fw-semibold">@item.OrderNo</td>
+                                            <td class="text-muted">@item.InternalRefNo</td>
+                                            <td>@item.CompItemCode</td>
+                                            <td>@item.ItemName</td>
+                                            <td class="text-center @(isOverdue ? "overdue-text" : "")">@item.DisplayDeliveryDT</td>
+                                            <td class="text-end fw-semibold">@item.BalanceQty</td>
+                                            <td class="text-end @(isOverdue ? "overdue-text" : "")">
+                                                @(item.DaysOverdue.HasValue ? item.DaysOverdue.Value.ToString() : "-")
+                                            </td>
+                                            <td>
+                                                @if (!string.IsNullOrEmpty(item.DisplayRemarks))
+                                                {
+                                                    <span class="badge @(item.DisplayRemarks == "Urgent" ? "bg-danger" : "bg-secondary")">@item.DisplayRemarks</span>
+                                                }
+                                            </td>
+                                            <td class="text-muted small">@item.DispatchListNos</td>
+                                            <td class="text-end">@(item.InnerQty > 0 ? item.InnerQty?.ToString() : "-")</td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Footer summary -->
+                <div class="row align-items-center mt-3 p-2 bg-light rounded-3 border g-2">
+                    <div class="col d-flex align-items-center gap-3">
+                        <span class="text-secondary" style="font-size:0.82rem;">
+                            <i class="fas fa-box me-1 text-primary"></i>
+                            Total Balance Qty: <strong>@allItems.Sum(i => i.BalanceQty).ToString("N0")</strong>
+                        </span>
+                        <span class="text-muted small">| Double-click a row to edit delivery date</span>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- ── Inline Delivery Date Edit Modal ── -->
+@if (showEditModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.45); backdrop-filter: blur(4px);">
+        <div class="modal-dialog modal-dialog-centered modal-md">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-primary text-white border-0 py-2" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <h6 class="modal-title fw-bold"><i class="fas fa-calendar-edit me-2"></i>Edit Delivery Date</h6>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showEditModal = false"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">New Delivery Date</label>
+                            <input type="date" class="form-control form-control-sm" @bind="editModel.NewDeliveryDT" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Remarks (Reason for change)</label>
+                            <input type="text" class="form-control form-control-sm" @bind="editModel.Remarks" placeholder="Enter reason for delivery date change..." />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => showEditModal = false">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm" @onclick="SaveDeliveryDate">
+                        <i class="fas fa-save me-1"></i> Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ── Password Prompt Modal ── -->
+@if (showPasswordModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.45); backdrop-filter: blur(4px);">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-warning text-dark border-0 py-2" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <h6 class="modal-title fw-bold"><i class="fas fa-lock me-2"></i>Authorization Required</h6>
+                    <button type="button" class="btn-close" @onclick="() => showPasswordModal = false"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <p class="text-secondary" style="font-size: 0.85rem;">Enter password to edit delivery dates:</p>
+                    <input type="password" class="form-control form-control-sm" @bind="enteredPassword" placeholder="Password..." @onkeyup="@(async (e) => { if (e.Key == "Enter") await VerifyPasswordAndExecute(); })" />
+                    @if (!string.IsNullOrEmpty(passwordError))
+                    {
+                        <div class="text-danger mt-1" style="font-size: 0.75rem;">@passwordError</div>
+                    }
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => showPasswordModal = false">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm" @onclick="VerifyPasswordAndExecute">Submit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ── Context Menu: General Options Bar Reports ── -->
+<ContextMenu Id="optionsBarMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <div class="win11-section-header">General Lists</div>
+    <Item class="win11-menu-item" OnClick="@(() => PrintOrderItemList())">
+        <i class="fas fa-list fa-fw win11-icon"></i> Print List
+    </Item>
+</ContextMenu>
+
+<style>
+    /* BlazoredTypeahead styling overrides to match Bootstrap form-control-sm */
+    .blazored-typeahead {
+        height: 31px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 29px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__clear {
+        margin-top: 5px !important;
+    }
+</style>

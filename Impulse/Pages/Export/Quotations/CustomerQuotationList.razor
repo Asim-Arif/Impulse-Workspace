@@ -1,0 +1,246 @@
+@page "/export/customer-quotation-list"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Export
+@using Impulse.Services
+@using Blazored.Typeahead
+@using BlazorContextMenu
+
+<PageTitle>Customer Quotation List</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <!-- Title -->
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <h5 class="mb-0 fw-bold text-dark-emphasis">
+                    <i class="fas fa-file-invoice text-primary me-2"></i>
+                    Quotation List
+                </h5>
+            </div>
+
+            <!-- ── Filter Toolbar Row 1 ── -->
+            <div class="row g-2 mb-2 align-items-end">
+                <!-- Customer -->
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Customer</label>
+                    <BlazoredTypeahead SearchMethod="SearchCustomers"
+                                       EnableDropDown="true"
+                                       Data="customers"
+                                       TValue="CustomerLookupModel"
+                                       TItem="CustomerLookupModel"
+                                       Value="selectedCustomerFilter"
+                                       ValueChanged="OnCustomerChanged"
+                                       ValueExpression="@(() => selectedCustomerFilter)"
+                                       Placeholder="All Customers"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="selectedCust">
+                            @selectedCust?.Name
+                        </SelectedTemplate>
+                        <ResultTemplate Context="cust">
+                            @cust.Name
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <!-- Country -->
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Country</label>
+                    <select class="form-select form-select-sm" value="@selectedCountryFilter" @onchange="OnCountryChanged">
+                        <option value="<All Countries>">&lt;All Countries&gt;</option>
+                        @foreach (var c in countries)
+                        {
+                            <option value="@c">@c</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Date Range Selection -->
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Date Range</label>
+                    <select class="form-select form-select-sm" value="@selectedDateRange" @onchange="OnDateRangeChanged" style="height: 31px;">
+                        <option value="0">Today</option>
+                        <option value="1">Last 15 Days</option>
+                        <option value="2">Last 30 Days</option>
+                        <option value="3">Last 60 Days</option>
+                        <option value="4">Last 90 Days</option>
+                        <option value="5">Last 180 Days</option>
+                        <option value="6">Custom</option>
+                    </select>
+                </div>
+
+                <!-- Date Range picker -->
+                <div class="col-auto d-flex gap-2">
+                    <div>
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">From</label>
+                        <input type="date" class="form-control form-control-sm" @bind="dtFrom" disabled="@(!isCustomDateRange)" style="height: 31px;" />
+                    </div>
+                    <div>
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">To</label>
+                        <input type="date" class="form-control form-control-sm" @bind="dtTo" disabled="@(!isCustomDateRange)" style="height: 31px;" />
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ── Filter Toolbar Row 2 ── -->
+            <div class="row g-2 mb-3 align-items-end">
+                <!-- Search and Options -->
+                <div class="col">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;"><i class="fas fa-search me-1"></i>Search</label>
+                    <input type="text" class="form-control form-control-sm" placeholder="Quotation No, customer, country..." @bind="searchText" @bind:event="oninput" style="height: 31px;" />
+                </div>
+
+                <div class="col-auto d-flex align-items-end justify-content-end gap-1 pb-1" style="height: 31px;">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="RefreshList" title="Refresh List">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" id="optionsBarMenuButton" @onclick="OpenOptionsBarMenu" title="Reports Options">
+                        <i class="fas fa-print me-1"></i> Reports
+                    </button>
+                </div>
+            </div>
+
+            <!-- Highlighted Selected Quotation info -->
+            @if (highlightedQuotation != null)
+            {
+                <div class="mb-3">
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill">
+                        Selected Quotation: <strong>@highlightedQuotation.QuotationNo</strong> (@highlightedQuotation.CustCode)
+                    </span>
+                </div>
+            }
+
+            <!-- Unified List Table -->
+            <div class="row">
+                <div class="col-12">
+                    @if (isLoading)
+                    {
+                        <div class="d-flex align-items-center justify-content-center py-5">
+                            <div class="spinner-border text-primary me-2" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="text-secondary fw-semibold">Loading quotations...</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="card border border-light-subtle rounded-3 overflow-hidden shadow-xs">
+                            <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                        <tr>
+                                            <th style="width: 50px;" class="text-center">S#</th>
+                                            <th>Customer</th>
+                                            <th>Country</th>
+                                            <th class="text-center">Quot. #</th>
+                                            <th class="text-center">Date</th>
+                                            <th style="width: 80px;" class="text-center">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (!allQuotations.Any())
+                                        {
+                                            <tr>
+                                                <td colspan="6" class="text-center text-muted py-4">No customer quotations found matching these filters.</td>
+                                            </tr>
+                                        }
+                                        else
+                                        {
+                                            int idx = 1;
+                                            @foreach (var quotation in GetFilteredQuotations())
+                                            {
+                                                var currentQuotation = quotation;
+                                                bool isSelected = highlightedQuotation?.QuotationNo == quotation.QuotationNo;
+                                                <tr @onclick="() => HighlightQuotation(currentQuotation)"
+                                                    @oncontextmenu="(e) => OpenRowMenu(e, currentQuotation)"
+                                                    @oncontextmenu:preventDefault="true"
+                                                    class="clickable-row @(isSelected ? "table-primary" : "")"
+                                                    style="cursor: pointer; transition: background 0.15s ease;">
+                                                    <td class="text-center text-secondary">@(idx++)</td>
+                                                    <td>@quotation.CustCode</td>
+                                                    <td>@quotation.Country</td>
+                                                    <td class="text-center fw-semibold">@quotation.QuotationNo</td>
+                                                    <td class="text-center">@quotation.DT.ToString("dd-MMM-yyyy")</td>
+                                                    <td class="text-center" @onclick:stopPropagation="true">
+                                                        <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2" style="font-size: 0.75rem;" @onclick="(e) => OpenRowMenu(e, currentQuotation)">Manage</button>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Context Menu: Row Actions ── -->
+<ContextMenu Id="rowContextMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    @if (context.Data is CustomerQuotationListItemModel quotation)
+    {
+        <div class="win11-section-header">Quotation No: @quotation.QuotationNo</div>
+        <Item class="win11-menu-item" OnClick="@(() => AddQuotation())">
+            <i class="fas fa-plus fa-fw win11-icon text-success"></i> Add New Quotation
+        </Item>
+        <div class="win11-divider"></div>
+        <Item class="win11-menu-item" OnClick="@(() => EditQuotation(quotation.QuotationNo))">
+            <i class="fas fa-edit fa-fw win11-icon text-primary"></i> Edit This Quotation
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => DeleteQuotation(quotation.QuotationNo))">
+            <i class="fas fa-trash-alt fa-fw win11-icon text-danger"></i> Delete Quotation
+        </Item>
+
+        <div class="win11-divider"></div>
+        <div class="win11-section-header">Printing</div>
+        <Item class="win11-menu-item" OnClick="@(() => PrintQuotation(quotation.QuotationNo))">
+            <i class="fas fa-print fa-fw win11-icon"></i> Print Quotation
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintQuotationDiscount(quotation.QuotationNo))">
+            <i class="fas fa-percent fa-fw win11-icon text-info"></i> Print Quotation (Discount)
+        </Item>
+    }
+</ContextMenu>
+
+<!-- ── Context Menu: General Options Bar Reports ── -->
+<ContextMenu Id="optionsBarMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <div class="win11-section-header">General Lists</div>
+    <Item class="win11-menu-item" OnClick="@(() => PrintList())">
+        <i class="fas fa-list fa-fw win11-icon"></i> Print List
+    </Item>
+</ContextMenu>
+
+<style>
+    .clickable-row:hover {
+        background-color: rgba(192, 88, 0, 0.05) !important;
+    }
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    .blazored-typeahead {
+        height: 31px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 29px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    .win11-context-menu-container, .blazor-context-menu {
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+    }
+</style>

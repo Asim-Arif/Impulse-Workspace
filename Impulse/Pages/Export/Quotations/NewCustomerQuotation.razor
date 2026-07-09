@@ -1,10 +1,10 @@
-@page "/export/newcustomerorder"
-@page "/export/new-customer-order/{OrderNo?}"
+@page "/export/newcustomerquotation"
+@page "/export/new-customer-quotation/{QuotationNo:int?}"
 @attribute [Authorize]
 @using DataAccessLibrary.Models.ViewModels.Export
-@using Impulse.Components.Export.NewCustomerOrderTabs
+@using Impulse.Components.Export.NewCustomerQuotationTabs
 
-<PageTitle>New Customer Order</PageTitle>
+<PageTitle>New Customer Quotation</PageTitle>
 
 <div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
     <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
@@ -14,20 +14,20 @@
             <div class="row g-2 mb-3 align-items-end border-bottom pb-2">
                 <div class="col-auto d-flex align-items-end pb-1">
                     <h5 class="mb-0 fw-bold text-dark-emphasis">
-                        <i class="fas fa-file-invoice text-primary me-2"></i>
-                        New Customer Order
+                        <i class="fas fa-file-invoice-dollar text-primary me-2"></i>
+                        New Customer Quotation
                     </h5>
                 </div>
             </div>
 
-            <EditForm Model="Order" OnValidSubmit="SaveOrderAndClose">
+            <EditForm Model="Quotation" OnValidSubmit="SaveQuotationAndClose">
                 <DataAnnotationsValidator />
                 <ValidationSummary class="text-danger mb-3" />
 
-                <!-- Master Order Header Panel -->
+                <!-- Master Quotation Header Panel -->
                 <div class="card mb-4 border" style="background: #f8f9fb; border-radius: 8px;">
                     <div class="card-header py-2 fw-bold text-secondary" style="background: #eef0f7; border-radius: 8px 8px 0 0; font-size: 0.85rem; letter-spacing: 0.03em;">
-                        <i class="fas fa-ship me-1 text-primary"></i> Order Header Information
+                        <i class="fas fa-file-alt me-1 text-primary"></i> Quotation Header Information
                     </div>
                     <div class="card-body py-3">
                         <div class="row g-3">
@@ -37,8 +37,8 @@
                                 <BlazoredTypeahead SearchMethod="SearchCompanies"
                                                    EnableDropDown="true"
                                                    Data="Companies"
-                                                   TValue="CompanyLookupModel"
-                                                   TItem="CompanyLookupModel"
+                                                   TValue="DataAccessLibrary.Models.ViewModels.Export.CompanyLookupModel"
+                                                   TItem="DataAccessLibrary.Models.ViewModels.Export.CompanyLookupModel"
                                                    Value="SelectedCompany"
                                                    ValueChanged="OnCompanySelected"
                                                    ValueExpression="@(() => SelectedCompany)"
@@ -58,8 +58,8 @@
                                 <BlazoredTypeahead SearchMethod="SearchCustomers"
                                                    EnableDropDown="true"
                                                    Data="Customers"
-                                                   TValue="CustomerLookupModel"
-                                                   TItem="CustomerLookupModel"
+                                                   TValue="DataAccessLibrary.Models.ViewModels.Export.CustomerLookupModel"
+                                                   TItem="DataAccessLibrary.Models.ViewModels.Export.CustomerLookupModel"
                                                    Value="SelectedCustomer"
                                                    ValueChanged="OnCustomerSelected"
                                                    ValueExpression="@(() => SelectedCustomer)"
@@ -76,7 +76,7 @@
                             <!-- Country -->
                             <div class="col-md-2">
                                 <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Country</label>
-                                <select class="form-select form-select-sm" value="@Order.Country" @onchange="OnCountryChangedArgs">
+                                <select class="form-select form-select-sm" value="@Quotation.Country" @onchange="OnCountryChangedArgs">
                                     <option value="">Select Country</option>
                                     @foreach (var country in Countries)
                                     {
@@ -88,25 +88,26 @@
                             <!-- Currency -->
                             <div class="col-md-2">
                                 <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Currency</label>
-                                <input type="text" class="form-control form-control-sm" @bind="Order.Currency" readonly style="background: #f0f2f5;" placeholder="Auto-filled" />
+                                <input type="text" class="form-control form-control-sm" @bind="Quotation.Currency" readonly style="background: #f0f2f5;" placeholder="Auto-filled" />
                             </div>
 
-                            <!-- Order No -->
+                            <!-- Quotation No -->
                             <div class="col-md-2">
-                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Order No <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control form-control-sm text-center fw-bold text-danger" @bind="Order.OrderNo" />
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Quotation No <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control form-control-sm text-center fw-bold text-danger" value="@Quotation.QuotationNo" readonly style="background: #f0f2f5;" />
                             </div>
 
-                            <!-- Order Date -->
+                            <!-- Quotation Date -->
                             <div class="col-md-2">
-                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Order Date</label>
-                                <input type="date" class="form-control form-control-sm" @bind="Order.DT" />
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Quotation Date</label>
+                                <input type="date" class="form-control form-control-sm" @bind="Quotation.DT" />
                             </div>
 
                             <!-- Trade Terms -->
                             <div class="col-md-3">
                                 <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Trade Terms</label>
-                                <select class="form-select form-select-sm" @bind="Order.TradeTerms">
+                                <select class="form-select form-select-sm" @bind="Quotation.TradeTerms">
+                                    <option value="">Select Trade Terms</option>
                                     @foreach (var term in TradeTermsList)
                                     {
                                         <option value="@term.DropDownValue_Description">@term.DropDownValue_Description</option>
@@ -117,7 +118,7 @@
                             <!-- Payment Terms -->
                             <div class="col-md-3">
                                 <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Payment Terms</label>
-                                <select class="form-select form-select-sm" @bind="Order.PaymentTerms">
+                                <select class="form-select form-select-sm" @bind="Quotation.PaymentTerms">
                                     <option value="">Select Payment Terms</option>
                                     @foreach (var pt in PaymentTermsList)
                                     {
@@ -126,34 +127,28 @@
                                 </select>
                             </div>
 
+                            <!-- Validity -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Validity</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Quotation.Validity" />
+                            </div>
+
                             <!-- Delivery Date -->
                             <div class="col-md-2">
                                 <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Delivery Date</label>
-                                <input type="date" class="form-control form-control-sm" @bind="Order.DeliveryDT" />
+                                <input type="date" class="form-control form-control-sm" @bind="Quotation.DeliveryDT" />
+                            </div>
+                            
+                            <!-- Delivery Time -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Delivery Time</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Quotation.DeliveryTime" />
                             </div>
 
-                            <!-- Internal Ref No -->
+                            <!-- Ship Via -->
                             <div class="col-md-2">
-                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Internal Ref #</label>
-                                <input type="text" class="form-control form-control-sm text-center fw-bold text-primary" @bind="Order.InternalRefNo" readonly style="background: #f0f2f5;" />
-                            </div>
-
-                            <!-- Quality -->
-                            <div class="col-md-2">
-                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Quality</label>
-                                <select class="form-select form-select-sm" @bind="Order.Quality">
-                                    <option value="">Select Quality</option>
-                                    @foreach (var q in Qualities)
-                                    {
-                                        <option value="@q.DropDownValue_Description">@q.DropDownValue_Description</option>
-                                    }
-                                </select>
-                            </div>
-
-                            <!-- Shipping Mode -->
-                            <div class="col-md-2">
-                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Shipping Mode</label>
-                                <select class="form-select form-select-sm" @bind="Order.ShippingMode">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Ship Via</label>
+                                <select class="form-select form-select-sm" @bind="Quotation.ShipVia">
                                     <option value="">Select Mode</option>
                                     @foreach (var mode in ShippingMethods)
                                     {
@@ -161,69 +156,96 @@
                                     }
                                 </select>
                             </div>
-
-                            <!-- Trans-Shipment -->
+                            
+                            <!-- Destination -->
                             <div class="col-md-2">
-                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Trans-Shipment</label>
-                                <select class="form-select form-select-sm" @bind="Order.TransShipment">
-                                    <option value="Allowed">Allowed</option>
-                                    <option value="Not Allowed">Not Allowed</option>
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Destination</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Quotation.Destination" />
+                            </div>
+
+                            <!-- Packing -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Packing</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Quotation.Packing" />
+                            </div>
+                            
+                            <!-- Department -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Department</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Quotation.Department" />
+                            </div>
+
+                            <!-- Attention Person -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Attention To</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Quotation.AttentionPerson" />
+                            </div>
+
+                            <!-- Bank -->
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Bank</label>
+                                <select class="form-select form-select-sm" @bind="Quotation.BankID">
+                                    <option value="">Select Bank</option>
+                                    @foreach (var bank in Banks)
+                                    {
+                                        <option value="@bank.BankID">@bank.Bank - @bank.BankAccNo</option>
+                                    }
                                 </select>
                             </div>
 
-                            <!-- Partial Shipment -->
+                            <!-- Swift Code -->
                             <div class="col-md-2">
-                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Partial Shipment</label>
-                                <select class="form-select form-select-sm" @bind="Order.PartialShipment">
-                                    <option value="Allowed">Allowed</option>
-                                    <option value="Not Allowed">Not Allowed</option>
-                                </select>
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Swift Code</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Quotation.SwiftCode" />
+                            </div>
+                            
+                            <!-- Gross Weight -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Gross Weight</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Quotation.GrossWeight" />
                             </div>
 
-                            <!-- Stamps -->
+                            <!-- Net Weight -->
                             <div class="col-md-2">
-                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Stamps</label>
-                                <input type="text" class="form-control form-control-sm text-center" @bind="Order.StampDT" />
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Net Weight</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Quotation.NetWeight" />
                             </div>
 
-                            <!-- Order Rcvd Via -->
+                            <!-- No. of Packages -->
                             <div class="col-md-2">
-                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Order Rcvd Via</label>
-                                <input type="text" class="form-control form-control-sm" @bind="Order.OrderRcvdVia" />
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">No. Packages</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Quotation.NoOfPackages" />
+                            </div>
+
+                            <!-- Remarks -->
+                            <div class="col-md-12">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Remarks</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Quotation.Remarks" />
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Tabs Navigation -->
-                <ul class="nav nav-tabs md3-tabs" id="orderTabs" role="tablist">
+                <ul class="nav nav-tabs md3-tabs" id="quotationTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link @(ActiveTab == "ArticleDetail" ? "active" : "")"
                                 @onclick='() => ChangeTab("ArticleDetail")'
-                                type="button" role="tab">Article Detail</button>
+                                type="button" role="tab">Items Detail</button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link @(ActiveTab == "OtherDetail" ? "active" : "")"
-                                @onclick='() => ChangeTab("OtherDetail")'
-                                type="button" role="tab">Other Detail</button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link @(ActiveTab == "ImportExcel" ? "active" : "")"
-                                @onclick='() => ChangeTab("ImportExcel")'
-                                type="button" role="tab">Import From Excel</button>
+                        <button class="nav-link @(ActiveTab == "OtherCharges" ? "active" : "")"
+                                @onclick='() => ChangeTab("OtherCharges")'
+                                type="button" role="tab">Other Charges</button>
                     </li>
                 </ul>
 
                 <!-- Tab Content panes -->
-                <div class="tab-content pt-4" id="orderTabsContent">
+                <div class="tab-content pt-4" id="quotationTabsContent">
                     <div class="tab-pane fade @(ActiveTab == "ArticleDetail" ? "show active" : "")" role="tabpanel">
-                        <ArticleDetailTab Order="Order"
+                        <QuotationArticleDetailTab Quotation="Quotation"
                                           CatalogItems="CatalogItems"
                                           Qualities="FinishingQualities"
-                                          QuotationsList="QuotationsList"
-                                          SelectedQuotationNo="@SelectedQuotationNo"
-                                          SelectedQuotationNoChanged="(val) => SelectedQuotationNo = val"
-                                          OnLoadQuotation="LoadQuotation"
                                           OnItemAdded="AddLineItem"
                                           OnItemDeleted="RemoveLineItem"
                                           OnItemEdit="SelectForEdit"
@@ -233,16 +255,14 @@
                                           OnFinishingTypeChanged="OnFinishingTypeChanged"
                                           NewItemInput="NewItemInput" />
                     </div>
-                    <div class="tab-pane fade @(ActiveTab == "OtherDetail" ? "show active" : "")" role="tabpanel">
-                        <OtherDetailTab Order="Order" />
-                    </div>
-                    <div class="tab-pane fade @(ActiveTab == "ImportExcel" ? "show active" : "")" role="tabpanel">
-                        <ImportExcelTab Order="Order"
-                                        ExcelNICompany="ExcelNICompany"
-                                        ExcelNICustomer="ExcelNICustomer"
-                                        ExcelOK="ExcelOK"
-                                        OnImportTrigger="ImportExcelMock"
-                                        OnAddToOrder="AppendExcelOkItems" />
+                    <div class="tab-pane fade @(ActiveTab == "OtherCharges" ? "show active" : "")" role="tabpanel">
+                        <QuotationOtherChargesTab Quotation="Quotation"
+                                          OnChargeAdded="AddCharge"
+                                          OnChargeDeleted="RemoveCharge"
+                                          OnChargeEdit="SelectChargeForEdit"
+                                          IsEditing="@(EditingCharge != null)"
+                                          OnCancelEdit="CancelEditCharge"
+                                          NewChargeInput="NewChargeInput" />
                     </div>
                 </div>
 
@@ -256,30 +276,14 @@
                                 Print On Save
                             </label>
                         </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="showPictureCheck" />
-                            <label class="form-check-label fw-bold text-secondary" for="showPictureCheck" style="font-size: 0.85rem;">
-                                Show Item Picture
-                            </label>
-                        </div>
-
-                        <!-- Revision inputs -->
-                        <div class="d-flex align-items-center gap-2 ms-3">
-                            <span class="fw-bold text-secondary" style="font-size: 0.82rem; white-space: nowrap;">Order Revision</span>
-                            <input type="text" class="form-control form-control-sm text-center fw-bold text-dark" readonly style="width: 50px; background: #f0f2f5;" @bind="Order.OrderRevisionNo" />
-                            <input type="date" class="form-control form-control-sm" readonly style="width: 130px; background: #f0f2f5;" @bind="Order.OrderRevisionDT" />
-                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddRevision">
-                                Add Revision
-                            </button>
-                        </div>
                     </div>
 
                     <div class="col-md-6 d-flex justify-content-end gap-2">
                         <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">Cancel</button>
-                        <button type="button" class="btn btn-outline-success" @onclick="SaveOrderAndStay" disabled="@IsSaving">
+                        <button type="button" class="btn btn-outline-success" @onclick="SaveQuotationAndStay" disabled="@IsSaving">
                             <i class="fas fa-save me-1"></i> Save &amp; Stay
                         </button>
-                        <button type="button" class="btn btn-outline-primary" @onclick="SaveOrderAndNew" disabled="@IsSaving">
+                        <button type="button" class="btn btn-outline-primary" @onclick="SaveQuotationAndNew" disabled="@IsSaving">
                             <i class="fas fa-plus me-1"></i> Save &amp; New
                         </button>
                         <button type="submit" class="btn btn-primary" disabled="@IsSaving">

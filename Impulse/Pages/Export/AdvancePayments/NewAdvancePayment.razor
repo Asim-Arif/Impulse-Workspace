@@ -1,0 +1,178 @@
+@page "/export/advance-payment/new"
+@page "/export/advance-payment/{EntryID:int}"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Export
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.ViewModels.Company
+
+<style>
+    input.form-control-sm, select.form-select-sm, .blazored-typeahead {
+        height: 31px !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 29px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+</style>
+
+<PageTitle>Advance Payment</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <!-- Title Header -->
+            <div class="row g-2 mb-3 align-items-end border-bottom pb-2">
+                <div class="col-auto d-flex align-items-end pb-1">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-money-bill-wave text-primary me-2"></i>
+                        Advance Payment
+                    </h5>
+                </div>
+            </div>
+
+            <EditForm Model="Payment" OnValidSubmit="SaveAndClose">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger mb-3" />
+
+                <!-- Form Body -->
+                <div class="row g-3">
+                    
+                    <!-- Customer Code (BlazoredTypeahead) -->
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Customer</label>
+                        <BlazoredTypeahead SearchMethod="SearchCustomers"
+                                           Data="Customers"
+                                           TValue="CustomerLookupModel"
+                                           TItem="CustomerLookupModel"
+                                           Value="SelectedCustomer"
+                                           ValueChanged="HandleCustomerChanged"
+                                           ValueExpression="@(() => SelectedCustomer)"
+                                           EnableDropDown="true"
+                                           Placeholder="Select Customer">
+                            <SelectedTemplate Context="cust">
+                                @cust.CustCode
+                            </SelectedTemplate>
+                            <ResultTemplate Context="cust">
+                                @cust.CustCode
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+
+                    <!-- Country -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Country</label>
+                        <select class="form-select form-select-sm" @bind="SelectedCountry" @bind:after="HandleCustomerCountryChanged">
+                            <option value="">Select Country</option>
+                            @foreach (var c in Countries)
+                            {
+                                <option value="@c">@c</option>
+                            }
+                        </select>
+                    </div>
+                    
+                    <!-- Order No -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Order No</label>
+                        <select class="form-select form-select-sm" @bind="Payment.OrderNo" @bind:after="OnOrderNoChanged">
+                            <option value="">Select Order</option>
+                            @foreach (var o in CustomerOrders)
+                            {
+                                <option value="@o">@o</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Date -->
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Date</label>
+                        <input type="date" class="form-control form-control-sm" @bind="Payment.DT" />
+                    </div>
+
+                    <!-- Amount -->
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Amount</label>
+                        <input type="number" step="0.01" class="form-control form-control-sm text-end" @bind="Payment.Amount" />
+                    </div>
+
+                    <!-- Currency (Readonly from Customer) -->
+                    <div class="col-md-1">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Curr</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Currency" disabled />
+                    </div>
+
+                    <!-- Exchange Rate -->
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Exch. Rate</label>
+                        <input type="number" step="0.0001" class="form-control form-control-sm text-end" @bind="Payment.ExchRate" />
+                    </div>
+
+                    <!-- Advice No -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Advice No.</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Payment.AdviceNo" />
+                    </div>
+
+                    <!-- Export Of -->
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Export Of</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Payment.ExportOf" />
+                    </div>
+
+                    <!-- Bank Account -->
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Bank Account</label>
+                        <select class="form-select form-select-sm" @bind="Payment.BankAccNo">
+                            <option value="">Select Bank Account</option>
+                            @foreach (var bank in Banks)
+                            {
+                                <option value="@bank.BankAccNo">@bank.BankName</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Importer Address -->
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Importer's Address</label>
+                        <textarea class="form-control form-control-sm" rows="3" @bind="Payment.ImporterAddress"></textarea>
+                    </div>
+                </div>
+
+                <!-- Footer Buttons -->
+                <div class="d-flex justify-content-end mt-4 pt-3 border-top">
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 me-2 shadow-sm">
+                        <i class="fas fa-save me-1"></i> Save
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4 shadow-sm" @onclick="Cancel">
+                        Cancel
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+<style>
+    .blazored-typeahead {
+        height: 31px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 29px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+</style>
