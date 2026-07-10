@@ -1,0 +1,185 @@
+@page "/export/post-prc/{EntryID:int}"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Export
+@using Impulse.Services.Export
+@using Radzen
+
+<style>
+    input.form-control-sm, select.form-select-sm {
+        height: 31px !important;
+    }
+</style>
+
+<PageTitle>Post PRC</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 900px; margin: 0 auto;">
+        <div class="card-body pt-3">
+
+            <!-- Title Header -->
+            <div class="row g-2 mb-3 align-items-end border-bottom pb-2">
+                <div class="col-auto d-flex align-items-end pb-1">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-file-invoice-dollar text-success me-2"></i>
+                        Post PRC
+                    </h5>
+                </div>
+            </div>
+
+            @if (IsLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary spinner-border-sm" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            }
+            else if (Model == null || Model.EntryID == 0)
+            {
+                <div class="alert alert-danger">Payment receipt data not found.</div>
+            }
+            else
+            {
+                <!-- Readonly Info Section -->
+                <div class="row g-3 mb-4 bg-light rounded p-3">
+                    <div class="col-md-3">
+                        <label class="form-label text-muted mb-0 small">Customer</label>
+                        <div class="fw-semibold">@Model.CustCode (@Model.Country)</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-muted mb-0 small">Invoice No.</label>
+                        <div class="fw-semibold text-primary">@Model.CustomInvoice</div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label text-muted mb-0 small">Exch Rate</label>
+                        <div class="fw-semibold">@Model.ExchRate.ToString("N4")</div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label text-muted mb-0 small">Amt Realized (@Model.Currency)</label>
+                        <div class="fw-bold text-success fs-5">@Model.AmountRealized.ToString("N2")</div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label text-muted mb-0 small">Amount in Rs.</label>
+                        <div class="fw-bold text-dark fs-5">@Model.AmountInRs.ToString("N2")</div>
+                    </div>
+                </div>
+
+                <!-- Input Section -->
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.85rem;">Realization Date</label>
+                        <input type="date" class="form-control form-control-sm" @bind="Model.RealizationDate" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.85rem;">Posting Date</label>
+                        <input type="date" class="form-control form-control-sm" @bind="Model.PostingDate" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.85rem;">Bank Account</label>
+                        <select class="form-select form-select-sm" @bind="Model.BankAccNo">
+                            <option value="">-- Select Bank Account --</option>
+                            @foreach (var bank in Banks)
+                            {
+                                <option value="@bank.DropDownValue_ID">@bank.DropDownValue_Description</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-md-3 mt-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.85rem;">Running Serial No.</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Model.SerialNo" />
+                    </div>
+                    <div class="col-md-3 mt-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.85rem;">Serial Date</label>
+                        <input type="date" class="form-control form-control-sm" @bind="Model.SerialDate" />
+                    </div>
+                    <div class="col-md-3 mt-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.85rem;">Bill Number</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Model.BillNo" />
+                    </div>
+                    <div class="col-md-3 mt-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.85rem;">Bill Date</label>
+                        <input type="date" class="form-control form-control-sm" @bind="Model.BillDate" />
+                    </div>
+
+                    <!-- Deductions -->
+                    <div class="col-12 mt-4">
+                        <h6 class="fw-bold text-danger mb-2 border-bottom pb-1">DEDUCTIONS</h6>
+                        <div class="row g-2 align-items-end mb-2">
+                            <div class="col-md-5">
+                                <label class="form-label small text-muted mb-0">Deduction Type (e.g. Postage)</label>
+                                <input type="text" class="form-control form-control-sm" @bind="NewDeductionTitle" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small text-muted mb-0">Amount</label>
+                                <input type="number" step="0.01" class="form-control form-control-sm text-end" @bind="NewDeductionAmount" />
+                            </div>
+                            <div class="col-md-4">
+                                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddDeduction">
+                                    <i class="fas fa-plus"></i> Add
+                                </button>
+                            </div>
+                        </div>
+
+                        @if (Model.Deductions.Any())
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Detail of Deduction</th>
+                                            <th style="width: 150px;">Amount</th>
+                                            <th style="width: 100px;">Currency</th>
+                                            <th style="width: 50px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var d in Model.Deductions)
+                                        {
+                                            <tr>
+                                                <td>@d.Title</td>
+                                                <td>
+                                                    <input type="number" step="0.01" class="form-control form-control-sm text-end" @bind="d.Amount" />
+                                                </td>
+                                                <td>
+                                                    <select class="form-select form-select-sm" @bind="d.Currency">
+                                                        <option value="PKR">PKR</option>
+                                                        <option value="USD">USD</option>
+                                                        <option value="EUR">EUR</option>
+                                                        <option value="GBP">GBP</option>
+                                                    </select>
+                                                </td>
+                                                <td class="text-center">
+                                                    <button type="button" class="btn btn-sm btn-link text-danger p-0" @onclick="@(() => Model.Deductions.Remove(d))"><i class="fas fa-times"></i></button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Net Amount -->
+                    <div class="col-12 text-end mt-4 pt-3 border-top">
+                        <h4 class="fw-bold text-dark">
+                            Net Amount (Rs): 
+                            <span class="text-success">
+                                @(Math.Round(Model.AmountInRs - Model.Deductions.Sum(d => d.Currency != "PKR" ? d.Amount * Model.ExchRate : d.Amount), 2).ToString("N2"))
+                            </span>
+                        </h4>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mt-4 pt-3 border-top">
+                    <button type="button" class="btn btn-success rounded-pill px-4 me-2 shadow-sm" @onclick="PostVoucher">
+                        <i class="fas fa-share-square me-1"></i> Post PRC
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4 shadow-sm" @onclick="Cancel">
+                        Cancel
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</div>

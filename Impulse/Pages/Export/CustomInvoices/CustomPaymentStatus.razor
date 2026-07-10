@@ -1,0 +1,257 @@
+@page "/export/custom-payment-status"
+@using Impulse.Services.Export
+@using DataAccessLibrary.Models.ViewModels.Export
+@using DataAccessLibrary.Models.ViewModels
+@using Blazored.Typeahead
+@inject ICustomPaymentService CustomPaymentService
+@inject ICustomInvoiceService CustomInvoiceService
+@inject NavigationManager NavManager
+
+<PageTitle>Custom Payment Status</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+            <div class="row g-2 mb-3 align-items-end border-bottom pb-2">
+                <div class="col-auto d-flex align-items-end pb-1">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-money-check-alt text-primary me-2"></i> Custom Payment Status
+                    </h5>
+                    @if (IsLoading)
+                    {
+                        <span class="spinner-border spinner-border-sm text-primary ms-3 mb-1" role="status" aria-hidden="true"></span>
+                    }
+                </div>
+                <div class="col text-end">
+                    <button class="btn btn-sm btn-outline-primary fw-bold" @onclick="ToggleAllCustomersView">
+                        <i class="fas fa-list me-1"></i> @(ShowAllCustomers ? "Hide All Customers Balance" : "Show All Customers Balance")
+                    </button>
+                    <button class="btn btn-sm btn-primary ms-2 fw-bold" @onclick="LoadDataAsync" disabled="@IsLoading">
+                        <i class="fas fa-sync-alt me-1"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Customer</label>
+                    <BlazoredTypeahead SearchMethod="SearchCustomers"
+                                       EnableDropDown="true"
+                                       TValue="CustomerLookupModel"
+                                       TItem="CustomerLookupModel"
+                                       Value="SelectedCustomer"
+                                       ValueChanged="OnCustomerChanged"
+                                       ValueExpression="@(() => SelectedCustomer)"
+                                       Placeholder="<All Customers>">
+                        <SelectedTemplate Context="selectedCust">
+                            @selectedCust?.Name
+                        </SelectedTemplate>
+                        <ResultTemplate Context="cust">
+                            @cust.Name
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Status</label>
+                    <select class="form-select form-select-sm" @bind="StatusIndex" @bind:after="LoadDataAsync">
+                        <option value="0">&lt;UnPaid&gt;</option>
+                        <option value="1">&lt;Paid&gt;</option>
+                        <option value="2">&lt;All&gt;</option>
+                    </select>
+                </div>
+                <div class="col-md-7 d-flex justify-content-end align-items-end">
+                     <div class="p-2 border rounded bg-light" style="font-size: 0.85rem; display: @(TotalAmount > 0 ? "block" : "none")">
+                         <span class="fw-bold">Amount: </span><span class="text-danger me-3">@TotalAmount.ToString("#,##0.00")</span>
+                         <span class="fw-bold">In Words: </span><span class="text-primary">@AmountInWords</span>
+                     </div>
+                </div>
+            </div>
+
+            <!-- Main Grid -->
+            <div style="display: @(ShowAllCustomers ? "none" : "block")">
+                <div class="table-responsive" style="height: 60vh; overflow-y: auto;">
+                    <table class="table table-sm table-hover table-bordered align-middle" style="font-size: 0.85rem;">
+                        <thead class="table-light sticky-top" style="z-index: 1;">
+                            <tr>
+                                <th>Customer</th>
+                                <th>Invoice No</th>
+                                <th>Order No</th>
+                                <th>Form E</th>
+                                <th>FDBC No</th>
+                                <th>FDBC Date</th>
+                                <th>Inv. Date</th>
+                                <th class="text-end">Inv. Amt</th>
+                                <th class="text-end">Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (PaymentStatuses == null || !PaymentStatuses.Any())
+                            {
+                                <tr>
+                                    <td colspan="9" class="text-center text-muted py-4">
+                                        <i class="fas fa-folder-open mb-2 text-secondary opacity-50" style="font-size: 2rem;"></i><br />
+                                        No records found.
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var item in PaymentStatuses)
+                                {
+                                    if (item.EntryType == 0)
+                                    {
+                                        <!-- Invoice Row -->
+                                        <tr class="clickable-row fw-bold" @oncontextmenu='e => ShowContextMenu(e, item, "paymentContextMenu")' @oncontextmenu:preventDefault="true">
+                                            <td>@item.CustCode</td>
+                                            <td>@item.CustomInvoice</td>
+                                            <td>@item.Orders</td>
+                                            <td>@item.FormE</td>
+                                            <td>@item.FDBCNo</td>
+                                            <td>@(item.FDBCDT?.ToString("dd-MMM-yyyy"))</td>
+                                            <td>@(item.DT?.ToString("dd-MMM-yyyy"))</td>
+                                            <td class="text-end">@item.TotalCustomAmt.ToString("N0")</td>
+                                            <td class="text-end" style="@(item.CustomAmtToRcv > 0 ? "color: red;" : "")">@item.CustomAmtToRcv.ToString("N0")</td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        <!-- Payment Row (Child) -->
+                                        <tr class="clickable-row bg-light text-secondary" @oncontextmenu='e => ShowContextMenu(e, item, "paymentContextMenuRcvd")' @oncontextmenu:preventDefault="true">
+                                            <td colspan="4" class="text-end fst-italic pe-4" style="border-right: none;">
+                                                <i class="fas fa-level-up-alt fa-rotate-90 text-primary me-2"></i>
+                                                <span class="text-muted">Payment Rcvd:</span>
+                                            </td>
+                                            <td style="border-left: none;">@item.FDBCNo</td>
+                                            <td></td>
+                                            <td>@(item.DT?.ToString("dd-MMM-yyyy"))</td>
+                                            <td class="text-end text-success fw-semibold">@item.TotalCommercialAmt.ToString("N0")</td>
+                                            <td class="text-end text-muted fst-italic">@item.Description</td>
+                                        </tr>
+                                    }
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- All Customers Grid -->
+            @if (ShowAllCustomers)
+            {
+                <div class="card mt-3 border-0 shadow-sm">
+                    <div class="card-header bg-primary text-white fw-bold py-2">
+                        All Customers Balance
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="max-height: 50vh; overflow-y: auto;">
+                            <table class="table table-sm table-hover table-bordered align-middle" style="font-size: 0.85rem;">
+                                <thead class="table-light sticky-top">
+                                    <tr>
+                                        <th>Currency</th>
+                                        <th class="text-end">Balance</th>
+                                        <th class="text-end">Exch. Rate</th>
+                                        <th class="text-end">Balance PK</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (AllCustomersBalances == null || !AllCustomersBalances.Any())
+                                    {
+                                        <tr>
+                                            <td colspan="4" class="text-center text-muted py-4">No records found.</td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var item in AllCustomersBalances)
+                                        {
+                                            <tr>
+                                                <td>@item.Currency</td>
+                                                <td class="text-end">@item.Balance.ToString("N2")</td>
+                                                <td class="text-end">@item.ExchangeRate.ToString("N4")</td>
+                                                <td class="text-end">@item.BalancePK.ToString("N2")</td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="bg-light p-2 border-top text-end fw-bold">
+                            Total Balance PK: <span class="text-danger">@AllCustomersBalances.Sum(x => x.BalancePK).ToString("N2")</span>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Context Menu for Main Grid -->
+<BlazorContextMenu.ContextMenu Id="paymentContextMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <div class="win11-section-header">Record Actions</div>
+    <BlazorContextMenu.Item class="win11-menu-item" OnClick="OnRefreshClick">
+        <i class="fas fa-sync-alt fa-fw win11-icon text-primary"></i> Refresh
+    </BlazorContextMenu.Item>
+    <div class="win11-divider"></div>
+    <BlazorContextMenu.Item class="win11-menu-item" OnClick="OnReceivePaymentClick">
+        <i class="fas fa-hand-holding-usd fa-fw win11-icon text-success"></i> Receive Payments For This Invoice
+    </BlazorContextMenu.Item>
+    <div class="win11-divider"></div>
+    <div class="win11-section-header">Printing Options</div>
+    <BlazorContextMenu.Item class="win11-menu-item" OnClick="OnPrintBankLetterClick">
+        <i class="fas fa-university fa-fw win11-icon text-info"></i> Print Bank Letter
+    </BlazorContextMenu.Item>
+    <BlazorContextMenu.Item class="win11-menu-item" OnClick="OnPrintPaymentStatusForThisInvoiceClick">
+        <i class="fas fa-file-invoice fa-fw win11-icon text-primary"></i> Print Payment Status For This Invoice
+    </BlazorContextMenu.Item>
+    <BlazorContextMenu.Item class="win11-menu-item" OnClick="OnPrintPaymentStatusOfAllClick">
+        <i class="fas fa-print fa-fw win11-icon text-secondary"></i> Print Payment Status Of All
+    </BlazorContextMenu.Item>
+    <BlazorContextMenu.Item class="win11-menu-item" OnClick="OnPrintStatusCustomerwiseClick">
+        <i class="fas fa-users fa-fw win11-icon text-secondary"></i> Print Status Customerwise
+    </BlazorContextMenu.Item>
+</BlazorContextMenu.ContextMenu>
+
+<!-- Context Menu for Payment Rows -->
+<BlazorContextMenu.ContextMenu Id="paymentContextMenuRcvd" UseDefaultEventHandlers="true" Template="Win11Style">
+    <div class="win11-section-header">Record Actions</div>
+    @if (SelectedPaymentData != null && string.IsNullOrEmpty(SelectedPaymentData.PRCVchrNo))
+    {
+        <BlazorContextMenu.Item class="win11-menu-item" OnClick="OnPostPrcClick">
+            <i class="fas fa-file-invoice-dollar fa-fw win11-icon text-success"></i> Post PRC
+        </BlazorContextMenu.Item>
+    }
+    else
+    {
+        <BlazorContextMenu.Item class="win11-menu-item" Enabled="false">
+            <i class="fas fa-check-circle fa-fw win11-icon text-muted"></i> PRC Already Posted
+        </BlazorContextMenu.Item>
+    }
+</BlazorContextMenu.ContextMenu>
+
+<style>
+    /* Fix Blazored Typeahead height to match .form-select-sm */
+    .blazored-typeahead {
+        height: 31px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 29px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important; 
+        display: flex !important;
+        align-items: center !important;
+    }
+    
+    /* Prevent Context Menu from getting cut off by ensuring it mathematically fits the viewport */
+    .win11-context-menu-container, .blazor-context-menu {
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+    }
+</style>

@@ -170,6 +170,9 @@ builder.Services.AddScoped<Impulse.Services.Export.IProformaInvoiceService, Impu
 builder.Services.AddScoped<DataAccessLibrary.Interface.Export.ICustomInvoiceDataAccess, DataAccessLibrary.DAC.Export.CustomInvoiceDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Export.ICustomInvoiceService, Impulse.Services.Export.CustomInvoiceService>();
 
+builder.Services.AddScoped<DataAccessLibrary.Interface.Export.ICustomPaymentDataAccess, DataAccessLibrary.DAC.Export.CustomPaymentDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Export.ICustomPaymentService, Impulse.Services.Export.CustomPaymentService>();
+
 
 builder.Services.AddScoped<LoadingService>();
 builder.Services.AddScoped<SecurityService>();

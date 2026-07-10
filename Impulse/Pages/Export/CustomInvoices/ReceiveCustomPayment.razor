@@ -1,0 +1,138 @@
+@page "/export/receive-custom-payment/{CustomInvoiceNo?}/{CustCode?}"
+@using Impulse.Services.Export
+@using DataAccessLibrary.Models.ViewModels.Export
+@using DataAccessLibrary.Models.ViewModels
+@using Blazored.Typeahead
+@inject ICustomPaymentService CustomPaymentService
+@inject ICustomInvoiceService CustomInvoiceService
+@inject NavigationManager NavManager
+@inject Radzen.NotificationService NotificationService
+
+<PageTitle>Receive Payment</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="max-width: 800px; margin: 0 auto; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+            <div class="row g-2 mb-3 align-items-end border-bottom pb-2">
+                <div class="col-auto d-flex align-items-end pb-1">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-hand-holding-usd text-success me-2"></i> Receive Payments From Customers
+                    </h5>
+                    @if (IsLoading)
+                    {
+                        <span class="spinner-border spinner-border-sm text-primary ms-3 mb-1" role="status" aria-hidden="true"></span>
+                    }
+                </div>
+            </div>
+
+            <EditForm Model="@PaymentModel" OnValidSubmit="SavePayment">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1">Customer</label>
+                        <BlazoredTypeahead SearchMethod="SearchCustomers"
+                                           EnableDropDown="true"
+                                           TValue="CustomerLookupModel"
+                                           TItem="CustomerLookupModel"
+                                           Value="SelectedCustomer"
+                                           ValueChanged="OnCustomerChanged"
+                                           ValueExpression="@(() => SelectedCustomer)"
+                                           Placeholder="Select Customer">
+                            <SelectedTemplate Context="selectedCust">
+                                @selectedCust?.Name
+                            </SelectedTemplate>
+                            <ResultTemplate Context="cust">
+                                @cust.Name
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold text-secondary mb-1">Country</label>
+                        <input type="text" class="form-control" @bind="PaymentModel.Country" readonly />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold text-secondary mb-1">Date</label>
+                        <input type="date" class="form-control" @bind="PaymentModel.Date" />
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold text-secondary mb-1">Bank</label>
+                        <select class="form-select" @bind="PaymentModel.BankID">
+                            <option value="0">-- Select Bank --</option>
+                            @foreach (var bank in Banks)
+                            {
+                                <option value="@bank.DropDownValue_ID">@bank.DropDownValue_Description</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-secondary mb-1">FDBC No.</label>
+                        <input type="text" class="form-control" @bind="PaymentModel.FDBCNo" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1">Currency</label>
+                        <input type="text" class="form-control" @bind="PaymentModel.Currency" readonly />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1">Custom Invoice</label>
+                        <BlazoredTypeahead SearchMethod="SearchInvoices"
+                                           EnableDropDown="true"
+                                           TValue="string"
+                                           TItem="string"
+                                           Value="PaymentModel.CustomInvoice"
+                                           ValueChanged="OnInvoiceChanged"
+                                           ValueExpression="@(() => PaymentModel.CustomInvoice)"
+                                           Placeholder="Select Invoice">
+                            <SelectedTemplate Context="inv">
+                                @inv
+                            </SelectedTemplate>
+                            <ResultTemplate Context="invResult">
+                                @invResult
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-secondary mb-1">Amount</label>
+                        <input type="number" step="0.01" class="form-control fw-bold text-danger text-end" @bind="PaymentModel.Amount" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-secondary mb-1">Bank Charges</label>
+                        <input type="number" step="0.01" class="form-control text-end" @bind="PaymentModel.BankCharges" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-secondary mb-1">Exchange Rate</label>
+                        <input type="number" step="0.0001" class="form-control text-end" @bind="PaymentModel.ExchangeRate" />
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold text-secondary mb-1">Description</label>
+                        <textarea class="form-control" rows="2" @bind="PaymentModel.Description"></textarea>
+                    </div>
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col text-end">
+                        <button type="button" class="btn btn-outline-secondary me-2" @onclick="GoBack">
+                            <i class="fas fa-times me-1"></i> Cancel
+                        </button>
+                        <button type="submit" class="btn btn-success fw-bold px-4" disabled="@IsLoading">
+                            <i class="fas fa-check me-1"></i> Receive
+                        </button>
+                    </div>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
