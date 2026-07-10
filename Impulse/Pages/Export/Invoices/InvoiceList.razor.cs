@@ -215,15 +215,13 @@ namespace Impulse.Pages.Export.Invoices
 
         private void AddInvoice(ItemClickEventArgs e)
         {
-            // Placeholder: NavigationManager.NavigateTo($"/Export/Invoices/InvoiceDetail/{invoiceType}");
-            NotificationServiceManager.ShowWarning("Pending", "Navigation to new Invoice Detail page will be implemented soon.");
+            NavigationManager.NavigateTo("/export/custominvoices/new-custominvoice");
         }
 
         private void EditInvoice(ItemClickEventArgs e)
         {
             if (contextMenuRowItem == null) return;
-            // Placeholder: NavigationManager.NavigateTo($"/Export/Invoices/InvoiceDetail/{invoiceType}/{contextMenuRowItem.CustomInvoice}");
-            NotificationServiceManager.ShowWarning("Pending", $"Navigation to Edit Invoice {contextMenuRowItem.CustomInvoice} will be implemented soon.");
+            NavigationManager.NavigateTo($"/export/custominvoices/new-custominvoice/{contextMenuRowItem.CustomInvoice}");
         }
 
         private void UpdateRebateRates(ItemClickEventArgs e)

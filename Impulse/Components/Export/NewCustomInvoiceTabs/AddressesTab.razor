@@ -1,0 +1,63 @@
+@using DataAccessLibrary.Models.ViewModels.Export
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card border border-secondary-subtle shadow-sm h-100">
+            <div class="card-header bg-secondary-subtle text-secondary-emphasis fw-bold py-2 d-flex justify-content-between align-items-center" style="font-size: 0.85rem;">
+                <span><i class="fas fa-truck-loading me-1"></i> Shipping Address</span>
+                <select class="form-select form-select-sm w-50" @onchange="OnShippingAddressPresetChanged">
+                    <option value="">— Select Preset —</option>
+                    @foreach (var p in ShippingAddressPresets)
+                    {
+                        <option value="@p.ShippingAddress">@p.ShippingAddress.Substring(0, Math.Min(30, p.ShippingAddress.Length))...</option>
+                    }
+                </select>
+            </div>
+            <div class="card-body">
+                <textarea class="form-control form-control-sm h-100" @bind="Invoice.ComAgainst" style="min-height: 150px;"></textarea>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card border border-secondary-subtle shadow-sm h-100">
+            <div class="card-header bg-secondary-subtle text-secondary-emphasis fw-bold py-2 d-flex justify-content-between align-items-center" style="font-size: 0.85rem;">
+                <span><i class="fas fa-file-invoice me-1"></i> Invoice To</span>
+                <select class="form-select form-select-sm w-50" @onchange="OnInvoiceToPresetChanged">
+                    <option value="">— Select Preset —</option>
+                    @foreach (var p in InvoiceToPresets)
+                    {
+                        <option value="@p.InvoiceTo">@p.InvoiceTo.Substring(0, Math.Min(30, p.InvoiceTo.Length))...</option>
+                    }
+                </select>
+            </div>
+            <div class="card-body">
+                <textarea class="form-control form-control-sm h-100" @bind="Invoice.InvoiceTo" style="min-height: 150px;"></textarea>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public CustomInvoiceViewModel Invoice { get; set; } = default!;
+    [Parameter] public List<ShippingAddressPresetModel> ShippingAddressPresets { get; set; } = new();
+    [Parameter] public List<InvoiceToPresetModel> InvoiceToPresets { get; set; } = new();
+
+    private void OnShippingAddressPresetChanged(ChangeEventArgs e)
+    {
+        var val = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(val))
+        {
+            Invoice.ComAgainst = val;
+        }
+    }
+
+    private void OnInvoiceToPresetChanged(ChangeEventArgs e)
+    {
+        var val = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(val))
+        {
+            Invoice.InvoiceTo = val;
+        }
+    }
+}

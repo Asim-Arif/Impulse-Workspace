@@ -1,0 +1,494 @@
+@using DataAccessLibrary.Models.ViewModels.Export
+@using DataAccessLibrary.Models.ViewModels
+@inject Impulse.Services.Export.ICustomInvoiceService InvoiceService
+
+<div class="row g-3">
+
+    <!-- ── Row 1: GD, Custom Date, Gate Pass ─────────────────────── -->
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">GD No.</label>
+        <input type="text" class="form-control form-control-sm" @bind="Invoice.GDNo" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Custom DT</label>
+        <input type="date" class="form-control form-control-sm" @bind="Invoice.CustomDT" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Gate Pass No.</label>
+        <input type="text" class="form-control form-control-sm" @bind="Invoice.GatePassNo" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Gate Pass DT</label>
+        <input type="date" class="form-control form-control-sm" @bind="Invoice.GatePassDT" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Gross Weight</label>
+        <input type="number" step="0.01" class="form-control form-control-sm" @bind="Invoice.GrossWeight" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Total Cartons</label>
+        <input type="number" class="form-control form-control-sm" @bind="Invoice.TotalCartons" />
+    </div>
+
+    <!-- ── Row 2: Checkboxes ──────────────────────────────────────── -->
+    <div class="col-12 d-flex gap-4 flex-wrap">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" @bind="Invoice.NoSRO" id="chkNoSRO">
+            <label class="form-check-label fw-bold text-secondary" for="chkNoSRO" style="font-size: 0.85rem;">No SRO</label>
+        </div>
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" @bind="Invoice.CIFTradeTerms" id="chkCIF">
+            <label class="form-check-label fw-bold text-secondary" for="chkCIF" style="font-size: 0.85rem;">CIF Trade Terms</label>
+        </div>
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" @bind="Invoice.SampleInvoice" id="chkSample">
+            <label class="form-check-label fw-bold text-secondary" for="chkSample" style="font-size: 0.85rem;">Sample Invoice</label>
+        </div>
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" @bind="Invoice.FreeSamples" id="chkFreeSamples">
+            <label class="form-check-label fw-bold text-secondary" for="chkFreeSamples" style="font-size: 0.85rem;">Free Samples</label>
+        </div>
+    </div>
+
+    <!-- ═══════════════ LEFT COLUMN ═══════════════ -->
+    <div class="col-md-6">
+
+        <!-- Port of Loading -->
+        <div class="card mb-3 border" style="border-radius:8px;">
+            <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; font-size:0.8rem; border-radius:8px 8px 0 0;">
+                <i class="fas fa-anchor me-1 text-primary"></i> Port of Loading
+            </div>
+            <div class="card-body py-2">
+                <div class="row g-2">
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Country</label>
+                        <select class="form-select form-select-sm" @bind="LoadCountry" @bind:after="OnLoadCountryChanged">
+                            @foreach (var c in LoadCountries)
+                            {
+                                <option value="@c">@c</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">City</label>
+                        <select class="form-select form-select-sm" @bind="SelectedLoadCityId" @bind:after="OnLoadCityChanged">
+                            <option value="0">Select City</option>
+                            @foreach (var city in LoadCities)
+                            {
+                                <option value="@city.CityID">@city.CityName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Port</label>
+                        <select class="form-select form-select-sm" @bind="Invoice.LoadPortID">
+                            <option value="">Select Port</option>
+                            @foreach (var p in LoadPorts)
+                            {
+                                <option value="@p.PortID">@p.Port</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Port of Discharge -->
+        <div class="card mb-3 border" style="border-radius:8px;">
+            <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; font-size:0.8rem; border-radius:8px 8px 0 0;">
+                <i class="fas fa-ship me-1 text-primary"></i> Port of Discharge
+            </div>
+            <div class="card-body py-2">
+                <div class="row g-2">
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Country</label>
+                        <input type="text" class="form-control form-control-sm" @bind="DisCountry" @oninput="OnDisCountryInput" list="dis-countries-list" />
+                        <datalist id="dis-countries-list">
+                            @foreach (var c in DisCountries)
+                            {
+                                <option value="@c"></option>
+                            }
+                        </datalist>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">City</label>
+                        <select class="form-select form-select-sm" @bind="SelectedDisCityId" @bind:after="OnDisCityChanged">
+                            <option value="0">Select City</option>
+                            @foreach (var city in DisCities)
+                            {
+                                <option value="@city.CityID">@city.CityName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Port</label>
+                        <select class="form-select form-select-sm" @bind="Invoice.DisPortID">
+                            <option value="">Select Port</option>
+                            @foreach (var p in DisPorts)
+                            {
+                                <option value="@p.PortID">@p.Port</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-5">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Man. Discharge</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Invoice.ManDischarge" />
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Warehouse</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Invoice.Warehouse" />
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Gate</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Invoice.Gate" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">ETA Date</label>
+                        <input type="date" class="form-control form-control-sm" @bind="Invoice.DTETA" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Shipping Details -->
+        <div class="card mb-3 border border-primary-subtle" style="border-radius:8px;">
+            <div class="card-header bg-primary-subtle text-primary-emphasis fw-bold py-2" style="font-size: 0.85rem;">
+                <i class="fas fa-ship me-1"></i> Shipping Details
+            </div>
+            <div class="card-body py-2">
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Trade Terms</label>
+                        <select class="form-select form-select-sm" @bind="Invoice.TradeTerms">
+                            @foreach (var t in TradeTermsList)
+                            {
+                                <option value="@t.DropDownValue_Description">@t.DropDownValue_Description</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Payment Terms</label>
+                        <select class="form-select form-select-sm" @bind="Invoice.PaymentTerms">
+                            @foreach (var p in PaymentTermsList)
+                            {
+                                <option value="@p.DropDownValue_Description">@p.DropDownValue_Description</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Shipping Method</label>
+                        <select class="form-select form-select-sm" @bind="Invoice.ShippingMode">
+                            @foreach (var s in ShippingMethods)
+                            {
+                                <option value="@s.DropDownValue_Description">@s.DropDownValue_Description</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Packaging</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Invoice.Packaging" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Trans-Shipment</label>
+                        <select class="form-select form-select-sm" @bind="Invoice.TransShipment">
+                            <option value="Allowed">Allowed</option>
+                            <option value="Not Allowed">Not Allowed</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Partial Shipment</label>
+                        <select class="form-select form-select-sm" @bind="Invoice.PartialShipment">
+                            <option value="Allowed">Allowed</option>
+                            <option value="Not Allowed">Not Allowed</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">LC No.</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Invoice.LCNo" disabled="@(Invoice.PaymentTerms != "Letter of Credit")" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">LC Date</label>
+                        <input type="date" class="form-control form-control-sm" @bind="Invoice.LCDate" disabled="@(Invoice.PaymentTerms != "Letter of Credit")" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ═══════════════ RIGHT COLUMN ═══════════════ -->
+    <div class="col-md-6">
+
+        <!-- Banking & Agents -->
+        <div class="card mb-3 border border-info-subtle" style="border-radius:8px;">
+            <div class="card-header bg-info-subtle text-info-emphasis fw-bold py-2" style="font-size: 0.85rem;">
+                <i class="fas fa-university me-1"></i> Banking &amp; Agents
+            </div>
+            <div class="card-body py-2">
+                <div class="row g-2">
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Our Bank</label>
+                        <select class="form-select form-select-sm" @bind="SelectedOurBankName" @bind:after="OnOurBankNameChanged">
+                            <option value="">— Select Bank —</option>
+                            @foreach (var bankName in OurBankNames)
+                            {
+                                <option value="@bankName">@bankName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Our Bank Account No.</label>
+                        <select class="form-select form-select-sm" @bind="Invoice.OurBankID">
+                            <option value="">— Select Account —</option>
+                            @foreach (var b in FilteredBankAccounts)
+                            {
+                                <option value="@b.BankID">@b.DisplayText</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Shipping Agent</label>
+                        <select class="form-select form-select-sm" @bind="Invoice.ShippingAgentID">
+                            <option value="">— Select Agent —</option>
+                            @foreach (var a in ShippingAgents)
+                            {
+                                <option value="@a.EntryID">@a.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Insurance Agent</label>
+                        <select class="form-select form-select-sm" @bind="Invoice.InsuranceAgentID" disabled="@(!Invoice.CIFTradeTerms && Invoice.TradeTerms != "CIF" && Invoice.TradeTerms != "CIP")">
+                            <option value="">— Select Agent —</option>
+                            @foreach (var a in InsuranceAgents)
+                            {
+                                <option value="@a.EntryID">@a.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">AWB / B/L No.</label>
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control" @bind="Invoice.AWBNo" placeholder="Number" />
+                            <input type="date" class="form-control" @bind="Invoice.AWBNoDT" style="max-width:130px;" />
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Form E</label>
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control" @bind="Invoice.FormE" placeholder="Form E No." />
+                            <input type="date" class="form-control" @bind="Invoice.FormEDT" style="max-width:130px;" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Consignee / Bank Address -->
+        <div class="card mb-3 border" style="border-radius:8px;">
+            <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; font-size:0.8rem; border-radius:8px 8px 0 0;">
+                <i class="fas fa-building me-1 text-primary"></i> Consignee (Bank Address)
+            </div>
+            <div class="card-body py-2">
+                <textarea class="form-control form-control-sm" @bind="Invoice.Consignee" rows="3"></textarea>
+            </div>
+        </div>
+
+        <!-- Invoice Of / Invoice Description / DTRE Description -->
+        <div class="card mb-3 border" style="border-radius:8px;">
+            <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; font-size:0.8rem; border-radius:8px 8px 0 0;">
+                <i class="fas fa-file-alt me-1 text-primary"></i> Invoice Details
+            </div>
+            <div class="card-body py-2">
+                <div class="row g-2">
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Invoice Of</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Invoice.InvoiceOf" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Invoice Description</label>
+                        <textarea class="form-control form-control-sm" @bind="Invoice.InvoiceDescription" rows="2"></textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">DTRE Description</label>
+                        <textarea class="form-control form-control-sm" @bind="Invoice.DTREDescription" rows="2"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Declarations -->
+        <div class="card mb-3 border" style="border-radius:8px;">
+            <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; font-size:0.8rem; border-radius:8px 8px 0 0;">
+                <i class="fas fa-scroll me-1 text-warning"></i> Declarations
+            </div>
+            <div class="card-body py-2">
+                <div class="row g-2">
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Footballs</label>
+                        <textarea class="form-control form-control-sm" @bind="Invoice.DeclarationsBalls" rows="2"></textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Garments</label>
+                        <textarea class="form-control form-control-sm" @bind="Invoice.DeclarationsGarments" rows="2"></textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Gloves</label>
+                        <textarea class="form-control form-control-sm" @bind="Invoice.DeclarationsGloves" rows="2"></textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Manual Declaration</label>
+                        <textarea class="form-control form-control-sm" @bind="Invoice.ManDeclaration" rows="2"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+@code {
+    [Parameter] public CustomInvoiceViewModel Invoice { get; set; } = default!;
+    [Parameter] public List<GenericDropDownModel> TradeTermsList { get; set; } = new();
+    [Parameter] public List<GenericDropDownModel> PaymentTermsList { get; set; } = new();
+    [Parameter] public List<GenericDropDownModel> ShippingMethods { get; set; } = new();
+    [Parameter] public List<AgentLookupModel> ShippingAgents { get; set; } = new();
+    [Parameter] public List<AgentLookupModel> InsuranceAgents { get; set; } = new();
+    [Parameter] public List<CompanyBankAccountModel> CompanyBankAccounts { get; set; } = new();
+    [Parameter] public List<CustomerBankModel> CustomerBanks { get; set; } = new();
+    [Parameter] public List<string> Countries { get; set; } = new();
+
+    // Port of Loading
+    private List<string> LoadCountries { get; set; } = new() { "Pakistan" };
+    private string LoadCountry { get; set; } = "Pakistan";
+    private List<CityModel> LoadCities { get; set; } = new();
+    private List<PortModel> LoadPorts { get; set; } = new();
+    private int SelectedLoadCityId { get; set; }
+
+    // Port of Discharge
+    private List<string> DisCountries { get; set; } = new();
+    private string DisCountry { get; set; } = string.Empty;
+    private List<CityModel> DisCities { get; set; } = new();
+    private List<PortModel> DisPorts { get; set; } = new();
+    private int SelectedDisCityId { get; set; }
+
+    // Our Bank two-step
+    private string SelectedOurBankName { get; set; } = string.Empty;
+    private List<string> OurBankNames => CompanyBankAccounts
+        .Select(b => b.BankName)
+        .Where(n => !string.IsNullOrEmpty(n))
+        .Distinct()
+        .OrderBy(n => n)
+        .ToList();
+    private List<CompanyBankAccountModel> FilteredBankAccounts =>
+        string.IsNullOrEmpty(SelectedOurBankName)
+            ? CompanyBankAccounts
+            : CompanyBankAccounts.Where(b => b.BankName == SelectedOurBankName).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        LoadCities = await InvoiceService.GetCitiesAsync("Pakistan");
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Restore Our Bank name from the selected bank ID
+        if (Invoice.OurBankID.HasValue && Invoice.OurBankID > 0 && CompanyBankAccounts.Any())
+        {
+            var match = CompanyBankAccounts.FirstOrDefault(a => a.BankID == Invoice.OurBankID);
+            if (match != null && string.IsNullOrEmpty(SelectedOurBankName))
+            {
+                SelectedOurBankName = match.BankName;
+            }
+        }
+
+        // Set discharge country from Countries list
+        if (DisCountries.Count == 0 && Countries.Any())
+        {
+            DisCountries = new List<string>(Countries);
+            if (!string.IsNullOrEmpty(Invoice.Country) && string.IsNullOrEmpty(DisCountry))
+            {
+                DisCountry = Invoice.Country;
+            }
+        }
+    }
+
+    public async Task RestorePortSelectionsAsync()
+    {
+        if (Invoice.LoadPortID.HasValue && Invoice.LoadPortID > 0)
+        {
+            var details = await InvoiceService.GetPortCityAndCountryAsync(Invoice.LoadPortID.Value);
+            if (details.CityID > 0)
+            {
+                LoadCountry = details.CountryName;
+                LoadCities = await InvoiceService.GetCitiesAsync(LoadCountry);
+                SelectedLoadCityId = details.CityID;
+                LoadPorts = await InvoiceService.GetPortsAsync(SelectedLoadCityId);
+            }
+        }
+        if (Invoice.DisPortID.HasValue && Invoice.DisPortID > 0)
+        {
+            var details = await InvoiceService.GetPortCityAndCountryAsync(Invoice.DisPortID.Value);
+            if (details.CityID > 0)
+            {
+                DisCountry = details.CountryName;
+                if (!DisCountries.Contains(DisCountry)) DisCountries.Add(DisCountry);
+                DisCities = await InvoiceService.GetCitiesAsync(DisCountry);
+                SelectedDisCityId = details.CityID;
+                DisPorts = await InvoiceService.GetPortsAsync(SelectedDisCityId);
+            }
+        }
+    }
+
+    public void SetDisChargeCountryList(List<string> countries)
+    {
+        DisCountries = countries;
+        if (countries.Count > 0 && string.IsNullOrEmpty(DisCountry))
+            DisCountry = countries[0];
+    }
+
+    private async Task OnLoadCountryChanged()
+    {
+        LoadCities = await InvoiceService.GetCitiesAsync(LoadCountry);
+        LoadPorts.Clear();
+        SelectedLoadCityId = 0;
+        Invoice.LoadPortID = null;
+    }
+
+    private async Task OnLoadCityChanged()
+    {
+        if (SelectedLoadCityId > 0)
+            LoadPorts = await InvoiceService.GetPortsAsync(SelectedLoadCityId);
+        else
+            LoadPorts.Clear();
+        Invoice.LoadPortID = null;
+    }
+
+    private async Task OnDisCountryInput(ChangeEventArgs e)
+    {
+        DisCountry = e.Value?.ToString() ?? string.Empty;
+        DisCities = await InvoiceService.GetCitiesAsync(DisCountry);
+        DisPorts.Clear();
+        SelectedDisCityId = 0;
+        Invoice.DisPortID = null;
+    }
+
+    private async Task OnDisCityChanged()
+    {
+        if (SelectedDisCityId > 0)
+            DisPorts = await InvoiceService.GetPortsAsync(SelectedDisCityId);
+        else
+            DisPorts.Clear();
+        Invoice.DisPortID = null;
+    }
+
+    private void OnOurBankNameChanged()
+    {
+        // When bank name changes, auto-select the first account
+        var accounts = FilteredBankAccounts;
+        if (accounts.Any())
+            Invoice.OurBankID = accounts.First().BankID;
+        else
+            Invoice.OurBankID = null;
+    }
+}

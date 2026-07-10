@@ -1,0 +1,99 @@
+@using DataAccessLibrary.Models.ViewModels.Export
+
+<div class="row g-3">
+    <div class="col-12">
+        <div class="table-responsive border rounded" style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.85rem;">
+                <thead style="position: sticky; top: 0; background: #f8f9fa; z-index: 1;">
+                    <tr class="text-secondary">
+                        <th style="width: 50px;">S.No</th>
+                        <th>Order No</th>
+                        <th>Proforma</th>
+                        <th>Item Code</th>
+                        <th>Description</th>
+                        <th class="text-center">Unit</th>
+                        <th class="text-end" style="width: 100px;">Price</th>
+                        <th class="text-end" style="width: 100px;">Custom Price</th>
+                        <th class="text-center" style="width: 100px;">Qty</th>
+                        <th class="text-end" style="width: 120px;">Amount</th>
+                        <th class="text-center" style="width: 60px;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Invoice.LineItems.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="11" class="text-center text-muted py-4">
+                                <i class="fas fa-box-open fs-4 mb-2 d-block text-black-50"></i>
+                                No items added. Add items from the Proforma Items tab.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        int index = 1;
+                        foreach (var item in Invoice.LineItems)
+                        {
+                            <tr @key="item">
+                                <td class="text-center fw-bold text-secondary">@(index++)</td>
+                                <td>@item.OrderNo</td>
+                                <td>@item.ProformaInvoice</td>
+                                <td>@item.ItemCode</td>
+                                <td>@item.Description</td>
+                                <td class="text-center">@item.Unit</td>
+                                <td class="text-end">
+                                    <input type="number" class="form-control form-control-sm text-end bg-light fw-bold" 
+                                           @bind="item.Price" @bind:event="oninput" @onchange="OnTotalsChanged" step="0.0001" style="width:100px;" />
+                                </td>
+                                <td class="text-end">
+                                    <input type="number" class="form-control form-control-sm text-end" 
+                                           @bind="item.CustomPrice" @bind:event="oninput" step="0.0001" style="width:100px;" />
+                                </td>
+                                <td class="text-center">
+                                    <input type="number" class="form-control form-control-sm text-center fw-bold" 
+                                           @bind="item.Qty" @bind:event="oninput" @onchange="OnTotalsChanged" style="width:80px;" />
+                                </td>
+                                <td class="text-end fw-bold text-success">
+                                    @item.Amount.ToString("N4")
+                                </td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-outline-danger border-0" @onclick="() => RemoveItem(item)" title="Remove Item">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="col-12 text-end">
+        <h5 class="mb-0 fw-bold">Total Pcs: <span class="text-primary me-4">@Invoice.LineItems.Sum(x => x.Qty)</span> Total Amount: <span class="text-success">@Invoice.Currency @Invoice.TotalAmount.ToString("N4")</span></h5>
+    </div>
+</div>
+
+@code {
+    [Parameter] public CustomInvoiceViewModel Invoice { get; set; } = default!;
+    [Parameter] public EventCallback OnTotalsChanged { get; set; }
+
+    private async Task RemoveItem(CustomInvoiceItemModel item)
+    {
+        // Actually, we should probably set Qty to 0 so it gets marked for deletion, or just remove it
+        Invoice.LineItems.Remove(item);
+        if (item.EntryID > 0)
+        {
+            Invoice.DeletedLineItemIds.Add(item.EntryID);
+        }
+        
+        // Also remove associated packing list items
+        var plToRemove = Invoice.PackingListItems.Where(p => p.OrderItemID == item.RefID).ToList(); // Note: OrderItemID maps to RefID locally or EntryID in DB. In local list we use RefID.
+        foreach (var pl in plToRemove)
+        {
+            Invoice.PackingListItems.Remove(pl);
+            if (pl.ID > 0) Invoice.DeletedPackingListIds.Add(pl.ID);
+        }
+        
+        await OnTotalsChanged.InvokeAsync();
+    }
+}

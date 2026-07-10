@@ -93,10 +93,9 @@ namespace DataAccessLibrary.DAC.Export
         {
             using IDbConnection db = new SqlConnection(_connectionString);
             const string sql = @"
-                SELECT BankID, BankName, ISNULL(Address1,'') AS Address1
+                SELECT *
                 FROM FCustBanks
-                WHERE CustCode = @CustCode AND Country = @Country
-                ORDER BY BankName";
+                WHERE CustCode = @CustCode AND Country = @Country";
             return (await db.QueryAsync<CustomerBankModel>(sql, new { CustCode = custCode, Country = country })).ToList();
         }
 

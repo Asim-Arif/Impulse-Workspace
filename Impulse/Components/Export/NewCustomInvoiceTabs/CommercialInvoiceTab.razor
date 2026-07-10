@@ -1,0 +1,59 @@
+@using DataAccessLibrary.Models.ViewModels.Export
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Notify</label>
+        <textarea class="form-control form-control-sm" @bind="Invoice.ComNotify" rows="3"></textarea>
+    </div>
+    <div class="col-md-6">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Consignee</label>
+        <textarea class="form-control form-control-sm" @bind="Invoice.ComConsignee" rows="3"></textarea>
+    </div>
+    
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Drawn Under</label>
+        <textarea class="form-control form-control-sm" @bind="Invoice.ComDrawnUnder" rows="3"></textarea>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Special Notes</label>
+        <textarea class="form-control form-control-sm" @bind="Invoice.ComSpecial" rows="3"></textarea>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Payment Terms</label>
+        <textarea class="form-control form-control-sm" @bind="Invoice.ComPayTerms" rows="3"></textarea>
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Vessel</label>
+        <input type="text" class="form-control form-control-sm" @bind="Invoice.Vessel" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Container No.</label>
+        <input type="text" class="form-control form-control-sm" @bind="Invoice.ContainerNo" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Seal No.</label>
+        <input type="text" class="form-control form-control-sm" @bind="Invoice.SealNo" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">ETA Date</label>
+        <input type="date" class="form-control form-control-sm" @bind="Invoice.DTETA" />
+    </div>
+    
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Declarations (Balls)</label>
+        <textarea class="form-control form-control-sm" @bind="Invoice.ComDeclarationsBalls" rows="2"></textarea>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Declarations (Garments)</label>
+        <textarea class="form-control form-control-sm" @bind="Invoice.ComDeclarationsGarments" rows="2"></textarea>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Declarations (Gloves)</label>
+        <textarea class="form-control form-control-sm" @bind="Invoice.ComDeclarationsGloves" rows="2"></textarea>
+    </div>
+</div>
+
+@code {
+    [Parameter] public CustomInvoiceViewModel Invoice { get; set; } = default!;
+}

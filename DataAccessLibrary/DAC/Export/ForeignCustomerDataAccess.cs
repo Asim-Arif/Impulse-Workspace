@@ -50,8 +50,7 @@ namespace DataAccessLibrary.DAC.Export
 
             // Eager-load child collections
             model.Banks = (await db.QueryAsync<ForeignCustomerBankViewModel>(@"
-                SELECT BankID,BankName,BankCountry AS Country,Phone1,Phone2,
-                       Fax1,Fax2,Email1,Email2,Address1,Address2,DefaultBank
+                SELECT *
                 FROM FCustBanks
                 WHERE CustCode+Country = @CustID", new { CustID = custId })).ToList();
 

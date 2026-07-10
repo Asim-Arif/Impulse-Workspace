@@ -1,0 +1,119 @@
+@using DataAccessLibrary.Models.ViewModels.Export
+
+<div class="row g-3">
+    <!-- Add new charge row -->
+    <div class="col-12 bg-light p-3 rounded border shadow-sm mb-2">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">S.No</label>
+                <input type="number" class="form-control form-control-sm text-center" @bind="NewCharge.SNo" disabled />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Charges Description</label>
+                <input type="text" class="form-control form-control-sm" @bind="NewCharge.ChargesDetail" placeholder="Enter description..." />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Amount</label>
+                <input type="number" class="form-control form-control-sm text-end" @bind="NewCharge.ChargesAmt" step="0.01" />
+            </div>
+            <div class="col-md-2 text-end">
+                <button class="btn btn-sm btn-primary fw-bold w-100" @onclick="AddCharge">
+                    <i class="fas fa-plus me-1"></i> Add
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charges Grid -->
+    <div class="col-12">
+        <div class="table-responsive border rounded" style="max-height: 300px; overflow-y: auto;">
+            <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.85rem;">
+                <thead style="position: sticky; top: 0; background: #f8f9fa; z-index: 1;">
+                    <tr class="text-secondary">
+                        <th style="width: 80px;" class="text-center">S.No</th>
+                        <th>Charges Description</th>
+                        <th class="text-end" style="width: 150px;">Amount</th>
+                        <th class="text-center" style="width: 80px;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (OtherCharges.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-3">No other charges added.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        foreach (var c in OtherCharges.OrderBy(x => x.SNo))
+                        {
+                            <tr @key="c">
+                                <td class="text-center fw-bold text-secondary">@c.SNo</td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm bg-transparent border-0" @bind="c.ChargesDetail" />
+                                </td>
+                                <td class="text-end">
+                                    <input type="number" class="form-control form-control-sm text-end bg-transparent border-0 fw-bold" @bind="c.ChargesAmt" @bind:event="oninput" @onchange="OnChargesUpdated" step="0.01" />
+                                </td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-outline-danger border-0" @onclick="() => RemoveCharge(c)" title="Remove Charge">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                        <tr class="table-light">
+                            <td colspan="2" class="text-end fw-bold">Total Charges:</td>
+                            <td class="text-end fw-bold text-success">@OtherCharges.Sum(x => x.ChargesAmt).ToString("N2")</td>
+                            <td></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<CustomInvoiceOtherChargeModel> OtherCharges { get; set; } = new();
+    [Parameter] public EventCallback OnChargesUpdated { get; set; }
+
+    private CustomInvoiceOtherChargeModel NewCharge = new CustomInvoiceOtherChargeModel { SNo = 1 };
+
+    protected override void OnParametersSet()
+    {
+        if (OtherCharges.Any())
+        {
+            NewCharge.SNo = OtherCharges.Max(x => x.SNo) + 1;
+        }
+    }
+
+    private async Task AddCharge()
+    {
+        if (string.IsNullOrWhiteSpace(NewCharge.ChargesDetail)) return;
+
+        OtherCharges.Add(new CustomInvoiceOtherChargeModel
+        {
+            SNo = NewCharge.SNo,
+            ChargesDetail = NewCharge.ChargesDetail,
+            ChargesAmt = NewCharge.ChargesAmt
+        });
+
+        NewCharge = new CustomInvoiceOtherChargeModel { SNo = OtherCharges.Max(x => x.SNo) + 1 };
+        await OnChargesUpdated.InvokeAsync();
+    }
+
+    private async Task RemoveCharge(CustomInvoiceOtherChargeModel charge)
+    {
+        OtherCharges.Remove(charge);
+        // Re-sequence
+        int sno = 1;
+        foreach (var c in OtherCharges.OrderBy(x => x.SNo))
+        {
+            c.SNo = sno++;
+        }
+        NewCharge.SNo = sno;
+        
+        await OnChargesUpdated.InvokeAsync();
+    }
+}
