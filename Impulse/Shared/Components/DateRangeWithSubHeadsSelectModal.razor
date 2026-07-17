@@ -1,4 +1,4 @@
-﻿@using DataAccessLibrary.Models.ReportModels
+@using DataAccessLibrary.Models.ReportModels
 @using DataAccessLibrary.Models.ViewModels
 @using Blazored.Typeahead
 
@@ -26,7 +26,7 @@
                                            Value="SelectedOption"
                                            ValueChanged="SelectedResultChanged_AccountHead"
                                            ValueExpression="@(() => SelectedOption)"
-                                           Placeholder="Search Account ..."
+                                           Placeholder="@PlaceholderText"
                                            MaximumSuggestions="1000">
                             <SelectedTemplate Context="selectedcard">
                                 @SelectedOption?.DropDownValue_Description
@@ -38,7 +38,7 @@
                     </div>
 
                     <div class="mb-4">
-                        <label class="mb-1 fw-bold" style="font-size: 0.85rem;">@LabelText</label>
+                        <label class="mb-1 fw-bold" style="font-size: 0.85rem;">@LabelTextSub</label>
                         <BlazoredTypeahead SearchMethod="SearchData_sub" EnableDropDown="true"
                                            Data="LocalOptions_sub"
                                            TValue="GenericDropDownModel"
@@ -46,7 +46,7 @@
                                            Value="SelectedOption_sub"
                                            ValueChanged="SelectedResultChanged_AccountHead_sub"
                                            ValueExpression="@(() => SelectedOption_sub)"
-                                           Placeholder="Search Account ..."
+                                           Placeholder="@PlaceholderTextSub"
                                            MaximumSuggestions="1000">
                             <SelectedTemplate Context="selectedcard">
                                 @SelectedOption_sub?.DropDownValue_Description
@@ -99,6 +99,9 @@
 @code {
     [Parameter] public string Title { get; set; } = "Select Parameters";
     [Parameter] public string LabelText { get; set; } = "Select Account:";
+    [Parameter] public string LabelTextSub { get; set; } = "Select Account:";
+    [Parameter] public string PlaceholderText { get; set; } = "Search Account ...";
+    [Parameter] public string PlaceholderTextSub { get; set; } = "Search Account ...";
 
     private bool IsVisible { get; set; }
     private DateTime DateFrom { get; set; } = DateTime.Today.AddDays(-30);
@@ -109,6 +112,7 @@
 
     private List<GenericDropDownModel> LocalOptions_sub { get; set; } = new();
     private GenericDropDownModel SelectedOption_sub { get; set; }
+
 
     private TaskCompletionSource<DateRangeSingleSelectionResultSubHeads> _tcs;
 
