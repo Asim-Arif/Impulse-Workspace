@@ -1,0 +1,144 @@
+@page "/export/invoices/print-inner-labels"
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.ViewModels.Company
+@attribute [Authorize]
+
+<PageTitle>Print Inner Labels</PageTitle>
+
+<style>
+    /* Fix Blazored Typeahead height to match .form-control-sm */
+    .blazored-typeahead {
+        height: 31px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 29px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    /* Premium hover effects and micro-animations */
+    .btn-premium {
+        position: relative;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        font-weight: 600;
+        border-radius: 6px;
+    }
+    .btn-premium:hover {
+        transform: translateY(-1.5px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    .btn-premium:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Glassmorphism panel styling */
+    .glass-panel {
+        background: rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+    }
+</style>
+
+<div class="container-fluid py-3" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <!-- Glassmorphic Card -->
+            <div class="card border-0 shadow-lg rounded-3 glass-panel">
+                <!-- Header with subtle gradient -->
+                <div class="card-header py-3 border-0 bg-transparent" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <div class="d-flex align-items-center">
+                        <div class="p-2 bg-primary-subtle rounded-3 me-3 text-primary" style="font-size: 1.25rem;">
+                            <i class="fas fa-print"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0 fw-bold text-dark-emphasis">Print Inner Labels</h5>
+                            <small class="text-muted">Generate and print inner item labels</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body px-4 py-3">
+                    @if (isLoading)
+                    {
+                        <div class="d-flex align-items-center justify-content-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Item selector -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Item <span class="text-danger">*</span></label>
+                            <BlazoredTypeahead SearchMethod="SearchItems"
+                                               EnableDropDown="true"
+                                               Data="items"
+                                               TValue="ItemLookupModel"
+                                               TItem="ItemLookupModel"
+                                               Value="selectedItem"
+                                               ValueChanged="OnItemChanged"
+                                               ValueExpression="@(() => selectedItem)"
+                                               Placeholder="Select Item"
+                                               MaximumSuggestions="1000">
+                                <SelectedTemplate Context="selectedItm">
+                                    @selectedItm?.ItemName
+                                </SelectedTemplate>
+                                <ResultTemplate Context="itm">
+                                    @itm.ItemName
+                                </ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+
+                        <!-- Order No -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Order No.</label>
+                            <select class="form-select form-select-sm" value="@selectedOrderNo" @onchange="OnOrderNoChanged" disabled="@(selectedItem == null)">
+                                <option value="">— Select Order No. —</option>
+                                @foreach (var order in orderNumbers)
+                                {
+                                    <option value="@order">@order</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="row g-2 mb-4">
+                            <!-- Quantity -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Qty</label>
+                                <input type="number" class="form-control form-control-sm text-center fw-bold" style="height: 31px;" @bind="qty" min="0" step="any" />
+                            </div>
+
+                            <!-- No. of Labels -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">No. of Labels <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control form-control-sm text-center fw-bold text-danger" style="height: 31px;" @bind="numberOfLabels" min="1" />
+                            </div>
+                        </div>
+
+                        <!-- Actions footer -->
+                        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                            <button type="button" class="btn btn-outline-secondary btn-sm btn-premium px-3" @onclick="GoBack">
+                                <i class="fas fa-times me-1"></i> Cancel
+                            </button>
+
+                            <button type="button" class="btn btn-primary btn-sm btn-premium px-4" @onclick="OnPrintClick" disabled="@(selectedItem == null || numberOfLabels <= 0)">
+                                <i class="fas fa-print me-1"></i> Print
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

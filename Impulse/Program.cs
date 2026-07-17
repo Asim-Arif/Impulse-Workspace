@@ -173,6 +173,33 @@ builder.Services.AddScoped<Impulse.Services.Export.ICustomInvoiceService, Impuls
 builder.Services.AddScoped<DataAccessLibrary.Interface.Export.ICustomPaymentDataAccess, DataAccessLibrary.DAC.Export.CustomPaymentDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Export.ICustomPaymentService, Impulse.Services.Export.CustomPaymentService>();
 
+builder.Services.AddScoped<DataAccessLibrary.Interface.Export.IPackingLabelsDataAccess, DataAccessLibrary.DAC.Export.PackingLabelsDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Export.IPackingLabelsService, Impulse.Services.Export.PackingLabelsService>();
+
+builder.Services.AddScoped<DataAccessLibrary.Interface.Export.IPrintInnerLabelsDataAccess, DataAccessLibrary.DAC.Export.PrintInnerLabelsDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Export.IPrintInnerLabelsService, Impulse.Services.Export.PrintInnerLabelsService>();
+
+builder.Services.AddScoped<DataAccessLibrary.Interface.Export.IShippingInstructionsDataAccess, DataAccessLibrary.DAC.Export.ShippingInstructionsDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Export.IShippingInstructionsService, Impulse.Services.Export.ShippingInstructionsService>();
+
+builder.Services.AddScoped<DataAccessLibrary.Interface.Export.IPrintValuationDataAccess, DataAccessLibrary.DAC.Export.PrintValuationDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Export.IPrintValuationService, Impulse.Services.Export.PrintValuationService>();
+
+builder.Services.AddScoped<DataAccessLibrary.Interface.Export.ICommercialCoveringDataAccess, DataAccessLibrary.DAC.Export.CommercialCoveringDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Export.ICommercialCoveringService, Impulse.Services.Export.CommercialCoveringService>();
+
+builder.Services.AddScoped<DataAccessLibrary.Interface.Export.ITotalExportDataAccess, DataAccessLibrary.DAC.Export.TotalExportDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Export.ITotalExportService, Impulse.Services.Export.TotalExportService>();
+
+builder.Services.AddScoped<DataAccessLibrary.Interface.Export.ITotalDemandDataAccess, DataAccessLibrary.DAC.Export.TotalDemandDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Export.ITotalDemandService, Impulse.Services.Export.TotalDemandService>();
+
+builder.Services.AddScoped<DataAccessLibrary.Interface.Export.IArticlewiseSaleDataAccess, DataAccessLibrary.DAC.Export.ArticlewiseSaleDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Export.IArticlewiseSaleService, Impulse.Services.Export.ArticlewiseSaleService>();
+
+builder.Services.AddScoped<DataAccessLibrary.Interface.Export.IArticlewiseDemandDataAccess, DataAccessLibrary.DAC.Export.ArticlewiseDemandDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Export.IArticlewiseDemandService, Impulse.Services.Export.ArticlewiseDemandService>();
+
 
 builder.Services.AddScoped<LoadingService>();
 builder.Services.AddScoped<SecurityService>();

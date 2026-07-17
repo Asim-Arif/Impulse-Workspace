@@ -1,0 +1,224 @@
+@page "/export/statistics/total-export"
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.ViewModels.Export
+@attribute [Authorize]
+
+<PageTitle>Total Export</PageTitle>
+
+<style>
+    /* Fix Blazored Typeahead height to match .form-control-sm */
+    .blazored-typeahead {
+        height: 31px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 29px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    /* Premium hover effects and micro-animations */
+    .btn-premium {
+        position: relative;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        font-weight: 600;
+        border-radius: 6px;
+    }
+    .btn-premium:hover {
+        transform: translateY(-1.5px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    .btn-premium:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Glassmorphism panel styling */
+    .glass-panel {
+        background: rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+    }
+</style>
+
+<div class="container-fluid py-4" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="row justify-content-center">
+        <div class="col-xxl-10 col-xl-11 col-lg-12">
+            <!-- Glassmorphic Card -->
+            <div class="card border-0 shadow-lg rounded-3 glass-panel">
+                <!-- Header -->
+                <div class="card-header py-3 border-0 bg-transparent">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <div class="p-2 bg-primary-subtle rounded-3 me-3 text-primary" style="font-size: 1.5rem;">
+                                <i class="fas fa-ship"></i>
+                            </div>
+                            <div>
+                                <h4 class="mb-0 fw-bold text-dark-emphasis">Total Export</h4>
+                                <small class="text-muted">View and analyze foreign shipments summary and values</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body px-4 py-3">
+                    @if (isLoading)
+                    {
+                        <div class="d-flex align-items-center justify-content-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Selection & Filters Form -->
+                        <div class="row g-2 mb-4 p-3 bg-light-subtle rounded-3 border align-items-end">
+                            <!-- Customer -->
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Customer</label>
+                                <BlazoredTypeahead SearchMethod="SearchCustomers"
+                                                   EnableDropDown="true"
+                                                   Data="customers"
+                                                   TValue="CustomerLookupModel"
+                                                   TItem="CustomerLookupModel"
+                                                   Value="selectedCustomer"
+                                                   ValueChanged="OnCustomerChanged"
+                                                   ValueExpression="@(() => selectedCustomer)"
+                                                   Placeholder="Select Customer">
+                                    <SelectedTemplate Context="selectedCust">
+                                        @selectedCust?.CustCode
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="cust">
+                                        @cust.CustCode
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+
+                            <!-- Range Select -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Range</label>
+                                <select class="form-select form-select-sm" style="height: 31px;" value="@selectedRange" @onchange="OnRangeChanged">
+                                    <option value="Today">Today</option>
+                                    <option value="15Days">15 Days</option>
+                                    <option value="30Days">30 Days</option>
+                                    <option value="60Days">60 Days</option>
+                                    <option value="90Days">90 Days</option>
+                                    <option value="Custom">Custom Range</option>
+                                </select>
+                            </div>
+
+                            <!-- Date From -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">From</label>
+                                <input type="date" class="form-control form-control-sm" style="height: 31px;" @bind="dateFrom" disabled="@(selectedRange != "Custom")" />
+                            </div>
+
+                            <!-- Date To -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">To</label>
+                                <input type="date" class="form-control form-control-sm" style="height: 31px;" @bind="dateTo" disabled="@(selectedRange != "Custom")" />
+                            </div>
+
+                            <!-- Show Custom Amount checkbox -->
+                            <div class="col-md-2 pb-1">
+                                <div class="form-check form-switch mb-1">
+                                    <input class="form-check-input" type="checkbox" id="chkCustomAmt" @bind="showCustomAmount" />
+                                    <label class="form-check-label fw-bold text-secondary" style="font-size: 0.82rem;" for="chkCustomAmt">Show Custom Amt</label>
+                                </div>
+                            </div>
+
+                            <!-- Actions -->
+                            <div class="col-md-1 d-grid">
+                                <button type="button" class="btn btn-primary btn-sm btn-premium" style="height: 31px;" @onclick="RefreshData">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Data List Grid -->
+                        <div class="table-responsive border rounded-3 mb-3 bg-white" style="max-height: 480px; overflow-y: auto;">
+                            <table class="table table-hover align-middle mb-0" style="font-size: 0.9rem;">
+                                <thead class="table-light sticky-top">
+                                    <tr>
+                                        <th style="width: 8%;" class="text-center">S No.</th>
+                                        <th style="width: 15%;">Cust Code</th>
+                                        <th style="width: 20%;">Country</th>
+                                        <th style="width: 22%;">Invoice No</th>
+                                        <th style="width: 18%;" class="text-center">Date</th>
+                                        <th style="width: 17%;" class="text-end">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (exportData.Count == 0)
+                                    {
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted py-5">
+                                                <i class="fas fa-box-open d-block mb-2 style-3" style="font-size: 1.8rem;"></i>
+                                                No export records found matching the chosen filters. Click Refresh to reload.
+                                            </td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        @for (int i = 0; i < exportData.Count; i++)
+                                        {
+                                            var row = exportData[i];
+                                            var amt = showCustomAmount ? row.TotalCustomAmt : row.TotalAmt;
+                                            <tr>
+                                                <td class="text-center text-muted">@(i + 1)</td>
+                                                <td class="fw-semibold">@row.CustCode</td>
+                                                <td>@row.Country</td>
+                                                <td class="text-primary-emphasis">@row.CustomInvoice</td>
+                                                <td class="text-center">@row.DT?.ToString("dd-MMM-yyyy")</td>
+                                                <td class="text-end fw-bold text-dark-emphasis">@amt.ToString("N0")</td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Total Summary Panels -->
+                        <div class="row g-2 mb-4">
+                            <!-- Amount Words -->
+                            <div class="col-lg-8 col-md-7">
+                                <div class="p-3 bg-light rounded-3 border h-100 d-flex flex-column justify-content-center">
+                                    <span class="text-muted fw-bold mb-1" style="font-size: 0.75rem;">AMOUNT (IN WORDS)</span>
+                                    <span class="fw-bold text-primary-emphasis" style="font-size: 0.88rem;">@amountInWords</span>
+                                </div>
+                            </div>
+
+                            <!-- Total Numeric -->
+                            <div class="col-lg-4 col-md-5">
+                                <div class="p-3 bg-primary-subtle text-primary-emphasis rounded-3 border border-primary-subtle h-100 d-flex flex-column align-items-end justify-content-center">
+                                    <span class="fw-bold mb-1" style="font-size: 0.75rem;">TOTAL AMOUNT</span>
+                                    <span class="fs-4 fw-extrabold">@totalAmount.ToString("N0")</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Footer Actions -->
+                        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                            <button type="button" class="btn btn-outline-secondary btn-sm btn-premium px-3" @onclick="GoBack">
+                                <i class="fas fa-times me-1"></i> Close
+                            </button>
+
+                            <button type="button" class="btn btn-primary btn-sm btn-premium px-4" @onclick="PrintReport" disabled="@(exportData.Count == 0)">
+                                <i class="fas fa-print me-1"></i> Print
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
