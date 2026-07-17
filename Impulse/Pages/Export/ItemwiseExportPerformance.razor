@@ -1,0 +1,199 @@
+@page "/export/statistics/itemwise-export-performance"
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.ViewModels.Export
+@attribute [Authorize]
+
+<PageTitle>Itemwise Export Performance</PageTitle>
+
+<style>
+    /* Fix Blazored Typeahead height to match .form-control-sm */
+    .blazored-typeahead {
+        height: 31px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 29px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    .btn-premium {
+        position: relative;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        font-weight: 600;
+        border-radius: 6px;
+    }
+    .btn-premium:hover {
+        transform: translateY(-1.5px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    .btn-premium:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .glass-panel {
+        background: rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+    }
+</style>
+
+<div class="container-fluid py-4" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="row justify-content-center">
+        <div class="col-xxl-10 col-xl-11 col-lg-12">
+            <div class="card border-0 shadow-lg rounded-3 glass-panel">
+                <!-- Header -->
+                <div class="card-header py-3 border-0 bg-transparent">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <div class="p-2 bg-warning-subtle rounded-3 me-3 text-warning-emphasis" style="font-size: 1.5rem;">
+                                <i class="fas fa-tachometer-alt"></i>
+                            </div>
+                            <div>
+                                <h4 class="mb-0 fw-bold text-dark-emphasis">Itemwise Export Performance</h4>
+                                <small class="text-muted">Filter by customer, item group, category and date range to generate the report</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body px-4 py-3">
+                    @if (isLoading)
+                    {
+                        <div class="d-flex align-items-center justify-content-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Filter Form -->
+                        <div class="row g-3 mb-4 p-3 bg-light-subtle rounded-3 border align-items-end">
+
+                            <!-- Customer -->
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Customer</label>
+                                <BlazoredTypeahead SearchMethod="SearchCustomers"
+                                                   EnableDropDown="true"
+                                                   Data="customers"
+                                                   TValue="CustomerLookupModel"
+                                                   TItem="CustomerLookupModel"
+                                                   Value="selectedCustomer"
+                                                   ValueChanged="OnCustomerChanged"
+                                                   ValueExpression="@(() => selectedCustomer)"
+                                                   Placeholder="<All Customers>"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="sel">
+                                        @sel?.CustCode
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="cust">
+                                        @cust.CustCode
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+
+                            <!-- Item Group -->
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Item Group</label>
+                                <BlazoredTypeahead SearchMethod="SearchItemGroups"
+                                                   EnableDropDown="true"
+                                                   Data="itemGroups"
+                                                   TValue="ExportItemGroupLookupModel"
+                                                   TItem="ExportItemGroupLookupModel"
+                                                   Value="selectedItemGroup"
+                                                   ValueChanged="OnItemGroupChanged"
+                                                   ValueExpression="@(() => selectedItemGroup)"
+                                                   Placeholder="<All Groups>"
+                                                   MaximumSuggestions="500">
+                                    <SelectedTemplate Context="sel">
+                                        @sel?.Description
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="grp">
+                                        @grp.Description
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+
+                            <!-- Category -->
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Category</label>
+                                <BlazoredTypeahead SearchMethod="SearchCategories"
+                                                   EnableDropDown="true"
+                                                   Data="categories"
+                                                   TValue="ExportItemCategoryLookupModel"
+                                                   TItem="ExportItemCategoryLookupModel"
+                                                   Value="selectedCategory"
+                                                   ValueChanged="OnCategoryChanged"
+                                                   ValueExpression="@(() => selectedCategory)"
+                                                   Placeholder="<All Categories>"
+                                                   MaximumSuggestions="500">
+                                    <SelectedTemplate Context="sel">
+                                        @sel?.Description
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="cat">
+                                        @cat.Description
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+
+                            <!-- Additional Group (Main Group) -->
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Additional Group</label>
+                                <BlazoredTypeahead SearchMethod="SearchMainGroups"
+                                                   EnableDropDown="true"
+                                                   Data="mainGroups"
+                                                   TValue="ExportMainGroupLookupModel"
+                                                   TItem="ExportMainGroupLookupModel"
+                                                   Value="selectedMainGroup"
+                                                   ValueChanged="OnMainGroupChanged"
+                                                   ValueExpression="@(() => selectedMainGroup)"
+                                                   Placeholder="<All Groups>"
+                                                   MaximumSuggestions="500">
+                                    <SelectedTemplate Context="sel">
+                                        @sel?.MainGroupName
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="mg">
+                                        @mg.MainGroupName
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+
+                            <!-- Date From -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Date From</label>
+                                <input type="date" class="form-control form-control-sm" style="height: 31px;" @bind="dateFrom" />
+                            </div>
+
+                            <!-- Date To -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Date To</label>
+                                <input type="date" class="form-control form-control-sm" style="height: 31px;" @bind="dateTo" />
+                            </div>
+
+                        </div>
+
+                        <!-- Footer Actions -->
+                        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                            <button type="button" class="btn btn-outline-secondary btn-sm btn-premium px-3" @onclick="GoBack">
+                                <i class="fas fa-times me-1"></i> Close
+                            </button>
+                            <button type="button" class="btn btn-primary btn-sm btn-premium px-4" @onclick="PrintReport">
+                                <i class="fas fa-print me-1"></i> Print Report
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

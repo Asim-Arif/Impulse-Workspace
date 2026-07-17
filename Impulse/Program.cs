@@ -200,6 +200,8 @@ builder.Services.AddScoped<Impulse.Services.Export.IArticlewiseSaleService, Impu
 builder.Services.AddScoped<DataAccessLibrary.Interface.Export.IArticlewiseDemandDataAccess, DataAccessLibrary.DAC.Export.ArticlewiseDemandDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Export.IArticlewiseDemandService, Impulse.Services.Export.ArticlewiseDemandService>();
 
+builder.Services.AddScoped<DataAccessLibrary.Interface.Export.IExportPerformanceReportDataAccess, DataAccessLibrary.DAC.Export.ExportPerformanceReportDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Export.IExportPerformanceReportService, Impulse.Services.Export.ExportPerformanceReportService>();
 
 builder.Services.AddScoped<LoadingService>();
 builder.Services.AddScoped<SecurityService>();

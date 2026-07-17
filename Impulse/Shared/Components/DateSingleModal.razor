@@ -1,4 +1,4 @@
-﻿@using DataAccessLibrary.Models.ReportModels
+@using DataAccessLibrary.Models.ReportModels
 
 @if (IsVisible)
 {
@@ -14,14 +14,29 @@
                 <div class="modal-body p-4">
                     <div class="cip-rpt-date-display text-center">
                         <small class="text-uppercase text-muted fw-normal" style="font-size: 0.7rem; letter-spacing: 1px; opacity: 0.8;">
-                            Target Date
+                            @(yearOnly ? "Target Year" : "Target Date")
                         </small>
-                        <h3 class="text-primary mb-0">@SelectedDate.ToString("dd-MMM-yyyy")</h3>
+                        <h3 class="text-primary mb-0">
+                            @(yearOnly ? selectedYear.ToString() : SelectedDate.ToString("dd-MMM-yyyy"))
+                        </h3>
                     </div>
 
-                    <div class="form-group">
-                        <label class="mb-1 fw-bold" style="font-size: 0.85rem;">Select Date:</label>
-                        <input type="date" class="form-control cip-rpt-input-custom" @bind="SelectedDate" />
+                    <div class="form-group mt-3">
+                        @if (yearOnly)
+                        {
+                            <label class="mb-1 fw-bold" style="font-size: 0.85rem;">Select Year:</label>
+                            <input type="number"
+                                   class="form-control cip-rpt-input-custom"
+                                   min="2000"
+                                   max="2100"
+                                   @bind="selectedYear"
+                                   style="font-size: 1.1rem; font-weight: 600; text-align: center;" />
+                        }
+                        else
+                        {
+                            <label class="mb-1 fw-bold" style="font-size: 0.85rem;">Select Date:</label>
+                            <input type="date" class="form-control cip-rpt-input-custom" @bind="SelectedDate" />
+                        }
                     </div>
                 </div>
                 <div class="modal-footer border-0 bg-light">
@@ -37,11 +52,27 @@
 
 @code {
     private bool IsVisible { get; set; }
+    private bool yearOnly = false;
     private DateTime SelectedDate { get; set; } = DateTime.Today;
+    private int selectedYear = DateTime.Today.Year;
     private TaskCompletionSource<DateSingleResult> _tcs;
 
+    /// <summary>Full date picker (default behaviour).</summary>
     public Task<DateSingleResult> Show()
     {
+        yearOnly = false;
+        SelectedDate = DateTime.Today;
+        IsVisible = true;
+        _tcs = new TaskCompletionSource<DateSingleResult>();
+        StateHasChanged();
+        return _tcs.Task;
+    }
+
+    /// <summary>Year-only picker — mirrors legacy DTPicker1.CustomFormat = "yyyy".</summary>
+    public Task<DateSingleResult> ShowYearOnly()
+    {
+        yearOnly = true;
+        selectedYear = DateTime.Today.Year;
         IsVisible = true;
         _tcs = new TaskCompletionSource<DateSingleResult>();
         StateHasChanged();
@@ -51,7 +82,11 @@
     private void Submit()
     {
         IsVisible = false;
-        _tcs.SetResult(new DateSingleResult(true, SelectedDate));
+        // When year-only, return Jan 1 of the selected year so callers can format as needed.
+        var result = yearOnly
+            ? new DateSingleResult(true, new DateTime(selectedYear, 1, 1))
+            : new DateSingleResult(true, SelectedDate);
+        _tcs.SetResult(result);
     }
 
     private void Cancel()
