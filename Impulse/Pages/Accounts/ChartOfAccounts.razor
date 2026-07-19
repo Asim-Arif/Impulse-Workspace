@@ -1,4 +1,4 @@
-﻿@page "/accounts/chartofaccounts"
+@page "/accounts/chartofaccounts"
 @attribute [Authorize]
 <PageTitle>Chart of Accounts</PageTitle>
 
@@ -57,10 +57,7 @@
                                     <th scope="col" style="width: 40%;">Account Title</th>
                                     <th scope="col" style="width: 10%;" class="text-end">Opening</th>
                                     <th scope="col" style="width: 10%;" class="text-end">Balance</th>
-                                    @* <th scope="col" style="width: 10%;">Group</th> *@
-                                    <th scope="col" style="width: 10%;" class="text-center">Budget</th>
-                                    <th scope="col" style="width: 10%;" class="text-center">Budget-G</th>
-                                    <th scope="col" style="width: 5%;" class="text-center">Tax %</th>
+                                    <th scope="col" style="width: 15%;" class="text-center">Reporting Group</th>
                                     <th scope="col" style="width: 5%;"> </th>
                                 </tr>
 
@@ -97,13 +94,24 @@
                                         {
                                             <td class="text-end" style="width: 10%;">@((Math.Abs(account.Balance).ToString("N0") + " Cr"))</td>
                                         }
-                                        @* <td style="width: 10%;">@account.ReportingGroup</td> *@
-
-                                        <td class="text-center" style="width: 10%;">
-                                            <span class="d-block text-center">@account.Budget</span>
+                                        <td style="width: 15%; cursor: @(account.bMainhead && !account.AccType ? "pointer" : "default");" @ondblclick="() => EnableEditReportingGroup(account)">
+                                            @if (EditingReportingGroupAccNo == account.AccNo)
+                                            {
+                                                <select class="form-select form-select-sm" value="@account.AccGroup_RefID" 
+                                                        @onchange="(e) => OnReportingGroupChanged(e, account)" 
+                                                        @onblur="CancelEditReportingGroup">
+                                                    <option value="0">------------</option>
+                                                    @foreach (var grp in ReportingGroups)
+                                                    {
+                                                        <option value="@grp.EntryID">@grp.GroupName</option>
+                                                    }
+                                                </select>
+                                            }
+                                            else
+                                            {
+                                                @account.ReportingGroup
+                                            }
                                         </td>
-                                        <td class="text-center" style="width: 10%;">@account.Budget_G</td>
-                                        <td class="text-center" style="width: 5%;">@account.TaxPercentage</td>
 
                                         <td style="width: 5%;">
                                             <ContextMenuTrigger 

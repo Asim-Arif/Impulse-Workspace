@@ -111,6 +111,8 @@ builder.Services.AddScoped<IProformaListService, ProformaListService>();
 
 builder.Services.AddScoped<IInvoiceListDataAccess, InvoiceListDataAccess>();
 builder.Services.AddScoped<IInvoiceListService, InvoiceListService>();
+builder.Services.AddScoped<ICustomInvoiceAuthDataAccess, CustomInvoiceAuthDataAccess>();
+builder.Services.AddScoped<ICustomInvoiceAuthService, CustomInvoiceAuthService>();
 builder.Services.AddScoped<IEmployeeDataAccess, EmployeeDataAccess>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IDepartmentDataAccess, DepartmentDataAccess>();

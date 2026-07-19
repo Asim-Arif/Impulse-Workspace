@@ -1,4 +1,4 @@
-﻿using BlazorBootstrap;
+using BlazorBootstrap;
 using BlazorContextMenu;
 using DataAccessLibrary;
 using DataAccessLibrary.Interface.Accounts;
@@ -42,13 +42,17 @@ namespace Impulse.Pages.Accounts
         private ElementReference gridRef;
         private bool bshowinactive=false;
 
+        private List<ReportingGroupModel> ReportingGroups { get; set; } = new List<ReportingGroupModel>();
+        private string EditingReportingGroupAccNo { get; set; } = string.Empty;
+
         protected override async Task OnInitializedAsync()
         {
             IsLoading = true;
             try
             {
+                ReportingGroups = await iChartOfAccountsDataAccess.GetReportingGroupsAsync();
                 var AccountsFromDb = await iChartOfAccountsDataAccess.GetChartOfAccountsList(bshowinactive);
-                ChartOfAccountsfromDB = AccountsFromDb.ToList();
+                ChartOfAccountsfromDB = ProcessAccountsWithHeads(AccountsFromDb);
                 OnAfterRenderAsync(true);
             }
             catch (Exception ex)
@@ -61,13 +65,40 @@ namespace Impulse.Pages.Accounts
                 IsLoading = false;
             }
         }
+        
+        private List<ChartOfAccountsModel> ProcessAccountsWithHeads(IEnumerable<ChartOfAccountsModel> accounts)
+        {
+            var result = new List<ChartOfAccountsModel>();
+            var grouped = accounts.GroupBy(a => new { a.HeadTypeNo, a.HeadType }).OrderBy(g => g.Key.HeadTypeNo);
+
+            foreach (var group in grouped)
+            {
+                // Add Head row
+                result.Add(new ChartOfAccountsModel
+                {
+                    AccNo = group.Key.HeadTypeNo,
+                    AccTitle = group.Key.HeadType,
+                    bMainhead = false, // Renders as table-secondary fw-bold in the grid
+                    AccType = false,
+                    Active = true,
+                    OpeningBalance = group.Sum(a => a.OpeningBalance),
+                    Balance = group.Sum(a => a.Balance)
+                });
+
+                // Add accounts under this Head
+                result.AddRange(group.OrderBy(a => a.AccNo));
+            }
+
+            return result;
+        }
+
         private async Task Refreshlist(bool showinactive)
         {
             IsLoading = true;
             try
             {
                 var AccountsFromDb = await iChartOfAccountsDataAccess.GetChartOfAccountsList(showinactive);
-                ChartOfAccountsfromDB = AccountsFromDb.ToList();
+                ChartOfAccountsfromDB = ProcessAccountsWithHeads(AccountsFromDb);
             }
             catch (Exception ex)
             {
@@ -82,6 +113,40 @@ namespace Impulse.Pages.Accounts
         private void SelectAccount(ChartOfAccountsModel account)
         {
             SelectedAccount = account;
+        }
+
+        private void EnableEditReportingGroup(ChartOfAccountsModel account)
+        {
+            // Only allow leaf nodes to be edited (not Head rows, and not Parent accounts)
+            if (account.bMainhead && !account.AccType)
+            {
+                EditingReportingGroupAccNo = account.AccNo;
+            }
+        }
+
+        private void CancelEditReportingGroup()
+        {
+            EditingReportingGroupAccNo = string.Empty;
+        }
+
+        private async Task OnReportingGroupChanged(ChangeEventArgs e, ChartOfAccountsModel account)
+        {
+            if (long.TryParse(e.Value?.ToString(), out long newGroupId))
+            {
+                try
+                {
+                    await iChartOfAccountsDataAccess.UpdateReportingGroupAsync(account.AccNo, newGroupId);
+                    var selectedGroup = ReportingGroups.FirstOrDefault(g => g.EntryID == newGroupId);
+                    account.ReportingGroup = selectedGroup != null ? selectedGroup.GroupName : string.Empty;
+                    account.AccGroup_RefID = newGroupId;
+                    NotificationServiceManager.ShowSuccess("Success", "Reporting Group updated successfully.");
+                }
+                catch (Exception ex)
+                {
+                    NotificationServiceManager.ShowError("Error", $"Failed to update Reporting Group: {ex.Message}");
+                }
+            }
+            EditingReportingGroupAccNo = string.Empty;
         }
         private async Task ShowAddModal()
         {
@@ -147,7 +212,7 @@ namespace Impulse.Pages.Accounts
                     return;
                 }
 
-                await ChartOfAccountsService.DeleteAccountAsync(SelectedAccount.AccNo);
+                await iChartOfAccountsDataAccess.DeleteAccountAsync(SelectedAccount.AccNo);
                 await Refreshlist(bshowinactive);
                 SelectedAccount = null;
 
@@ -188,7 +253,7 @@ namespace Impulse.Pages.Accounts
                 }
 
                 await GetNextAccountNo(CurrentAccount.HeadTypeNo, CurrentAccount.AccTitle, CurrentAccount.AccType, CurrentAccount.SubAccOf);
-                await ChartOfAccountsService.SaveNewAccount(CurrentAccount);
+                await iChartOfAccountsDataAccess.SaveNewAccount(CurrentAccount);
             }
             else if (IsEdit)
             {
@@ -204,7 +269,7 @@ namespace Impulse.Pages.Accounts
                 else {
                     CurrentAccount.Balance = Math.Abs(CurrentAccount.Balance);
                 }
-                await ChartOfAccountsService.EditAccount(CurrentAccount, CurrentAccount.AccNo);
+                await iChartOfAccountsDataAccess.EditAccount(CurrentAccount, CurrentAccount.AccNo);
                 await Refreshlist(bshowinactive);
             }
             HideModal();
@@ -392,11 +457,11 @@ namespace Impulse.Pages.Accounts
                         return;
                     }
 
-                    await ChartOfAccountsService.UpdateAccountStatusAsync(SelectedAccount.AccNo,SelectedAccount.Active);
+                    await iChartOfAccountsDataAccess.UpdateAccountStatusAsync(SelectedAccount.AccNo,SelectedAccount.Active);
                     NotificationServiceManager.ShowSuccess("Account Marked InActive", "Account Status Changed.");
                 }
                 else {
-                    await ChartOfAccountsService.UpdateAccountStatusAsync(SelectedAccount.AccNo, SelectedAccount.Active);
+                    await iChartOfAccountsDataAccess.UpdateAccountStatusAsync(SelectedAccount.AccNo, SelectedAccount.Active);
                     NotificationServiceManager.ShowSuccess("Account Marked Active", "Account Status Changed.");
                 }
 
@@ -416,8 +481,8 @@ namespace Impulse.Pages.Accounts
         }
         private void GoToIndexPage()
         {
-            // Navigate to the index page ("/" is typically the root URL)
-            Navigation.NavigateTo("/", true);
+            // Navigate to the financial dashboard
+            Navigation.NavigateTo("/financial", true);
         }
 
 

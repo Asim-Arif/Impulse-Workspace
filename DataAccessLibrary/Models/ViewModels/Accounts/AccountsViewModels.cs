@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -58,5 +58,13 @@ namespace DataAccessLibrary.Models.ViewModels.Accounts
     {
         public long EntryID { get; set; }
         public string GroupName { get; set; }
+    }
+
+    public class ReportingGroupModel
+    {
+        public long EntryID { get; set; }
+        public string GroupName { get; set; }
+        public int Type { get; set; } // 0 = Expense, 1 = Income
+        public int SortNo { get; set; }
     }
 }

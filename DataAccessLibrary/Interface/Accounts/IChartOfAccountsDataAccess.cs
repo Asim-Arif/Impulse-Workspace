@@ -1,11 +1,11 @@
-﻿using DataAccessLibrary.Models;
+using DataAccessLibrary.Models;
 using DataAccessLibrary.Models.ViewModels.Accounts;
 
 namespace DataAccessLibrary.Interface.Accounts
 {
     public interface IChartOfAccountsDataAccess
     {
-        Task<List<ChartOfAccountsModel>> GetChartOfAccountsList(bool showinactive);
+        Task<List<ChartOfAccountsModel>> GetChartOfAccountsList(bool showinactive, string filterAccNo = null);
         Task<List<ChartOfAccountsModel>> GetAccountsHeads();
         Task<List<ChartOfAccountsModel>> GetSubAccOfAccounts(string acctype);
         Task<string> GetNextAccountNumberAsync(string acctype, string accountname, Boolean isparent, string subaccof);
@@ -21,5 +21,17 @@ namespace DataAccessLibrary.Interface.Accounts
         Task SaveAccountGroupsForBalancesheet(ChartOfAccountsModel coa, string accno, long AccGroup_RefID, int itype);
 
         Task<List<NotesToAccountsModel>> GetNotesToAccountsHeads();
+
+        Task<List<ReportingGroupModel>> GetReportingGroupsAsync();
+        Task AddReportingGroupAsync(ReportingGroupModel model);
+        Task UpdateReportingGroupDetailsAsync(ReportingGroupModel model);
+        Task DeleteReportingGroupAsync(long entryId);
+        Task UpdateReportingGroupAsync(string AccNo, long AccGroup_RefID);
+
+        Task<List<ChartOfAccountsModel>> GetParentCategoriesAsync();
+        Task<List<ChartOfAccountsModel>> GetChildAccountsAsync(string parentAccNo);
+        Task ChangeAccountCategoryAsync(string oldAccNo, string newAccNo, string newParentAccNo, string userName, string machineName);
+
+        Task ReindexFinancialBalancesAsync();
     }
 }

@@ -1,0 +1,58 @@
+@page "/accounts/reindex"
+@attribute [Authorize]
+<PageTitle>Financial Re-Indexing</PageTitle>
+
+<div class="container-fluid mt-0 m-0 p-0" style="font-family: Calibri, sans-serif; ">
+
+    <div class="card shadow-sm border-0 rounded-1 bg-transparent mx-auto mt-4" style="max-width: 600px;">
+        <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color" style="position: sticky; top: 0; z-index: 1000;">
+            <h5 class="mb-0"><i class="fas fa-sync-alt me-2"></i> Financial Re-Indexing</h5>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage" disabled="@IsProcessing">
+                    <i class="fas fa-xmark me-2"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <div class="card-body bg-white border border-top-0 rounded-bottom-4 shadow p-4 text-center">
+
+            <i class="fas fa-database text-primary mb-3" style="font-size: 4rem;"></i>
+            
+            <h4 class="fw-bold mb-3">Re-Index Financial Balances</h4>
+            
+            <p class="text-muted mb-4">
+                This process recalculates the running balance for every voucher and updates the main account balances to ensure data integrity. 
+                This operation processes the entire database natively on the server and is generally very fast.
+            </p>
+
+            @if (!string.IsNullOrEmpty(ErrorMessage))
+            {
+                <div class="alert alert-danger text-start">
+                    <i class="fas fa-exclamation-triangle me-2"></i> @ErrorMessage
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(SuccessMessage))
+            {
+                <div class="alert alert-success text-start">
+                    <i class="fas fa-check-circle me-2"></i> @SuccessMessage
+                </div>
+            }
+
+            <div class="mt-4">
+                <button class="btn btn-primary btn-lg px-5 shadow-sm" @onclick="StartReindexing" disabled="@IsProcessing">
+                    @if (IsProcessing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Processing Database...</span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-play me-2"></i> <span>Start Re-Indexing</span>
+                    }
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>

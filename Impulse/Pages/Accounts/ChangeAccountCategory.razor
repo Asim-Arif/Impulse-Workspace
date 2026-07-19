@@ -1,0 +1,154 @@
+@page "/accounts/changecategory"
+@attribute [Authorize]
+<PageTitle>Change Account Category</PageTitle>
+
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using Blazored.Typeahead
+
+<div class="container-fluid mt-0 m-0 p-0" style="font-family: Calibri, sans-serif; ">
+
+    <div class="card shadow-sm border-0 rounded-1 bg-transparent mx-auto mt-4" style="max-width: 600px;">
+        <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color" style="position: sticky; top: 0; z-index: 1000;">
+            <h5 class="mb-0"><i class="fas fa-exchange-alt me-2"></i> Change Account Category</h5>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
+                    <i class="fas fa-xmark me-2"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <div class="card-body bg-white border border-top-0 rounded-bottom-4 shadow p-4">
+
+            @if (IsLoading)
+            {
+                <div class="text-center my-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Current Category</label>
+                    <BlazoredTypeahead SearchMethod="@SearchCategories"
+                                       EnableDropDown="true"
+                                       Data="AllCategories"
+                                       TValue="ChartOfAccountsModel"
+                                       TItem="ChartOfAccountsModel"
+                                       Value="SelectedCategory"
+                                       ValueChanged="OnCategoryChanged"
+                                       ValueExpression="@(() => SelectedCategory)"
+                                       Placeholder="Select Current Category..."
+                                       Debounce="100">
+                        <SelectedTemplate Context="cat">
+                            {@cat.AccNo} @cat.AccTitle
+                        </SelectedTemplate>
+                        <ResultTemplate Context="cat">
+                            {@cat.AccNo} @cat.AccTitle
+                        </ResultTemplate>
+                        <NotFoundTemplate>
+                            No categories found.
+                        </NotFoundTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Account to Change</label>
+                    <BlazoredTypeahead SearchMethod="@SearchChildAccounts"
+                                       EnableDropDown="true"
+                                       Data="ChildAccounts"
+                                       TValue="ChartOfAccountsModel"
+                                       TItem="ChartOfAccountsModel"
+                                       Value="SelectedAccount"
+                                       ValueChanged="OnAccountChanged"
+                                       ValueExpression="@(() => SelectedAccount)"
+                                       Placeholder="Select Account..."
+                                       Disabled="SelectedCategory == null"
+                                       Debounce="100">
+                        <SelectedTemplate Context="acc">
+                            {@acc.AccNo} @acc.AccTitle
+                        </SelectedTemplate>
+                        <ResultTemplate Context="acc">
+                            {@acc.AccNo} @acc.AccTitle
+                        </ResultTemplate>
+                        <NotFoundTemplate>
+                            @if (SelectedCategory == null)
+                            {
+                                <span>Please select a category first.</span>
+                            }
+                            else
+                            {
+                                <span>No accounts found in this category.</span>
+                            }
+                        </NotFoundTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <hr class="my-4" />
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-primary">New Category</label>
+                    <BlazoredTypeahead SearchMethod="@SearchCategories"
+                                       EnableDropDown="true"
+                                       Data="AllCategories"
+                                       TValue="ChartOfAccountsModel"
+                                       TItem="ChartOfAccountsModel"
+                                       Value="SelectedNewCategory"
+                                       ValueChanged="OnNewCategoryChanged"
+                                       ValueExpression="@(() => SelectedNewCategory)"
+                                       Placeholder="Select New Category..."
+                                       Disabled="SelectedAccount == null"
+                                       Debounce="100">
+                        <SelectedTemplate Context="cat">
+                            {@cat.AccNo} @cat.AccTitle
+                        </SelectedTemplate>
+                        <ResultTemplate Context="cat">
+                            {@cat.AccNo} @cat.AccTitle
+                        </ResultTemplate>
+                        <NotFoundTemplate>
+                            No categories found.
+                        </NotFoundTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold text-success">New Account No</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-hashtag"></i></span>
+                        <input type="text" class="form-control fw-bold text-success" value="@NewAccountNo" readonly placeholder="Calculated automatically..." />
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(ErrorMessage))
+                {
+                    <div class="alert alert-danger">
+                        @ErrorMessage
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(SuccessMessage))
+                {
+                    <div class="alert alert-success">
+                        @SuccessMessage
+                    </div>
+                }
+
+                <div class="d-flex justify-content-end gap-2 mt-3">
+                    <button class="btn btn-secondary" @onclick="GoToIndexPage">Cancel</button>
+                    <button class="btn btn-primary px-4" @onclick="SaveChanges" disabled="@(!CanSave)">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save me-2"></i> <span>Save Changes</span>
+                        }
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</div>

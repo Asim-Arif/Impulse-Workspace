@@ -1,0 +1,141 @@
+@page "/accounts/{Type}"
+@attribute [Authorize]
+<PageTitle>@PageTitle</PageTitle>
+
+@using System.Collections.ObjectModel
+@using Microsoft.AspNetCore.Components.Web
+@using DataAccessLibrary
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using Impulse.Configurations
+@using DataAccessLibrary.Interface.Accounts
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using BlazorContextMenu
+
+
+
+<div class="container-fluid mt-0 m-0 p-0" style="font-family: Calibri, sans-serif; ">
+
+    <div class="card shadow-sm border-0 rounded-1 bg-transparent">
+        <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color" style="position: sticky; top: 0; z-index: 1000;">
+            <h5 class="mb-0"><i class="fas fa-chart-bar"></i> @PageTitle</h5>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
+                    <i class="fas fa-xmark me-2"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <div class="card-body p-0">
+            @if (IsLoading)
+            {
+                <div class="progress" style="width: 100%">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                         role="progressbar" style="width: 100%">
+                        Loading Data...
+                    </div>
+                </div>
+            }
+            else if (AccountsList?.Any() ?? false)
+            {
+                <div style="width: 100%">
+                    <ContextMenuProvider Id="accountContextMenuProvider">
+                        <table class="table table-bordered table-hover align-middle mb-0"
+                                style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                            <thead class="theme-color"
+                                    style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">                                   
+                                <tr>
+                                    <th scope="col" style="width: 15%;">Account No</th>
+                                    <th scope="col" style="width: 50%;">Account Title</th>
+                                    <th scope="col" style="width: 15%;" class="text-end">Opening</th>
+                                    <th scope="col" style="width: 15%;" class="text-end">Balance</th>
+                                    <th scope="col" style="width: 5%;"> </th>
+                                </tr>
+                            </thead>
+
+                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">
+                                <Virtualize Items="@AccountsList" Context="account">
+                                    <ContextMenuTrigger WrapperTag="tr"
+                                            MenuId="accountContextMenu"
+                                            Data="account"
+                                            MouseButtonTrigger="MouseButtonTrigger.Right"
+                                            CssClass="@(
+                                        account.Active == false ? "table-danger" :
+                                        account.bMainhead == false ? "table-secondary fw-bold" :
+                                        account.AccType ? "fw-bold table-light" : "")"
+                                        @key="account.AccNo"> 
+
+                                        <td style="width: 15%;">@account.AccNo</td>
+                                        <td style="width: 50%;">@account.AccTitle</td>
+                                    <td class="text-end" style="width: 15%;">
+                                            @(account.OpeningBalance < 0 ? 
+                                            (Math.Abs(account.OpeningBalance).ToString("N0") + " Cr")
+                                            : account.OpeningBalance.ToString("N0") + " Dr")
+                                    </td>
+
+                                        @if (account.Balance > 0)
+                                        {
+                                            <td class="text-end" style="width: 15%;">@((account.Balance.ToString("N0") + " Dr"))</td>
+                                        }
+                                        else
+                                        {
+                                            <td class="text-end" style="width: 15%;">@((Math.Abs(account.Balance).ToString("N0") + " Cr"))</td>
+                                        }
+
+                                        <td style="width: 5%;">
+                                            <ContextMenuTrigger 
+                                                MenuId="accountContextMenu"
+                                                Data="account"
+                                                MouseButtonTrigger="MouseButtonTrigger.Both">
+
+                                                <button class="btn btn-sm btn-primary" style="border:none; background:none;">
+                                                    <i class="fa-solid fa-ellipsis-vertical" style="color:black "></i>
+                                                </button>
+                                            </ContextMenuTrigger>
+                                        </td>
+                                    </ContextMenuTrigger>
+                                </Virtualize>
+                            </tbody>
+                        </table>
+                    </ContextMenuProvider>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-3 text-muted">No accounts found.</div>
+            }
+        </div>
+    </div>
+</div>
+
+<ContextMenu Id="accountContextMenu" 
+             UseDefaultEventHandlers="true"
+             Template="Win11Style">
+
+    <Item OnClick="@RefreshData">
+        <i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh
+    </Item>
+    <Item OnClick="@(async (e) => await ShowInActive(e, !bshowinactive))">
+        <i class="fas fa-eye fa-fw win11-icon"></i> Show InActive Accounts
+    </Item>
+    <div class="menu-divider"></div>
+    <Seperator/>
+
+    <Item OnClick="MakeAccountActive" class="menu-item">
+        <i class="fas fa-toggle-off fa-fw win11-icon"></i> Make This Account InActive
+    </Item>
+
+    <div class="menu-divider"></div>
+    <Seperator />
+    <Item class="menu-item" OnClick="@(() => PrintChartOfAccounts(1))">
+        <i class="fas fa-book fa-fw win11-icon"></i> Print Chart Of Accounts
+    </Item>
+
+    <Item class="menu-item" OnClick="@(() => PrintChartOfAccounts(2))">
+        <i class="fas fa-box-open fa-fw win11-icon"></i> Print Accounts Opening
+    </Item>
+
+    <Item class="menu-item" OnClick="@(() => PrintChartOfAccounts(1))">
+        <i class="fas fa-balance-scale-left fa-fw win11-icon"></i> Print Current Balances
+    </Item>
+
+</ContextMenu>
