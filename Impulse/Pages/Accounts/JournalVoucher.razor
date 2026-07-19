@@ -1,4 +1,4 @@
-﻿@page "/accounts/journalvoucher"
+@page "/accounts/journalvoucher"
 
 @attribute [Authorize]
 @using DataAccessLibrary
@@ -68,32 +68,11 @@
             </div>
 
             <div class="row g-1 mb-1 align-items-end">
-                <div class="col-sm-6">
+                <div class="col-sm-9">
                     <label for="description" class="form-label mb-0">Description</label>
                     <input type="text" id="description" name="description" class="form-control" placeholder="Enter Description" @bind="newVoucherLine.Description">
                 </div>
 
-                <div class="col-sm-3">
-                    <label for="pname" class="form-label mb-0">Admin / Operations</label>
-                    <BlazoredTypeahead SearchMethod="SearchCostCenter"
-                                       EnableDropDown="true"
-                                       Data="CostCenters"
-                                       TValue="GenericDropDownModel"
-                                       TItem="GenericDropDownModel"
-                                       Value="SelectedCostCenter"
-                                       ValueChanged="SelectedResultChanged_CostCenter"
-                                       ValueExpression="@(() => SelectedCostCenter)"
-                                       Placeholder="Select Cost Center"
-                                       Disabled="!EnableCostCenter">
-
-                        <SelectedTemplate Context="selectedcard">
-                            @SelectedCostCenter.DropDownValue_Description
-                        </SelectedTemplate>
-                        <ResultTemplate Context="result">
-                            @result.DropDownValue_Description
-                        </ResultTemplate>
-                    </BlazoredTypeahead>
-                </div>
                 <div class="col-sm-1">
                     <label for="authcode" class="form-label mb-0">Debit</label>
                     <input type="text" id="Debit" name="authcode" class="form-control" placeholder="Debit" @bind="newVoucherLine.Debit">
@@ -121,10 +100,10 @@
                         <tr>
                             <th>Account</th>
                             <th>Description</th>
-                            <th>Cost Center</th>
-                            <th>Debit</th>
-                            <th>Credit</th>                            
-                            <th class="text-center">Actions</th>
+                            
+                            <th style="width: 8.333%;">Debit</th>
+                            <th style="width: 8.333%;">Credit</th>                            
+                            <th class="text-center" style="width: 8.333%;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -138,17 +117,10 @@
                                     <tr>
                                         <td>
                                             @Acc.AccTitle
-                                            @if (Acc.AdjustmentDetails != null && Acc.AdjustmentDetails.Any())
-                                            {
-                                                <span class="badge rounded-pill bg-success ms-2"
-                                                      style="font-size: 0.7rem; cursor: help;"
-                                                      title="Instructions Added">
-                                                    <i class="bi bi-link-45deg"></i> @Acc.AdjustmentDetails.Count
-                                                </span>
-                                            }
+                                            
                                         </td>
                                         <td>@Acc.Description</td>
-                                        <td>@Acc.CS_Description</td>
+                                        
                                         <td>@Acc.Debit</td>
                                         <td>@Acc.Credit</td>                                
 
@@ -156,9 +128,7 @@
                                             <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveVoucherLine(Acc)">
                                                 <i class="fa-solid fa-circle-minus"></i>
                                             </button>
-                                            <button type="button" class="btn btn-secondary btn-sm" @onclick="() => AddDetails(Acc)">
-                                                <i class="fa-solid fa-pen-to-square"></i>
-                                            </button>
+                                            
                                         </td>
                                     </tr>
                                 }
@@ -167,7 +137,7 @@
                         else
                         {
                             <tr class="table-light">
-                                <td colspan="6" class="text-center text-muted py-3">
+                                <td colspan="5" class="text-center text-muted py-3">
                                     No accounts added yet.
                                 </td>
                             </tr>
@@ -175,7 +145,7 @@
                     </tbody>
                     <tfoot class="table-dark fw-bold">
                         <tr>
-                            <td colspan="3" class="text-end">Total:</td>
+                            <td colspan="2" class="text-end">Total:</td>
 
                             <td>@voucherViewModel.TotalDebit.ToString("N2")</td>
 
@@ -186,28 +156,13 @@
                     </tfoot>
                 </table>
             </div>
-            <div class="row g-1 mb-1">
-                <div class="col-sm-9">
-                    <label for="submitto" class="form-label mb-0">Submit To</label>
-                    <BlazoredTypeahead SearchMethod="SearchSubmitTo"
-                                   EnableDropDown="true"
-                                   Data="cashAccounts"
-                                   TValue="GenericDropDownModel"
-                                   TItem="GenericDropDownModel"
-                                   Value="SelectedSubmitTo"
-                                   ValueChanged="SelectedResultChanged_SubmitTo"
-                                   ValueExpression="@(() => SelectedSubmitTo)"
-                                   Placeholder="Submit To"
-                                   MaximumSuggestions="1000">
+            <div class="row g-1 mb-1 align-items-end">
 
-                        <SelectedTemplate Context="selectedcard">
-                            @SelectedSubmitTo?.DropDownValue_Description
-                        </SelectedTemplate>
-                        <ResultTemplate Context="result">
-                            @result.DropDownValue_Description
-                        </ResultTemplate>
-                    </BlazoredTypeahead>
+                <div class="col-sm-6">
+                    <label for="Notes" class="form-label mb-0">Notes</label>
+                    <textarea id="Notes" name="Notes" class="form-control" rows="3" @bind:event="oninput" @bind="voucherViewModel.Notes"></textarea>
                 </div>
+
                 <div class="col-sm-2">
                     <label for="DueDate" class="form-label mb-0 mb-0">Due Date</label>
                     <input type="date" id="DueDate" class="form-control" @bind="voucherViewModel.DueDate" @bind:event="oninput" @onchange="OnDTChanged" />
@@ -216,28 +171,15 @@
                     <label for="Difference" class="form-label mb-0">Difference</label>
                     <input type="text" id="Difference" name="Difference" class="form-control" placeholder="Difference" @bind="dDebitCreditDifference" readonly>
                 </div>
-            </div>
-            
 
-            <div class="row g-1 mb-1 align-items-end">
-
-                <div class="col-sm-6">
-                    <label for="Notes" class="form-label mb-0">Notes</label>
-                    <textarea id="Notes" name="Notes" class="form-control" rows="3" @bind:event="oninput" @bind="voucherViewModel.Remarks"></textarea>
-                </div>
-
-                <div class="col-sm-6 d-flex flex-column">
-
-                    <div class="form-check">
+                <div class="col-sm-3 d-flex flex-column justify-content-end">
+                    <div class="form-check mb-2 align-self-end">
                         <input class="form-check-input" type="checkbox" value="" id="defaultCheck1" >
                         <label class="form-check-label" for="defaultCheck1">
                             Print When Saved
                         </label>
                     </div>                    
                     <div class="d-flex justify-content-end gap-2">
-                        <button type="button" class="btn btn-sm btn-info" @onclick="ToggleTaxModal">
-                            <i class="bi bi-taxes"></i> Tax Types
-                        </button>
                         <button type="button" class="btn btn-primary" disabled="@isSaving" @onclick="SaveVoucherMain">Save</button>
                         <button type="button" class="btn btn-primary" @onclick="GoToIndexPage">Close</button>
                     </div>
@@ -256,105 +198,4 @@
     </div>
 </div>
 
-@if (showTaxModal)
-{
-    <div class="modal fade show d-block" tabindex="-1" role="dialog" style="font-family: Calibri, sans-serif;">
-        <div class="modal-dialog modal-dialog-centered modal-lg" role="document" style="max-width: 700px; width: auto !important;">
-            <div class="modal-content" style="max-width: none; width: 100%;">
 
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title">Tax Details</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" @onclick="ToggleTaxModal"></button>
-                </div>
-
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label mb-2 d-block">Tax Category</label>
-
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="radio"
-                                   name="TaxCategoryGroup"
-                                   id="radioBTL"
-                                   value="1"
-                                   checked="@(voucherViewModel.TaxType == 1)"
-                                   @onchange="HandleTaxTypeChange">
-                            <label class="form-check-label" for="radioBTL">Below Tax Limit</label>
-                        </div>
-
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="radio"
-                                   name="TaxCategoryGroup"
-                                   id="radioTD"
-                                   value="2"
-                                   checked="@(voucherViewModel.TaxType == 2)"
-                                   @onchange="HandleTaxTypeChange">
-                            <label class="form-check-label" for="radioTD">Tax Deduction</label>
-                        </div>
-
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="radio"
-                                   name="TaxCategoryGroup"
-                                   id="radioExempted"
-                                   value="3"
-                                   checked="@(voucherViewModel.TaxType == 3)"
-                                   @onchange="HandleTaxTypeChange">
-                            <label class="form-check-label" for="radioExempted">Tax Exempted</label>
-                        </div>
-
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="radio"
-                                   name="TaxCategoryGroup"
-                                   id="radioTNA"
-                                   value="4"
-                                   checked="@(voucherViewModel.TaxType == 4)"
-                                   @onchange="HandleTaxTypeChange">
-                            <label class="form-check-label" for="radioTNA">Tax Not Applicable</label>
-                        </div>
-
-                    </div>
-                    <div class="row g-1 mb-3">
-                        <div class="col-sm-6">
-                            <label for="TaxHeadTypes" class="form-label mb-0">Head Type</label>
-                            <select id="TaxHeadTypes" class="form-select py-2" @bind="voucherViewModel.HeadType" disabled="@(voucherViewModel.TaxType != 2)">
-
-                                @if (TaxHeadTypes.Count == 0)
-                                {
-                                    <option value="">Loading...</option>
-                                }
-                                else
-                                {
-                                    <option value=""></option>
-                                    @foreach (var type in TaxHeadTypes)
-                                    {
-                                        <option value="@type.DropDownValue_Description">@type.DropDownValue_Description</option>
-                                    }
-                                }
-
-                            </select>
-                        </div>
-                        <div class="col-sm-3">
-                            <label>Taxable Amount</label>
-                            <input type="text" @bind="voucherViewModel.TaxAmount" class="form-control" disabled="@(voucherViewModel.TaxType != 2)" />
-                        </div>
-                        <div class="col-sm-3">
-                            <label>Tax Rate (%)</label>
-                            <input type="number" @bind="voucherViewModel.TaxRate" class="form-control" />
-                        </div>
-                    </div>
-                    <div class="row g-1 mb-3">
-                        <label>Reason</label>
-                        <textarea id="Reason" name="Reason" class="form-control" rows="3" @bind:event="oninput" @bind="voucherViewModel.Reason" disabled="@(voucherViewModel.TaxType != 3)"></textarea>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @onclick="ToggleTaxModal">Cancel</button>
-                    <button type="button" class="btn btn-success" @onclick="SaveTaxDetails">Save Tax Details</button>
-                </div>
-
-            </div>
-        </div>
-    </div>
-
-    <div class="modal-backdrop fade show"></div>
-}

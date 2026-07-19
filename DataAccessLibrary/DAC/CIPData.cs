@@ -1,4 +1,4 @@
-﻿using Dapper;
+using Dapper;
 using DataAccessLibrary.Models;
 using Microsoft.Extensions.Configuration;
 using OfficeOpenXml;
@@ -304,7 +304,7 @@ namespace DataAccessLibrary
         {
             using (var connection = new SqlConnection(_connectionString))
             {
-                string sql = "SELECT BankID,Bank +'{ ' + Branch +' }' As BankName,Bank +'{ ' + Branch +' }' AS CipSourceTypesForFilter_values FROM BankList WHERE ShowInCIP=1 ORDER BY BankList.Bank ASC";
+                string sql = "SELECT BankID,Bank +'{ ' + Branch +' }' As BankName,Bank +'{ ' + Branch +' }' AS CipSourceTypesForFilter_values FROM BankList ORDER BY BankList.Bank ASC";
                 return (await connection.QueryAsync<CipLoungeEntry>(sql)).ToList();
             }
         }
@@ -583,7 +583,7 @@ namespace DataAccessLibrary
         public async Task<List<CIPBanks>> getbanks()
         {
             using var connection = new SqlConnection(_connectionString);
-            var sql = "SELECT BankID,Bank AS BankName,COA AS bCOA FROM BankList T1 WHERE ISNULL(ShowInCIP,0)=1 ORDER BY T1.COA DESC"; 
+            var sql = "SELECT BankID,Bank AS BankName FROM BankList T1 ORDER BY T1.Bank ASC"; 
             var result = await connection.QueryAsync<CIPBanks>(sql);
             return result.ToList();
         }

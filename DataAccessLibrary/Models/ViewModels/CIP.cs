@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -54,7 +54,6 @@ namespace DataAccessLibrary.Models
         public int FolioNo { get; set; }
         public string CnicNo { get; set;}
         public string machineIP { get; set; }
-        public Boolean bCOA { get; set; }
         public string AuthCardNo { get; set; }
 
         public List<CIPDetail> CIPDetails { get; set; } = new List<CIPDetail>();
@@ -105,7 +104,6 @@ namespace DataAccessLibrary.Models
     {
         public string bankname { get; set; }
         public int bankid { get; set; }
-        public Boolean bCOA { get; set; }
     }
 
     public class ExcelItem

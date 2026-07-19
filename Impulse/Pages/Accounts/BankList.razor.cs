@@ -1,4 +1,4 @@
-﻿using BlazorBootstrap;
+using BlazorBootstrap;
 using BlazorContextMenu;
 using DataAccessLibrary;
 using DataAccessLibrary.DAC.Accounts;
@@ -79,14 +79,11 @@ namespace Impulse.Pages.Accounts
                     await JS.InvokeVoidAsync("alert", "Cannot Save Bank. Cannot Save Without City");
                     return;
                 }
-                if (CurrentBank.COA==true)
-                {
                     string strBankParent = await IDBHelper.getSingleStringValue("DataValue", "GeneralData", "WHERE DataName='BankParent'");
                     string NextAccountNo = await iChartOfAccountsDataAccess.GetNextAccountNumberAsync("22", CurrentBank.Bank, false, strBankParent);
                     CurrentBank.AccNo = NextAccountNo;
                     CurrentBank.SubAccOf= strBankParent;
                     CurrentBank.AccType = "22";
-                }
                 await BankListDataAccess.SaveNewBank(CurrentBank);
             }
 
@@ -134,8 +131,6 @@ namespace Impulse.Pages.Accounts
                     Remittance = SelectedBank.Remittance,
                     Manager = SelectedBank.Manager,
                     Address = SelectedBank.Address,
-                    ShowInCIP = SelectedBank.ShowInCIP,
-                    COA = SelectedBank.COA,
                     BankAccNo=SelectedBank.BankAccNo,
                     Email = SelectedBank.Email,
                 };
@@ -162,7 +157,6 @@ namespace Impulse.Pages.Accounts
                 CurrentBank.Phone1 = "";
                 CurrentBank.Phone2 = "";
                 CurrentBank.Address = "";
-                CurrentBank.ShowInCIP = false;
                 CurrentBank.BankID = 0;
                 SelectedBank = null;
             }

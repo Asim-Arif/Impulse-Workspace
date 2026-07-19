@@ -1,4 +1,4 @@
-﻿using Dapper;
+using Dapper;
 using DataAccessLibrary.Interface.Accounts;
 using DataAccessLibrary.Models.ViewModels;
 using DataAccessLibrary.Models.ViewModels.Accounts;
@@ -299,22 +299,11 @@ namespace DataAccessLibrary.DAC.Accounts
                         DT = voucher.DT,
                         Notes = voucher.Notes,
                         Payee = voucher.Payee,
-                        TaxType = voucher.TaxType,
-                        HeadType = voucher.HeadType,
-                        TaxAmount = voucher.TaxAmount,
-                        TaxRate = voucher.TaxRate,
-                        Reason = voucher.Reason,
-                        //In case it's not BPV, ChequeDetails will be null, this way it will pass null to chequeno but avoiding null ref. error.
                         ChequeNo = voucher.ChequeDetails?.ChequeNo,
                         BankAccNo = voucher.ChequeDetails?.BankAccNo,
                         ChqBookNo = voucher.ChequeDetails?.ChqBookNo,
                         DueDate = voucher.DueDate,
-                        Online_Vchr=voucher.Online_Vchr,
-                        Online_Vchr_Type=voucher.Online_Vchr_Type,
-                        Advising= voucher.Advising,
-                        VendID = voucher.VendID,
-                        EmpID = voucher.EmpID,
-                        PaymentToEmp = voucher.PaymentToEmp
+                        Handed_Over_To = voucher.EmpID
                     },
                     commandType: CommandType.StoredProcedure,
                     transaction: transaction
@@ -455,10 +444,7 @@ namespace DataAccessLibrary.DAC.Accounts
             dt.Columns.Add("Credit", typeof(decimal));
             dt.Columns.Add("Balance", typeof(decimal));
             dt.Columns.Add("DpstSlip", typeof(string));
-            dt.Columns.Add("CSNo", typeof(long));        
-            dt.Columns.Add("CS_RefID", typeof(int));
-
-            
+            dt.Columns.Add("CSNo", typeof(long));                    
             foreach (var line in lineItems)
             {
                 if (line != null && (line.Debit > 0 || line.Credit > 0))
@@ -473,8 +459,7 @@ namespace DataAccessLibrary.DAC.Accounts
                         line.Credit,
                         line.Balance,
                         line.DpstSlip,
-                        line.CSNo,
-                        line.CS_RefID                        
+                        line.CSNo
                     );
                 }
             }

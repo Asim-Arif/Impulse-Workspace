@@ -1,4 +1,4 @@
-﻿using Dapper;
+using Dapper;
 using DataAccessLibrary.Interface.Accounts;
 using DataAccessLibrary.Models;
 using DataAccessLibrary.Models.ViewModels.Accounts;
@@ -70,10 +70,10 @@ public class BankListDataAccess : IBankListDataAccess
             {
                 string sql = @"
                     INSERT INTO BankList 
-                    (Bank,Branch,City,Phone1,Phone2,Fax,Email,Manager,Address,AccNo,ShowInCIP,COA,Remittance) 
+                    (Bank,Branch,City,Phone1,Phone2,Fax,Email,Manager,Address,AccNo,Remittance) 
                     OUTPUT INSERTED.BankID
                     VALUES 
-                    (@Bank,@Branch,@City,@Phone1,@Phone2,@FaxNo,@Email,@Manager,@Address,@BankAccNo,@ShowInCIP,@COA,@Remittance)";
+                    (@Bank,@Branch,@City,@Phone1,@Phone2,@FaxNo,@Email,@Manager,@Address,@BankAccNo,@Remittance)";
 
                 var parameters = new
                 {
@@ -87,15 +87,13 @@ public class BankListDataAccess : IBankListDataAccess
                     Manager = newbank.Manager,
                     Address = newbank.Address,
                     BankAccNo = newbank.BankAccNo,
-                    ShowInCIP = newbank.ShowInCIP,
-                    COA = newbank.COA,
                     Remittance=newbank.Remittance
                 };
                 //await db.ExecuteAsync(sql, parameters);
                 int newBankId = await db.ExecuteScalarAsync<int>(sql, parameters);
 
-                /////////////////////////////// IF COA MARKED THEN ADD IN ACCOUNTS
-                if (newbank.COA == true) 
+                /////////////////////////////// IF ACCNO IS GENERATED THEN ADD IN ACCOUNTS
+                if (!string.IsNullOrEmpty(newbank.AccNo)) 
                 {
                     string sql_bankacc = @"INSERT INTO BankAccounts(BankID,AccNo,Type,BankAccNo) 
                     VALUES (@BankID, @AccNo, @AccType, @BankAccNo)";
@@ -141,7 +139,7 @@ public class BankListDataAccess : IBankListDataAccess
                 string sql =
                     @"UPDATE BankList SET Bank=@Bank,Branch=@Branch,City=@City,
                     Phone1=@Phone1,Phone2=@Phone2,Fax=@Fax,Email=@Email,Manager=@Manager,
-                    Address=@Address,AccNo=@AccNo,Remittance=@Remittance,ShowInCIP=@ShowInCIP,COA=@COA 
+                    Address=@Address,AccNo=@AccNo,Remittance=@Remittance 
                     WHERE BankID=@bankid";
 
                 var parameters = new
@@ -157,8 +155,6 @@ public class BankListDataAccess : IBankListDataAccess
                     Address = newbank.Address,
                     AccNo = newbank.BankAccNo,
                     Remittance = newbank.Remittance,
-                    ShowInCIP = newbank.ShowInCIP,
-                    COA = newbank.COA,
                     bankid = bankid
                 };
                 await db.ExecuteAsync(sql, parameters);

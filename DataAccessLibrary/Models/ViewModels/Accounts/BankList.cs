@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -21,8 +21,6 @@ namespace DataAccessLibrary.Models.ViewModels.Accounts
         public string BankAccNo { get; set; }
         public string IBAN { get; set; }
         public string SwiftCode { get; set; }
-        public bool ShowInCIP { get; set; }
-        public bool COA { get; set; }
         public string AccNo { get; set; }
         public string AccType { get; set; }
         public string SubAccOf { get; set; }

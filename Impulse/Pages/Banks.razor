@@ -1,4 +1,4 @@
-﻿@page "/banks"
+@page "/banks"
 @attribute [Authorize]
 @inject NavigationManager Navigation
 
@@ -69,20 +69,10 @@
                             @bank.bankname
                         </button> *@
 
-                        @if (bank.bCOA)
-                        {
-                            <button @onclick="() => NavigateToEntryForm(bank.bankid)"
-                                    class="btn btn-danger w-100 py-4 fw-bold fs-5 text-white shadow-lg">
-                                @bank.bankname
-                            </button>
-                        }
-                        else
-                        {
                             <button @onclick="() => NavigateToEntryForm(bank.bankid)"
                                     class="btn btn-success w-100 py-4 fw-bold fs-5 text-white shadow-lg">
                                 @bank.bankname
                             </button>
-                        }
 
                     </div>
                 }
