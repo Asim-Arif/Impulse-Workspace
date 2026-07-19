@@ -8,9 +8,12 @@ namespace DataAccessLibrary.Models.ViewModels.Export
         public int EntryID { get; set; }
         public string CustomInvoice { get; set; } = string.Empty;
         public string CustCode { get; set; } = string.Empty;
+        public string CustomerAccNo { get; set; } = string.Empty;
         public string Country { get; set; } = string.Empty;
         public string Currency { get; set; } = string.Empty;
         public decimal ExchRate { get; set; }
+        public decimal AuthorizedExchRate { get; set; }
+        public string ExchDiffAccNo { get; set; } = string.Empty;
         public decimal AmountRealized { get; set; }
         public decimal AmountInRs => Math.Round(AmountRealized * ExchRate, 2);
         
@@ -23,6 +26,8 @@ namespace DataAccessLibrary.Models.ViewModels.Export
         public DateTime PostingDate { get; set; } = DateTime.Today;
         
         public string BankAccNo { get; set; } = string.Empty;
+        public string UserName { get; set; } = string.Empty;
+        public string MachineName { get; set; } = string.Empty;
         
         public List<PrcDeductionModel> Deductions { get; set; } = new();
     }

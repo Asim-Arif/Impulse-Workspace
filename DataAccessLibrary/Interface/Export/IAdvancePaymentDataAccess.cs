@@ -11,7 +11,7 @@ namespace DataAccessLibrary.Interface.Export
         Task<AdvancePaymentViewModel?> GetAdvancePaymentAsync(int entryId);
         Task<bool> SaveAdvancePaymentAsync(AdvancePaymentViewModel payment);
         Task<bool> UpdateExchangeRateAsync(int entryId, decimal exchRate);
-        Task<string> PostToFinancialAsync(int entryId, AdvancePaymentViewModel payment);
+        Task<string> PostToFinancialAsync(int entryId, AdvancePaymentViewModel payment, List<PrcDeductionModel> deductions, DateTime postingDate);
         Task<bool> DeleteAdvancePaymentAsync(int entryId);
         Task<List<AdvancePaymentUsageViewModel>> GetUsageDetailsAsync(int entryId);
         

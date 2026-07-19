@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using DataAccessLibrary.Models.ViewModels.Export;
 using DataAccessLibrary.Interface.Export;
+using DataAccessLibrary.Models.ViewModels.Export;
 
 namespace Impulse.Services.Export
 {
@@ -12,7 +12,7 @@ namespace Impulse.Services.Export
         Task<AdvancePaymentViewModel?> GetAdvancePaymentAsync(int entryId);
         Task<bool> SaveAdvancePaymentAsync(AdvancePaymentViewModel payment);
         Task<bool> UpdateExchangeRateAsync(int entryId, decimal exchRate);
-        Task<string> PostToFinancialAsync(int entryId, AdvancePaymentViewModel payment);
+        Task<string> PostToFinancialAsync(int entryId, AdvancePaymentViewModel payment, List<PrcDeductionModel> deductions, DateTime postingDate);
         Task<bool> DeleteAdvancePaymentAsync(int entryId);
         Task<List<AdvancePaymentUsageViewModel>> GetUsageDetailsAsync(int entryId);
         
@@ -24,10 +24,12 @@ namespace Impulse.Services.Export
     public class AdvancePaymentService : IAdvancePaymentService
     {
         private readonly IAdvancePaymentDataAccess _dataAccess;
+        private readonly IAuditService _auditService;
 
-        public AdvancePaymentService(IAdvancePaymentDataAccess dataAccess)
+        public AdvancePaymentService(IAdvancePaymentDataAccess dataAccess, IAuditService auditService)
         {
             _dataAccess = dataAccess;
+            _auditService = auditService;
         }
 
         public async Task<List<AdvancePaymentListViewModel>> GetAdvancePaymentListAsync(DateTime dtFrom, DateTime dtTo, string custCode, string country)
@@ -50,9 +52,15 @@ namespace Impulse.Services.Export
             return await _dataAccess.UpdateExchangeRateAsync(entryId, exchRate);
         }
 
-        public async Task<string> PostToFinancialAsync(int entryId, AdvancePaymentViewModel payment)
+        /// <summary>
+        /// Posts to the financial ledger. Populates UserName/MachineName from IAuditService
+        /// before delegating to the data access layer.
+        /// </summary>
+        public async Task<string> PostToFinancialAsync(int entryId, AdvancePaymentViewModel payment, List<PrcDeductionModel> deductions, DateTime postingDate)
         {
-            return await _dataAccess.PostToFinancialAsync(entryId, payment);
+            payment.UserName = _auditService.GetCurrentUserName();
+            payment.MachineName = _auditService.GetClientIpAddress();
+            return await _dataAccess.PostToFinancialAsync(entryId, payment, deductions, postingDate);
         }
 
         public async Task<bool> DeleteAdvancePaymentAsync(int entryId)

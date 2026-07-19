@@ -62,7 +62,12 @@ namespace DataAccessLibrary.DAC.Export
         public async Task<AdvancePaymentViewModel?> GetAdvancePaymentAsync(int entryId)
         {
             using IDbConnection db = new SqlConnection(_connectionString);
-            string sql = "SELECT * FROM FCustAdvancePayments WHERE EntryID = @EntryID";
+            // JOIN ForeignCustomers to also fetch the customer's ledger AccNo
+            string sql = @"
+                SELECT ap.*, fc.AccNo AS CustomerAccNo
+                FROM FCustAdvancePayments ap
+                LEFT JOIN ForeignCustomers fc ON ap.CustCode = fc.CustCode AND ap.Country = fc.Country
+                WHERE ap.EntryID = @EntryID";
             return await db.QuerySingleOrDefaultAsync<AdvancePaymentViewModel>(sql, new { EntryID = entryId });
         }
 
@@ -111,29 +116,132 @@ namespace DataAccessLibrary.DAC.Export
             return true;
         }
 
-        public async Task<string> PostToFinancialAsync(int entryId, AdvancePaymentViewModel payment)
+        /// <summary>
+        /// Posts the advance payment to the financial ledger by building a real voucher
+        /// matching the VB6 frmAdvancePaymentPosting.AddVoucher logic (VoucherType = "ADV").
+        /// 
+        /// Entries posted:
+        ///   DR  Bank Account          = Net Amount (AmtInPakRs - all deductions)
+        ///   DR  Each deduction acct   = deduction amount (USD deductions × ExchRate)
+        ///   CR  Customer Account      = Full Amount in Rs (AmtInPakRs)
+        /// </summary>
+        public async Task<string> PostToFinancialAsync(
+            int entryId,
+            AdvancePaymentViewModel payment,
+            List<PrcDeductionModel> deductions,
+            DateTime postingDate)
         {
             using IDbConnection db = new SqlConnection(_connectionString);
-            
-            // Note: To properly map to IVouchersDataAccess, we'd create a VoucherMasterViewModel and VouchersDetailViewModels
-            // This is a stub for the complex accounting posting
-            // Currently, it creates a basic voucher object for the sake of compiling and structure
-            
-            // Example of what should be done:
-            // var voucher = new VoucherMasterViewModel { ... }
-            // voucher.VouchersDetails.Add(new VouchersDetailViewModel { ... })
-            // string vchrNo = await _vouchersDataAccess.SaveVoucher(voucher);
+            db.Open();
+            using IDbTransaction transaction = db.BeginTransaction();
+            try
+            {
+                // 1. Get next voucher number (VoucherType = "ADV" as per VB6)
+                string vchrNo = await _vouchersDataAccess.GetNextVchrNo(postingDate, "ADV");
 
-            // For now, generating a placeholder VchrNo to satisfy the business logic
-            string vchrNo = "BRV-" + DateTime.Now.ToString("yyMMdd-HHmm");
-            
-            string updateSql = "UPDATE FCustAdvancePayments SET VchrNo = @VchrNo WHERE EntryID = @EntryID";
-            await db.ExecuteAsync(updateSql, new { VchrNo = vchrNo, EntryID = entryId });
-            
-            string insertSql = "INSERT INTO FCustAdvancePaymentsVouchers (RefID, VchrNo) VALUES (@EntryID, @VchrNo)";
-            await db.ExecuteAsync(insertSql, new { EntryID = entryId, VchrNo = vchrNo });
-            
-            return vchrNo;
+                // 2. Build description (matching VB6 format)
+                decimal amtInPakRs = Math.Round(payment.Amount * payment.ExchRate, 2);
+                string desc = $"{payment.AdviceNo} {payment.Amount} @ {payment.ExchRate} {payment.CustCode}({payment.Country})";
+
+                // 3. Calculate total deductions in PKR (USD deductions use ExchRate)
+                decimal dTotalDeductions = 0;
+                foreach (var d in deductions)
+                {
+                    decimal amt = d.Currency != "PKR"
+                        ? Math.Round(d.Amount * payment.ExchRate, 2)
+                        : d.Amount;
+                    dTotalDeductions += Math.Round(amt, 2);
+                }
+                decimal dNetAmt = Math.Round(amtInPakRs - dTotalDeductions, 2);
+
+                // 4. Get next SNo for line items (within same transaction)
+                long sNo = await _vouchersDataAccess.GetNextSNo(postingDate, "Vouchers", db, transaction);
+
+                // 5. Build VoucherViewModel
+                var voucher = new VoucherViewModel
+                {
+                    VchrNo = vchrNo,
+                    DT = postingDate,
+                    Notes = desc,
+                    UserName = payment.UserName,
+                    MachineName = payment.MachineName,
+                    PostedThroughJVForm = false
+                };
+
+                // DR Bank Account (Net Amount)
+                voucher.LineItems.Add(new VoucherLineItemViewModel
+                {
+                    SNo = sNo++,
+                    VDate = postingDate,
+                    VchrNo = vchrNo,
+                    AccNo = payment.BankAccNo,
+                    AccTitle = string.Empty,
+                    Description = desc,
+                    Debit = dNetAmt,
+                    Credit = 0,
+                    Balance = 0,
+                    CSNo = 0
+                });
+
+                // DR each deduction account with amount > 0
+                foreach (var d in deductions)
+                {
+                    if (string.IsNullOrEmpty(d.AccountNo)) continue;
+                    decimal dAmt = d.Currency != "PKR"
+                        ? Math.Round(d.Amount * payment.ExchRate, 2)
+                        : d.Amount;
+                    dAmt = Math.Round(dAmt, 2);
+                    if (dAmt > 0)
+                    {
+                        voucher.LineItems.Add(new VoucherLineItemViewModel
+                        {
+                            SNo = sNo++,
+                            VDate = postingDate,
+                            VchrNo = vchrNo,
+                            AccNo = d.AccountNo,
+                            AccTitle = d.Title,
+                            Description = desc,
+                            Debit = dAmt,
+                            Credit = 0,
+                            Balance = 0,
+                            CSNo = 0
+                        });
+                    }
+                }
+
+                // CR Customer Account (full Amount in Rs)
+                voucher.LineItems.Add(new VoucherLineItemViewModel
+                {
+                    SNo = sNo++,
+                    VDate = postingDate,
+                    VchrNo = vchrNo,
+                    AccNo = payment.CustomerAccNo,
+                    AccTitle = string.Empty,
+                    Description = desc,
+                    Debit = 0,
+                    Credit = amtInPakRs,
+                    Balance = 0,
+                    CSNo = 0
+                });
+
+                // 6. Save voucher in same transaction
+                await _vouchersDataAccess.ExecuteVoucherSave(voucher, db, transaction);
+
+                // 7. Update FCustAdvancePayments and insert into vouchers link table
+                string updateSql = "UPDATE FCustAdvancePayments SET VchrNo = @VchrNo WHERE EntryID = @EntryID";
+                await db.ExecuteAsync(updateSql, new { VchrNo = vchrNo, EntryID = entryId }, transaction);
+
+                string insertSql = "INSERT INTO FCustAdvancePaymentsVouchers (RefID, VchrNo) VALUES (@EntryID, @VchrNo)";
+                await db.ExecuteAsync(insertSql, new { EntryID = entryId, VchrNo = vchrNo }, transaction);
+
+                transaction.Commit();
+                return vchrNo;
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
 
         public async Task<bool> DeleteAdvancePaymentAsync(int entryId)

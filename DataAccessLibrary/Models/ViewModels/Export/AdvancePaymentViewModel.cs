@@ -16,6 +16,8 @@ namespace DataAccessLibrary.Models.ViewModels.Export
         public string VchrNo { get; set; } = string.Empty;
         public string UserName { get; set; } = string.Empty;
         public string MachineName { get; set; } = string.Empty;
+        /// <summary>The debtors/receivable account for this customer from ForeignCustomers.AccNo</summary>
+        public string CustomerAccNo { get; set; } = string.Empty;
         public DateTime? DTEntry { get; set; }
         public string BankAccNo { get; set; } = string.Empty;
         public int? CustID { get; set; }

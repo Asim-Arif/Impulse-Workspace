@@ -114,7 +114,7 @@ namespace Impulse.Pages.Accounts
             dDebitCreditDifference = 0;
 
             
-            // Later i'll change amount & get from GD            
+            // Later i'll change amount & get from GD         
             await GetNextVoucherNo(voucherViewModel.DT);
             StateHasChanged();
 

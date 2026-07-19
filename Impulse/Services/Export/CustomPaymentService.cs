@@ -9,10 +9,12 @@ namespace Impulse.Services.Export
     public class CustomPaymentService : ICustomPaymentService
     {
         private readonly ICustomPaymentDataAccess _dataAccess;
+        private readonly IAuditService _auditService;
 
-        public CustomPaymentService(ICustomPaymentDataAccess dataAccess)
+        public CustomPaymentService(ICustomPaymentDataAccess dataAccess, IAuditService auditService)
         {
             _dataAccess = dataAccess;
+            _auditService = auditService;
         }
 
         public async Task<List<CustomPaymentStatusModel>> GetCustomPaymentStatusesAsync(string? custCode, int statusIndex)
@@ -35,6 +37,11 @@ namespace Impulse.Services.Export
             return await _dataAccess.GetBanksAsync();
         }
 
+        public async Task<List<GenericDropDownModel>> GetPrcBanksAsync()
+        {
+            return await _dataAccess.GetPrcBanksAsync();
+        }
+
         public async Task<List<string>> GetCustomInvoicesForPaymentAsync(string custCode)
         {
             return await _dataAccess.GetCustomInvoicesForPaymentAsync(custCode);
@@ -55,8 +62,14 @@ namespace Impulse.Services.Export
             return await _dataAccess.GetPrcDetailsAsync(entryId);
         }
 
+        /// <summary>
+        /// Posts the PRC to the financial ledger. Populates UserName/MachineName from 
+        /// IAuditService before delegating to the data access layer.
+        /// </summary>
         public async Task<string> PostPrcAsync(PostPrcModel model)
         {
+            model.UserName = _auditService.GetCurrentUserName();
+            model.MachineName = _auditService.GetClientIpAddress();
             return await _dataAccess.PostPrcAsync(model);
         }
     }

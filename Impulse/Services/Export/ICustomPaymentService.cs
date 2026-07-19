@@ -11,6 +11,7 @@ namespace Impulse.Services.Export
         Task<List<AllCustomersBalanceModel>> GetAllCustomersBalanceAsync();
         Task<decimal> GetCurrencyExchangeRateAsync(string currency);
         Task<List<GenericDropDownModel>> GetBanksAsync();
+        Task<List<GenericDropDownModel>> GetPrcBanksAsync();
         Task<List<string>> GetCustomInvoicesForPaymentAsync(string custCode);
         Task<decimal> GetCustomInvoiceBalanceAsync(string customInvoice);
         Task<bool> SaveReceivePaymentAsync(ReceivePaymentModel payment);

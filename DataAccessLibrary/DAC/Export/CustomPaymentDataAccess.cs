@@ -6,7 +6,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
 using DataAccessLibrary.Interface.Export;
+using DataAccessLibrary.Interface.Accounts;
 using DataAccessLibrary.Models.ViewModels;
+using DataAccessLibrary.Models.ViewModels.Accounts;
 using DataAccessLibrary.Models.ViewModels.Export;
 using Microsoft.Extensions.Configuration;
 
@@ -15,11 +17,13 @@ namespace DataAccessLibrary.DAC.Export
     public class CustomPaymentDataAccess : ICustomPaymentDataAccess
     {
         private readonly string _connectionString;
+        private readonly IVouchersDataAccess _vouchersDataAccess;
 
-        public CustomPaymentDataAccess(IConfiguration configuration)
+        public CustomPaymentDataAccess(IConfiguration configuration, IVouchersDataAccess vouchersDataAccess)
         {
             _connectionString = configuration.GetConnectionString("DefaultConnection") 
                 ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+            _vouchersDataAccess = vouchersDataAccess;
         }
 
         public async Task<List<CustomPaymentStatusModel>> GetCustomPaymentStatusesAsync(string? custCode, int statusIndex)
@@ -80,6 +84,13 @@ namespace DataAccessLibrary.DAC.Export
             return (await db.QueryAsync<GenericDropDownModel>(sql)).ToList();
         }
 
+        public async Task<List<GenericDropDownModel>> GetPrcBanksAsync()
+        {
+            using IDbConnection db = new SqlConnection(_connectionString);
+            string sql = "SELECT AccNo AS DropDownValue_ID, AccTitle AS DropDownValue_Description FROM VBankAccounts ORDER BY AccTitle";
+            return (await db.QueryAsync<GenericDropDownModel>(sql)).ToList();
+        }
+
         public async Task<List<string>> GetCustomInvoicesForPaymentAsync(string custCode)
         {
             using IDbConnection db = new SqlConnection(_connectionString);
@@ -121,6 +132,12 @@ namespace DataAccessLibrary.DAC.Export
 
             return rowsAffected > 0;
         }
+
+        /// <summary>
+        /// Fetches PRC posting details, including:
+        /// - CustomerAccNo from ForeignCustomers.AccNo (the debtors/receivable ledger account)
+        /// - AuthorizedExchRate from VCustomInvoiceAuthorized.ExchRate (for Exch.Diff calculation)
+        /// </summary>
         public async Task<PostPrcModel> GetPrcDetailsAsync(int entryId)
         {
             using IDbConnection db = new SqlConnection(_connectionString);
@@ -132,50 +149,205 @@ namespace DataAccessLibrary.DAC.Export
                     v.Country,
                     f.ExchRate,
                     f.AmtRcvd AS AmountRealized,
-                    fc.Curr AS Currency
+                    fc.Curr AS Currency,
+                    fc.AccNo AS CustomerAccNo,
+                    v.ExchRate AS AuthorizedExchRate
                 FROM FCustPayments f
                 JOIN VCustomInvoiceAuthorized v ON f.CustomInvoice = v.CustomInvoice
-                JOIN ForeignCustomers fc ON v.CustCode = fc.CustCode
+                JOIN ForeignCustomers fc ON v.CustCode = fc.CustCode AND v.Country = fc.Country
                 WHERE f.EntryID = @EntryID";
 
             var model = await db.QueryFirstOrDefaultAsync<PostPrcModel>(sql, new { EntryID = entryId });
             return model ?? new PostPrcModel();
         }
 
+        /// <summary>
+        /// Posts the PRC to the financial ledger, building a real voucher matching the
+        /// VB6 frmPRC.AddVoucher function (VoucherType = "JV").
+        ///
+        /// Entries posted:
+        ///   DR  Bank Account          = Net Amount (AmtInPakRs - deductions)
+        ///   DR  Each deduction acct   = deduction amount (foreign deductions × ExchRate)
+        ///   DR  Exch. Diff. account   = Abs(ExchDiff) if ExchDiff is Dr (negative)
+        ///   CR  Customer Account      = dAmtForED (AuthorizedExchRate × AmountRealized)
+        ///   CR  Exch. Diff. account   = ExchDiff if ExchDiff is Cr (positive)
+        /// </summary>
         public async Task<string> PostPrcAsync(PostPrcModel model)
         {
             using IDbConnection db = new SqlConnection(_connectionString);
-            
-            // Generate pseudo voucher number for now until full voucher logic is ported
-            string vchrNo = "PRC-" + DateTime.Now.ToString("yyyyMMddHHmmss");
-
-            string sql = @"
-                INSERT INTO PRC (
-                    CustomInvoice, RunningSerialNo, SerialNoDT, BillNo, BillNoDT, 
-                    RealizationDT, AmtRealized, ExchRate, UserName, MachineName, VchrNo
-                ) VALUES (
-                    @CustomInvoice, @SerialNo, @SerialDate, @BillNo, @BillDate, 
-                    @RealizationDate, @AmountRealized, @ExchRate, 'Auto', 'Auto', @VchrNo
-                );
-
-                UPDATE FCustPayments SET PRCVchrNo = @VchrNo WHERE EntryID = @EntryID;
-            ";
-
-            await db.ExecuteAsync(sql, new
+            db.Open();
+            using IDbTransaction transaction = db.BeginTransaction();
+            try
             {
-                model.CustomInvoice,
-                model.SerialNo,
-                model.SerialDate,
-                model.BillNo,
-                model.BillDate,
-                model.RealizationDate,
-                model.AmountRealized,
-                model.ExchRate,
-                VchrNo = vchrNo,
-                model.EntryID
-            });
+                // 1. Get next voucher number (VoucherType = "JV" as per VB6 AddVoucher)
+                string vchrNo = await _vouchersDataAccess.GetNextVchrNo(model.PostingDate, "JV");
 
-            return vchrNo;
+                // 2. Build description string (matching VB6 format)
+                string desc = $"{model.CustomInvoice} {model.AmountRealized} {model.Currency} @ {model.ExchRate} {model.BillNo} {model.CustCode}({model.Country})";
+
+                // 3. Calculate amounts
+                // Total deductions in PKR (foreign currency deductions × ExchRate)
+                decimal dTotalDeductions = 0;
+                foreach (var d in model.Deductions)
+                {
+                    decimal dAmt = d.Currency != "PKR"
+                        ? Math.Round(d.Amount * model.ExchRate, 2)
+                        : d.Amount;
+                    dTotalDeductions += dAmt;
+                }
+
+                decimal dNetAmt = Math.Round(model.AmountInRs, 2) - Math.Round(dTotalDeductions, 2);
+
+                // dAmtForED: The amount originally credited to Customer = AuthorizedExchRate × AmountRealized
+                decimal dAmtForED = Math.Round(model.AuthorizedExchRate * model.AmountRealized, 4);
+
+                // ExchDiff: positive = Credit side, negative = Debit side
+                decimal dExchDiff = Math.Round(model.AmountInRs - dAmtForED, 4);
+
+                // 4. Get next SNo for line items (within same transaction to avoid gaps)
+                long sNo = await _vouchersDataAccess.GetNextSNo(model.PostingDate, "Vouchers", db, transaction);
+
+                // 5. Build VoucherViewModel
+                var voucher = new VoucherViewModel
+                {
+                    VchrNo = vchrNo,
+                    DT = model.PostingDate,
+                    Notes = desc,
+                    UserName = model.UserName,
+                    MachineName = model.MachineName,
+                    PostedThroughJVForm = false
+                };
+
+                // DR Bank Account (Net Amount)
+                voucher.LineItems.Add(new VoucherLineItemViewModel
+                {
+                    SNo = sNo++,
+                    VDate = model.PostingDate,
+                    VchrNo = vchrNo,
+                    AccNo = model.BankAccNo,
+                    AccTitle = string.Empty,
+                    Description = desc,
+                    Debit = dNetAmt,
+                    Credit = 0,
+                    Balance = 0,
+                    CSNo = 0
+                });
+
+                // DR each deduction account (amount > 0)
+                foreach (var d in model.Deductions)
+                {
+                    if (string.IsNullOrEmpty(d.AccountNo)) continue;
+                    decimal dAmt = d.Currency != "PKR"
+                        ? Math.Round(d.Amount * model.ExchRate, 2)
+                        : d.Amount;
+                    dAmt = Math.Round(dAmt, 2);
+                    if (dAmt > 0)
+                    {
+                        voucher.LineItems.Add(new VoucherLineItemViewModel
+                        {
+                            SNo = sNo++,
+                            VDate = model.PostingDate,
+                            VchrNo = vchrNo,
+                            AccNo = d.AccountNo,
+                            AccTitle = d.Title,
+                            Description = desc,
+                            Debit = dAmt,
+                            Credit = 0,
+                            Balance = 0,
+                            CSNo = 0
+                        });
+                    }
+                }
+
+                // DR Exch. Diff. account if ExchDiff is Dr side (negative difference)
+                if (!string.IsNullOrEmpty(model.ExchDiffAccNo) && dExchDiff < 0)
+                {
+                    voucher.LineItems.Add(new VoucherLineItemViewModel
+                    {
+                        SNo = sNo++,
+                        VDate = model.PostingDate,
+                        VchrNo = vchrNo,
+                        AccNo = model.ExchDiffAccNo,
+                        AccTitle = "Exch. Diff.",
+                        Description = desc,
+                        Debit = Math.Abs(dExchDiff),
+                        Credit = 0,
+                        Balance = 0,
+                        CSNo = 0
+                    });
+                }
+
+                // CR Customer Account (dAmtForED = AuthorizedExchRate × AmountRealized)
+                voucher.LineItems.Add(new VoucherLineItemViewModel
+                {
+                    SNo = sNo++,
+                    VDate = model.PostingDate,
+                    VchrNo = vchrNo,
+                    AccNo = model.CustomerAccNo,
+                    AccTitle = string.Empty,
+                    Description = desc,
+                    Debit = 0,
+                    Credit = dAmtForED,
+                    Balance = 0,
+                    CSNo = 0
+                });
+
+                // CR Exch. Diff. account if ExchDiff is Cr side (positive difference)
+                if (!string.IsNullOrEmpty(model.ExchDiffAccNo) && dExchDiff > 0)
+                {
+                    voucher.LineItems.Add(new VoucherLineItemViewModel
+                    {
+                        SNo = sNo++,
+                        VDate = model.PostingDate,
+                        VchrNo = vchrNo,
+                        AccNo = model.ExchDiffAccNo,
+                        AccTitle = "Exch. Diff.",
+                        Description = desc,
+                        Debit = 0,
+                        Credit = dExchDiff,
+                        Balance = 0,
+                        CSNo = 0
+                    });
+                }
+
+                // 6. Save voucher (within same transaction)
+                await _vouchersDataAccess.ExecuteVoucherSave(voucher, db, transaction);
+
+                // 7. Insert into PRC table and update FCustPayments (within same transaction)
+                string sql = @"
+                    INSERT INTO PRC (
+                        CustomInvoice, RunningSerialNo, SerialNoDT, BillNo, BillNoDT,
+                        RealizationDT, AmtRealized, ExchRate, UserName, MachineName, VchrNo
+                    ) VALUES (
+                        @CustomInvoice, @SerialNo, @SerialDate, @BillNo, @BillDate,
+                        @RealizationDate, @AmountRealized, @ExchRate, @UserName, @MachineName, @VchrNo
+                    );
+                    UPDATE FCustPayments SET PRCVchrNo = @VchrNo WHERE EntryID = @EntryID;";
+
+                await db.ExecuteAsync(sql, new
+                {
+                    model.CustomInvoice,
+                    model.SerialNo,
+                    model.SerialDate,
+                    model.BillNo,
+                    model.BillDate,
+                    model.RealizationDate,
+                    model.AmountRealized,
+                    model.ExchRate,
+                    model.UserName,
+                    model.MachineName,
+                    VchrNo = vchrNo,
+                    model.EntryID
+                }, transaction);
+
+                transaction.Commit();
+                return vchrNo;
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
     }
 }
