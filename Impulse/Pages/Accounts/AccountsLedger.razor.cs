@@ -1,4 +1,4 @@
-﻿using BlazorBootstrap;
+using BlazorBootstrap;
 using BlazorContextMenu;
 using DataAccessLibrary;
 using DataAccessLibrary.Interface.Accounts;
@@ -9,6 +9,8 @@ using Impulse.Services;
 using Microsoft.AspNetCore.Components;
 using Radzen;
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.JSInterop;
 
 namespace Impulse.Pages.Accounts
 {
@@ -24,6 +26,17 @@ namespace Impulse.Pages.Accounts
 
         [Inject]
         protected IReportNavigationService ReportNavigationService { get; set; }
+        [Inject] 
+        private AuthenticationStateProvider AuthStateProvider { get; set; }
+        [Inject] 
+        private IJSRuntime JSRuntime { get; set; }
+        
+        private async Task<string> GetUserName()
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            return authState.User.Identity?.Name ?? "Guest";
+        }
+
         private List<GenericDropDownModel> Accounts = new List<GenericDropDownModel>();
         private List<AccountsReportingModel> AccountsList = new List<AccountsReportingModel>();
         private AccountsReportingModel CurrentAccount = new AccountsReportingModel();
@@ -33,6 +46,9 @@ namespace Impulse.Pages.Accounts
 
         private string? StrOpeningMsg = null;
         private string? StrClosingMsg = null;
+
+        public bool IsChequeModalVisible { get; set; } = false;
+        public AccountsReportingModel? CurrentChequeRow { get; set; } = null;
 
         protected override async Task OnInitializedAsync()
         {
@@ -76,7 +92,13 @@ namespace Impulse.Pages.Accounts
 
         private async Task<IEnumerable<AccountsReportingModel>> GetAccounts(string searchText)
         {
-            return await Task.FromResult(AccountsList.Where(x => x.AccTitle.ToLower().Contains(searchText.ToLower())).ToList());
+            if (string.IsNullOrWhiteSpace(searchText))
+                return AccountsList;
+
+            return await Task.FromResult(AccountsList.Where(x => 
+                (!string.IsNullOrEmpty(x.AccTitle) && x.AccTitle.Contains(searchText, StringComparison.OrdinalIgnoreCase)) || 
+                (!string.IsNullOrEmpty(x.AccNo) && x.AccNo.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+            ).ToList());
         }
         private async Task SelectedResultChanged(AccountsReportingModel? selectedhead)
         {
@@ -132,6 +154,66 @@ namespace Impulse.Pages.Accounts
                 Navigation.NavigateTo($"/accounts/transactionregister/{CurrentAccount.VchrNo}");
             }
         }
+        private ChequeDetailModel? ChequeDetails = null;
+
+        private async Task ShowChequeDetails(AccountsReportingModel row)
+        {
+            CurrentChequeRow = row;
+            ChequeDetails = await AccountReportingAccess.GetChequeDetails(row.VchrNo, row.ChqNo);
+            IsChequeModalVisible = true;
+            StateHasChanged();
+        }
+
+        private void CloseChequeModal()
+        {
+            IsChequeModalVisible = false;
+            CurrentChequeRow = null;
+            StateHasChanged();
+        }
+
+        private async Task InsertBalanceTag(ItemClickEventArgs e)
+        {
+            var row = e.Data as AccountsReportingModel;
+            if (row != null)
+            {
+                var userName = await GetUserName();
+                await AccountReportingAccess.InsertBalanceTag(row.SNo, userName);
+                row.BalanceTag_UserName = userName;
+                row.BalanceTag_DTEntry = DateTime.Now;
+                StateHasChanged();
+            }
+        }
+
+        private async Task RemoveBalanceTag(ItemClickEventArgs e)
+        {
+            var row = e.Data as AccountsReportingModel;
+            if (row != null)
+            {
+                await AccountReportingAccess.RemoveBalanceTag(row.SNo);
+                row.BalanceTag_UserName = null;
+                row.BalanceTag_DTEntry = null;
+                StateHasChanged();
+            }
+        }
+
+        private void OnInsertBalanceTagAppearing(ItemAppearingEventArgs e)
+        {
+            var row = e.Data as AccountsReportingModel;
+            if (row != null && !string.IsNullOrEmpty(row.BalanceTag_UserName))
+            {
+                e.IsVisible = false;
+            }
+        }
+
+        private void OnRemoveBalanceTagAppearing(ItemAppearingEventArgs e)
+        {
+            var row = e.Data as AccountsReportingModel;
+            if (row != null && string.IsNullOrEmpty(row.BalanceTag_UserName))
+            {
+                e.IsVisible = false;
+            }
+        }
+
         private void PrintVoucher(ItemClickEventArgs e)
         {
             var vchr = e.Data as AccountsReportingModel;

@@ -1,209 +1,322 @@
-﻿@page "/accounts/accountsledger"
+@page "/accounts/accountsledger"
 @attribute [Authorize]
+
 <PageTitle>Accounts Ledger</PageTitle>
 
-@using System.Collections.ObjectModel
-@using Microsoft.AspNetCore.Components.Web
+@using Blazored.Typeahead
 @using BlazorContextMenu
-@using Microsoft.Extensions.Options
-@using DataAccessLibrary
 @using DataAccessLibrary.Models.ViewModels.Accounts
 @using Impulse.Configurations
 @using DataAccessLibrary.Interface.Accounts
-@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using Microsoft.AspNetCore.Components.Web
 
-@inject IJSRuntime JS
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
+<style>
+    .clickable-row:hover {
+        background-color: rgba(192, 88, 0, 0.05) !important;
+        cursor: pointer;
+    }
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    .blazored-typeahead {
+        height: 31px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 29px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
 
-<div class="container-fluid mt-0 m-0 p-0" style="font-family: Calibri, sans-serif; ">    
-        
-        <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color"
-             style="position: sticky; top: 0; z-index: 1000;">
-            <h5 class="mb-0"><i class="fas fa-file-invoice"></i> Accounts Ledger </h5>
-            <div class="d-flex align-items-center gap-2">
-                <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
-                <i class="fas fa-xmark me-2"></i> Close
+    .win11-context-menu-container, .blazor-context-menu {
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+    }
+
+    /* Keep the modal beautiful with glassmorphism */
+    .glass-modal .modal-content {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+    .glass-modal .modal-header {
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+        background: rgba(248, 249, 250, 0.8);
+        border-radius: 12px 12px 0 0;
+    }
+    .glass-modal .modal-footer {
+        border-top: 1px solid rgba(0,0,0,0.05);
+        background: rgba(248, 249, 250, 0.8);
+        border-radius: 0 0 12px 12px;
+    }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+            <!-- Title -->
+            <div class="d-flex justify-content-between align-items-end pb-2 mb-3 border-bottom">
+                <h5 class="mb-0 fw-bold text-dark-emphasis">
+                    <i class="fas fa-file-invoice text-primary me-2"></i>
+                    Accounts Ledger
+                </h5>
+                <button class="btn btn-outline-secondary btn-sm fw-semibold" @onclick="GoToIndexPage">
+                    <i class="fas fa-xmark me-1"></i> Close
                 </button>
             </div>
-        </div>
 
-        <div class="card-body p-0">
-
-            <div class="row mb-1 align-items-end">
-                <div class="col-sm-6 form-control-sm">
-                    <label for="Accounts" class="form-label fw-bold">Accounts</label>
-                    <BlazoredTypeahead SearchMethod="GetAccounts" EnableDropDown="true"
-                                       Data="AccountsList"
+            <!-- Filter Row -->
+            <div class="row g-2 mb-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Account</label>
+                    <BlazoredTypeahead SearchMethod="GetAccounts"
+                                       EnableDropDown="true"
                                        TValue="AccountsReportingModel"
                                        TItem="AccountsReportingModel"
                                        Value="SelectedAccount"
                                        ValueChanged="SelectedResultChanged"
                                        ValueExpression="@(() => SelectedAccount)"
-                                       Placeholder="Search By Account ..."
+                                       Placeholder="Search By Account No or Title ..."
                                        MaximumSuggestions="1000">
                         <SelectedTemplate Context="selectedhead">
-                            @selectedhead?.AccNo @selectedhead?.AccTitle
+                            @selectedhead?.AccNo - @selectedhead?.AccTitle
                         </SelectedTemplate>
                         <ResultTemplate Context="result">
-                            @result.AccNo @result.AccTitle
+                            @result.AccNo - @result.AccTitle
                         </ResultTemplate>
                     </BlazoredTypeahead>
                 </div>
-
-                <div class="col-sm-2 form-control-sm">
-                    <label for="fromDate" class="fw-bold">Date From:</label>
-                    <input type="date" id="fromDate" class="form-control form-control-md" @bind="CurrentAccount.DTFrom" />
+                
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">From Date</label>
+                    <input type="date" class="form-control form-control-sm" style="height: 31px;" @bind="CurrentAccount.DTFrom" />
                 </div>
-
-                <div class="col-sm-2 form-control-sm">
-                    <label for="toDate" class="fw-bold">Date To:</label>
-                    <input type="date" id="toDate" class="form-control form-control-md" @bind="CurrentAccount.DTTo" />
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">To Date</label>
+                    <input type="date" class="form-control form-control-sm" style="height: 31px;" @bind="CurrentAccount.DTTo" />
                 </div>
-                <div class="col-sm-2 form-control-sm">
-                    <div class="col d-flex">
-                        <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="RefreshLedger">Refresh</button>
-                    </div>
+                <div class="col d-flex align-items-end justify-content-end gap-2 pb-1" style="height: 31px;">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="RefreshLedger" title="Refresh">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                    <ContextMenuTrigger MenuId="optionsBarMenu" WrapperTag="span" MouseButtonTrigger="MouseButtonTrigger.Left">
+                        <button type="button" class="btn btn-primary btn-sm" title="Options">
+                            <i class="fas fa-cog me-1"></i> Options <i class="fas fa-caret-down ms-1"></i>
+                        </button>
+                    </ContextMenuTrigger>
                 </div>
-
             </div>
 
+            <!-- Grid -->
             @if (IsLoading)
             {
-                <div class="progress" style="width: 100%">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
-                         role="progressbar" style="width: 100%">
-                        Loading Ledger Data...
+                <div class="d-flex align-items-center justify-content-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
                     </div>
-                </div>
-            }
-            else if (LedgerDatafromDB?.Any() ?? false)
-            {
-                <div style="width: 100%">
-                    <ContextMenuProvider Id="accountsContext">
-
-                        <table class="table table-bordered table-hover align-middle mb-0" 
-                               style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
-
-                            <thead class="theme-color"
-                                   style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
-                                <tr>
-                                    <th style="width: 10%;" class="text-center">Dated</th>
-                                    <th style="width: 10%;">Voucher</th>
-                                    <th style="width: 48%;">Description</th>
-                                    <th style="width: 10%;" class="text-end">Debit</th>
-                                    <th style="width: 10%;" class="text-end">Credit</th>
-                                    <th style="width: 10%;" class="text-end">Balance</th>
-                                    <th style="width: 2%;"> </th>
-                                </tr>
-                            </thead>
-
-                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">
-
-                                <tr >
-                                    <td class="text-center" colspan="3"> <strong>@StrOpeningMsg</strong> </td>
-                                    <td class="text-end" colspan="4"><strong>@CurrentAccount.OpeningBalance</strong></td>
-                                </tr>
-
-                                <Virtualize Items="@LedgerDatafromDB" Context="ledger">
-                                    <ContextMenuTrigger WrapperTag="tr"
-                                                        MenuId="accountContextMenu"
-                                                        Data="ledger"
-                                                        MouseButtonTrigger="MouseButtonTrigger.Right"
-                                                        CssClass="@($"key-{ledger.VchrNo}")">
-
-                                        <td>@ledger.VDate.ToString("dd-MMM-yyyy")</td>
-                                        <td>@ledger.VchrNo</td>
-                                        <td>@ledger.Description</td>
-                                        <td class="text-end">@ledger.Debit</td>
-                                        <td class="text-end">@ledger.Credit</td>
-                                        <td class="text-end">@ledger.Balance</td>
-                                        @* @{
-                                            TotalDebit =TotalDebit+ ledger.Debit;
-                                            TotalCredit =TotalCredit+ ledger.Credit;
-                                        } *@
-                                        <td>
-                                        <ContextMenuTrigger MenuId="accountContextMenu"
-                                                                Data="ledger"
-                                                                MouseButtonTrigger="MouseButtonTrigger.Both">
-                                                <button class="btn btn-sm btn-primary" style="border:none; background:none;">
-                                                    <i class="fa-solid fa-ellipsis-vertical" style="color:black"></i>
-                                                </button>
-                                            </ContextMenuTrigger>
-                                        </td>
-
-                                    </ContextMenuTrigger>
-                                </Virtualize>
-
-                                <tr>
-
-                                    <td class="text-center"> </td>
-                                    <td class="text-center"> </td>
-
-                                    <td class="text-center" >
-                                        <strong>@StrClosingMsg</strong>
-                                    </td>
-
-                                    <td class="text-end">
-                                        <strong>@TotalDebit</strong>
-                                    </td>
-
-                                    <td class="text-end">
-                                        <strong> @TotalCredit </strong>
-                                    </td>
-
-                                    <td class="text-end">
-                                        <strong>@CurrentAccount.Balance</strong>
-                                    </td>
-
-                                </tr>
-
-                            </tbody>
-
-                        </table>
-                    </ContextMenuProvider>
                 </div>
             }
             else
             {
-                <div class="text-center py-3 text-muted">No ledger entries found.</div>
+                <div class="card border border-light-subtle rounded-3 overflow-hidden shadow-xs">
+                    <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                <tr>
+                                    <th>Dated</th>
+                                    <th>Voucher #</th>
+                                    <th>Description</th>
+                                    <th class="text-end">Debit</th>
+                                    <th class="text-end">Credit</th>
+                                    <th class="text-end">Balance</th>
+                                    <th class="text-center">Chq #</th>
+                                    <th class="text-center">Chq Date</th>
+                                    <th>Handed Over To</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (LedgerDatafromDB != null && LedgerDatafromDB.Any())
+                                {
+                                    <!-- Opening Balance Row -->
+                                    <tr class="table-warning fw-bold">
+                                        <td colspan="5" class="text-center text-primary" style="font-size: 0.8rem;">
+                                            @StrOpeningMsg
+                                        </td>
+                                        <td class="text-end text-primary">@CurrentAccount.OpeningBalance.ToString("N2")</td>
+                                        <td colspan="3"></td>
+                                    </tr>
+
+                                    @foreach (var row in LedgerDatafromDB)
+                                    {
+                                        <ContextMenuTrigger MenuId="rowContextMenu" Data="row" WrapperTag="tr" CssClass="clickable-row">
+                                            <td>@row.VDate.ToString("dd-MMM-yyyy")</td>
+                                            <td>@row.VchrNo</td>
+                                            <td>@row.Description</td>
+                                            <td class="text-end">@row.Debit.ToString("N2")</td>
+                                            <td class="text-end">@row.Credit.ToString("N2")</td>
+                                            <td class="text-end">@row.Balance.ToString("N2")</td>
+                                            <td class="text-center">
+                                                @if (!string.IsNullOrEmpty(row.ChqNo))
+                                                {
+                                                    <span class="badge bg-info text-dark" style="cursor: pointer;" @onclick:stopPropagation="true" @onclick="() => ShowChequeDetails(row)">
+                                                        <i class="fas fa-money-check me-1"></i> @row.ChqNo
+                                                    </span>
+                                                }
+                                            </td>
+                                            <td class="text-center">@(row.ChqDate == DateTime.MinValue ? "" : row.ChqDate.ToString("dd-MMM-yyyy"))</td>
+                                            <td>@row.Handed_Over_To</td>
+                                        </ContextMenuTrigger>
+                                        
+                                        @if (!string.IsNullOrEmpty(row.BalanceTag_UserName))
+                                        {
+                                            <tr class="table-success">
+                                                <td colspan="9" class="text-start fw-bold" style="color: #007d00;">
+                                                    <i class="fas fa-check-circle me-1"></i>
+                                                    &lt;  Balance OK  &gt; (@row.BalanceTag_UserName @(row.BalanceTag_DTEntry?.ToString("dd-MMM-yyyy HH:mm")))
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+
+                                    <!-- Closing Balance Row -->
+                                    <tr class="table-primary fw-bold">
+                                        <td colspan="3" class="text-end">TOTAL:</td>
+                                        <td class="text-end text-danger">@TotalDebit?.ToString("N2")</td>
+                                        <td class="text-end text-success">@TotalCredit?.ToString("N2")</td>
+                                        <td class="text-end text-primary">@CurrentAccount.Balance.ToString("N2")</td>
+                                        <td colspan="3"></td>
+                                    </tr>
+                                    <tr class="table-warning fw-bold">
+                                        <td colspan="5" class="text-center text-primary" style="font-size: 0.8rem;">
+                                            @StrClosingMsg
+                                        </td>
+                                        <td class="text-end text-primary">@CurrentAccount.Balance.ToString("N2")</td>
+                                        <td colspan="3"></td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="9" class="text-center text-muted py-4">Please select an account and click Refresh to view the ledger.</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             }
-
-        <!-- CONTEXT MENU -->
-        <ContextMenu Id="accountContextMenu"
-                     UseDefaultEventHandlers="true"
-                     Template="Win11Style">
-
-            <Item Onclick="@RefreshLedger">
-                <i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh
-            </Item>
-
-            <div class="menu-divider"></div>
-            <Seperator />
-
-            <Item Onclick="GoToVoucherTransaction">
-                <i class="fas fa-square-arrow-up-right fa-fw win11-icon"></i> Go To Transaction
-            </Item>
-
-            <Item OnClick="PrintVoucher">
-                <i class="fas fa-ticket fa-fw win11-icon"></i> Print Voucher
-            </Item>
-
-            <div class="menu-divider"></div>
-            <Seperator />
-            <Item OnClick="PrintLedger">
-                <i class="fas fa-book-open fa-fw win11-icon"></i> Print Ledger
-            </Item>
-            <Item Onclick="PrintLedgerWithTitle">
-                <i class="fas fa-file-invoice fa-fw win11-icon"></i> Print Ledger With Title
-            </Item>
-            <Item Onclick="PrintTransactionReport">
-                <i class="fas fa-exchange-alt fa-fw win11-icon"></i> Print Transaction Report
-            </Item>
-
-        </ContextMenu>
-      
         </div>
     </div>
+</div>
 
+<!-- Row Context Menu -->
+<ContextMenu Id="rowContextMenu" Template="Win11Style">
+    <div class="win11-section-header">Record Options</div>
+    <Item OnClick="GoToVoucherTransaction" CssClass="win11-menu-item">
+        <i class="fas fa-eye win11-icon text-primary"></i> View Transaction Report
+    </Item>
+    <Item OnClick="PrintVoucher" CssClass="win11-menu-item">
+        <i class="fas fa-print win11-icon text-success"></i> Print Voucher
+    </Item>
+    <Item OnClick="InsertBalanceTag" CssClass="win11-menu-item" OnAppearing="OnInsertBalanceTagAppearing">
+        <i class="fas fa-tag win11-icon text-success"></i> Insert Balance OK Tag Here
+    </Item>
+    <Item OnClick="RemoveBalanceTag" CssClass="win11-menu-item" OnAppearing="OnRemoveBalanceTagAppearing">
+        <i class="fas fa-trash-alt win11-icon text-danger"></i> Remove Balance Tag
+    </Item>
+</ContextMenu>
 
+<!-- Global Context Menu -->
+<ContextMenu Id="optionsBarMenu" Template="Win11Style">
+    <div class="win11-section-header">Ledger Options</div>
+    <Item OnClick="PrintLedger" CssClass="win11-menu-item">
+        <i class="fas fa-print win11-icon text-primary"></i> Print Ledger
+    </Item>
+</ContextMenu>
+
+<!-- Cheque Details Modal -->
+@if (IsChequeModalVisible)
+{
+    string status = "Pending";
+    string badgeClass = "bg-warning text-dark";
+    if (ChequeDetails != null)
+    {
+        if (ChequeDetails.ChequeType == "Canceled") { status = "Canceled"; badgeClass = "bg-danger"; }
+        else if (ChequeDetails.Bounced) { status = "Bounced"; badgeClass = "bg-danger"; }
+        else if (ChequeDetails.Posted)
+        {
+            if (ChequeDetails.ClearanceDT == null) { status = "Pending"; badgeClass = "bg-warning text-dark"; }
+            else { status = "Cleared"; badgeClass = "bg-success"; }
+        }
+        else if (ChequeDetails.ChequeDate <= DateTime.Now && !ChequeDetails.Posted) { status = "Due"; badgeClass = "bg-primary"; }
+    }
+
+    <div class="modal fade show d-block glass-modal" tabindex="-1" style="background-color: rgba(0,0,0,0.4);">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content shadow-lg" style="font-family: 'Calibri', 'Segoe UI', sans-serif; font-size: 0.88rem;">
+                <div class="modal-header bg-light text-dark py-2">
+                    <h6 class="modal-title fw-bold text-dark-emphasis mb-0">
+                        <i class="fas fa-money-check text-info me-2"></i> Cheque Details
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="CloseChequeModal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    @if (ChequeDetails == null)
+                    {
+                        <div class="text-center p-4">
+                            <span class="spinner-border spinner-border-sm text-primary me-2" role="status" aria-hidden="true"></span> Loading...
+                        </div>
+                    }
+                    else
+                    {
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light text-secondary" style="font-size: 0.78rem; text-transform: uppercase;">
+                                <tr>
+                                    <th>Dated</th>
+                                    <th>Cheque #</th>
+                                    <th>Bank & Branch</th>
+                                    <th>Description</th>
+                                    <th class="text-end">Amount</th>
+                                    <th class="text-center">Type</th>
+                                    <th class="text-center">Chq. Date</th>
+                                    <th class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>@ChequeDetails.CDate.ToString("dd-MMM-yyyy")</td>
+                                    <td>@ChequeDetails.ChequeNo</td>
+                                    <td>@ChequeDetails.Bank @ChequeDetails.Branch</td>
+                                    <td>@ChequeDetails.Description</td>
+                                    <td class="text-end">@ChequeDetails.Amount.ToString("N2")</td>
+                                    <td class="text-center">@ChequeDetails.ChequeType</td>
+                                    <td class="text-center">@(ChequeDetails.ChequeDate?.ToString("dd-MMM-yyyy"))</td>
+                                    <td class="text-center">
+                                        <span class="badge @badgeClass">@status</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    }
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-3 mt-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CloseChequeModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

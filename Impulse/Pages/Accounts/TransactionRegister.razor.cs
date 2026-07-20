@@ -1,4 +1,4 @@
-﻿using Azure.Identity;
+using Azure.Identity;
 using BlazorBootstrap;
 using BlazorContextMenu;
 using DataAccessLibrary;
@@ -49,9 +49,6 @@ namespace Impulse.Pages.Accounts
         private bool IsCPV = true;
         private bool IsCRV = true;
         private bool IsBRV = true;
-        private bool IsReguler = true;
-        private bool IsOnline = true;
-        private bool IsCorp = true;
         private string userName;
         [Parameter] public string? p_VchrNo { get; set; }
         private string? pVoucherNo;
@@ -142,33 +139,7 @@ namespace Impulse.Pages.Accounts
                 }
 
                 strcond = strcond.Substring(0, strcond.Length - 3);
-
-                if (IsReguler == false || IsOnline == false || IsCorp == false)
-                {
-                    //strcond = strcond + " ) AND (";
-                    strcond = strcond + " ) AND ";
-                }
-                else {
-                    strcond = strcond + " ) ";
-                }
-                if (IsReguler == false)
-                {
-                    strcond = strcond + " Online_Vchr<>0 AND";
-                }
-                if (IsOnline == false)
-                {   
-                    strcond = strcond + " Online_Vchr_Type<>1 AND";
-                }
-                if (IsCorp == false)
-                {   
-                    strcond = strcond + " Online_Vchr_Type<>2 AND";
-                }
-                if (IsReguler == false || IsOnline == false || IsCorp == false)
-                {
-                    strcond = strcond.Substring(0, strcond.Length - 4);
-                }
-                //strcond = strcond + " )";
-                strcond = strcond + " ";
+                strcond = strcond + " ) ";
 
                 LedgerDatafromDB.Clear();
                 LedgerGroups = null;

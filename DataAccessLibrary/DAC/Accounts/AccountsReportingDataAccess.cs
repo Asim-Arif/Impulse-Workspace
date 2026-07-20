@@ -1,4 +1,4 @@
-﻿using Dapper;
+using Dapper;
 using DataAccessLibrary.Interface.Accounts;
 using DataAccessLibrary.Models;
 using DataAccessLibrary.Models.ViewModels.Accounts;
@@ -36,10 +36,15 @@ public class AccountsReportingDataAccess : IAccountReportingAccess
             using (IDbConnection db = new SqlConnection(_connectionString))
             {
                 string sql = @"
-                SELECT AccNo, AccTitle,VDate,VchrNo,Description,Debit,Credit,Balance  FROM VLedger
-                WHERE AccNo = @StrAccNo
-                AND VDate BETWEEN @DTFrom AND @DTTo
-                ORDER BY VDate, SNo";
+                SELECT V.SNo, V.AccNo, V.AccTitle, V.VDate, V.VchrNo, V.Description, V.Debit, V.Credit, V.Balance, 
+                       V.chequeno AS ChqNo, V.chequeDate AS ChqDate, V.chequeType AS ChqType, 
+                       V.Payee, V.Handed_Over_To, V.UserName, V.MachineName, V.DT AS EntryDate,
+                       B.UserName AS BalanceTag_UserName, B.DTEntry AS BalanceTag_DTEntry
+                FROM VLedger V
+                LEFT JOIN BalanceTags B ON V.SNo = B.Sno
+                WHERE V.AccNo = @StrAccNo
+                AND V.VDate BETWEEN @DTFrom AND @DTTo
+                ORDER BY V.VDate, V.SNo";
 
                 var listdata = await db.QueryAsync<AccountsReportingModel>(sql,new { StrAccNo, DTFrom, DTTo });
 
@@ -53,9 +58,66 @@ public class AccountsReportingDataAccess : IAccountReportingAccess
         }
     }
 
+    public async Task<ChequeDetailModel> GetChequeDetails(string vchrNo, string chqNo)
+    {
+        try
+        {
+            using (IDbConnection db = new SqlConnection(_connectionString))
+            {
+                string sql = @"
+                SELECT CDate, chequeno AS ChequeNo, Bank, Branch, Description, Amount, 
+                       chequeType AS ChequeType, chequeDate AS ChequeDate, Posted, 
+                       Bounced, ClearanceDT, Payment
+                FROM VChqLedger
+                WHERE VchrNo = @vchrNo AND chequeno = @chqNo";
+
+                return await db.QueryFirstOrDefaultAsync<ChequeDetailModel>(sql, new { vchrNo, chqNo });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching cheque details: {ex.Message}");
+            return null;
+        }
+    }
+
+    public async Task InsertBalanceTag(double sNo, string userName)
+    {
+        try
+        {
+            using (IDbConnection db = new SqlConnection(_connectionString))
+            {
+                string sql = "INSERT INTO BalanceTags(Sno, UserName) VALUES(@sNo, @userName)";
+                await db.ExecuteAsync(sql, new { sNo, userName });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error inserting balance tag: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task RemoveBalanceTag(double sNo)
+    {
+        try
+        {
+            using (IDbConnection db = new SqlConnection(_connectionString))
+            {
+                string sql = "DELETE FROM BalanceTags WHERE Sno = @sNo";
+                await db.ExecuteAsync(sql, new { sNo });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error removing balance tag: {ex.Message}");
+            throw;
+        }
+    }
+
     public async Task<decimal> GetAccountOpeningBalance(string strAccNo, DateTime OnDate)
     {
-        string sql = "SELECT [dbo].[GetClosingBalance](@AccNo, @DT, @CurrentDT)";
+        string sql = "SELECT [dbo].[GetBalance](@AccNo, @DT, @CurrentDT)";
         // Prepare the parameters
         var parameters = new
         {
@@ -79,14 +141,22 @@ public class AccountsReportingDataAccess : IAccountReportingAccess
                var strcondition = "WHERE VDate BETWEEN @DTFrom AND @DTTo";
                     strcondition = strcondition + StrCond;
 
-                strcondition = strcondition + " ORDER BY T1.VoucherType ASC,T1.VDate,T1.SNo";
+                strcondition = strcondition + " ORDER BY VoucherType ASC, T1.VDate, T1.SNo";
 
                 string sql = @"
-                        SELECT VoucherType,AccNo,AccTitle,VDate,VchrNo,Description,Debit,Credit,BillDate,BillNo,
-                               UserName AS GeneratedBy,MachineName,DT_Generator AS EntryDate,UserName_Edit AS EditedBy,
-                               MachineName_Edit AS EditMachineName,DT_Edit EditedDate FROM VLedger1 T1 " + strcondition ;
+                        SELECT 
+                            CASE
+                                WHEN LEFT(VchrNo, 3) = 'BPV' THEN 'BPV'
+                                WHEN LEFT(VchrNo, 3) = 'CPV' THEN 'CPV'
+                                WHEN LEFT(VchrNo, 3) = 'BRV' THEN 'BRV'
+                                WHEN LEFT(VchrNo, 3) = 'CRV' THEN 'CRV'
+                                ELSE 'JV'
+                            END AS VoucherType,
+                            AccNo, AccTitle, VDate, VchrNo, Description, Debit, Credit, 
+                            UserName AS GeneratedBy, MachineName, DT AS EntryDate, Handed_Over_To, chequeno AS ChqNo, chequeDate AS ChqDate 
+                        FROM VLedger T1 " + strcondition;
 
-                var listdata = await db.QueryAsync<AccountsReportingModel>(sql, new { DTFrom, DTTo , strcondition });
+                var listdata = await db.QueryAsync<AccountsReportingModel>(sql, new { DTFrom, DTTo });
                 return listdata.ToList();
 
             }
@@ -109,9 +179,17 @@ public class AccountsReportingDataAccess : IAccountReportingAccess
                 //strcondition = strcondition + StrVchrNo;
 
                 string sql = @"
-                        SELECT VoucherType,AccNo,AccTitle,VDate,VchrNo,Description,Debit,Credit,BillDate,BillNo,
-                               UserName AS GeneratedBy,MachineName,DT_Generator AS EntryDate,UserName_Edit AS EditedBy,
-                               MachineName_Edit AS EditMachineName,DT_Edit EditedDate FROM VLedger1 T1 " + strcondition;
+                        SELECT 
+                            CASE
+                                WHEN LEFT(VchrNo, 3) = 'BPV' THEN 'BPV'
+                                WHEN LEFT(VchrNo, 3) = 'CPV' THEN 'CPV'
+                                WHEN LEFT(VchrNo, 3) = 'BRV' THEN 'BRV'
+                                WHEN LEFT(VchrNo, 3) = 'CRV' THEN 'CRV'
+                                ELSE 'JV'
+                            END AS VoucherType,
+                            AccNo, AccTitle, VDate, VchrNo, Description, Debit, Credit, 
+                            UserName AS GeneratedBy, MachineName, VchrEntryDate AS EntryDate 
+                        FROM VLedger1 T1 " + strcondition;
 
                 var listdata = await db.QueryAsync<AccountsReportingModel>(sql, new { StrVchrNo });
                 return listdata.ToList();

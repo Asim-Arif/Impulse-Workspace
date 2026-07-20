@@ -1,4 +1,4 @@
-﻿using DataAccessLibrary.Models.ViewModels.Accounts;
+using DataAccessLibrary.Models.ViewModels.Accounts;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +11,9 @@ public interface IAccountReportingAccess
     Task<List<AccountsReportingModel>> GetLedgerData(string StrAccNo, DateTime DTFrom, DateTime DTTo);
     Task<decimal> GetAccountOpeningBalance(string strAccNo, DateTime DT);
     Task<List<AccountsReportingModel>> GetTransactionData(DateTime DTFrom, DateTime DTTo, string StrCond);
+    Task<ChequeDetailModel> GetChequeDetails(string vchrNo, string chqNo);
+    Task InsertBalanceTag(double sNo, string userName);
+    Task RemoveBalanceTag(double sNo);
     Task<List<AccountsReportingModel>> GetVoucherData(string StrVchrNo);
     Task<List<BOD_Meeting_Payment_List_ViewModel>> GetBODMeetingPaymentList(DateTime DTFrom, DateTime DTTo, int iStatus = 3, int iBankID = 0);
     Task<List<BOD_Meeting_Payment_Detail_ViewModel>> GetBODMeetingPaymentDetail(int EntryID);

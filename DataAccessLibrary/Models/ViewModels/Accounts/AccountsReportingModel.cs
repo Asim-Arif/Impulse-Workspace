@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,6 +8,9 @@ namespace DataAccessLibrary.Models.ViewModels.Accounts
 {
     public class AccountsReportingModel
     {
+        public double SNo { get; set; }
+        public string BalanceTag_UserName { get; set; }
+        public DateTime? BalanceTag_DTEntry { get; set; }
         public string AccNo { get; set; }
         public string AccTitle { get; set; }
         public DateTime DTFrom { get; set; }
@@ -33,6 +36,8 @@ namespace DataAccessLibrary.Models.ViewModels.Accounts
         public string VoucherType { get; set; }
         public string ChqType { get; set; }
         public string DeleteReason { get; set; }
+        public string Handed_Over_To { get; set; }
+        public string Payee { get; set; }
 
     }
 }
