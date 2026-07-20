@@ -252,7 +252,7 @@ namespace Impulse.Pages.Accounts
                 //successMessage = string.Empty;
                 //StateHasChanged(); // Update UI
 
-                ResetForm();
+                await ResetForm();
                 
                 //VoucherLineList.Clear();
                 isSaving = false;
@@ -281,9 +281,9 @@ namespace Impulse.Pages.Accounts
         }
 
         // RESET FORM AFTER SAVE DATA INTO DATABASE
-        private void ResetForm()
+        private async Task ResetForm()
         {
-            InitializeData();
+            await InitializeData();
             //Following 4 lines are used to clear fileinput
             bClearInputFile = true;
             StateHasChanged();

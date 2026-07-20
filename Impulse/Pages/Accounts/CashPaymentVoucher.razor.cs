@@ -1,4 +1,4 @@
-﻿using DataAccessLibrary.Models.ViewModels.Accounts;
+using DataAccessLibrary.Models.ViewModels.Accounts;
 using DataAccessLibrary.Models.ViewModels;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
@@ -14,14 +14,10 @@ namespace Impulse.Pages.Accounts
         private string strUserName = string.Empty;
         private string strCashInHandParent=string.Empty;
         private VoucherViewModel voucherViewModel = new VoucherViewModel();
-        private float fTaxRate=0;
-        private float fTaxAmount = 0;
         private string VoucherNo { get; set; }
         private bool bClearInputFile = false;        
-        private bool EnableCostCenter = false;
         private string successMessage = string.Empty;
         private bool isError = false;
-        private bool showTaxModal = false;
         private string myFileExtension = string.Empty;
         private bool isSaving = false;
         private DateTime selectedDate = DateTime.Today;
@@ -31,12 +27,9 @@ namespace Impulse.Pages.Accounts
         
         private List<ChartOfAccountsModel> cashAccounts = new List<ChartOfAccountsModel>();
         private List<ChartOfAccountsModel> Accounts = new List<ChartOfAccountsModel>();
-        private List<GenericDropDownModel> CostCenters = new List<GenericDropDownModel>();
-        private List<GenericDropDownModel> TaxHeadTypes = new List<GenericDropDownModel>();
         
         private ChartOfAccountsModel? SelectedCashAccount = null;
         private ChartOfAccountsModel? SelectedAccount = null;        
-        private GenericDropDownModel? SelectedCostCenter = null;
 
         private VoucherLineItemViewModel newVoucherLine = new VoucherLineItemViewModel();
         private string validationMessage = string.Empty;
@@ -63,8 +56,6 @@ namespace Impulse.Pages.Accounts
                 SelectedCashAccount = cashAccounts.FirstOrDefault(p => p.AccTitle == "Petty Cash") ?? cashAccounts.First();
                 await SelectedResultChanged_CashAccounts(SelectedCashAccount);
             }
-            CostCenters = await _voucherService.GetValuesForDropDown("CostCenters", "EntryID", "CostCenter", " ORDER BY CostCenter");
-            TaxHeadTypes = await _voucherService.GetValuesForDropDown("EnumValues", "EnumValue", "EnumDescription", " WHERE EnumName='Voucher_Tax_Head_Type' ORDER BY EnumValue");
             
         }
         // This method handles the timer expiration
@@ -126,12 +117,12 @@ namespace Impulse.Pages.Accounts
             
             //strCashBalance = string.Empty;
             voucherViewModel.LineItems.Clear();
-            SelectedCostCenter = null;
             dDebitCreditDifference = 0;
             //SelectedCashAccount = null;
             /*voucherViewModel.ChequeDetails.Description=string.Empty;
-            voucherViewModel.Notes = string.Empty;
             voucherViewModel.ChequeDetails.Payee=string.Empty;*/
+            voucherViewModel.Notes = string.Empty;
+            voucherViewModel.Handed_Over_To = string.Empty;
             
             // Later i'll change amount & get from GD            
             await GetNextVoucherNo(voucherViewModel.DT);            
@@ -150,15 +141,6 @@ namespace Impulse.Pages.Accounts
                 //validationMessage = "Please Select Account";
                 NotificationServiceManager.ShowError("Please select Account No.", "You need to select account from the drop-down.");
                 return;
-            }
-            if (EnableCostCenter && SelectedCostCenter == null)
-            {
-                NotificationServiceManager.ShowError("Please select Cost Center", "You need to select cost center from the drop-down.");
-                return;
-            }
-            if (EnableCostCenter == false) 
-            {
-                
             }
             if (string.IsNullOrEmpty(newVoucherLine.Description)) 
             {
@@ -186,8 +168,8 @@ namespace Impulse.Pages.Accounts
                 AccNo = SelectedAccount.AccNo,
                 AccTitle = SelectedAccount.AccTitle,
                 Description = newVoucherLine.Description,
-                CS_RefID = int.Parse(SelectedCostCenter?.DropDownValue_ID ?? "0"),
-                CS_Description = SelectedCostCenter?.DropDownValue_Description ?? "",
+                CS_RefID = 0,
+                CS_Description = "",
                 Debit = newVoucherLine.Debit,
                 Credit = newVoucherLine.Credit
             };
@@ -202,12 +184,9 @@ namespace Impulse.Pages.Accounts
             newVoucherLine.Debit = 0;
             newVoucherLine.Credit = 0;
 
-            // flight no should not b blank after adding entry into list
-            //SelectedFlightNo.FlightNo = string.Empty;
-            //SelectedAccount.AccTitle = string.Empty;
+            // SelectedFlightNo.FlightNo = string.Empty;
+            // SelectedAccount.AccTitle = string.Empty;
             SelectedAccount = null;
-            if (SelectedCostCenter != null)
-                SelectedCostCenter = null;
 
             // Clear the validation message
             validationMessage = string.Empty;
@@ -246,9 +225,9 @@ namespace Impulse.Pages.Accounts
                     return;                    
                 }
                                 
-                if (string.IsNullOrEmpty(voucherViewModel.Payee))
+                if (string.IsNullOrEmpty(voucherViewModel.Handed_Over_To))
                 {
-                    NotificationServiceManager.ShowWarning("Error", "Please enter Payee.");
+                    NotificationServiceManager.ShowWarning("Error", "Please enter Handed over to.");
                     return;
                 }                
                 if (string.IsNullOrEmpty(voucherViewModel.Notes))
@@ -287,7 +266,7 @@ namespace Impulse.Pages.Accounts
                 voucherViewModel.ChequeDetails.ClearanceDT = null;
 
                 voucherViewModel.ChequeDetails.ChqPrintingDone = false;
-                voucherViewModel.ChequeDetails.Vouchers_SNo = null;
+
 
                 voucherViewModel.Payee = voucherViewModel.ChequeDetails.Payee;*/
 
@@ -314,7 +293,7 @@ namespace Impulse.Pages.Accounts
                 //successMessage = string.Empty;
                 //StateHasChanged(); // Update UI
 
-                ResetForm();
+                await ResetForm();
                 
                 //VoucherLineList.Clear();
                 isSaving = false;
@@ -343,9 +322,9 @@ namespace Impulse.Pages.Accounts
         }
 
         // RESET FORM AFTER SAVE DATA INTO DATABASE
-        private void ResetForm()
+        private async Task ResetForm()
         {
-            InitializeData();
+            await InitializeData();
             //Following 4 lines are used to clear fileinput
             bClearInputFile = true;
             StateHasChanged();
@@ -356,7 +335,7 @@ namespace Impulse.Pages.Accounts
 
         private void GoToIndexPage()
         {
-            Navigation.NavigateTo("/Banks", true);
+            Navigation.NavigateTo("/financial", true);
         }
 
         private IBrowserFile selectedFile;
@@ -431,23 +410,8 @@ namespace Impulse.Pages.Accounts
                 StateHasChanged();
                 
             }
-            int iAccType = 0;
-            iAccType = int.Parse(SelectedAccount.AccNo.Substring(0, 2));
-            if (iAccType >= 31)
-                EnableCostCenter = true;
-            else
-                EnableCostCenter = false;
-            //newCIP.CardNo = SelectedCardNo.CardNo;
         }
-        private async Task<IEnumerable<GenericDropDownModel>> SearchCostCenter(string searchText)
-        {
-            return await Task.FromResult(CostCenters.Where(x => x.DropDownValue_Description.ToLower().Contains(searchText.ToLower())).ToList());
-        }
-        private void SelectedResultChanged_CostCenter(GenericDropDownModel? selectedCostCenter)
-        {
-            SelectedCostCenter = selectedCostCenter;
-        }
-        
+
         private string GetAlertClass()
         {
             // Use the isError flag to return the appropriate Bootstrap class
@@ -458,89 +422,6 @@ namespace Impulse.Pages.Accounts
         {
             // Provide a different title based on the outcome
             return isError ? "Error!" : "Success!";
-        }
-        
-
-        private async Task ToggleTaxModal()
-        {
-            if (showTaxModal == false) 
-            {
-                //before showing tax details check for following
-                foreach (var line in voucherViewModel.LineItems)
-                {
-                    string strAccNo=line.AccNo;
-                    if (strAccNo.Substring(0, 10) == "13-003-009") 
-                    {
-                        string strLast5 = strAccNo.Substring(strAccNo.Length - 5, 5);
-                        if (strLast5 != "16005" && strLast5 != "16027") 
-                        {
-                            //fTaxRate = await _idbHelperService.getSingleValueasync<float>("Tax_Per", "Accounts", " WHERE AccNo='" + line.AccNo + "'");
-                            fTaxRate = await _idbHelperService.GetSingleValueAsync<float>("Tax_Per", "Accounts", " WHERE AccNo='" + line.AccNo + "'");
-                            fTaxAmount = (float) line.Debit;
-                            break;
-                        }
-                    }
-                    if (strAccNo== "13-003-009-16005")
-                        fTaxAmount = (float)line.Debit;
-                }
-                showTaxModal = !showTaxModal;
-            }
-            else
-                showTaxModal = false;
-
-        }
-
-        private void SaveTaxDetails()
-        {
-            // 1. Perform client-side validation if necessary.
-            // (e.g., ensure TaxRate is > 0)
-
-            // 2. The data is already bound to voucherViewModel, so no assignment is needed.
-
-            // 3. Hide the modal
-            showTaxModal = false;
-        }
-        private void HandleTaxTypeChange(ChangeEventArgs e)
-        {
-            // 1. Update TaxType
-            if (int.TryParse(e.Value.ToString(), out int selectedTaxType))
-            {
-                voucherViewModel.TaxType = selectedTaxType;
-                //Tax Type Option Button are 1 based index.
-                if (voucherViewModel.TaxType == 1)  //Below Tax Limit..
-                {
-                    voucherViewModel.TaxRate = 0;
-                    voucherViewModel.TaxAmount = 0;
-                    voucherViewModel.HeadType = string.Empty;
-                    voucherViewModel.Reason = string.Empty;
-                }
-                else if (voucherViewModel.TaxType == 2)     //Tax Deduction
-                {
-                    voucherViewModel.TaxRate = fTaxRate;
-                    voucherViewModel.TaxAmount = (fTaxAmount* fTaxRate)/100;
-                    voucherViewModel.Reason = string.Empty;
-                }
-                else if (voucherViewModel.TaxType == 3)  //Tax Exempted
-                {
-                    voucherViewModel.TaxRate = 0;
-                    voucherViewModel.TaxAmount = 0;
-                    voucherViewModel.HeadType = string.Empty;
-                    voucherViewModel.Reason = string.Empty;
-                }
-                if (voucherViewModel.TaxType == 4) // 4 is for Tax Not Applicable
-                {
-                    voucherViewModel.TaxRate = 0;
-                    voucherViewModel.TaxAmount = 0;
-                    voucherViewModel.HeadType = string.Empty;
-                    voucherViewModel.Reason = "Not Applicable";
-                }
-                else if (voucherViewModel.TaxType != 4 && voucherViewModel.Reason == "Not Applicable")
-                {
-                    // If they switch to another option, clear the "Not Applicable" text 
-                    // so they can enter a real reason.
-                    voucherViewModel.Reason = string.Empty;
-                }
-            }
         }
 
     }

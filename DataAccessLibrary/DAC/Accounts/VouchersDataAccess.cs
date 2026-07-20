@@ -303,7 +303,7 @@ namespace DataAccessLibrary.DAC.Accounts
                         BankAccNo = voucher.ChequeDetails?.BankAccNo,
                         ChqBookNo = voucher.ChequeDetails?.ChqBookNo,
                         DueDate = voucher.DueDate,
-                        Handed_Over_To = voucher.EmpID
+                        Handed_Over_To = voucher.Handed_Over_To
                     },
                     commandType: CommandType.StoredProcedure,
                     transaction: transaction
@@ -486,8 +486,6 @@ namespace DataAccessLibrary.DAC.Accounts
                 return null;
             }
 
-            // Use Dapper's QuerySingleAsync to execute the SP and retrieve the single integer ID.
-            // Dapper maps the ChequeViewModel properties to the SP parameters.
             long CSNo = await db.QuerySingleAsync<long>(
                 "dbo.InsertChequeDetails_SP",
                 chequeDetails,

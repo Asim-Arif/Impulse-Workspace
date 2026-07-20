@@ -14,12 +14,14 @@ namespace DataAccessLibrary.DAC.Accounts
     {
         private readonly string _connectionString;
         private readonly ILogger<CustomInvoiceAuthDataAccess> _logger;
+        private readonly IVouchersDataAccess _vouchersDataAccess;
 
-        public CustomInvoiceAuthDataAccess(IConfiguration configuration, ILogger<CustomInvoiceAuthDataAccess> logger)
+        public CustomInvoiceAuthDataAccess(IConfiguration configuration, ILogger<CustomInvoiceAuthDataAccess> logger, IVouchersDataAccess vouchersDataAccess)
         {
             _connectionString = configuration.GetConnectionString("DefaultConnection")
                             ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
             _logger = logger;
+            _vouchersDataAccess = vouchersDataAccess;
         }
 
         // Legacy: cmbCust.AddVals(con, "Distinct CustCode", "ForeignCustomers", "CustCode")
@@ -146,26 +148,39 @@ namespace DataAccessLibrary.DAC.Accounts
             }
 
             DateTime dated = request.VoucherDate.Date;  // DTVchr
-            long iNextSno = await GetNextSNoAsync(db, transaction, dated);
-            string vchrNo = await db.QueryFirstOrDefaultAsync<string>(
-                "SELECT [dbo].[GetNextVchrNo](@DT,@VchrType)",
-                new { DT = dated, VchrType = "JV" }, transaction) ?? string.Empty;
+            string vchrNo = await _vouchersDataAccess.GetNextVchrNo(dated, "JV");
 
             // Legacy description: InvNo,Amt @ Rate,Customer Country
             string theDesc = BuildVoucherDescription(item);
 
-            // Charge to Foreign Sales Account ... full amount (Credit entry)
-            string accNo = request.SalesAccNo;
-            double bal = await GetBalanceAsync(db, transaction, accNo, dated);
-            bal -= dAmt;
-            await InsertVoucherLineAsync(db, transaction, iNextSno, dated, vchrNo, accNo, theDesc, 0, dAmt, bal);
-            await AdjustLedgerAsync(db, transaction, accNo, dated, iNextSno, -dAmt);
+            long sNo = await _vouchersDataAccess.GetNextSNo(dated, "Vouchers", db, transaction);
 
-            iNextSno++;
+            var voucher = new VoucherViewModel
+            {
+                VchrNo = vchrNo,
+                DT = dated,
+                Notes = theDesc,
+                UserName = request.UserName,
+                MachineName = request.MachineName,
+                PostedThroughJVForm = false
+            };
+
+            // Charge to Foreign Sales Account ... full amount (Credit entry)
+            voucher.LineItems.Add(new VoucherLineItemViewModel
+            {
+                SNo = sNo++,
+                VDate = dated,
+                VchrNo = vchrNo,
+                AccNo = request.SalesAccNo,
+                AccTitle = string.Empty,
+                Description = theDesc,
+                Debit = 0,
+                Credit = (decimal)dAmt,
+                Balance = 0,
+                CSNo = 0
+            });
 
             // Charge to Customer Account ... amount depends on advance postings against the invoice (Debit entry)
-            accNo = item.AccNo;
-            bal = await GetBalanceAsync(db, transaction, accNo, dated);
             double dCustomerAmt;
             if (dTotalAdvAmt == 0)
             {
@@ -177,9 +192,20 @@ namespace DataAccessLibrary.DAC.Accounts
                 dCustomerAmt += dTotalAdvAmtPK;
                 dCustomerAmt = Math.Round(dCustomerAmt);
             }
-            bal += dCustomerAmt;
-            await InsertVoucherLineAsync(db, transaction, iNextSno, dated, vchrNo, accNo, theDesc, dCustomerAmt, 0, bal);
-            await AdjustLedgerAsync(db, transaction, accNo, dated, iNextSno, dCustomerAmt);
+            
+            voucher.LineItems.Add(new VoucherLineItemViewModel
+            {
+                SNo = sNo++,
+                VDate = dated,
+                VchrNo = vchrNo,
+                AccNo = item.AccNo,
+                AccTitle = string.Empty,
+                Description = theDesc,
+                Debit = (decimal)dCustomerAmt,
+                Credit = 0,
+                Balance = 0,
+                CSNo = 0
+            });
 
             // Foreign exchange gain/loss when advances were involved
             if (dTotalAdvAmt != 0)
@@ -199,19 +225,25 @@ namespace DataAccessLibrary.DAC.Accounts
                 {
                     dGLCreditAmt = Math.Round(dGLCreditAmt);
                     dGLDebitAmt = Math.Round(dGLDebitAmt);
-                    bal = await GetBalanceAsync(db, transaction, request.ExchDiffAccNo, dated);
-                    bal += dGLDebitAmt - dGLCreditAmt;
 
-                    iNextSno++;
-                    await InsertVoucherLineAsync(db, transaction, iNextSno, dated, vchrNo, request.ExchDiffAccNo, theDesc, dGLDebitAmt, dGLCreditAmt, bal);
-                    await AdjustLedgerAsync(db, transaction, request.ExchDiffAccNo, dated, iNextSno, dGLDebitAmt - dGLCreditAmt);
+                    voucher.LineItems.Add(new VoucherLineItemViewModel
+                    {
+                        SNo = sNo++,
+                        VDate = dated,
+                        VchrNo = vchrNo,
+                        AccNo = request.ExchDiffAccNo,
+                        AccTitle = string.Empty,
+                        Description = theDesc,
+                        Debit = (decimal)dGLDebitAmt,
+                        Credit = (decimal)dGLCreditAmt,
+                        Balance = 0,
+                        CSNo = 0
+                    });
                 }
             }
 
-            // Legacy: GetServerDate(True) is the server date with time -> GETDATE()
-            await db.ExecuteAsync(
-                "INSERT INTO VoucherInfo(VchrNo,UserName,MachineName,DT) VALUES(@VchrNo,@UserName,@MachineName,GETDATE())",
-                new { VchrNo = vchrNo, request.UserName, request.MachineName }, transaction);
+            // Save the voucher using the centralized method
+            await _vouchersDataAccess.ExecuteVoucherSave(voucher, db, transaction);
 
             return vchrNo;
         }
@@ -222,55 +254,6 @@ namespace DataAccessLibrary.DAC.Accounts
             string amtF = item.TotalCustomAmt.ToString("0.##", CultureInfo.InvariantCulture);
             string rate = item.ExchRate.ToString("0.##", CultureInfo.InvariantCulture);
             return $"{item.CustomInvoice},{item.Curr} {amtF} @ {rate},{item.CustCode} {item.Country}";
-        }
-
-        // Direct port of the legacy getNextSno() function (Vouchers table, per voucher date)
-        private async Task<long> GetNextSNoAsync(IDbConnection db, IDbTransaction transaction, DateTime onDate)
-        {
-            long? maxSNo = await db.QueryFirstOrDefaultAsync<long?>(
-                "SELECT MAX(SNo) AS MaxSNo FROM Vouchers WHERE VDate=@VDate",
-                new { VDate = onDate }, transaction);
-            if (maxSNo == null)
-                return long.Parse(onDate.ToString("yyMMdd") + "0001");
-            return (maxSNo ?? 1) + 1;
-        }
-
-        // Legacy getBalance() is mirrored by the dbo.GetBalance scalar function (same as VouchersDataAccess.GetBalance)
-        private async Task<double> GetBalanceAsync(IDbConnection db, IDbTransaction transaction, string accNo, DateTime onDate)
-        {
-            return await db.QueryFirstOrDefaultAsync<double>(
-                "SELECT [dbo].[GetBalance](@AccNo, @DT, @CurrentDT)",
-                new { AccNo = accNo, DT = onDate, CurrentDT = DateTime.Now }, transaction);
-        }
-
-        // Direct port of the legacy adjustLedger() sub (Vouchers.bas)
-        private async Task AdjustLedgerAsync(IDbConnection db, IDbTransaction transaction, string accNo, DateTime startDate, long sNo, double amountToAdd)
-        {
-            await db.ExecuteAsync(
-                "UPDATE Accounts SET Balance = Balance + @Amount WHERE AccNo = @AccNo",
-                new { Amount = amountToAdd, AccNo = accNo }, transaction);
-            await db.ExecuteAsync(
-                "UPDATE Vouchers SET Balance = Balance + @Amount WHERE AccNo = @AccNo AND (VDate >= @StartDate AND SNo > @SNo)",
-                new { Amount = amountToAdd, AccNo = accNo, StartDate = startDate, SNo = sNo }, transaction);
-        }
-
-        // Legacy: INSERT INTO Vouchers VALUES(SNo,Dated,VchrNo,AccNo,Desc,Debit,Credit,Bal,'',0)
-        private async Task InsertVoucherLineAsync(IDbConnection db, IDbTransaction transaction, long sNo, DateTime vDate, string vchrNo, string accNo, string description, double debit, double credit, double balance)
-        {
-            await db.ExecuteAsync(
-                @"INSERT INTO Vouchers(SNo,VDate,VchrNo,Accno,Description,Debit,Credit,balance,DpstSlip,CSNo)
-                  VALUES(@SNo,@VDate,@VchrNo,@Accno,@Description,@Debit,@Credit,@Balance,'',0)",
-                new
-                {
-                    SNo = sNo,
-                    VDate = vDate,
-                    VchrNo = vchrNo,
-                    Accno = accNo,
-                    Description = description,
-                    Debit = debit,
-                    Credit = credit,
-                    Balance = balance
-                }, transaction);
         }
     }
 }

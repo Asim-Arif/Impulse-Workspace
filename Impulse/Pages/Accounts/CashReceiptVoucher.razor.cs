@@ -1,4 +1,4 @@
-﻿using DataAccessLibrary.Models.ViewModels.Accounts;
+using DataAccessLibrary.Models.ViewModels.Accounts;
 using DataAccessLibrary.Models.ViewModels;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
@@ -18,7 +18,6 @@ namespace Impulse.Pages.Accounts
         private float fTaxAmount = 0;
         private string VoucherNo { get; set; }
         private bool bClearInputFile = false;        
-        private bool EnableCostCenter = false;
         private string successMessage = string.Empty;
         private bool isError = false;
         private bool showTaxModal = false;
@@ -31,12 +30,10 @@ namespace Impulse.Pages.Accounts
         
         private List<ChartOfAccountsModel> cashAccounts = new List<ChartOfAccountsModel>();
         private List<ChartOfAccountsModel> Accounts = new List<ChartOfAccountsModel>();
-        private List<GenericDropDownModel> CostCenters = new List<GenericDropDownModel>();
         private List<GenericDropDownModel> TaxHeadTypes = new List<GenericDropDownModel>();
         
         private ChartOfAccountsModel? SelectedCashAccount = null;
         private ChartOfAccountsModel? SelectedAccount = null;        
-        private GenericDropDownModel? SelectedCostCenter = null;
 
         private VoucherLineItemViewModel newVoucherLine = new VoucherLineItemViewModel();
         private string validationMessage = string.Empty;
@@ -61,7 +58,6 @@ namespace Impulse.Pages.Accounts
             //    SelectedCashAccount = cashAccounts.FirstOrDefault(p => p.AccTitle == "Petty Cash") ?? cashAccounts.First();
             //    await SelectedResultChanged_CashAccounts(SelectedCashAccount);
             //}
-            CostCenters = await _voucherService.GetValuesForDropDown("CostCenters", "EntryID", "CostCenter", " ORDER BY CostCenter");
             //TaxHeadTypes = await _voucherService.GetValuesForDropDown("EnumValues", "EnumValue", "EnumDescription", " WHERE EnumName='Voucher_Tax_Head_Type' ORDER BY EnumValue");
             
         }
@@ -126,7 +122,6 @@ namespace Impulse.Pages.Accounts
             voucherViewModel.Notes = string.Empty;
             voucherViewModel.Payee = string.Empty;
             voucherViewModel.LineItems.Clear();
-            SelectedCostCenter = null;
             dDebitCreditDifference = 0;
             //SelectedCashAccount = null;
             /*voucherViewModel.ChequeDetails.Description=string.Empty;
@@ -150,15 +145,6 @@ namespace Impulse.Pages.Accounts
                 //validationMessage = "Please Select Account";
                 NotificationServiceManager.ShowError("Please select Account No.", "You need to select account from the drop-down.");
                 return;
-            }
-            if (EnableCostCenter && SelectedCostCenter == null)
-            {
-                NotificationServiceManager.ShowError("Please select Cost Center", "You need to select cost center from the drop-down.");
-                return;
-            }
-            if (EnableCostCenter == false) 
-            {
-                
             }
             if (string.IsNullOrEmpty(newVoucherLine.Description)) 
             {
@@ -186,8 +172,8 @@ namespace Impulse.Pages.Accounts
                 AccNo = SelectedAccount.AccNo,
                 AccTitle = SelectedAccount.AccTitle,
                 Description = newVoucherLine.Description,
-                CS_RefID = int.Parse(SelectedCostCenter?.DropDownValue_ID ?? "0"),
-                CS_Description = SelectedCostCenter?.DropDownValue_Description ?? "",
+                CS_RefID = 0,
+                CS_Description = "",
                 Debit = newVoucherLine.Debit,
                 Credit = newVoucherLine.Credit
             };
@@ -202,12 +188,9 @@ namespace Impulse.Pages.Accounts
             newVoucherLine.Debit = 0;
             newVoucherLine.Credit = 0;
 
-            // flight no should not b blank after adding entry into list
-            //SelectedFlightNo.FlightNo = string.Empty;
-            //SelectedAccount.AccTitle = string.Empty;
+            // SelectedFlightNo.FlightNo = string.Empty;
+            // SelectedAccount.AccTitle = string.Empty;
             SelectedAccount = null;
-            if (SelectedCostCenter != null)
-                SelectedCostCenter = null;
 
             // Clear the validation message
             validationMessage = string.Empty;
@@ -240,11 +223,6 @@ namespace Impulse.Pages.Accounts
                     NotificationServiceManager.ShowWarning("Error", "No items added. Please add items before saving.");
                     return;
                 }                
-                if (SelectedCashAccount == null)
-                {
-                    NotificationServiceManager.ShowWarning("Error", "Please select Cash Account.");
-                    return;                    
-                }
                                 
                 if (string.IsNullOrEmpty(voucherViewModel.Payee))
                 {
@@ -287,7 +265,7 @@ namespace Impulse.Pages.Accounts
                 voucherViewModel.ChequeDetails.ClearanceDT = null;
 
                 voucherViewModel.ChequeDetails.ChqPrintingDone = false;
-                voucherViewModel.ChequeDetails.Vouchers_SNo = null;
+
 
                 voucherViewModel.Payee = voucherViewModel.ChequeDetails.Payee;*/
 
@@ -314,7 +292,7 @@ namespace Impulse.Pages.Accounts
                 //successMessage = string.Empty;
                 //StateHasChanged(); // Update UI
 
-                ResetForm();
+                await ResetForm();
                 
                 //VoucherLineList.Clear();
                 isSaving = false;
@@ -343,9 +321,9 @@ namespace Impulse.Pages.Accounts
         }
 
         // RESET FORM AFTER SAVE DATA INTO DATABASE
-        private void ResetForm()
+        private async Task ResetForm()
         {
-            InitializeData();
+            await InitializeData();
             //Following 4 lines are used to clear fileinput
             bClearInputFile = true;
             StateHasChanged();
@@ -356,7 +334,7 @@ namespace Impulse.Pages.Accounts
 
         private void GoToIndexPage()
         {
-            Navigation.NavigateTo("/Banks", true);
+            Navigation.NavigateTo("/financial", true);
         }
 
         private IBrowserFile selectedFile;
@@ -431,23 +409,8 @@ namespace Impulse.Pages.Accounts
                 StateHasChanged();
                 
             }
-            int iAccType = 0;
-            iAccType = int.Parse(SelectedAccount.AccNo.Substring(0, 2));
-            if (iAccType >= 31)
-                EnableCostCenter = true;
-            else
-                EnableCostCenter = false;
-            //newCIP.CardNo = SelectedCardNo.CardNo;
         }
-        private async Task<IEnumerable<GenericDropDownModel>> SearchCostCenter(string searchText)
-        {
-            return await Task.FromResult(CostCenters.Where(x => x.DropDownValue_Description.ToLower().Contains(searchText.ToLower())).ToList());
-        }
-        private void SelectedResultChanged_CostCenter(GenericDropDownModel? selectedCostCenter)
-        {
-            SelectedCostCenter = selectedCostCenter;
-        }
-        
+
         private string GetAlertClass()
         {
             // Use the isError flag to return the appropriate Bootstrap class

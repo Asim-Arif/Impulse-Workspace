@@ -1,4 +1,4 @@
-﻿using DataAccessLibrary.Models.ViewModels;
+using DataAccessLibrary.Models.ViewModels;
 using DataAccessLibrary.Models.ViewModels.Accounts;
 using Impulse.Services;
 using Microsoft.AspNetCore.Components;
@@ -215,8 +215,8 @@ namespace Impulse.Pages.Accounts
                 isError = false;
                 NotificationServiceManager.ShowSuccess("Saved", "Transaction saved successfully.");
                 
-                ResetForm();
-               
+                await ResetForm();
+                
                 isSaving = false;
             }
             catch (Exception ex)
@@ -235,27 +235,21 @@ namespace Impulse.Pages.Accounts
             }
         }
 
-        private void ResetForm()
+        private async Task ResetForm()
         {
-            InitializeData();
+            await InitializeData();
             bClearInputFile = true;
             voucherViewModel.DT = DateTime.Today;
             voucherViewModel.Remarks = string.Empty;
-            var voucher = new Vouchers_Main_Model
-            {
-                DT = DateTime.Now,
-                LineItems = new List<Vouchers_Detail_Model> { new Vouchers_Detail_Model() }
-            };
             StateHasChanged();
             if (newVoucherLine != null) 
             { 
-                //newVoucherLine = null;
                 voucherViewModel.LineItems = new List<Vouchers_Detail_Model>();
-                //voucherViewModel.LineItems.Add(new Vouchers_Detail_Model());
             }
             StateHasChanged();
             bClearInputFile = false;
             StateHasChanged();
+
         }
 
         private void GoToIndexPage()

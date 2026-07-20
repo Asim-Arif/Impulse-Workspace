@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -56,6 +56,7 @@ namespace DataAccessLibrary.Models.ViewModels.Accounts
         public int VendID { get; set; }
         public string EmpID { get; set; }
         public int PaymentToEmp {  get; set; }
+        public string Handed_Over_To { get; set; }
 
 
         public List<VoucherLineItemViewModel> LineItems { get; set; } = new List<VoucherLineItemViewModel>();
@@ -120,7 +121,6 @@ namespace DataAccessLibrary.Models.ViewModels.Accounts
         public string BankAccNo { get; set; }
         public DateTime? ClearanceDT { get; set; }
         public bool ChqPrintingDone { get; set; }
-        public double? Vouchers_SNo { get; set; }
 
     }
 

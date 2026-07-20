@@ -1,4 +1,4 @@
-﻿using DataAccessLibrary.Models.ViewModels.Accounts;
+using DataAccessLibrary.Models.ViewModels.Accounts;
 using DataAccessLibrary.Models.ViewModels;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
@@ -327,7 +327,7 @@ namespace Impulse.Pages.Accounts
                 voucherViewModel.ChequeDetails.ClearanceDT = null;
 
                 voucherViewModel.ChequeDetails.ChqPrintingDone = false;
-                voucherViewModel.ChequeDetails.Vouchers_SNo = null;
+
 
                 voucherViewModel.Payee = voucherViewModel.ChequeDetails.Payee;                
 
@@ -382,7 +382,7 @@ namespace Impulse.Pages.Accounts
                 //successMessage = string.Empty;
                 //StateHasChanged(); // Update UI
 
-                ResetForm();
+                await ResetForm();
                 
                 //VoucherLineList.Clear();
                 isSaving = false;
@@ -411,9 +411,9 @@ namespace Impulse.Pages.Accounts
         }
 
         // RESET FORM AFTER SAVE DATA INTO DATABASE
-        private void ResetForm()
+        private async Task ResetForm()
         {
-            InitializeData();
+            await InitializeData();
             //Following 4 lines are used to clear fileinput
             bClearInputFile = true;
             StateHasChanged();
