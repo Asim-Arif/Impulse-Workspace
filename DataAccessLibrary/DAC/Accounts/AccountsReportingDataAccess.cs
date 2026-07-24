@@ -376,6 +376,7 @@ public class AccountsReportingDataAccess : IAccountReportingAccess
                 var listdata = await db.QueryAsync<Trial_Balance_ViewModel>(
                 "Trial_Balance_SP",          // your stored procedure name
                 parameters,
+                commandTimeout: 180,
                 commandType: CommandType.StoredProcedure);
 
                 return listdata.ToList();                
@@ -385,6 +386,29 @@ public class AccountsReportingDataAccess : IAccountReportingAccess
         catch (Exception ex)
         {
             Console.WriteLine($"Error fetching trial balance data: {ex.Message}");
+            throw;
+        }
+    }
+    public async Task<List<Cash_Balance_Statement_ViewModel>> GetCashBalanceStatement()
+    {
+        try
+        {
+            using (IDbConnection db = new SqlConnection(_connectionString))
+            {
+                string cashInHandParent = await db.QueryFirstOrDefaultAsync<string>("SELECT DataValue FROM GeneralData WHERE DataName = 'CashInHandParent'");
+                if (string.IsNullOrEmpty(cashInHandParent))
+                {
+                    cashInHandParent = "15-001";
+                }
+
+                string sql = "SELECT AccNo, AccTitle, Balance FROM VActiveAccounts WHERE LEFT(AccNo, 6) = @cashInHandParent";
+                var listdata = await db.QueryAsync<Cash_Balance_Statement_ViewModel>(sql, new { cashInHandParent });
+                return listdata.ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching Cash Balance Statement Data: {ex.Message}");
             throw;
         }
     }
@@ -528,6 +552,133 @@ public class AccountsReportingDataAccess : IAccountReportingAccess
         catch (Exception ex)
         {
             Console.WriteLine($"Error fetching Leeter Dispatch Register: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task<List<Cash_Book_Report_ViewModel>> GetCashBookReport(DateTime dtFrom, DateTime dtTo)
+    {
+        try
+        {
+            using (IDbConnection db = new SqlConnection(_connectionString))
+            {
+                var parameters = new
+                {
+                    DTFrom = dtFrom,
+                    DTTo = dtTo
+                };
+
+                var listdata = await db.QueryAsync<Cash_Book_Report_ViewModel>(
+                    "CashBookReport_SP",
+                    parameters,
+                commandTimeout: 180,
+                commandType: CommandType.StoredProcedure);
+
+                return listdata.ToList();                
+
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching trial balance data: {ex.Message}");
+            throw;
+        }
+    }
+
+    public async Task PrepareExpenseReportDataAsync(DateTime dtStart)
+    {
+        try
+        {
+            using (IDbConnection db = new SqlConnection(_connectionString))
+            {
+                DateTime dtEnd = dtStart.AddMonths(6).AddDays(-1);
+                DateTime myDtEnd = dtStart.AddMonths(12).AddDays(-1);
+                DateTime dtPrevStart = dtStart.AddYears(-1);
+                DateTime dtPrevEnd = myDtEnd.AddYears(-1);
+
+                db.Open();
+                using (var transaction = db.BeginTransaction())
+                {
+                    await db.ExecuteAsync("DELETE FROM rptSaleHeaders", transaction: transaction);
+                    await db.ExecuteAsync("DELETE FROM rptSalePeriods", transaction: transaction);
+                    await db.ExecuteAsync("DELETE FROM rptSalePeriodsPrevious", transaction: transaction);
+
+                    // Build Periods list
+                    var periods = new List<string>();
+                    DateTime current = dtStart;
+                    while (current <= myDtEnd)
+                    {
+                        string p = current.ToString("MMM-yy");
+                        periods.Add(p);
+                        await db.ExecuteAsync("INSERT INTO rptSalePeriods(Period) VALUES(@p)", new { p }, transaction);
+                        current = current.AddMonths(1);
+                    }
+
+                    while (periods.Count < 12) periods.Add("");
+
+                    string insertHeader = $@"
+                        INSERT INTO rptSaleHeaders(Period1, Period2, Period3, Period4, Period5, Period6, Period7, Period8, Period9, Period10, Period11, Period12)
+                        VALUES('{periods[0]}', '{periods[1]}', '{periods[2]}', '{periods[3]}', '{periods[4]}', '{periods[5]}', 
+                               '{periods[6]}', '{periods[7]}', '{periods[8]}', '{periods[9]}', '{periods[10]}', '{periods[11]}')";
+                    await db.ExecuteAsync(insertHeader, transaction: transaction);
+
+                    current = dtPrevStart;
+                    while (current <= dtPrevEnd)
+                    {
+                        string p = current.ToString("MMM-yy");
+                        await db.ExecuteAsync("INSERT INTO rptSalePeriodsPrevious(Period) VALUES(@p)", new { p }, transaction);
+                        current = current.AddMonths(1);
+                    }
+
+                    long lRefID = await db.ExecuteScalarAsync<long>("SELECT ISNULL(MAX(EntryID), 1) FROM rptSaleHeaders", transaction: transaction);
+
+                    string pivotInsertSales = @"
+                        INSERT INTO rptSales (RefID, Customer, Period1, Period2, Period3, Period4, Period5, Period6, Period7, Period8, Period9, Period10, Period11, Period12)
+                        SELECT 
+                            @lRefID,
+                            AccNo,
+                            ISNULL([1],0) AS Period1, ISNULL([2],0) AS Period2, ISNULL([3],0) AS Period3, ISNULL([4],0) AS Period4, 
+                            ISNULL([5],0) AS Period5, ISNULL([6],0) AS Period6, ISNULL([7],0) AS Period7, ISNULL([8],0) AS Period8, 
+                            ISNULL([9],0) AS Period9, ISNULL([10],0) AS Period10, ISNULL([11],0) AS Period11, ISNULL([12],0) AS Period12
+                        FROM (
+                            SELECT AccNo, Amount, ROW_NUMBER() OVER(PARTITION BY AccNo ORDER BY SortID) as PeriodNum 
+                            FROM dbo.F_Expenses(@DTStart, @DTEnd)
+                        ) as SourceTable
+                        PIVOT (
+                            SUM(Amount)
+                            FOR PeriodNum IN ([1], [2], [3], [4], [5], [6], [7], [8], [9], [10], [11], [12])
+                        ) AS PivotTable
+                        WHERE TRY_CAST(Left(AccNo,2) AS INT) >= 31";
+
+                    await db.ExecuteAsync(pivotInsertSales, new { lRefID, DTStart = dtStart, DTEnd = dtEnd }, transaction: transaction);
+
+                    string pivotInsertSalesPrevious = @"
+                        INSERT INTO rptSalesPrevious (RefID, Customer, Period1, Period2, Period3, Period4, Period5, Period6, Period7, Period8, Period9, Period10, Period11, Period12)
+                        SELECT 
+                            @lRefID,
+                            AccNo,
+                            ISNULL([1],0) AS Period1, ISNULL([2],0) AS Period2, ISNULL([3],0) AS Period3, ISNULL([4],0) AS Period4, 
+                            ISNULL([5],0) AS Period5, ISNULL([6],0) AS Period6, ISNULL([7],0) AS Period7, ISNULL([8],0) AS Period8, 
+                            ISNULL([9],0) AS Period9, ISNULL([10],0) AS Period10, ISNULL([11],0) AS Period11, ISNULL([12],0) AS Period12
+                        FROM (
+                            SELECT AccNo, Amount, ROW_NUMBER() OVER(PARTITION BY AccNo ORDER BY SortID) as PeriodNum 
+                            FROM dbo.F_ExpensesPrevious(@DTPrevStart, @DTPrevEnd)
+                        ) as SourceTable
+                        PIVOT (
+                            SUM(Amount)
+                            FOR PeriodNum IN ([1], [2], [3], [4], [5], [6], [7], [8], [9], [10], [11], [12])
+                        ) AS PivotTable
+                        WHERE TRY_CAST(Left(AccNo,2) AS INT) >= 31";
+
+                    await db.ExecuteAsync(pivotInsertSalesPrevious, new { lRefID, DTPrevStart = dtPrevStart, DTPrevEnd = dtPrevEnd }, transaction: transaction);
+
+                    transaction.Commit();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error preparing expense report data: {ex.Message}");
             throw;
         }
     }

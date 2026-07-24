@@ -1,4 +1,4 @@
-﻿using DataAccessLibrary.Interface.Accounts;
+using DataAccessLibrary.Interface.Accounts;
 using DataAccessLibrary.Models.ViewModels;
 using DataAccessLibrary.Models.ViewModels.Accounts;
 using System.Data;
@@ -36,6 +36,10 @@ namespace Impulse.Services
         {
             return await _accountReportingAccess.GetBankBalanceStatement();
         }
+        public async Task<List<Cash_Balance_Statement_ViewModel>> GetCashBalanceStatement() 
+        {
+            return await _accountReportingAccess.GetCashBalanceStatement();
+        }
         public async Task<List<Cheque_Receiving_ViewModel>> GetChequeReceivingData(DateTime DTFrom, DateTime DTTo) 
         {
             return await _accountReportingAccess.GetChequeReceivingData(DTFrom,DTTo);
@@ -57,5 +61,19 @@ namespace Impulse.Services
             return await _accountReportingAccess.GetLetterDispatchData(DTFrom, DTTo);
         }
 
+        public async Task DeleteVoucher(AccountsReportingModel selectedvoucher, string strvoucherno, bool bDeleteForEdit)
+        {
+            await _accountReportingAccess.DeleteVoucher(selectedvoucher, strvoucherno, bDeleteForEdit);
+        }
+
+        public async Task PrepareExpenseReportDataAsync(DateTime dtStart)
+        {
+            await _accountReportingAccess.PrepareExpenseReportDataAsync(dtStart);
+        }
+
+        public async Task<List<Cash_Book_Report_ViewModel>> GetCashBookReport(DateTime dtFrom, DateTime dtTo)
+        {
+            return await _accountReportingAccess.GetCashBookReport(dtFrom, dtTo);
+        }
     }
 }

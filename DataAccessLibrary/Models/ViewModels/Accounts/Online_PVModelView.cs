@@ -1,4 +1,4 @@
-﻿using Microsoft.Identity.Client;
+using Microsoft.Identity.Client;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -285,6 +285,14 @@ namespace DataAccessLibrary.Models.ViewModels.Accounts
         };
         
     }
+    public class Cash_Balance_Statement_ViewModel
+    {
+        public string AccNo { set; get; }
+        public string AccTitle { set; get; }
+        public decimal Balance { get; set; }
+
+        public string RowClass => (Balance < 0) ? "table-warning-light" : "table-success-light";
+    }
     public class Bank_Balance_Statement_ViewModel
     {
         public string AccNo { set; get; }
@@ -370,8 +378,28 @@ namespace DataAccessLibrary.Models.ViewModels.Accounts
         public string Address { set; get; }
         public string CellNo { set; get; }
         public string CourierName { set; get; }
-        public string CourierNo { set; get; }
+        public string CourierNo { get; set; }
 
     }
+    public class Cash_Book_Report_ViewModel
+    {
+        public long SNo { get; set; }
+        public DateTime VDate { get; set; }
+        public string VchrNo { get; set; }
+        public string Accno { get; set; }
+        public string Description { get; set; }
+        public decimal Credit { get; set; }
+        public decimal Debit { get; set; }
+        public decimal balance { get; set; }
+        public string DpstSlip { get; set; }
+        public long CSNo { get; set; }
+        public string AccTitle { get; set; }
+        public decimal? CashBalance { get; set; }
+        public decimal? CashDebit { get; set; }
+        public decimal? CashCredit { get; set; }
+        public decimal OpeningBalance { get; set; }
+        public decimal ClosingBalance { get; set; }
 
+        public string RowClass => "";
+    }
 }

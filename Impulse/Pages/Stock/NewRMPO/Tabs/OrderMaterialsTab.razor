@@ -1,0 +1,321 @@
+@using DataAccessLibrary.Models.ViewModels.Stock
+@using Blazored.Typeahead
+
+<div class="row g-2 mb-3 mt-2 dropdown-row" style="position: relative !important; z-index: 10000 !important;">
+    <!-- First Row: Order No, Vendor, PO Type, Customer PO -->
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Order No</label>
+        <input type="text" class="form-control form-control-sm" @bind="Order.OrderNo" readonly placeholder="Auto-generated" />
+    </div>
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Select Vendor</label>
+        <BlazoredTypeahead SearchMethod="SearchVendors"
+                           @bind-Value="SelectedVendor"
+                           placeholder="Search Vendor..."
+                           class="w-100 blazored-typeahead"
+                           EnableDropDown="true"
+                           MaximumSuggestions="1000">
+            <SelectedTemplate Context="vendor">
+                @vendor.VendorName
+            </SelectedTemplate>
+            <ResultTemplate Context="vendor">
+                @vendor.VendorName
+            </ResultTemplate>
+        </BlazoredTypeahead>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">PO Type</label>
+        <select class="form-select form-select-sm" @bind="Order.POType" @bind:after="OnPOTypeChanged">
+            <option value="0">Normal</option>
+            <option value="1">Annealing (from stock)</option>
+            <option value="2">Annealing</option>
+            <option value="3">Male Grinding</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Customer PO No</label>
+        <input type="text" class="form-control form-control-sm" @bind="Order.CustomerPONo" />
+    </div>
+</div>
+
+<div class="row g-2 mb-3">
+    <!-- Second Row: Dates, Attn, Pay Terms, Dept, Req No -->
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Order Date</label>
+        <input type="date" class="form-control form-control-sm" @bind="Order.DT" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Delivery Date</label>
+        <input type="date" class="form-control form-control-sm" @bind="Order.DeliveryDT" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Attn Person</label>
+        <input type="text" class="form-control form-control-sm" @bind="Order.AttnPerson" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Payment Terms</label>
+        <input type="text" class="form-control form-control-sm" @bind="Order.PaymentTerms" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Department</label>
+        <input type="text" class="form-control form-control-sm" @bind="Order.Department" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Req No</label>
+        <input type="text" class="form-control form-control-sm" @bind="Order.ReqNo" />
+    </div>
+</div>
+
+<div class="row g-2 mb-3">
+    <div class="col-md-10">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Remarks</label>
+        <input type="text" class="form-control form-control-sm" @bind="Order.Remarks" />
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+        <div class="form-check form-switch mb-1">
+            <input class="form-check-input" type="checkbox" role="switch" id="urgentSwitch" @bind="Order.VeryUrgent" />
+            <label class="form-check-label fw-bold text-danger" for="urgentSwitch" style="font-size:0.8rem;">Very Urgent</label>
+        </div>
+    </div>
+</div>
+
+<div class="row g-2 mb-4">
+    <!-- Metadata Checkboxes -->
+    <div class="col-md-4">
+        <div class="d-flex align-items-center p-1 border rounded bg-white" style="height: 35px;">
+            <div class="form-check form-check-inline mb-0 me-2 ms-2 d-flex align-items-center">
+                <input class="form-check-input mt-0 me-1" type="checkbox" id="chkSteel" @bind="Order.SteelProvided">
+                <label class="form-check-label fw-bold text-dark mb-0 pt-1" for="chkSteel" style="font-size:0.8rem; cursor:pointer;">Steel</label>
+            </div>
+            <input type="text" class="form-control form-control-sm border-0 bg-light w-100" @bind="Order.SteelProvidedDescription" disabled="@(!Order.SteelProvided)" placeholder="Detail..." style="height: 25px; box-shadow: none;" />
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="d-flex align-items-center p-1 border rounded bg-white" style="height: 35px;">
+            <div class="form-check form-check-inline mb-0 me-2 ms-2 d-flex align-items-center">
+                <input class="form-check-input mt-0 me-1" type="checkbox" id="chkDrawing" @bind="Order.DrawingProvided">
+                <label class="form-check-label fw-bold text-dark mb-0 pt-1" for="chkDrawing" style="font-size:0.8rem; cursor:pointer;">Drawing</label>
+            </div>
+            <input type="text" class="form-control form-control-sm border-0 bg-light w-100" @bind="Order.DrawingProvidedDescription" disabled="@(!Order.DrawingProvided)" placeholder="Detail..." style="height: 25px; box-shadow: none;" />
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="d-flex align-items-center p-1 border rounded bg-white" style="height: 35px;">
+            <div class="form-check form-check-inline mb-0 me-2 ms-2 d-flex align-items-center">
+                <input class="form-check-input mt-0 me-1" type="checkbox" id="chkSample" @bind="Order.SampleProvided">
+                <label class="form-check-label fw-bold text-dark mb-0 pt-1" for="chkSample" style="font-size:0.8rem; cursor:pointer;">Sample</label>
+            </div>
+            <input type="text" class="form-control form-control-sm border-0 bg-light w-100" @bind="Order.SampleProvidedDescription" disabled="@(!Order.SampleProvided)" placeholder="Detail..." style="height: 25px; box-shadow: none;" />
+        </div>
+    </div>
+</div>
+
+<hr class="my-4" />
+<h6 class="fw-bold text-primary mb-3"><i class="fas fa-boxes me-2"></i>Add Order Materials</h6>
+
+<div class="row g-2 align-items-end mb-3 dropdown-row" style="position: relative !important; z-index: 9999 !important;">
+    <div class="col-md-4">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Select Material</label>
+        <BlazoredTypeahead SearchMethod="SearchMaterials"
+                           @bind-Value="SelectedMaterial"
+                           placeholder="Search Materials..."
+                           class="w-100 blazored-typeahead"
+                           EnableDropDown="true"
+                           MaximumSuggestions="1000">
+            <SelectedTemplate Context="mat">
+                @mat.RMName
+            </SelectedTemplate>
+            <ResultTemplate Context="mat">
+                @mat.RMName (@mat.Unit)
+            </ResultTemplate>
+        </BlazoredTypeahead>
+    </div>
+    
+
+    @if (Order.POType > 0)
+    {
+        <div class="col-md-3">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">For Material</label>
+            <BlazoredTypeahead SearchMethod="SearchMaterials"
+                               @bind-Value="SelectedForMaterial"
+                               placeholder="Search Material..."
+                               class="w-100 blazored-typeahead"
+                               EnableDropDown="true"
+                               MaximumSuggestions="1000">
+                <SelectedTemplate Context="mat">
+                    @mat.RMName
+                </SelectedTemplate>
+                <ResultTemplate Context="mat">
+                    @mat.RMName
+                </ResultTemplate>
+            </BlazoredTypeahead>
+        </div>
+    }
+
+    <div class="col-md-1">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Price</label>
+        <input type="number" class="form-control form-control-sm text-end" @bind="NewRate" step="0.01" />
+    </div>
+    <div class="col-md-1">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Quantity</label>
+        <input type="number" class="form-control form-control-sm text-end" @bind="NewQty" step="0.01" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Remarks</label>
+        <input type="text" class="form-control form-control-sm" @bind="NewItemRemarks" />
+    </div>
+    <div class="col-md-1">
+        <button class="btn btn-sm btn-primary w-100" style="height:35px;" @onclick="AddMaterial">
+            <i class="fas fa-plus-circle"></i> Add
+        </button>
+    </div>
+</div>
+
+<div class="row g-2 mb-3">
+    <div class="col-12">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="ccItemsCheck" @bind="ShowCCItems" @bind:after="OnShowCCItemsChanged" />
+            <label class="form-check-label fw-bold text-primary" for="ccItemsCheck" style="font-size:0.8rem;">
+                Show Company Catalog Items
+            </label>
+        </div>
+    </div>
+</div>
+
+<div class="table-wrapper table-responsive border rounded" style="max-height: 400px; overflow-y: auto; position: relative !important; z-index: 1 !important;">
+    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+        <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+            <tr>
+                <th style="width: 50px;">S No.</th>
+                <th>Material ID</th>
+                <th>Material Description</th>
+                <th>Material Type</th>
+                <th class="text-end">Price/Unit</th>
+                <th class="text-end">Order Qty</th>
+                <th class="text-end">Amount</th>
+                <th>Remarks</th>
+                <th class="text-center" style="width: 80px;">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Order.OrderDetails == null || !Order.OrderDetails.Any())
+            {
+                <tr>
+                    <td colspan="9" class="text-center text-muted py-4">No materials added to this order.</td>
+                </tr>
+            }
+            else
+            {
+                int index = 1;
+                foreach (var item in Order.OrderDetails)
+                {
+                    int currentIndex = index;
+                    bool isEditing = editingRowIndex == currentIndex;
+
+                    <tr class="@(isEditing ? "table-warning" : "")">
+                        <td>@currentIndex</td>
+                        <td>@item.RMID</td>
+                        <td>@item.RMName</td>
+                        <td>@item.RMType</td>
+                        <td class="text-end">
+                            @if (isEditing)
+                            {
+                                <input type="number" class="form-control form-control-sm text-end d-inline-block" style="width:80px;" @bind="item.Rate" />
+                            }
+                            else
+                            {
+                                @(item.Rate?.ToString("N2"))
+                            }
+                        </td>
+                        <td class="text-end">
+                            @if (isEditing)
+                            {
+                                <input type="number" class="form-control form-control-sm text-end d-inline-block" style="width:80px;" @bind="item.Qty" />
+                            }
+                            else
+                            {
+                                @(item.Qty?.ToString("N2"))
+                            }
+                        </td>
+                        <td class="text-end">
+                            @item.Amount.ToString("N2")
+                        </td>
+                        <td>
+                            @if (isEditing)
+                            {
+                                <input type="text" class="form-control form-control-sm" @bind="item.ItemRemarks" />
+                            }
+                            else
+                            {
+                                @item.ItemRemarks
+                            }
+                        </td>
+                        <td class="text-center">
+                            @if (isEditing)
+                            {
+                                <button class="btn btn-xs btn-success me-1" @onclick="() => SaveRow()" title="Save">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-xs btn-light border me-1" @onclick="() => EditRow(currentIndex)" title="Edit">
+                                    <i class="fas fa-pencil-alt text-primary"></i>
+                                </button>
+                                <button class="btn btn-xs btn-danger" @onclick="() => RemoveMaterial(item)" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            }
+                        </td>
+                    </tr>
+                    index++;
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+<style>
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        margin: 0 !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+    }
+    .blazored-typeahead__results {
+        z-index: 1050 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    .form-control-sm, .form-select-sm, .input-group-text, .btn-sm {
+        height: 35px !important;
+    }
+    .table-wrapper .form-control-sm {
+        height: 28px !important;
+        padding: 0.15rem 0.5rem !important;
+    }
+</style>

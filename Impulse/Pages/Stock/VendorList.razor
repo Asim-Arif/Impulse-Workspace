@@ -1,0 +1,201 @@
+@page "/vendorlist"
+@attribute [Authorize]
+@using Blazored.Typeahead
+@using BlazorContextMenu
+@using DataAccessLibrary.Models.ViewModels.Stock
+
+<PageTitle>Vendor List</PageTitle>
+
+<div class="container-fluid py-2 vendorlist-page" style="font-family: 'Outfit', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; min-height: 80vh;">
+        <div class="card-body pt-3">
+
+            <!-- ── Toolbar: Filters + Actions ── -->
+            <div class="row g-2 mb-3 align-items-end border-bottom pb-2">
+
+                <!-- Title -->
+                <div class="col-auto d-flex align-items-end pb-1 me-3">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-truck text-primary me-2"></i>
+                        Vendor List
+                    </h5>
+                </div>
+
+                <!-- Search -->
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Search Vendors</label>
+                    <input type="text" class="form-control form-control-sm" placeholder="Search by Maker No, Name..." value="@searchText" @oninput="OnSearchInput" />
+                </div>
+
+                <div class="col-auto d-flex align-items-center gap-3 pb-1 ms-auto">
+                    <!-- Show Inactive Switch -->
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="showInactiveCheck" checked="@showInactive" @onchange="OnShowInactiveChanged">
+                        <label class="form-check-label fw-bold text-secondary" style="font-size:0.85rem;" for="showInactiveCheck">Show Inactive Vendors</label>
+                    </div>
+
+                    <!-- Add New Button -->
+                    <button class="btn btn-primary btn-sm fw-bold px-3 shadow-sm" @onclick="AddNewVendor" style="border-radius:6px;">
+                        <i class="fas fa-plus me-1"></i> New Vendor
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Data Grid ── -->
+            <div class="row">
+                <div class="col-12">
+                    @if (isLoading)
+                    {
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2 fw-bold text-secondary">Loading vendors...</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive" style="max-height: calc(100vh - 220px); overflow-y: auto;">
+                            <table class="table table-hover table-sm align-middle" style="font-size: 0.85rem;">
+                                <thead class="table-light sticky-top">
+                                    <tr>
+                                        <th>Maker No</th>
+                                        <th>Vendor Name</th>
+                                        <th>Contact Person</th>
+                                        <th>Phone 1</th>
+                                        <th>Phone 2</th>
+                                        <th class="text-end">Balance</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (!filteredVendors.Any())
+                                    {
+                                        <tr>
+                                            <td colspan="7" class="text-center text-muted py-4">No vendors found matching your criteria.</td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var vendor in filteredVendors)
+                                        {
+                                            var isSelected = highlightedVendor?.VendID == vendor.VendID;
+                                            <ContextMenuTrigger WrapperTag="tr"
+                                                                MenuId="vendorContextMenu"
+                                                                Data="vendor"
+                                                                MouseButtonTrigger="MouseButtonTrigger.Right"
+                                                                style="cursor:pointer;"
+                                                                CssClass="@(isSelected ? "table-primary fw-semibold" : "")"
+                                                                @onclick="() => SelectVendor(vendor)"
+                                                                @ondblclick="() => EditVendor(vendor)">
+                                                <td class="font-monospace text-primary">@vendor.MakerNo</td>
+                                                <td>
+                                                    @vendor.VendorName
+                                                    @if (vendor.Inactive)
+                                                    {
+                                                        <span class="badge bg-secondary ms-1" style="font-size:0.65rem;">Inactive</span>
+                                                    }
+                                                </td>
+                                                <td>@vendor.ContactPerson</td>
+                                                <td>@vendor.Phone1</td>
+                                                <td>@vendor.Phone2</td>
+                                                <td class="text-end fw-bold">
+                                                    @{
+                                                        string formattedBalance = "-";
+                                                        if (vendor.CurrentBalance > 0)
+                                                        {
+                                                            formattedBalance = $"{vendor.CurrentBalance:N2} DR";
+                                                        }
+                                                        else if (vendor.CurrentBalance < 0)
+                                                        {
+                                                            formattedBalance = $"{Math.Abs(vendor.CurrentBalance):N2} CR";
+                                                        }
+                                                        else
+                                                        {
+                                                            formattedBalance = "0.00";
+                                                        }
+                                                    }
+                                                    @formattedBalance
+                                                </td>
+                                                <td>
+                                                    <div class="text-truncate" style="max-width: 200px;" title="@vendor.VendorDescription">
+                                                        @vendor.VendorDescription
+                                                    </div>
+                                                </td>
+                                            </ContextMenuTrigger>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<ContextMenu Id="vendorContextMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <div class="win11-section-header">Operations</div>
+    <Item class="win11-menu-item" OnClick="@OnEditVendorClick">
+        <i class="fas fa-edit fa-fw win11-icon"></i> Edit Vendor Information
+    </Item>
+    <Item class="win11-menu-item" OnClick="@OnToggleActiveClick">
+        <i class="fas fa-ban fa-fw win11-icon"></i> Make Active / Inactive
+    </Item>
+    
+    <div class="win11-section-header">Print</div>
+    <Item class="win11-menu-item" OnClick="@PrintVendorList">
+        <i class="fas fa-print fa-fw win11-icon"></i> Print Vendor List
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintVendorFileLabel">
+        <i class="fas fa-file-alt fa-fw win11-icon"></i> Print Vendor File Label
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintVendorProfile">
+        <i class="fas fa-user-circle fa-fw win11-icon"></i> Print Vendor Profile
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintVendorDetails">
+        <i class="fas fa-info-circle fa-fw win11-icon"></i> Print Vendor Details
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintVendorLabel">
+        <i class="fas fa-tag fa-fw win11-icon"></i> Print Vendor Label
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintVendorShippingLabel">
+        <i class="fas fa-truck-loading fa-fw win11-icon"></i> Print Vendor Shipping Label
+    </Item>
+</ContextMenu>
+
+<style>
+    /* Win11 Context Menu Styles */
+    .win11-section-header {
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #6c757d;
+        padding: 4px 12px;
+        margin-top: 4px;
+        margin-bottom: 2px;
+    }
+
+    .win11-menu-item {
+        font-size: 0.85rem !important;
+        padding: 6px 12px !important;
+        color: #333 !important;
+        display: flex !important;
+        align-items: center !important;
+        border-radius: 4px;
+        margin: 0 4px;
+    }
+
+    .win11-menu-item:hover {
+        background-color: #f0f0f0 !important;
+        color: #000 !important;
+    }
+
+    .win11-icon {
+        color: #555;
+        margin-right: 8px;
+        font-size: 0.9rem;
+    }
+</style>

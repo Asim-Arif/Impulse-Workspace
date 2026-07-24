@@ -1,0 +1,101 @@
+@using DataAccessLibrary.Models.ViewModels.Stock
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.ViewModels.Accounts
+
+<div class="row g-4 mt-2">
+    <div class="col-md-8 mx-auto">
+        <div class="card border-0 shadow-sm rounded-3">
+            <div class="card-header bg-light border-bottom fw-bold text-secondary py-2" style="font-size:0.85rem;">
+                <i class="fas fa-file-invoice-dollar text-primary me-2"></i> Account Mapping
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Sale Account</label>
+                        <BlazoredTypeahead SearchMethod="SearchSaleAccounts"
+                                           EnableDropDown="true"
+                                           Data="SaleAccounts"
+                                           TValue="ChartOfAccountsModel"
+                                           TItem="ChartOfAccountsModel"
+                                           Value="SelectedSaleAcc"
+                                           ValueChanged="OnSaleAccChanged"
+                                           ValueExpression="@(() => SelectedSaleAcc)"
+                                           Placeholder="Select Sale Account"
+                                           MaximumSuggestions="100">
+                            <SelectedTemplate Context="acc">
+                                @acc?.AccTitle (@acc?.AccNo)
+                            </SelectedTemplate>
+                            <ResultTemplate Context="acc">
+                                @acc.AccTitle <span class="text-muted" style="font-size:0.75rem;">(@acc.AccNo)</span>
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Sale Return Account</label>
+                        <BlazoredTypeahead SearchMethod="SearchSaleRAccounts"
+                                           EnableDropDown="true"
+                                           Data="SaleRAccounts"
+                                           TValue="ChartOfAccountsModel"
+                                           TItem="ChartOfAccountsModel"
+                                           Value="SelectedSaleRAcc"
+                                           ValueChanged="OnSaleRAccChanged"
+                                           ValueExpression="@(() => SelectedSaleRAcc)"
+                                           Placeholder="Select Sale Return Account"
+                                           MaximumSuggestions="100">
+                            <SelectedTemplate Context="acc">
+                                @acc?.AccTitle (@acc?.AccNo)
+                            </SelectedTemplate>
+                            <ResultTemplate Context="acc">
+                                @acc.AccTitle <span class="text-muted" style="font-size:0.75rem;">(@acc.AccNo)</span>
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Asset Account</label>
+                        <BlazoredTypeahead SearchMethod="SearchAssetAccounts"
+                                           EnableDropDown="true"
+                                           Data="AssetAccounts"
+                                           TValue="ChartOfAccountsModel"
+                                           TItem="ChartOfAccountsModel"
+                                           Value="SelectedAssetAcc"
+                                           ValueChanged="OnAssetAccChanged"
+                                           ValueExpression="@(() => SelectedAssetAcc)"
+                                           Placeholder="Select Asset Account"
+                                           MaximumSuggestions="100">
+                            <SelectedTemplate Context="acc">
+                                @acc?.AccTitle (@acc?.AccNo)
+                            </SelectedTemplate>
+                            <ResultTemplate Context="acc">
+                                @acc.AccTitle <span class="text-muted" style="font-size:0.75rem;">(@acc.AccNo)</span>
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Fix Blazored Typeahead height to match .form-control-sm */
+    .blazored-typeahead {
+        height: 31px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 29px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+</style>

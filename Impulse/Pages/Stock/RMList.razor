@@ -1,0 +1,364 @@
+@page "/rmlist"
+@page "/rmlist/{Sampling:bool}"
+@attribute [Authorize]
+@using Blazored.Typeahead
+@using BlazorContextMenu
+@using DataAccessLibrary.Models.ViewModels.Stock
+
+<PageTitle>Raw Materials</PageTitle>
+
+<div class="container-fluid py-2 rmlist-page" style="font-family: 'Outfit', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; min-height: 80vh;">
+        <div class="card-body pt-3">
+
+            <!-- ── Toolbar: Filters + Actions ── -->
+            <div class="row g-2 mb-3 align-items-end">
+
+                <!-- Title -->
+                <div class="col-auto d-flex align-items-end pb-1">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-boxes text-primary me-2"></i>
+                        @(Sampling ? "Sampling Raw Materials" : "Raw Materials")
+                    </h5>
+                </div>
+
+                <!-- Group Filter -->
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Group</label>
+                    <BlazoredTypeahead SearchMethod="SearchGroups"
+                                       EnableDropDown="true"
+                                       Data="groups"
+                                       TValue="RMGroupViewModel"
+                                       TItem="RMGroupViewModel"
+                                       Value="selectedGroup"
+                                       ValueChanged="OnGroupChanged"
+                                       ValueExpression="@(() => selectedGroup)"
+                                       Placeholder="All Groups"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="selectedG">
+                            @selectedG?.Description
+                        </SelectedTemplate>
+                        <ResultTemplate Context="g">
+                            @g.Description
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <!-- Used In Filter -->
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Used In (Item)</label>
+                    <BlazoredTypeahead SearchMethod="SearchUsedInItems"
+                                       EnableDropDown="true"
+                                       Data="usedInItems"
+                                       TValue="UsedInItemModel"
+                                       TItem="UsedInItemModel"
+                                       Value="selectedUsedIn"
+                                       ValueChanged="OnUsedInChanged"
+                                       ValueExpression="@(() => selectedUsedIn)"
+                                       Placeholder="All"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="selectedU">
+                            @selectedU?.ItemID
+                        </SelectedTemplate>
+                        <ResultTemplate Context="u">
+                            @u.ItemID
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <!-- Quick Jump To RM -->
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Go To Material</label>
+                    <BlazoredTypeahead SearchMethod="SearchRMLookup"
+                                       EnableDropDown="true"
+                                       Data="rmLookup"
+                                       TValue="RMLookupModel"
+                                       TItem="RMLookupModel"
+                                       Value="selectedLookup"
+                                       ValueChanged="OnLookupChanged"
+                                       ValueExpression="@(() => selectedLookup)"
+                                       Placeholder="Type code or name..."
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="selectedR">
+                            @selectedR?.DisplayText
+                        </SelectedTemplate>
+                        <ResultTemplate Context="r">
+                            @r.DisplayText
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <!-- Search -->
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Search</label>
+                    <input type="text" class="form-control form-control-sm" placeholder="Search code, name..." value="@searchText" @oninput="OnSearchInput" />
+                </div>
+
+                <!-- Switches -->
+                <div class="col-auto d-flex align-items-center gap-3 pb-1">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="showInactiveCheck" checked="@showInactive" @onchange="OnShowInactiveChanged">
+                        <label class="form-check-label text-dark-emphasis fw-semibold" for="showInactiveCheck" style="font-size:0.85rem;">Inactive</label>
+                    </div>
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="showPictureCheck" checked="@showPicture" @onchange="OnShowPictureChanged">
+                        <label class="form-check-label text-dark-emphasis fw-semibold" for="showPictureCheck" style="font-size:0.85rem;">Photo</label>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="col d-flex align-items-end justify-content-end gap-2 pb-1">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => RefreshList(null)" title="Refresh List">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" @onclick="OpenToolbarOptions" title="More Options">
+                        <i class="fas fa-ellipsis-v me-1"></i> Options
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- Selected item indicator -->
+            @if (highlightedItem != null)
+            {
+                <div class="mb-3">
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill">
+                        Selected: <strong>@highlightedItem.RMName</strong> (@highlightedItem.RMID1)
+                    </span>
+                </div>
+            }
+
+            <!-- ── Workspace Layout (Grid + Image Preview) ── -->
+            <div class="row g-3">
+                <div class="@(showPicture && !string.IsNullOrEmpty(rmPicBase64) ? "col-lg-9" : "col-12")">
+                    @if (isLoading)
+                    {
+                        <div class="d-flex align-items-center justify-content-center py-5">
+                            <div class="spinner-border text-primary me-2" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="text-secondary fw-semibold">Loading data...</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <ContextMenuProvider Id="rmContextMenuProvider">
+                            <div class="table-responsive border rounded-3" style="background:#fff; max-height: 60vh; overflow-y:auto;">
+                                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th>Code</th>
+                                            <th>Raw Material</th>
+                                            <th class="text-end">Stock</th>
+                                            <th class="text-end">Rate</th>
+                                            <th>Group</th>
+                                            <th>Unit</th>
+                                            <th>Weight/Length</th>
+                                            <th class="text-end">ReOrder</th>
+                                            <th class="text-end">Open POs</th>
+                                            <th class="text-end">Min</th>
+                                            <th class="text-end">Max</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (!pagedItems.Any())
+                                        {
+                                            <tr>
+                                                <td colspan="11" class="text-center text-muted py-4">No raw materials matched your filters.</td>
+                                            </tr>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var item in pagedItems)
+                                            {
+                                                var isSelected = highlightedItem?.RMID == item.RMID;
+                                                <ContextMenuTrigger WrapperTag="tr"
+                                                                    MenuId="rowContextMenu"
+                                                                    Data="item"
+                                                                    MouseButtonTrigger="MouseButtonTrigger.Right"
+                                                                    style="cursor:pointer;"
+                                                                    CssClass="@(isSelected ? "table-primary fw-semibold" : "")"
+                                                                    @onclick="() => SelectItem(item)"
+                                                                    @ondblclick="() => EditRM(item)">
+                                                    <td class="font-monospace text-primary">@item.RMID1</td>
+                                                    <td>
+                                                        <span style="color:@item.NameColorCss">
+                                                            @item.RMName @(item.RMSize.HasValue ? item.RMSize.Value.ToString("0.##") : "") @item.SizeUnit
+                                                        </span>
+                                                        @if (item.InActive)
+                                                        {
+                                                            <span class="badge bg-secondary ms-1" style="font-size:0.65rem;">Inactive</span>
+                                                        }
+                                                    </td>
+                                                    <td class="text-end fw-bold">@Math.Round(item.QtyInStock, 2)</td>
+                                                    <td class="text-end">@(item.Rate?.ToString("0.##"))</td>
+                                                    <td>@item.GroupName</td>
+                                                    <td>@item.Unit</td>
+                                                    <td>@item.Weight_Length</td>
+                                                    <td class="text-end @((item.ReorderPoint ?? 0) > item.QtyInStock ? "text-danger fw-bold" : "")">@(item.ReorderPoint?.ToString() ?? "")</td>
+                                                    <td class="text-end">@((item.OpenPOsQty ?? 0).ToString("0.##"))</td>
+                                                    <td class="text-end">@(item.MinLevel?.ToString("0.##"))</td>
+                                                    <td class="text-end">@(item.MaxLevel?.ToString("0.##"))</td>
+                                                </ContextMenuTrigger>
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </ContextMenuProvider>
+
+                        <!-- Paging Info & Controls + Totals -->
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <div class="text-muted" style="font-size: 0.85rem;">
+                                Articles: <strong>@totalCount</strong>
+                                <span class="ms-3">Total Value: <strong>@totalValue.ToString("#,##0.00")</strong></span>
+                                @if (totalCount > 0)
+                                {
+                                    <span class="ms-3">Showing @(((currentPage - 1) * pageSize) + 1) to @Math.Min(currentPage * pageSize, totalCount)</span>
+                                }
+                            </div>
+                            @if (totalPages > 1)
+                            {
+                                <nav aria-label="RM Page Navigation">
+                                    <ul class="pagination pagination-sm mb-0">
+                                        <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                                            <button class="page-link" @onclick="() => GoToPage(currentPage - 1)">Previous</button>
+                                        </li>
+                                        @for (int idx = 1; idx <= totalPages; idx++)
+                                        {
+                                            var pageNumber = idx;
+                                            <li class="page-item @(currentPage == pageNumber ? "active" : "")">
+                                                <button class="page-link" @onclick="() => GoToPage(pageNumber)">@pageNumber</button>
+                                            </li>
+                                        }
+                                        <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                                            <button class="page-link" @onclick="() => GoToPage(currentPage + 1)">Next</button>
+                                        </li>
+                                    </ul>
+                                </nav>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <!-- Product Preview image -->
+                @if (showPicture && !string.IsNullOrEmpty(rmPicBase64))
+                {
+                    <div class="col-lg-3">
+                        <div class="card border-0 shadow-sm text-center p-3" style="background:#fff;">
+                            <h6 class="fw-bold text-secondary mb-3">Material Photo</h6>
+                            <img src="data:image/jpeg;base64,@rmPicBase64" class="img-fluid rounded shadow-sm" style="max-height: 250px; object-fit: cover;" />
+                        </div>
+                    </div>
+                }
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ── BlazorContextMenu: Row Context Menu (Row-State Operations Only) ── -->
+<ContextMenu Id="rowContextMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <div class="win11-section-header">Operations</div>
+    <Item class="win11-menu-item" OnClick="@EditRM">
+        <i class="fas fa-edit fa-fw win11-icon"></i> Edit This Raw Material
+    </Item>
+    <Item class="win11-menu-item" OnClick="@ToggleActive">
+        <i class="fas fa-ban fa-fw win11-icon"></i> Make Active / Inactive
+    </Item>
+    <Item class="win11-menu-item" OnClick="@AddNewRMCopy">
+        <i class="fas fa-copy fa-fw win11-icon"></i> Add New RM (Copy)
+    </Item>
+    <Item class="win11-menu-item" OnClick="@ViewStockHistory">
+        <i class="fas fa-history fa-fw win11-icon"></i> Stock History
+    </Item>
+    <Item class="win11-menu-item" OnClick="@NewPurchaseOrder">
+        <i class="fas fa-shopping-cart fa-fw win11-icon"></i> New Purchase Order
+    </Item>
+    <div class="win11-section-header">Print</div>
+    <Item class="win11-menu-item" OnClick="@PrintSpecification">
+        <i class="fas fa-file-lines fa-fw win11-icon"></i> Print Specification
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintDetails">
+        <i class="fas fa-file-alt fa-fw win11-icon"></i> Print Details
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintLabel">
+        <i class="fas fa-tag fa-fw win11-icon"></i> Print Label
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintRLabel">
+        <i class="fas fa-tags fa-fw win11-icon"></i> Print R-Label
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintBarcode">
+        <i class="fas fa-barcode fa-fw win11-icon"></i> Print Barcode
+    </Item>
+    <div class="win11-section-header">Danger Zone</div>
+    <Item class="win11-menu-item" OnClick="@DeleteRM">
+        <i class="fas fa-trash fa-fw win11-icon"></i> Delete Raw Material
+    </Item>
+</ContextMenu>
+
+<!-- ── BlazorContextMenu: Toolbar Options Menu (Global Actions + Reports) ── -->
+<ContextMenu Id="optionsBarMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <div class="win11-section-header">Actions</div>
+    <Item class="win11-menu-item" OnClick="@NewRM">
+        <i class="fas fa-plus fa-fw win11-icon"></i> New Raw Material
+    </Item>
+    <Item class="win11-menu-item" OnClick="@NewCategory">
+        <i class="fas fa-layer-group fa-fw win11-icon"></i> Raw Material Groups
+    </Item>
+    <Item class="win11-menu-item" OnClick="@ShowAll">
+        <i class="fas fa-list fa-fw win11-icon"></i> Show All (Incl. Inactive)
+    </Item>
+    <Item class="win11-menu-item" OnClick="@RefreshList">
+        <i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh
+    </Item>
+    <div class="win11-section-header">Reports</div>
+    <Item class="win11-menu-item" OnClick="@PrintRMList">
+        <i class="fas fa-print fa-fw win11-icon"></i> Print RM List
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintNonZero">
+        <i class="fas fa-table fa-fw win11-icon"></i> Print Non-Zero Stock
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintBelowMin">
+        <i class="fas fa-arrow-down fa-fw win11-icon"></i> Print Below Min Level
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintAboveMax">
+        <i class="fas fa-arrow-up fa-fw win11-icon"></i> Print Above Max Level
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintListWithValue">
+        <i class="fas fa-dollar-sign fa-fw win11-icon"></i> Print List With Value
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintListWithUsedIn">
+        <i class="fas fa-link fa-fw win11-icon"></i> Print List With Used-In
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintListCrossNo">
+        <i class="fas fa-hashtag fa-fw win11-icon"></i> Print List Cross No
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintCrossReference">
+        <i class="fas fa-random fa-fw win11-icon"></i> Print Cross Reference
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintRackwise">
+        <i class="fas fa-boxes-stacked fa-fw win11-icon"></i> Print Rackwise
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintRateHistory">
+        <i class="fas fa-chart-line fa-fw win11-icon"></i> Print Rate History
+    </Item>
+</ContextMenu>
+
+<style>
+    /* Keep typeaheads aligned with .form-control-sm (Agents.md §11) */
+    .rmlist-page .blazored-typeahead__controls {
+        min-height: 31px !important;
+        height: 31px;
+    }
+
+    .rmlist-page .form-control-sm {
+        height: 31px;
+    }
+
+    /* Prevent context menu cutoff */
+    #rowContextMenu, #optionsBarMenu {
+        max-height: 40vh;
+        overflow-y: auto;
+    }
+</style>

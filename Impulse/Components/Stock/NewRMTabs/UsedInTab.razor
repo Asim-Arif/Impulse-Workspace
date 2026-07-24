@@ -1,0 +1,109 @@
+@using DataAccessLibrary.Models.ViewModels.Stock
+@using DataAccessLibrary.Models.ViewModels.Company
+@using Blazored.Typeahead
+
+<div class="row g-3 mt-2">
+    <div class="col-md-10 mx-auto">
+        
+        <!-- Add Item Section -->
+        <div class="card border-0 shadow-sm rounded-3 mb-4 bg-light">
+            <div class="card-body py-3">
+                <div class="row align-items-end g-2">
+                    <div class="col-md-9">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Select Item</label>
+                        <BlazoredTypeahead SearchMethod="SearchItems"
+                                           EnableDropDown="true"
+                                           Data="AvailableItems"
+                                           TValue="ItemLookupModel"
+                                           TItem="ItemLookupModel"
+                                           Value="selectedItem"
+                                           ValueChanged="OnItemSelected"
+                                           ValueExpression="@(() => selectedItem)"
+                                           Placeholder="Search by Item ID or Name..."
+                                           MaximumSuggestions="100">
+                            <SelectedTemplate Context="itm">
+                                @itm?.ItemID - @itm?.ItemName
+                            </SelectedTemplate>
+                            <ResultTemplate Context="itm">
+                                <span class="fw-bold">@itm.ItemID</span> <span class="text-muted ms-2">@itm.ItemName</span>
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end pb-1" style="height: 31px;">
+                        <button type="button" class="btn btn-primary btn-sm w-100 shadow-sm" @onclick="AddItem">
+                            <i class="fas fa-plus me-1"></i> Add Item
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Grid Section -->
+        <div class="card border border-light-subtle rounded-3 overflow-hidden shadow-xs">
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th class="ps-3" style="width: 60px;">S #</th>
+                            <th style="width: 200px;">Item Code</th>
+                            <th>Item Name</th>
+                            <th class="text-center" style="width: 80px;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.UsedInItems != null && Model.UsedInItems.Any(x => !x.IsDeleted))
+                        {
+                            int index = 1;
+                            @foreach (var item in Model.UsedInItems.Where(x => !x.IsDeleted))
+                            {
+                                <tr>
+                                    <td class="ps-3 text-secondary">@(index++)</td>
+                                    <td class="fw-semibold">@item.ItemID</td>
+                                    <td>@item.ItemName</td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-outline-danger btn-xs py-0 px-2" style="font-size: 0.75rem;" @onclick="() => RemoveItem(item)" title="Remove Item">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-muted">
+                                    <i class="fas fa-link fa-2x mb-2 text-light"></i>
+                                    <p class="mb-0">No items linked. Add an item above.</p>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+    </div>
+</div>
+
+<style>
+    /* Fix Blazored Typeahead height to match .form-control-sm */
+    .blazored-typeahead {
+        height: 31px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 29px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    .btn-xs {
+        border-radius: 4px;
+    }
+</style>

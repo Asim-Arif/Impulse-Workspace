@@ -1,4 +1,4 @@
-﻿using BlazorBootstrap;
+using BlazorBootstrap;
 using BlazorContextMenu;
 using Impulse.Services.Integrations;
 using DataAccessLibrary;
@@ -53,11 +53,13 @@ namespace Impulse.Pages.Accounts
         private GenericDropDownModel? SelectedAccount = null;
 
         private List<Bank_Balance_Statement_ViewModel> ListToUse { get; set; }=new List<Bank_Balance_Statement_ViewModel>();
+        private List<Cash_Balance_Statement_ViewModel> CashBalanceList { get; set; } = new List<Cash_Balance_Statement_ViewModel>();
         private Trial_Balance_ViewModel SelectedRow =new Trial_Balance_ViewModel();
         //If it feels slow, could use filtered list to only filter once for all 6 totals like 
         //var filteredList = ListToUse.Where(x => x.EntryType == 0).ToList();
         //and then use filteredList to Sum
         private decimal TotalBankBalance => ListToUse?.Sum(x => x.Balance) ?? 0;
+        private decimal TotalCashBalance => CashBalanceList?.Sum(x => x.Balance) ?? 0;
         
         private DateTime DTFrom { get; set; } = DateTime.Now;
         private DateTime DTTo { get; set; } = DateTime.Now;
@@ -106,6 +108,8 @@ namespace Impulse.Pages.Accounts
                 var listtouse = await AccountReportingAccessService.GetBankBalanceStatement();
                 ListToUse = listtouse.ToList();                
                 
+                var cashlist = await AccountReportingAccessService.GetCashBalanceStatement();
+                CashBalanceList = cashlist.ToList();
 
                 StateHasChanged();
 

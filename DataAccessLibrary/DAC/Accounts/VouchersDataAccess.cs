@@ -241,8 +241,7 @@ namespace DataAccessLibrary.DAC.Accounts
         {
             // 1. Build the condition
             // We use WITH (UPDLOCK) to prevent another user from grabbing this same cheque number 
-            // before we finish our transaction.
-            string sql = @"SELECT TOP 1 ChqNo FROM VChqList WITH (UPDLOCK, HOLDLOCK) WHERE AccNo = @AccNo AND CAST(ChqNo AS NUMERIC) > @LastChq AND Issued = 0 AND Chq_Type = @ChqType";
+            string sql = @"SELECT TOP 1 ChqNo FROM VChqList WITH (UPDLOCK, HOLDLOCK) WHERE AccNo = @AccNo AND CAST(ChqNo AS NUMERIC) > @LastChq AND Issued = 0";
 
             if (chqBookNo > 0)
             {

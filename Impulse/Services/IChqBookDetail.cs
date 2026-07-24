@@ -1,4 +1,4 @@
-﻿using DataAccessLibrary.Models.ViewModels.Accounts;
+using DataAccessLibrary.Models.ViewModels.Accounts;
 using DataAccessLibrary.Models.ViewModels;
 
 namespace Impulse.Services
@@ -14,5 +14,6 @@ namespace Impulse.Services
         Task<bool> SaveOverDraftData(BankAccountInfo bankaccount, string StrBankAccNo, bool bdefaultbank);
         Task<List<ChqListModel>> GetChqBookChequesList(long chqbookno);
         Task<bool> ChangeChqStatus(ChqListModel chqs, string chqno, double sno, int iType, long INextSno);
+        Task<bool> UpdateChequeClearanceDate(long sno, DateTime? clearanceDate);
     }
 }

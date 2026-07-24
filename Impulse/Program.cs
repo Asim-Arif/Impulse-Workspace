@@ -115,6 +115,19 @@ builder.Services.AddScoped<ICustomInvoiceAuthDataAccess, CustomInvoiceAuthDataAc
 builder.Services.AddScoped<ICustomInvoiceAuthService, CustomInvoiceAuthService>();
 builder.Services.AddScoped<IEmployeeDataAccess, EmployeeDataAccess>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
+builder.Services.AddScoped<IAccountReportingAccessService, AccountReportingAccessService>();
+
+//Stock Module Registrations
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IVendorRMAssignmentDataAccess, DataAccessLibrary.DAC.Stock.VendorRMAssignmentDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IVendorRMAssignmentService, Impulse.Services.Stock.VendorRMAssignmentService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IRMGroupsDataAccess, DataAccessLibrary.DAC.Stock.RMGroupsDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IRMGroupsService, Impulse.Services.Stock.RMGroupsService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.INewRMDataAccess, DataAccessLibrary.DAC.Stock.NewRMDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.INewRMService, Impulse.Services.Stock.NewRMService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.INewVendorDataAccess, DataAccessLibrary.DAC.Stock.NewVendorDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.INewVendorService, Impulse.Services.Stock.NewVendorService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IVendOrderDataAccess, DataAccessLibrary.DAC.Stock.VendOrderDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IVendOrderService, Impulse.Services.Stock.VendOrderService>();
 builder.Services.AddScoped<IDepartmentDataAccess, DepartmentDataAccess>();
 builder.Services.AddScoped<IDepartmentService, DepartmentService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Company.IItemDataAccess, DataAccessLibrary.DAC.Company.ItemDataAccess>();
@@ -123,6 +136,7 @@ builder.Services.AddScoped<DataAccessLibrary.Interface.Company.ICustomerCatalogD
 builder.Services.AddScoped<Impulse.Services.Company.ICustomerCatalogService, Impulse.Services.Company.CustomerCatalogService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Company.IItemGroupsDataAccess, DataAccessLibrary.DAC.Company.ItemGroupsDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Company.IItemGroupsService, Impulse.Services.Company.ItemGroupsService>();
+
 builder.Services.AddScoped<DataAccessLibrary.Interface.Company.IMiscSetupDataAccess, DataAccessLibrary.DAC.Company.MiscSetupDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Company.IMiscSetupService, Impulse.Services.Company.MiscSetupService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Company.ILocationsDataAccess, DataAccessLibrary.DAC.Company.LocationsDataAccess>();

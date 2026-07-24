@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -17,7 +17,6 @@ namespace DataAccessLibrary.Models.ViewModels.Accounts
         public int Chqs { get; set; }
         public string ManualNo { get; set; }
         public string ChqBookDetail { get; set; }
-        public int Chq_Type { get; set; }
         public string UserName { get; set; }
         public string MachineName { get; set; }
         public DateTime DT { get; set; }

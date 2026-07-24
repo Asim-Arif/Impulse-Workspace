@@ -1,0 +1,74 @@
+@using DataAccessLibrary.Models.ViewModels.Stock
+
+<div class="row g-4 mt-2">
+    <!-- Picture Upload -->
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm rounded-3 h-100">
+            <div class="card-header bg-light border-bottom fw-bold text-secondary py-2" style="font-size:0.85rem;">
+                <i class="fas fa-image text-primary me-2"></i> Picture
+            </div>
+            <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                @if (!string.IsNullOrEmpty(PicBase64))
+                {
+                    <div class="position-relative mb-3">
+                        <img src="@($"data:image/png;base64,{PicBase64}")" alt="Picture" class="img-thumbnail shadow-sm" style="max-height: 250px; max-width: 100%; object-fit: contain;" />
+                        <button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0 m-1 rounded-circle shadow" @onclick="ClearPicture" title="Remove Picture">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center p-4 border border-dashed rounded-3 bg-light w-100 mb-3" style="border-color: #dee2e6 !important;">
+                        <i class="fas fa-cloud-upload-alt fa-3x text-secondary mb-2"></i>
+                        <p class="text-muted mb-0" style="font-size:0.85rem;">No picture uploaded.</p>
+                    </div>
+                }
+
+                <div class="w-100">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Upload Picture</label>
+                    <InputFile OnChange="HandlePictureUpload" class="form-control form-control-sm" accept="image/*" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Technical Drawing Upload -->
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm rounded-3 h-100">
+            <div class="card-header bg-light border-bottom fw-bold text-secondary py-2" style="font-size:0.85rem;">
+                <i class="fas fa-drafting-compass text-primary me-2"></i> Technical Drawing
+            </div>
+            <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                @if (!string.IsNullOrEmpty(TechDrawingBase64))
+                {
+                    <div class="position-relative mb-3">
+                        <img src="@($"data:image/png;base64,{TechDrawingBase64}")" alt="Technical Drawing" class="img-thumbnail shadow-sm" style="max-height: 250px; max-width: 100%; object-fit: contain;" />
+                        <button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0 m-1 rounded-circle shadow" @onclick="ClearTechDrawing" title="Remove Drawing">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center p-4 border border-dashed rounded-3 bg-light w-100 mb-3" style="border-color: #dee2e6 !important;">
+                        <i class="fas fa-file-image fa-3x text-secondary mb-2"></i>
+                        <p class="text-muted mb-0" style="font-size:0.85rem;">No technical drawing uploaded.</p>
+                    </div>
+                }
+
+                <div class="w-100">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Upload Drawing</label>
+                    <InputFile OnChange="HandleTechDrawingUpload" class="form-control form-control-sm" accept="image/*" />
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .border-dashed {
+        border-style: dashed !important;
+        border-width: 2px !important;
+    }
+</style>

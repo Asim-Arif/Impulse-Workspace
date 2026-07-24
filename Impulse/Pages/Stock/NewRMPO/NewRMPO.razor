@@ -1,0 +1,39 @@
+@page "/stock/new-rm-po"
+@using DataAccessLibrary.Models.ViewModels.Stock
+@using Impulse.Pages.Stock.NewRMPO.Tabs
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+            <div class="d-flex justify-content-between align-items-end pb-2 mb-3 border-bottom">
+                <h5 class="mb-0 fw-bold text-dark-emphasis">
+                    <i class="fas fa-file-invoice-dollar text-primary me-2"></i>
+                    Raw Material Purchase Order
+                </h5>
+                <div>
+                    <button class="btn btn-sm btn-primary me-2" @onclick="SaveOrder" disabled="@IsSaving">
+                        <i class="fas fa-save me-1"></i> @(IsSaving ? "Saving..." : "Save")
+                    </button>
+                    <button class="btn btn-sm btn-light border" @onclick="Cancel" disabled="@IsSaving">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                </div>
+            </div>
+
+            @if (Order != null)
+            {
+                <CascadingValue Value="Order">
+                    <OrderMaterialsTab />
+                </CascadingValue>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>

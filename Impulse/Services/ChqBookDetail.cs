@@ -1,4 +1,4 @@
-﻿using DataAccessLibrary.Models.ViewModels.Accounts;
+using DataAccessLibrary.Models.ViewModels.Accounts;
 using DataAccessLibrary.Models.ViewModels;
 using DataAccessLibrary.Interface.Accounts;
 
@@ -66,5 +66,9 @@ namespace Impulse.Services
             return await _dataAccess.ChangeChqStatus(chqs, chqno, sno, iType, INextSno);       
         }
 
+        public async Task<bool> UpdateChequeClearanceDate(long sno, DateTime? clearanceDate)
+        {
+            return await _dataAccess.UpdateChequeClearanceDate(sno, clearanceDate);
+        }
     }
 }

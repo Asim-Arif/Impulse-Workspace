@@ -1,0 +1,157 @@
+@page "/accounts/cashbookreport"
+@attribute [Authorize]
+<PageTitle>Cash Book Report</PageTitle>
+
+@using System.Collections.ObjectModel
+@using Microsoft.AspNetCore.Components.Web
+@using BlazorContextMenu
+@using Microsoft.Extensions.Options
+@using DataAccessLibrary
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using DataAccessLibrary.Models.ViewModels
+@using Impulse.Configurations
+@using DataAccessLibrary.Interface.Accounts
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using Impulse.Pages.SelectionModals
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+<div class="container-fluid mt-0 m-0 p-0" style="font-family: Calibri, sans-serif; ">    
+        
+    <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color"
+         style="position: sticky; top: 0; z-index: 1000;">
+        <h5 class="mb-0"><i class="fas fa-book"></i> Cash Book Report</h5>
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
+            <i class="fas fa-xmark me-2"></i> Close
+            </button>
+        </div>
+    </div>
+
+    <div class="card-body">
+        <div class="row g-1 mb-3 align-items-end">
+            <div class="col-sm-2">
+                <label for="FromDate" class="form-label fw-bold mb-0">From</label>
+                <input type="date" id="FromDate" class="form-control form-control-sm" @bind="DTFrom" />
+            </div>
+            <div class="col-sm-2">
+                <label for="ToDate" class="form-label fw-bold mb-0">To</label>
+                <input type="date" id="ToDate" class="form-control form-control-sm" @bind="DTTo" />
+            </div>
+            <div class="col-sm-1">
+                <button class="btn btn-primary btn-sm w-100" @onclick="RefreshCashLedger">
+                    <i class="fas fa-sync-alt me-1"></i> Refresh
+                </button>
+            </div>
+        </div>
+
+        @if (IsLoading)
+        {
+            <div class="text-center mt-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p>Loading cash book report...</p>
+            </div>
+        }
+        else if (ListToUse?.Any() ?? false)
+        {
+            <div class="sticky-table-container">                
+                <ContextMenuProvider Id="accountsContext">
+                    <table class="table table-bordered table-hover align-middle mb-0" 
+                           style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                        <thead class="theme-color" style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                            <tr>
+                                <th style="width: 10%;">Dated</th>
+                                <th style="width: 15%;">Voucher #</th>
+                                <th style="width: 25%;">Account</th>
+                                <th style="width: 30%;">Description</th>
+                                <th style="width: 10%;" class="text-center">Debit</th>
+                                <th style="width: 10%;" class="text-center">Credit</th>
+                            </tr>
+                        </thead>
+                        <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">
+                            <!-- Opening Balance Row -->
+                            <tr class="table-info fw-bold">
+                                <td></td>
+                                <td></td>
+                                <td>Opening Cash in Hand</td>
+                                <td></td>
+                                <td class="text-end">
+                                    @if (OpeningBalance >= 0)
+                                    {
+                                        @OpeningBalance.ToString("N2")
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    @if (OpeningBalance < 0)
+                                    {
+                                        @Math.Abs(OpeningBalance).ToString("N2")
+                                    }
+                                </td>
+                            </tr>
+
+                            <Virtualize Items="@ListToUse" Context="row">
+                                <ContextMenuTrigger WrapperTag="tr" MenuId="accountsContext" Data="row">
+                                    <td>@row.VDate.ToString("dd-MMM-yyyy")</td>
+                                    <td>@row.VchrNo</td>
+                                    <td title="@row.AccTitle">@row.AccTitle</td>
+                                    @{
+                                        string dpst = string.IsNullOrEmpty(row.DpstSlip) || row.DpstSlip == "0" ? "" : $" Dpst Slip:{row.DpstSlip}";
+                                        string desc = $"{row.Description}{dpst}";
+                                    }
+                                    <td title="@desc">@desc</td>
+                                    <td class="text-end">@row.Debit.ToString("N2")</td>
+                                    <td class="text-end">@row.Credit.ToString("N2")</td>
+                                </ContextMenuTrigger>
+                            </Virtualize>
+                        </tbody>
+                        <tfoot class="bg-light fw-bold" style="position: sticky; bottom: 0; z-index: 10; background-color: #f8f9fa !important; border-top: 2px solid #dee2e6;">
+                            <tr>
+                                <td colspan="4" class="text-center">TOTALS</td>
+                                <td class="text-end">@TotalDebit.ToString("N2")</td>
+                                <td class="text-end">@TotalCredit.ToString("N2")</td>
+                            </tr>
+                            <tr class="table-info">
+                                <td colspan="4" class="text-center">Closing Cash in Hand</td>
+                                <td class="text-end">
+                                    @if (ClosingBalance >= 0)
+                                    {
+                                        @ClosingBalance.ToString("N2")
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    @if (ClosingBalance < 0)
+                                    {
+                                        @Math.Abs(ClosingBalance).ToString("N2")
+                                    }
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </ContextMenuProvider>
+            </div>
+            
+            <div class="d-flex justify-content-end gap-2 mt-3 border-top pt-3">                
+                <button class="btn btn-outline-success btn-sm px-3 btn-min-width" @onclick="PrintCashBookReport">
+                    <i class="fas fa-print me-1"></i> Print
+                </button>
+            </div>
+            
+            <ContextMenu Id="accountsContext">
+                <Item OnClick="@OnEditVoucherClick">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-edit me-2 text-primary" style="width: 20px;"></i>
+                        <span>Edit Voucher</span>
+                    </div>
+                </Item>
+            </ContextMenu>
+        }
+        else
+        {
+            <div class="alert alert-info mt-3" role="alert">
+                <i class="fas fa-info-circle me-2"></i> No records found for the selected date range.
+            </div>
+        }
+    </div>
+</div>

@@ -1,4 +1,4 @@
-﻿using Dapper;
+using Dapper;
 using DataAccessLibrary.Interface.Accounts;
 using DataAccessLibrary.Models.ViewModels;
 using DataAccessLibrary.Models.ViewModels.Accounts;
@@ -78,8 +78,7 @@ namespace DataAccessLibrary.DAC.Accounts
                                 ChqBookDetail = chqbook.ChqBookDetail,
                                 AccNo = chqbook.AccNo,
                                 UserName = chqbook.UserName,
-                                MachineName = chqbook.MachineName,
-                                Chq_Type = chqbook.Chq_Type
+                                MachineName = chqbook.MachineName
                             },
                             commandType: CommandType.StoredProcedure, transaction: transaction
                         );
@@ -135,7 +134,7 @@ namespace DataAccessLibrary.DAC.Accounts
             {
                 using (IDbConnection db = new SqlConnection(_connectionString))
                 {
-                    string sql = @"SELECT ChqBookNo,AccNo,StartingFrom,Chqs,ManualNo,ChqBookDetail,Chq_Type,ChqsLeft 
+                    string sql = @"SELECT ChqBookNo,AccNo,StartingFrom,Chqs,ManualNo,ChqBookDetail,ChqsLeft 
                         FROM VChqBooks WHERE @StrAccNo='' OR AccNo=@StrAccNo";
                     return (await db.QueryAsync<ChqBookDetailViewModel>(sql, new { StrAccNo=StrAccNo ?? "" })).ToList();
                 }
@@ -324,6 +323,15 @@ namespace DataAccessLibrary.DAC.Accounts
             {
                 string sql = @"UPDATE ChqList SET Issued=1 WHERE ChqNo= @Chqno AND ChqBookNo=@ChqBookNo";
                 return await db.ExecuteAsync(sql, new { Chqno, ChqBookNo }) > 0;
+            }
+        }
+
+        public async Task<bool> UpdateChequeClearanceDate(long sno, DateTime? clearanceDate)
+        {
+            using (IDbConnection db = new SqlConnection(_connectionString))
+            {
+                string sql = @"UPDATE Cheque SET ClearanceDT = @ClearanceDate WHERE SNo = @sno";
+                return await db.ExecuteAsync(sql, new { ClearanceDate = clearanceDate, sno = sno }) > 0;
             }
         }
 

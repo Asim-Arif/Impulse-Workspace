@@ -1,4 +1,4 @@
-﻿using DataAccessLibrary.Models;
+using DataAccessLibrary.Models;
 using DataAccessLibrary.Models.ViewModels.Accounts;
 using DataAccessLibrary.Models.ViewModels;
 namespace DataAccessLibrary.Interface.Accounts
@@ -14,5 +14,6 @@ namespace DataAccessLibrary.Interface.Accounts
         Task<bool> SaveOverDraftData(BankAccountInfo bankAccount,string StrAccNo,bool bdefaultbank);
         Task<List<ChqListModel>> GetChqBookChequesList(long chqbookno);
         Task<bool> ChangeChqStatus(ChqListModel chqs, string chqno, double sno, int iType, long INextSno);
+        Task<bool> UpdateChequeClearanceDate(long sno, DateTime? clearanceDate);
     }
 }

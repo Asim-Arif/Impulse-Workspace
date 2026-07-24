@@ -1,4 +1,4 @@
-﻿using DataAccessLibrary.Models.ViewModels;
+using DataAccessLibrary.Models.ViewModels;
 using DataAccessLibrary.Models.ViewModels.Accounts;
 
 namespace Impulse.Services
@@ -10,6 +10,10 @@ namespace Impulse.Services
         Task<List<Online_Payment_Voucher_List_ViewModel>> GetOnlinePaymentVoucherList(DateTime DTFrom, DateTime DTTo, int iBankID = 0, int iStatus = 0, int iVchrType = 0);
         Task<List<Trial_Balance_ViewModel>> GetTrialBalanceList(DateTime DTFrom, DateTime DTTo, string Code);
         Task<List<Bank_Balance_Statement_ViewModel>> GetBankBalanceStatement();
+        Task<List<Cash_Balance_Statement_ViewModel>> GetCashBalanceStatement();
+        Task DeleteVoucher(AccountsReportingModel selectedvoucher, string strvoucherno, bool bDeleteForEdit);
+        Task PrepareExpenseReportDataAsync(DateTime dtStart);
+        Task<List<Cash_Book_Report_ViewModel>> GetCashBookReport(DateTime dtFrom, DateTime dtTo);
         Task<List<Cheque_Receiving_ViewModel>> GetChequeReceivingData(DateTime DTFrom, DateTime DTTo);
         Task<List<Important_Tasks_ViewModel>> GetImportantTasksData(DateTime DTFrom, DateTime DTTo);
         Task<List<Bills_Received_ViewModel>> GetBillsReceivedData(DateTime DTFrom, DateTime DTTo, int SerialFrom, int SerialTo);

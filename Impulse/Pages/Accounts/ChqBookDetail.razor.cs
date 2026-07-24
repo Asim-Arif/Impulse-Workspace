@@ -1,4 +1,4 @@
-﻿using BlazorBootstrap;
+using BlazorBootstrap;
 using BlazorContextMenu;
 using DataAccessLibrary;
 using DataAccessLibrary.DAC.Accounts;
@@ -180,14 +180,12 @@ namespace Impulse.Pages.Accounts
             IsAdding = true;
             ShowModal = true;
             IsEdit = false;
-            ChqBookModel.Chq_Type = OnlineChqBook;
         }
         private void HideModal()
         {
             IsAdding = false;
             ShowModal = false;
             IsEdit = false;
-            ChqBookModel.Chq_Type = 0;
 
             ChqBookModel.ManualNo = string.Empty;
             ChqBookModel.StartingFrom = string.Empty;
@@ -227,21 +225,41 @@ namespace Impulse.Pages.Accounts
         {
             ShowODModel = false;
         }
-        private bool ShowChqsData = false;
-        private void ShowChqModel(ItemClickEventArgs e)
+        private async Task OnChequeBookSelected(ChqBookDetailViewModel chqbook)
         {
-            var chqbook = e.Data as ChqBookDetailViewModel;
             SelectedChqBook = chqbook;
             if (SelectedChqBook != null)
             {
-                ShowChqsData = true;
-                RefreshChqsData(SelectedChqBook.ChqBookNo);
+                await RefreshChqsData(SelectedChqBook.ChqBookNo);
             }
         }
-        private void HideChqModel()
+
+        private async Task OnClearanceDateChanged(ChqListModel cheque, ChangeEventArgs e)
         {
-            ShowChqsData = false;
-            SelectedChqBook = null;
+            if (DateTime.TryParse(e.Value?.ToString(), out DateTime newDate))
+            {
+                cheque.ClearanceDT = newDate.ToString("dd-MMM-yy");
+                bool success = await _chqbookService.UpdateChequeClearanceDate((long)cheque.CSNo, newDate);
+                if (success)
+                {
+                    NotificationServiceManager.ShowSuccess("Success", "Clearance Date updated successfully.");
+                }
+                else
+                {
+                    NotificationServiceManager.ShowError("Error", "Failed to update Clearance Date.");
+                }
+            }
+        }
+
+        private void PrintChqBookDetail(ItemClickEventArgs e)
+        {
+            var chqbook = e.Data as ChqBookDetailViewModel;
+            if (chqbook != null)
+            {
+                string rptName = "ChqBook.rpt";
+                string strcond = $"{{VChqBookLedger.ChqbookNo}}={chqbook.ChqBookNo}";
+                ReportNavigationService.PrintReportAsync_Old(rptName, strcond);
+            }
         }
 
         private List<ChqListModel> getDatafromdb_chqsdata { get; set; } = new List<ChqListModel>();

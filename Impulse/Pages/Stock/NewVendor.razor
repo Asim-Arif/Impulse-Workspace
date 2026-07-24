@@ -1,0 +1,247 @@
+@page "/newvendor"
+@page "/newvendor/{Id:int}"
+
+@using DataAccessLibrary.Models.ViewModels.Stock
+@using Blazored.Typeahead
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <div class="row g-2 mb-3 align-items-end border-bottom pb-2">
+                <div class="col-auto d-flex align-items-end pb-1">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-truck text-primary me-2"></i>
+                        @(Id == 0 ? "New Vendor" : "Edit Vendor")
+                    </h5>
+                </div>
+                <div class="col text-end">
+                    <button class="btn btn-outline-secondary btn-sm me-2 fw-bold px-3 shadow-sm" @onclick="GoBack" style="border-radius:6px;">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                    <button class="btn btn-primary btn-sm fw-bold px-3 shadow-sm" @onclick="SaveVendor" disabled="@isSaving" style="border-radius:6px;">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save me-1"></i>
+                            <span>Save Vendor</span>
+                        }
+                    </button>
+                </div>
+            </div>
+
+            @if (isLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2 fw-bold text-secondary">Loading vendor data...</p>
+                </div>
+            }
+            else
+            {
+                <EditForm Model="@Model" OnValidSubmit="SaveVendor">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="alert alert-danger p-2 mb-3" style="font-size:0.85rem;" />
+
+                    <div class="row g-3">
+                        <!-- General Info Panel -->
+                        <div class="col-md-6">
+                            <div class="card h-100 border" style="background:#f8f9fb; border-radius:8px;">
+                                <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; border-radius:8px 8px 0 0; font-size:0.85rem; letter-spacing:0.03em;">
+                                    <i class="fas fa-info-circle me-1 text-primary"></i> General Information
+                                </div>
+                                <div class="card-body py-2">
+                                    <div class="row g-2 align-items-end mb-2">
+                                        <div class="col-md-12">
+                                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Category <span class="text-danger">*</span></label>
+                                            <BlazoredTypeahead SearchMethod="SearchCategories"
+                                                               @bind-Value="SelectedCategory"
+                                                               Placeholder="Search category..."
+                                                               EnableDropDown="true">
+                                                <SelectedTemplate Context="category">
+                                                    @category.AccTitle
+                                                </SelectedTemplate>
+                                                <ResultTemplate Context="category">
+                                                    @category.AccTitle
+                                                </ResultTemplate>
+                                            </BlazoredTypeahead>
+                                            <ValidationMessage For="@(() => Model.ParentAccNo)" class="text-danger" style="font-size:0.75rem;" />
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-2 align-items-end mb-2">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Vendor Name <span class="text-danger">*</span></label>
+                                            <InputText class="form-control form-control-sm" @bind-Value="Model.VendorName" placeholder="Enter vendor name" />
+                                            <ValidationMessage For="@(() => Model.VendorName)" class="text-danger" style="font-size:0.75rem;" />
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Vendor Name (Urdu)</label>
+                                            <InputText class="form-control form-control-sm" @bind-Value="Model.VendorNameUrdu" dir="rtl" placeholder="Urdu name" />
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-2 align-items-end mb-2">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Account Number</label>
+                                            <input type="text" class="form-control form-control-sm bg-light fw-bold text-primary" value="@(string.IsNullOrEmpty(Model.AccNo) ? "Auto-generated on save" : Model.AccNo)" readonly />
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Maker No</label>
+                                            <InputText class="form-control form-control-sm" @bind-Value="Model.MakerNo" />
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-2 align-items-end mb-2">
+                                        <div class="col-md-8">
+                                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Opening Balance</label>
+                                            <InputNumber class="form-control form-control-sm" @bind-Value="Model.OpeningBalance" />
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Type</label>
+                                            <InputSelect class="form-select form-select-sm" @bind-Value="Model.OpeningBalanceType">
+                                                <option value="DR">DR</option>
+                                                <option value="CR">CR</option>
+                                            </InputSelect>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-check form-switch mt-3">
+                                        <InputCheckbox class="form-check-input" id="inactiveCheck" @bind-Value="Model.Inactive" />
+                                        <label class="form-check-label fw-bold text-secondary" style="font-size:0.82rem;" for="inactiveCheck">Vendor is Inactive</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Contact Info Panel -->
+                        <div class="col-md-6">
+                            <div class="card h-100 border" style="background:#f8f9fb; border-radius:8px;">
+                                <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; border-radius:8px 8px 0 0; font-size:0.85rem; letter-spacing:0.03em;">
+                                    <i class="fas fa-address-book me-1 text-primary"></i> Contact Information
+                                </div>
+                                <div class="card-body py-2">
+                                    <div class="row g-2 align-items-end mb-2">
+                                        <div class="col-md-12">
+                                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Contact Person</label>
+                                            <InputText class="form-control form-control-sm" @bind-Value="Model.ContactPerson" />
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-2 align-items-end mb-2">
+                                        <div class="col-md-12">
+                                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Address</label>
+                                            <InputTextArea class="form-control form-control-sm" @bind-Value="Model.Address" rows="1" />
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-2 align-items-end mb-2">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Phone 1</label>
+                                            <InputText class="form-control form-control-sm" @bind-Value="Model.Phone1" />
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Phone 2</label>
+                                            <InputText class="form-control form-control-sm" @bind-Value="Model.Phone2" />
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-2 align-items-end mb-2">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Mobile</label>
+                                            <InputText class="form-control form-control-sm" @bind-Value="Model.Mobile" />
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Contact Phone</label>
+                                            <InputText class="form-control form-control-sm" @bind-Value="Model.CPhone" />
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-2 align-items-end mb-2">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Email</label>
+                                            <InputText type="email" class="form-control form-control-sm" @bind-Value="Model.CEmail" />
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Fax</label>
+                                            <InputText class="form-control form-control-sm" @bind-Value="Model.Fax1" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Other Info & Media Panel -->
+                        <div class="col-md-12">
+                            <div class="card mb-3 border" style="background:#f8f9fb; border-radius:8px;">
+                                <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; border-radius:8px 8px 0 0; font-size:0.85rem; letter-spacing:0.03em;">
+                                    <i class="fas fa-file-invoice-dollar me-1 text-primary"></i> Additional Details & Media
+                                </div>
+                                <div class="card-body py-2">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <div class="mb-2">
+                                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Bank Account No</label>
+                                                <InputText class="form-control form-control-sm" @bind-Value="Model.BankAccNo" />
+                                            </div>
+
+                                            <div class="mb-2">
+                                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Vendor Description</label>
+                                                <InputTextArea class="form-control form-control-sm" @bind-Value="Model.VendorDescription" rows="2" />
+                                            </div>
+
+                                            <div class="form-check form-switch mt-3 mb-2">
+                                                <InputCheckbox class="form-check-input" id="importVendorCheck" @bind-Value="Model.ImportVendor" />
+                                                <label class="form-check-label fw-bold text-secondary" style="font-size:0.82rem;" for="importVendorCheck">Import Vendor</label>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-md-6">
+                                            <div class="row g-3">
+                                                <div class="col-md-6 text-center">
+                                                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Vendor Picture</label>
+                                                    <div class="border rounded p-2 mb-2" style="background:#fff; height: 120px; display: flex; align-items: center; justify-content: center; overflow: hidden; border-color:#e0e0e0 !important;">
+                                                        @if (!string.IsNullOrEmpty(Model.VendorPic))
+                                                        {
+                                                            <img src="@Model.VendorPic" style="max-height: 100%; max-width: 100%;" />
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="text-muted" style="font-size:0.8rem;"><i class="fas fa-image fs-3 mb-1 d-block text-black-50"></i>No Image</span>
+                                                        }
+                                                    </div>
+                                                    <InputFile class="form-control form-control-sm" OnChange="LoadVendorPic" accept="image/*" />
+                                                </div>
+                                                
+                                                <div class="col-md-6 text-center">
+                                                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Signature / Thumb</label>
+                                                    <div class="border rounded p-2 mb-2" style="background:#fff; height: 120px; display: flex; align-items: center; justify-content: center; overflow: hidden; border-color:#e0e0e0 !important;">
+                                                        @if (!string.IsNullOrEmpty(Model.VendorSig))
+                                                        {
+                                                            <img src="@Model.VendorSig" style="max-height: 100%; max-width: 100%;" />
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="text-muted" style="font-size:0.8rem;"><i class="fas fa-signature fs-3 mb-1 d-block text-black-50"></i>No Signature</span>
+                                                        }
+                                                    </div>
+                                                    <InputFile class="form-control form-control-sm" OnChange="LoadVendorSig" accept="image/*" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </EditForm>
+            }
+        </div>
+    </div>
+</div>

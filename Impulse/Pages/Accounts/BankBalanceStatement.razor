@@ -1,6 +1,6 @@
-﻿@page "/accounts/bankbalancestatement"
+@page "/accounts/bankbalancestatement"
 @attribute [Authorize]
-<PageTitle>Bank Balance Statement</PageTitle>
+<PageTitle>Cash & Bank Status</PageTitle>
 
 @using System.Collections.ObjectModel
 @using Microsoft.AspNetCore.Components.Web
@@ -21,7 +21,7 @@
         
         <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color"
              style="position: sticky; top: 0; z-index: 1000;">
-            <h5 class="mb-0"><i class="fas fa-piggy-bank"></i> Bank Balance Statement</h5>
+            <h5 class="mb-0"><i class="fas fa-piggy-bank"></i> Cash & Bank Status</h5>
             <div class="d-flex align-items-center gap-2">
                 <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
                 <i class="fas fa-xmark me-2"></i> Close
@@ -32,6 +32,12 @@
         <div class="card-body">
 
         <div class="row g-1 mb-1 align-items-end">
+            <div class="col-sm-4">
+                <label for="TotalCashBalance" class="form-label fw-bold mb-0">Total Cash Balance</label>
+                <input type="text" id="TotalCashBalance" name="TotalCashBalance" class="form-control fw-bold text-center" 
+                        value="@TotalCashBalance.ToString("N0")" style="background-color: black; color: #00FF00;"
+                        readonly>
+            </div>
             <div class="col-sm-4">
                 <label for="TotalBankBalance" class="form-label fw-bold mb-0">Total Bank Balance</label>
                 <input type="text" id="TotalBankBalance" name="TotalBankBalance" class="form-control fw-bold text-center" 
@@ -49,9 +55,11 @@
                     </div>
                 </div>
             }
-            else if (ListToUse?.Any() ?? false)
+            else if ((ListToUse?.Any() ?? false) || (CashBalanceList?.Any() ?? false))
             {
-            <div class="sticky-table-container">                
+                <div class="mb-3">
+                    <h6 class="fw-bold bg-light p-2 border-bottom mb-0">Bank Balance Details</h6>
+                    <div class="sticky-table-container">                
                     <ContextMenuProvider Id="accountsContext">
 
                         <table class="table table-bordered table-hover align-middle mb-0" 
@@ -112,6 +120,39 @@
                         </table>
                     </ContextMenuProvider>
                 </div>
+                </div>
+
+                <div class="mt-3">
+                    <h6 class="fw-bold bg-light p-2 border-bottom mb-0">Cash Balance Details</h6>
+                    <div class="sticky-table-container">
+                        <table class="table table-bordered table-hover align-middle mb-0" 
+                               style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                            <thead class="theme-color" style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                                <tr>
+                                    <th style="width: 20%;">Account No.</th>
+                                    <th style="width: 60%;">Account Title</th>
+                                    <th style="width: 20%;" class="text-center">Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">
+                                <Virtualize Items="@CashBalanceList" Context="cashRow">
+                                    <tr class="@cashRow.RowClass">
+                                        <td>@cashRow.AccNo</td>
+                                        <td>@cashRow.AccTitle</td>
+                                        <td class="text-end">@cashRow.Balance.ToString("N0")</td>
+                                    </tr>
+                                </Virtualize>
+                            </tbody>
+                            <tfoot class="bg-light fw-bold" style="position: sticky; bottom: 0; z-index: 10; background-color: #f8f9fa !important; border-top: 2px solid #dee2e6;">
+                                <tr>
+                                    <td colspan="2" class="text-center">TOTALS</td>
+                                    <td class="text-end">@TotalCashBalance.ToString("N0")</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
                 <div class="d-flex justify-content-end gap-2 mt-3 border-top pt-3">                
                     <button class="btn btn-outline-success btn-sm px-3 btn-min-width" @onclick="PrintBankBalanceSheet">
                             <i class="fas fa-print me-1"></i> Print
