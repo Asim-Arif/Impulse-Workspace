@@ -1,4 +1,4 @@
-﻿using Microsoft.JSInterop;
+using Microsoft.JSInterop;
 using Radzen;
 
 namespace Impulse.Services
@@ -70,8 +70,8 @@ namespace Impulse.Services
 
         public async Task<bool> ShowQuestionNotification(string summary, string detail)
         {
-            return await _js.InvokeAsync<bool>("confirm", $"{summary}\n\n{detail}");
-
+            var result = await _dialogService.Confirm(detail, summary, new Radzen.ConfirmOptions() { OkButtonText = "Yes", CancelButtonText = "No" });
+            return result ?? false;
         }
     }
 }

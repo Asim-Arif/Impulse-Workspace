@@ -1,0 +1,286 @@
+@page "/stock/rmpolist"
+@using DataAccessLibrary.Models.ViewModels.Stock
+@using Impulse.Services.Stock
+@using Blazored.Typeahead
+@using BlazorContextMenu
+@inject IVendOrderService VendOrderService
+@inject INewVendorService VendorService
+@inject INewRMService RMService
+@inject Impulse.Services.INotificationService NotificationService
+@inject NavigationManager NavigationManager
+@inject Impulse.Services.IReportNavigationService ReportNavigation
+
+<PageTitle>RM PO List</PageTitle>
+
+<style>
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .disabled-typeahead-wrapper .blazored-typeahead {
+        background-color: #e9ecef !important;
+        overflow: hidden !important;
+        border-radius: 4px;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__results {
+        z-index: 1050 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    .win11-context-menu-container, .blazor-context-menu {
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+    }
+
+    .dropdown-row {
+        position: relative !important;
+        z-index: 9999 !important;
+    }
+    .table-wrapper {
+        position: relative !important;
+        z-index: 1 !important;
+    }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom justify-content-between">
+                <h5 class="mb-0 fw-bold text-dark-emphasis">
+                    <i class="fas fa-list-alt text-primary me-2"></i>
+                    @(IsSampleList ? "Samples PO List" : "PO List")
+                </h5>
+                <div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="optionsBarMenuBtn" @onclick="ShowOptionsMenu">
+                        <i class="fas fa-cog"></i> Options
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary" @onclick="OnRefreshClicked">
+                        <i class="fas fa-sync-alt me-1"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="row g-2 align-items-end mb-3 dropdown-row" style="position: relative; z-index: 10000;">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Vendor</label>
+                    <BlazoredTypeahead SearchMethod="SearchVendors"
+                                       @bind-Value="SelectedVendor"
+                                       Placeholder="<All Vendors>"
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>@context.VendorName</SelectedTemplate>
+                        <ResultTemplate>@context.VendorName</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Material</label>
+                    <BlazoredTypeahead SearchMethod="SearchMaterials"
+                                       @bind-Value="SelectedMaterial"
+                                       Placeholder="<All Materials>"
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>@context.RMName</SelectedTemplate>
+                        <ResultTemplate>@context.RMName</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">PO Type</label>
+                    <select class="form-select form-select-sm" @bind="Filter.POType">
+                        <option value="">&lt;All&gt;</option>
+                        <option value="0">Regular</option>
+                        <option value="1">Annealing</option>
+                        <option value="2">Machining</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Range</label>
+                    <select class="form-select form-select-sm" @bind="Filter.DateRangeIndex" @bind:after="OnDateRangeChanged">
+                        <option value="0">Last 15 Days</option>
+                        <option value="1">Last 30 Days</option>
+                        <option value="2">Last 60 Days</option>
+                        <option value="3">Last 90 Days</option>
+                        <option value="4">Last 1 Year</option>
+                        <option value="5">Custom Date</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">PO No.</label>
+                    <input type="text" class="form-control form-control-sm" @bind="Filter.OrderNo" />
+                </div>
+            </div>
+
+            <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">From</label>
+                    <input type="date" class="form-control form-control-sm" @bind="Filter.DateFrom" disabled="@(Filter.DateRangeIndex != 5)" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">To</label>
+                    <input type="date" class="form-control form-control-sm" @bind="Filter.DateTo" disabled="@(Filter.DateRangeIndex != 5)" />
+                </div>
+                <div class="col-md-8 d-flex align-items-center gap-3">
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkOpenPOs" @bind="Filter.ShowOpenPOsOnly">
+                        <label class="form-check-label text-secondary fw-bold" style="font-size: 0.8rem;" for="chkOpenPOs">Open PO Only</label>
+                    </div>
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkRunning" @bind="Filter.ShowSamplePOs">
+                        <label class="form-check-label text-secondary fw-bold" style="font-size: 0.8rem;" for="chkRunning">Sample POs</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-responsive table-wrapper border rounded" style="max-height: 55vh; overflow-y: auto;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th class="px-3" style="width: 50px;">S.#</th>
+                            <th>PO No.</th>
+                            <th>Dated</th>
+                            <th>Vendor</th>
+                            <th>Delivery Date</th>
+                            <th>Type</th>
+                            <th>PDF</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center py-4 text-muted">
+                                    <div class="spinner-border spinner-border-sm me-2" role="status"></div> Loading...
+                                </td>
+                            </tr>
+                        }
+                        else if (POList == null || !POList.Any())
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center py-4 text-muted">No Purchase Orders found.</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            int sno = 1;
+                            foreach (var item in POList)
+                            {
+                                <ContextMenuTrigger WrapperTag="tr" MenuId="rowContextMenu" Data="@item" @ondblclick="() => EditPO(item)">
+                                    <td class="px-3 text-muted">@sno</td>
+                                    <td class="fw-bold">@item.OrderNo @(item.RunningPONo.HasValue ? $"({item.RunningPONo})" : "")</td>
+                                    <td>@(item.DT?.ToString("dd-MMM-yyyy"))</td>
+                                    <td>@item.AccTitle</td>
+                                    <td>@(item.DeliveryDT?.ToString("dd-MMM-yyyy"))</td>
+                                    <td>
+                                        @if (item.IssuanceType == 0) { <span>Regular</span> }
+                                        else if (item.IssuanceType == 1) { <span>Annealing</span> }
+                                        else if (item.IssuanceType == 2) { <span>Machining</span> }
+                                    </td>
+                                    <td @ondblclick="() => OpenPDF(item)" @ondblclick:stopPropagation="true" style="@(item.PDFAttachment != null && item.PDFAttachment.Length > 0 ? "cursor: pointer;" : "")">
+                                        @if (item.PDFAttachment != null && item.PDFAttachment.Length > 0)
+                                        {
+                                            <span class="badge bg-success" title="Double-click to open PDF">Attached</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (item.Final == true)
+                                        {
+                                            <span class="badge bg-secondary">Closed</span>
+                                        }
+                                        else if (item.TotalQtyRcvd == null || item.TotalQtyRcvd == 0)
+                                        {
+                                            <span class="badge bg-warning text-dark">Pending</span>
+                                        }
+                                        else if (item.TotalQtyRcvd < item.TotalQtyOrdered)
+                                        {
+                                            <span class="badge bg-info text-dark">Partially</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-success">Received</span>
+                                        }
+                                    </td>
+                                </ContextMenuTrigger>
+                                sno++;
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<ContextMenu Id="rowContextMenu" Template="Win11Style">
+    <Item OnClick="OnEditPO" CssClass="win11-menu-item">
+        <i class="fas fa-pencil-alt text-primary win11-icon me-2"></i> Edit This Order
+    </Item>
+    <Seperator />
+    <Item OnClick="OnDeletePO" CssClass="win11-menu-item">
+        <i class="fas fa-trash text-danger win11-icon me-2"></i> Delete Order
+    </Item>
+    <Seperator />
+    <Item OnClick="OnPrintOrder" CssClass="win11-menu-item">
+        <i class="fas fa-print text-secondary win11-icon me-2"></i> Print This Order
+    </Item>
+    <Item OnClick="OnPrintOrderStatus" CssClass="win11-menu-item">
+        <i class="fas fa-print text-secondary win11-icon me-2"></i> Print This Order (Status)
+    </Item>
+    <Item OnClick="OnPrintOrderZeroRate" CssClass="win11-menu-item">
+        <i class="fas fa-print text-secondary win11-icon me-2"></i> Print This Order (Zero Rate)
+    </Item>
+    <Item OnClick="OnPrintOrderOfficeCopy" CssClass="win11-menu-item">
+        <i class="fas fa-print text-secondary win11-icon me-2"></i> Print This Order (Office Copy)
+    </Item>
+    <Item OnClick="OnPrintOrderVendorCopy" CssClass="win11-menu-item">
+        <i class="fas fa-print text-secondary win11-icon me-2"></i> Print This Order (Vendor Copy)
+    </Item>
+    <Item OnClick="OnPrintOrderAccountsCopy" CssClass="win11-menu-item">
+        <i class="fas fa-print text-secondary win11-icon me-2"></i> Print This Order (Accounts Copy)
+    </Item>
+    <Item OnClick="OnEndPO" CssClass="win11-menu-item">
+        <i class="fas fa-check-circle text-success win11-icon me-2"></i> Close This PO
+    </Item>
+    <Seperator />
+    <Item CssClass="win11-menu-item" OnClick="TriggerFileUpload">
+        <i class="fas fa-paperclip text-info win11-icon me-2"></i> Attach PDF File
+    </Item>
+</ContextMenu>
+
+<ContextMenu Id="optionsBarMenu" Template="Win11Style">
+    <Item OnClick="OnPrintOrderListSimple" CssClass="win11-menu-item">
+        <i class="fas fa-list text-secondary win11-icon me-2"></i> Print Order List (Simple)
+    </Item>
+</ContextMenu>
+
+<InputFile id="pdfFileInput" style="display:none;" OnChange="OnPdfFileSelected" accept="application/pdf" />

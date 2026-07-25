@@ -1,0 +1,176 @@
+@page "/stock/rm-movement"
+@using DataAccessLibrary.Models.ViewModels.Stock
+@using Impulse.Services.Stock
+@attribute [Authorize]
+@inject IRMMovementService MovementService
+@inject IMaterialPlacementService PlacementService
+@inject DataAccessLibrary.Interface.Stock.IRMDataAccess RMDataAccess
+@inject Impulse.Services.INotificationService NotificationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavManager
+
+<PageTitle>Material Movement</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 900px; margin: 0 auto;">
+        <div class="card-body p-4">
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center">
+                    <i class="fas fa-exchange-alt me-2"></i> Change Material Location
+                </h4>
+            </div>
+
+            @if (IsLoadingInitialData)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                </div>
+            }
+            else
+            {
+                <!-- Material Selection -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Select Material</label>
+                        <div class="p-3 border rounded bg-light shadow-sm">
+                            <BlazoredTypeahead SearchMethod="SearchMaterials" @bind-Value="SelectedMaterial" Placeholder="Search Material..." EnableDropDown="true">
+                                <SelectedTemplate>@context.RMName</SelectedTemplate>
+                                <ResultTemplate>@context.RMName</ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    <!-- Move From -->
+                    <div class="col-md-6">
+                        <div class="card border border-danger shadow-sm h-100">
+                            <div class="card-header bg-white border-bottom border-danger text-danger fw-bold py-2">
+                                <i class="fas fa-arrow-up me-1"></i> Move From
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Current Location</label>
+                                    <div class="@(SelectedMaterial == null ? "disabled-typeahead-wrapper" : "")">
+                                        <BlazoredTypeahead SearchMethod="SearchLocations" @bind-Value="SelectedLocation" Placeholder="Select Location..." EnableDropDown="true" Disabled="@(SelectedMaterial == null)">
+                                            <SelectedTemplate>@context.DisplayText</SelectedTemplate>
+                                            <ResultTemplate>@context.DisplayText</ResultTemplate>
+                                        </BlazoredTypeahead>
+                                    </div>
+                                </div>
+                                <div class="mb-0">
+                                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Available Qty</label>
+                                    <input type="text" class="form-control form-control-sm text-end fw-bold custom-input-sm" readonly value="@(SelectedLocation?.AvailableQty.ToString("N2") ?? "0.00")" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Move To -->
+                    <div class="col-md-6">
+                        <div class="card border border-success shadow-sm h-100">
+                            <div class="card-header bg-white border-bottom border-success text-success fw-bold py-2">
+                                <i class="fas fa-arrow-down me-1"></i> Move To
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Target Store</label>
+                                    <BlazoredTypeahead SearchMethod="SearchStores" @bind-Value="SelectedStore" Placeholder="Select Store..." EnableDropDown="true">
+                                        <SelectedTemplate>@context.StoreName</SelectedTemplate>
+                                        <ResultTemplate>@context.StoreName</ResultTemplate>
+                                    </BlazoredTypeahead>
+                                </div>
+                                
+                                <div class="row gx-2 mb-3">
+                                    <div class="col-6">
+                                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Target Rack</label>
+                                        <div class="@(SelectedStore == null ? "disabled-typeahead-wrapper" : "")">
+                                            <BlazoredTypeahead SearchMethod="SearchRacks" @bind-Value="SelectedRack" Placeholder="Select Rack..." EnableDropDown="true" Disabled="@(SelectedStore == null)">
+                                                <SelectedTemplate>@context.RackNo</SelectedTemplate>
+                                                <ResultTemplate>@context.RackNo</ResultTemplate>
+                                            </BlazoredTypeahead>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Target Shelf</label>
+                                        <div class="@(SelectedRack == null ? "disabled-typeahead-wrapper" : "")">
+                                            <BlazoredTypeahead SearchMethod="SearchShelves" @bind-Value="SelectedShelf" Placeholder="Select Shelf..." EnableDropDown="true" Disabled="@(SelectedRack == null)">
+                                                <SelectedTemplate>@context.ShelfNo</SelectedTemplate>
+                                                <ResultTemplate>@context.ShelfNo</ResultTemplate>
+                                            </BlazoredTypeahead>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-0">
+                                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Target Shelf Qty</label>
+                                    <input type="text" class="form-control form-control-sm text-end fw-bold custom-input-sm" readonly value="@TargetShelfQty.ToString("N2")" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Qty and Actions -->
+                <div class="row mt-4 align-items-end">
+                    <div class="col-md-4 offset-md-4">
+                        <label class="form-label fw-bold text-danger mb-1" style="font-size: 0.9rem;">Qty to Move</label>
+                        <input type="number" class="form-control text-end fw-bold border-danger shadow-sm" style="height: 40px; font-size: 1.1rem;" @bind="QtyToMove" min="0.01" step="0.01" max="@(SelectedLocation?.AvailableQty ?? 0)" />
+                    </div>
+                    <div class="col-md-4 text-end mt-3 mt-md-0">
+                        <button class="btn btn-sm btn-outline-secondary me-2" style="height: 35px; width: 100px;" @onclick="ResetForm">Cancel</button>
+                        <button class="btn btn-sm btn-primary shadow-sm" style="height: 35px; width: 120px;" @onclick="SaveMovementAsync" disabled="@IsSaving">
+                            @if (IsSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                <span>Saving...</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-check me-1"></i>
+                                <span>Save</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .disabled-typeahead-wrapper .blazored-typeahead {
+        overflow: hidden !important;
+        border-radius: 4px;
+        background-color: #e9ecef !important;
+    }
+    .custom-input-sm {
+        height: 35px !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+</style>

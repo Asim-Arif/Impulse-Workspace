@@ -1,0 +1,133 @@
+@page "/stock/change-batch-lot"
+@using DataAccessLibrary.Models.ViewModels.Company
+@using DataAccessLibrary.Models.ViewModels.Stock
+@using Impulse.Services.Stock
+@attribute [Authorize]
+@inject IChangeBatchNoLotService ChangeService
+@inject Impulse.Services.INotificationService NotificationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Change Batch No / Lot</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 1200px; margin: 0 auto;">
+        <div class="card-body p-4">
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center flex-grow-1">
+                    <i class="fas fa-edit me-2"></i> Change Batch No / Lot
+                </h4>
+                <div>
+                    <button class="btn btn-sm btn-primary shadow-sm" style="height: 35px; width: 120px;" @onclick="SaveLotsAsync" disabled="@IsSaving">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-check me-1"></i>
+                            <span>Save</span>
+                        }
+                    </button>
+                </div>
+            </div>
+
+            @if (IsLoadingInitialData)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                </div>
+            }
+            else
+            {
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Select Material</label>
+                        <BlazoredTypeahead SearchMethod="SearchMaterials" @bind-Value="SelectedMaterial" Placeholder="Search Item..." EnableDropDown="true">
+                            <SelectedTemplate>@context.ItemName</SelectedTemplate>
+                            <ResultTemplate>@context.ItemName</ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                </div>
+
+                @if (IsLoadingGrid)
+                {
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status"></div>
+                    </div>
+                }
+                else if (SelectedMaterial != null)
+                {
+                    <div class="table-responsive border rounded bg-white shadow-sm" style="max-height: 60vh; overflow-y: auto;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 1; box-shadow: 0 1px 0 #dee2e6;">
+                                <tr>
+                                    <th style="width: 15%;">Lot No</th>
+                                    <th style="width: 20%;">Batch No</th>
+                                    <th style="width: 25%;">Mill Certificate No</th>
+                                    <th style="width: 40%;">Remarks</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in Lots)
+                                {
+                                    <tr class="@(item.IsModified ? "table-warning" : "")">
+                                        <td class="fw-bold">@item.LotNo</td>
+                                        <td>
+                                            <input type="text" class="form-control form-control-sm custom-input-sm" value="@item.Batch_No" @onchange="@(e => OnFieldChanged(item, "Batch_No", e.Value?.ToString()))" />
+                                        </td>
+                                        <td>
+                                            <input type="text" class="form-control form-control-sm custom-input-sm" value="@item.Mill_Certificate_No" @onchange="@(e => OnFieldChanged(item, "Mill_Certificate_No", e.Value?.ToString()))" />
+                                        </td>
+                                        <td>
+                                            <input type="text" class="form-control form-control-sm custom-input-sm" value="@item.Lot_Remarks" @onchange="@(e => OnFieldChanged(item, "Lot_Remarks", e.Value?.ToString()))" />
+                                        </td>
+                                    </tr>
+                                }
+                                @if (!Lots.Any())
+                                {
+                                    <tr>
+                                        <td colspan="4" class="text-center py-4 text-muted">No lots found for this material.</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .custom-input-sm {
+        height: 30px !important;
+        box-sizing: border-box !important;
+        font-size: 0.85rem !important;
+    }
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+</style>

@@ -39,9 +39,21 @@ namespace Impulse.Pages.Stock.NewRMPO.Tabs
                 }
             }
         }
-        public RawMaterialLookupModel SelectedMaterial { get; set; }
+        private RawMaterialLookupModel _selectedMaterial;
+        public RawMaterialLookupModel SelectedMaterial
+        {
+            get => _selectedMaterial;
+            set
+            {
+                _selectedMaterial = value;
+                if (value != null) SelectedMaterialId = value.RMID1;
+            }
+        }
+        
+        public string SelectedMaterialId { get; set; }
+        public bool ShowPicture { get; set; }
+
         public RawMaterialLookupModel SelectedForMaterial { get; set; }
-        public bool ShowCCItems { get; set; }
         public float NewRate { get; set; }
         public float NewQty { get; set; }
         public string NewItemRemarks { get; set; }
@@ -76,12 +88,6 @@ namespace Impulse.Pages.Stock.NewRMPO.Tabs
             await Task.Delay(50);
             var query = AllMaterials.AsEnumerable();
 
-            if (ShowCCItems)
-            {
-                // In a real scenario, there would be a flag like IsCCItem or we filter by Sample=1 based on legacy code
-                // Assuming RawMaterialLookupModel has a way to identify this, else we just return all for now
-            }
-
             if (Order.POType == 3) // Male Grinding
             {
                 // Filter specifically if needed
@@ -98,11 +104,6 @@ namespace Impulse.Pages.Stock.NewRMPO.Tabs
             // Reset selected items if needed
             SelectedMaterial = null;
             SelectedForMaterial = null;
-        }
-
-        private void OnShowCCItemsChanged()
-        {
-            SelectedMaterial = null;
         }
 
         private void AddMaterial()
@@ -139,7 +140,8 @@ namespace Impulse.Pages.Stock.NewRMPO.Tabs
                 Rate = NewRate,
                 Qty = NewQty,
                 ItemRemarks = NewItemRemarks,
-                ForRMID = SelectedForMaterial != null && int.TryParse(SelectedForMaterial.RMID1, out int forRmId) ? forRmId : (int?)null
+                ForRMID = SelectedForMaterial != null && int.TryParse(SelectedForMaterial.RMID1, out int forRmId) ? forRmId : (int?)null,
+                CCItem = false
             };
 
             Order.OrderDetails.Add(detail);
@@ -171,6 +173,11 @@ namespace Impulse.Pages.Stock.NewRMPO.Tabs
         private void SaveRow()
         {
             editingRowIndex = -1;
+        }
+
+        private void SelectRowMaterial(string rmid)
+        {
+            SelectedMaterialId = rmid;
         }
     }
 }

@@ -27,6 +27,10 @@ namespace Impulse.Pages.Stock.NewRMPO
         [SupplyParameterFromQuery]
         public string OrderNo { get; set; }
 
+        [Parameter]
+        [SupplyParameterFromQuery(Name = "returnUrl")]
+        public string ReturnUrl { get; set; }
+
         protected override async Task OnInitializedAsync()
         {
             if (!string.IsNullOrEmpty(OrderNo))
@@ -71,7 +75,14 @@ namespace Impulse.Pages.Stock.NewRMPO
                 string result = await VendOrderService.SaveVendOrderAsync(Order);
                 NotificationService.Notify(NotificationSeverity.Success, "Success", "Purchase Order saved successfully.");
                 
-                NavigationManager.NavigateTo("/stock/new-rm-po?OrderNo=" + result, forceLoad: true);
+                if (!string.IsNullOrEmpty(ReturnUrl))
+                {
+                    NavigationManager.NavigateTo(ReturnUrl);
+                }
+                else
+                {
+                    NavigationManager.NavigateTo("/stock");
+                }
             }
             catch (Exception ex)
             {
@@ -85,7 +96,14 @@ namespace Impulse.Pages.Stock.NewRMPO
 
         private void Cancel()
         {
-            NavigationManager.NavigateTo("/"); // Assuming dashboard or list view
+            if (!string.IsNullOrEmpty(ReturnUrl))
+            {
+                NavigationManager.NavigateTo(ReturnUrl);
+            }
+            else
+            {
+                NavigationManager.NavigateTo("/stock");
+            }
         }
     }
 }

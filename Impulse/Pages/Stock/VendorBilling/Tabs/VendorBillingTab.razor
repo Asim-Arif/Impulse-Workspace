@@ -1,0 +1,116 @@
+@using DataAccessLibrary.Models.ViewModels.Stock
+@using BlazorContextMenu
+
+<ContextMenu Id="billingRowContextMenu" Template="Win11Style">
+    <style>
+        .win11-section-header { font-size: 0.75rem; font-weight: 600; color: #6c757d; padding: 4px 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .win11-menu-item { display: flex; align-items: center; gap: 8px; }
+        .win11-icon { width: 16px; text-align: center; }
+        .blazor-context-menu { max-height: 40vh !important; overflow-y: auto !important; }
+    </style>
+    <Item OnClick="OnHideFromBilling">
+        <div class="win11-menu-item">
+            <span class="win11-icon"><i class="fas fa-eye-slash text-danger"></i></span>
+            Hide This Lot from Billing
+        </div>
+    </Item>
+</ContextMenu>
+
+<div class="table-wrapper" style="position: relative; z-index: 1; overflow-x: auto; max-height: 420px; overflow-y: auto;">
+    @if (IsLoading)
+    {
+        <div class="text-center py-4">
+            <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+            <span class="text-muted" style="font-size: 0.85rem;">Loading receivings...</span>
+        </div>
+    }
+    else if (!Rows.Any())
+    {
+        <div class="text-center py-4 text-muted" style="font-size: 0.85rem;">
+            <i class="fas fa-inbox me-2"></i>No unposted receivings found for selected vendor and date range.
+        </div>
+    }
+    else
+    {
+        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                <tr>
+                    <th style="width:36px;">
+                        <input type="checkbox" class="form-check-input" @onchange="OnSelectAllChanged" title="Select / Deselect All" />
+                    </th>
+                    <th style="width:40px;">S.#</th>
+                    <th>Order #</th>
+                    <th style="width:90px;">Date</th>
+                    <th style="width:90px;">Type</th>
+                    <th>Material</th>
+                    <th class="text-end" style="width:80px;">Qty</th>
+                    <th class="text-end" style="width:80px;">Rate</th>
+                    <th class="text-end" style="width:100px;">Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{ int idx = 0; }
+                @foreach (var row in Rows)
+                {
+                    idx++;
+                    var capturedRow = row;
+                    <tr @oncontextmenu="(e) => OnRowRightClick(e, capturedRow)"
+                        @oncontextmenu:preventDefault
+                        class="@(row.IsChecked ? "table-primary" : "")">
+                        <td>
+                            <input type="checkbox" class="form-check-input"
+                                   checked="@row.IsChecked"
+                                   @onchange="(e) => OnRowChecked(capturedRow, e)" />
+                        </td>
+                        <td class="text-muted">@idx</td>
+                        <td><span class="fw-semibold text-dark">@row.PORefNo</span></td>
+                        <td>@row.RcvDate.ToString("dd-MMM-yy")</td>
+                        <td>
+                            <span class="badge @(row.IssuanceType == 1 ? "bg-info" : row.IssuanceType == 2 ? "bg-warning text-dark" : "bg-secondary")" style="font-size:0.72rem;">
+                                @row.OrderType
+                            </span>
+                        </td>
+                        <td>
+                            <span class="text-muted me-1" style="font-size:0.78rem;">(@row.MaterialID)</span>@row.RMName
+                        </td>
+                        <td class="text-end">@row.NetQty.ToString("N2")</td>
+                        <td class="text-end">
+                            @if (row.IsEditingRate)
+                            {
+                                <input type="number" class="form-control form-control-sm text-end p-0"
+                                       style="width:75px; font-size:0.82rem;"
+                                       value="@row.EditingRate"
+                                       @onchange="(e) => OnRateChanged(capturedRow, e)"
+                                       @onkeydown="(e) => OnRateKeyDown(capturedRow, e)"
+                                       @onblur="() => OnRateBlur(capturedRow)"
+                                       autofocus />
+                            }
+                            else
+                            {
+                                <span style="cursor:pointer;" @ondblclick="() => StartEditRate(capturedRow)"
+                                      title="Double-click to edit rate">
+                                    @row.Rate.ToString("N2")
+                                </span>
+                            }
+                        </td>
+                        <td class="text-end fw-semibold">@row.Value.ToString("N0")</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot class="table-light" style="font-size: 0.8rem; position: sticky; bottom: 0; z-index: 2;">
+                <tr>
+                    <td colspan="6" class="text-end text-secondary fw-semibold pe-2">All Rows Total :</td>
+                    <td class="text-end fw-bold text-dark">@Rows.Sum(r => r.NetQty).ToString("N2")</td>
+                    <td></td>
+                    <td class="text-end fw-bold text-dark">@Rows.Sum(r => r.Value).ToString("N0")</td>
+                </tr>
+                <tr class="table-primary">
+                    <td colspan="6" class="text-end text-primary fw-semibold pe-2">Selected Total :</td>
+                    <td class="text-end fw-bold text-primary">@Rows.Where(r => r.IsChecked).Sum(r => r.NetQty).ToString("N2")</td>
+                    <td></td>
+                    <td class="text-end fw-bold text-primary">@Rows.Where(r => r.IsChecked).Sum(r => r.Value).ToString("N0")</td>
+                </tr>
+            </tfoot>
+        </table>
+    }
+</div>

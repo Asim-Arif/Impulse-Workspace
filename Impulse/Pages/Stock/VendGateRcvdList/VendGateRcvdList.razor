@@ -1,0 +1,225 @@
+@page "/stock/vend-rcv-list"
+@using DataAccessLibrary.Models.ViewModels.Stock
+@using Impulse.Services.Stock
+@using Blazored.Typeahead
+@using BlazorContextMenu
+@inject IVendGateRcvdListService VendGateRcvdListService
+@inject Impulse.Services.INotificationService NotificationService
+@inject NavigationManager NavigationManager
+@inject Impulse.Services.IReportNavigationService ReportNavigation
+@inject IJSRuntime JS
+@inject IBlazorContextMenuService BlazorContextMenuService
+
+<PageTitle>Vendor Receiving List</PageTitle>
+
+<style>
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .disabled-typeahead-wrapper .blazored-typeahead {
+        background-color: #e9ecef !important;
+        overflow: hidden !important;
+        border-radius: 4px;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__results {
+        z-index: 1050 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    .form-control-sm, .form-select-sm, .input-group-text, .btn-sm {
+        height: 35px !important;
+    }
+
+    .win11-context-menu-container, .blazor-context-menu {
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+    }
+
+    .dropdown-row {
+        position: relative !important;
+        z-index: 9999 !important;
+    }
+    .table-wrapper {
+        position: relative !important;
+        z-index: 1 !important;
+    }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom justify-content-between">
+                <h5 class="mb-0 fw-bold text-dark-emphasis">
+                    <i class="fas fa-truck-loading text-primary me-2"></i>
+                    Vendor Receiving List
+                </h5>
+                <div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="optionsBarMenuBtn" @onclick="ShowOptionsMenu">
+                        <i class="fas fa-cog"></i> Options
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary" @onclick="OnRefreshClicked">
+                        <i class="fas fa-sync-alt me-1"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="row g-2 align-items-end mb-3 dropdown-row" style="position: relative; z-index: 10000;">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Vendor</label>
+                    <BlazoredTypeahead SearchMethod="SearchVendors"
+                                       @bind-Value="SelectedVendor"
+                                       Placeholder="<All Vendors>"
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>@(((dynamic)context).AccTitle)</SelectedTemplate>
+                        <ResultTemplate>@(((dynamic)context).AccTitle)</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">RM Group</label>
+                    <BlazoredTypeahead SearchMethod="SearchRMGroups"
+                                       @bind-Value="SelectedRMGroup"
+                                       Placeholder="<All Groups>"
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>@(((dynamic)context).Description)</SelectedTemplate>
+                        <ResultTemplate>@(((dynamic)context).Description)</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Range</label>
+                    <select class="form-select form-select-sm" @bind="Filter.DateRangeIndex" @bind:after="OnDateRangeChanged">
+                        <option value="0">Today</option>
+                        <option value="1">Last 15 Days</option>
+                        <option value="2">Last 30 Days</option>
+                        <option value="3">Last 60 Days</option>
+                        <option value="4">Last 90 Days</option>
+                        <option value="5">Custom Date</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">PO No.</label>
+                    <input type="text" class="form-control form-control-sm" @bind="Filter.OrderNo" />
+                </div>
+                <div class="col-md-2 d-flex align-items-end mb-1" style="display:none !important;">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="chkSample" @bind="IsSampleList" @bind:after="LoadDataAsync">
+                        <label class="form-check-label text-secondary fw-bold" style="font-size: 0.8rem;" for="chkSample">Sample Orders</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">From</label>
+                    <input type="date" class="form-control form-control-sm" @bind="Filter.DateFrom" disabled="@(Filter.DateRangeIndex != 5)" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">To</label>
+                    <input type="date" class="form-control form-control-sm" @bind="Filter.DateTo" disabled="@(Filter.DateRangeIndex != 5)" />
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-responsive table-wrapper border rounded" style="max-height: 55vh; overflow-y: auto;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th class="px-3" style="width: 50px;">S.#</th>
+                            <th>P.O. No.</th>
+                            <th>Receiving ID</th>
+                            <th>Dated</th>
+                            <th>Vendor</th>
+                            <th class="text-end">Total Qty</th>
+                            <th class="text-end px-3">Rej. Qty</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-muted">
+                                    <div class="spinner-border spinner-border-sm me-2" role="status"></div> Loading...
+                                </td>
+                            </tr>
+                        }
+                        else if (ReceivingList == null || !ReceivingList.Any())
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-muted">No records found.</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            foreach (var item in ReceivingList)
+                            {
+                                <ContextMenuTrigger WrapperTag="tr" MenuId="rowContextMenu" Data="@item" @ondblclick="() => EditReceiving(item)">
+                                    <td class="px-3 text-muted">@item.SNo</td>
+                                    <td class="fw-bold">@item.PORefNo</td>
+                                    <td>@item.RcvID</td>
+                                    <td>@(item.RcvDate.ToString("dd-MMM-yyyy"))</td>
+                                    <td>@item.VenderName</td>
+                                    <td class="text-end">@item.TotalQty.ToString("N2")</td>
+                                    <td class="text-end px-3 text-danger">@item.TotalQtyRejected.ToString("N2")</td>
+                                </ContextMenuTrigger>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<ContextMenu Id="rowContextMenu" Template="Win11Style">
+    <Item OnClick="OnInspectionEntry" CssClass="win11-menu-item">
+        <i class="fas fa-search text-info win11-icon me-2"></i> Inspection Entry
+    </Item>
+    <Seperator />
+    <Item OnClick="OnPrintSelectedGRN" CssClass="win11-menu-item">
+        <i class="fas fa-print text-secondary win11-icon me-2"></i> Print Selected GRN
+    </Item>
+    <Item OnClick="OnPrintMakerGRN" CssClass="win11-menu-item">
+        <i class="fas fa-print text-secondary win11-icon me-2"></i> Print Maker GRN Slip
+    </Item>
+    <Seperator />
+    <Item OnClick="OnDelete" CssClass="win11-menu-item">
+        <i class="fas fa-trash text-danger win11-icon me-2"></i> Delete Selected Entry
+    </Item>
+</ContextMenu>
+
+<ContextMenu Id="optionsBarMenu" Template="Win11Style">
+    <Item OnClick="OnPrintDailyReceiving" CssClass="win11-menu-item">
+        <i class="fas fa-list text-secondary win11-icon me-2"></i> Print Daily Receiving
+    </Item>
+    <Item OnClick="OnPrintListWithValue" CssClass="win11-menu-item">
+        <i class="fas fa-list-alt text-secondary win11-icon me-2"></i> Print List (With Value)
+    </Item>
+</ContextMenu>

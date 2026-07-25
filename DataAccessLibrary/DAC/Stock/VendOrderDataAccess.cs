@@ -25,6 +25,118 @@ namespace DataAccessLibrary.DAC.Stock
             _logger = logger;
         }
 
+        public async Task<IEnumerable<RMPOListViewModel>> GetRMPOListAsync(RMPOListSearchFilter filter)
+        {
+            try
+            {
+                using var connection = new SqlConnection(_connectionString);
+                
+                var conditions = new List<string>();
+                var parameters = new DynamicParameters();
+
+                if (!string.IsNullOrEmpty(filter.VendorID) && filter.VendorID != "0")
+                {
+                    conditions.Add("VendID = @VendorID");
+                    parameters.Add("@VendorID", filter.VendorID);
+                }
+
+                if (filter.DateFrom.HasValue && filter.DateTo.HasValue)
+                {
+                    conditions.Add("DT BETWEEN @DateFrom AND @DateTo");
+                    parameters.Add("@DateFrom", filter.DateFrom.Value);
+                    parameters.Add("@DateTo", filter.DateTo.Value);
+                }
+
+                if (!string.IsNullOrEmpty(filter.MaterialID) && filter.MaterialID != "0")
+                {
+                    conditions.Add("OrderNo IN (SELECT OrderNo FROM VendOrderDetail WHERE RMID = @MaterialID)");
+                    parameters.Add("@MaterialID", filter.MaterialID);
+                }
+
+                if (filter.RMGroupID.HasValue && filter.RMGroupID.Value != 0)
+                {
+                    conditions.Add("OrderNo IN (SELECT OrderNo FROM VVendOrderDetail WHERE GroupID = @RMGroupID)");
+                    parameters.Add("@RMGroupID", filter.RMGroupID.Value);
+                }
+
+                if (filter.POType.HasValue && filter.POType.Value < 3)
+                {
+                    conditions.Add("IssuanceType = @POType");
+                    parameters.Add("@POType", filter.POType.Value);
+                }
+
+                if (!string.IsNullOrEmpty(filter.OrderNo))
+                {
+                    conditions.Add("OrderNo = @OrderNo");
+                    parameters.Add("@OrderNo", filter.OrderNo);
+                }
+
+                if (filter.ShowSamplePOs)
+                {
+                    conditions.Add("SampleOrder = 1");
+                }
+                else
+                {
+                    conditions.Add("(SampleOrder = 0 OR SampleOrder IS NULL)");
+                }
+
+                if (filter.ShowOpenPOsOnly)
+                {
+                    conditions.Add("RcvableOrderNo IS NOT NULL");
+                }
+
+                if (filter.ShowLateOrdersOnly)
+                {
+                    conditions.Add("DeliveryDT <= GETDATE()");
+                }
+
+                string whereClause = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : "";
+
+                string sql = $@"
+                    SELECT DT, VendID, AccTitle, AttnPerson, PaymentTerms, 
+                           Department, DeliveryDT, Remarks, OrderNo, ReqNo, Final, 
+                           RunningPONo, IssuanceType, CAST(CASE WHEN PDFAttachment IS NOT NULL THEN 1 ELSE 0 END AS BIT) AS HasPDF, 
+                           TotalQtyOrdered, SampleOrder, RcvableOrderNo, TotalQtyRcvd
+                    FROM VVendOrdersList 
+                    {whereClause} 
+                    ORDER BY DT ASC";
+
+                // Since we only need to know if PDF is attached, we can just use the HasPDF bit.
+                // But wait, the ViewModel has byte[] PDFAttachment. Let's just fetch it normally.
+
+                string finalSql = $@"
+                    SELECT DT, VendID, AccTitle, AttnPerson, PaymentTerms, 
+                           Department, DeliveryDT, Remarks, OrderNo, ReqNo, Final, 
+                           RunningPONo, IssuanceType, PDFAttachment, TotalQtyOrdered, SampleOrder, 
+                           RcvableOrderNo, TotalQtyRcvd
+                    FROM VVendOrdersList 
+                    {whereClause} 
+                    ORDER BY DT ASC";
+
+                return await connection.QueryAsync<RMPOListViewModel>(finalSql, parameters);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting RM PO List");
+                throw;
+            }
+        }
+
+        public async Task UpdatePDFAttachmentAsync(string orderNo, byte[] pdfData)
+        {
+            try
+            {
+                using var connection = new SqlConnection(_connectionString);
+                string sql = "UPDATE VendOrders SET PDFAttachment = @PdfData WHERE OrderNo = @OrderNo";
+                await connection.ExecuteAsync(sql, new { PdfData = pdfData, OrderNo = orderNo });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating PDF attachment");
+                throw;
+            }
+        }
+
         public async Task<string> GetNextOrderNoAsync()
         {
             try

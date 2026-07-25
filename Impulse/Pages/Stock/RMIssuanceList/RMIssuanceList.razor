@@ -1,0 +1,213 @@
+@page "/stock/rm-issuance-list"
+
+<PageTitle>RM Issuance List</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body">
+            
+            <!-- Header & Top Actions -->
+            <div class="d-flex justify-content-between align-items-end pb-2 mb-3 border-bottom">
+                <div>
+                    <h5 class="mb-0 fw-bold text-primary" style="font-size: 1.25rem;">
+                        <i class="fas fa-list-alt me-2"></i>RM Issuance List
+                    </h5>
+                    <small class="text-muted">Manage and print raw material issuances</small>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-primary" @onclick="RefreshData" disabled="@IsLoading">
+                        @if (IsLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <span>Loading...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-sync-alt me-1"></i><span>Refresh</span>
+                        }
+                    </button>
+                    <button id="optionsBarMenu" class="btn btn-sm btn-primary" @onclick="ShowOptionsMenu">
+                        <i class="fas fa-cog me-1"></i>Options
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="row g-2 mb-3">
+                <div class="col-md-2">
+                    <label class="form-label mb-1" style="font-size: 0.85rem; font-weight: 500;">From Date</label>
+                    <input type="date" class="form-control form-control-sm" @bind="DateFrom" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label mb-1" style="font-size: 0.85rem; font-weight: 500;">To Date</label>
+                    <input type="date" class="form-control form-control-sm" @bind="DateTo" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label mb-1" style="font-size: 0.85rem; font-weight: 500;">Material Group</label>
+                    <BlazoredTypeahead SearchMethod="SearchGroups" @bind-Value="SelectedGroup" 
+                                       Placeholder="All Groups" MaximumSuggestions="1000" EnableDropDown="true" class="blazored-typeahead">
+                        <SelectedTemplate Context="grp">@grp.Display</SelectedTemplate>
+                        <ResultTemplate Context="grp">@grp.Display</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label mb-1" style="font-size: 0.85rem; font-weight: 500;">Material</label>
+                    <BlazoredTypeahead SearchMethod="SearchMaterials" @bind-Value="SelectedMaterial" 
+                                       Placeholder="All Materials" MaximumSuggestions="1000" EnableDropDown="true" class="blazored-typeahead">
+                        <SelectedTemplate Context="mat">@mat.Display</SelectedTemplate>
+                        <ResultTemplate Context="mat">@mat.Display</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label mb-1" style="font-size: 0.85rem; font-weight: 500;">Department</label>
+                    <BlazoredTypeahead SearchMethod="SearchDepartments" @bind-Value="SelectedDepartment" 
+                                       Placeholder="All Departments" MaximumSuggestions="1000" EnableDropDown="true" class="blazored-typeahead">
+                        <SelectedTemplate Context="dept">@dept.Display</SelectedTemplate>
+                        <ResultTemplate Context="dept">@dept.Display</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label mb-1" style="font-size: 0.85rem; font-weight: 500;">Employee</label>
+                    <BlazoredTypeahead SearchMethod="SearchEmployees" @bind-Value="SelectedEmployee" 
+                                       Placeholder="Employee" MaximumSuggestions="1000" EnableDropDown="true" class="blazored-typeahead">
+                        <SelectedTemplate Context="emp">@emp.Display</SelectedTemplate>
+                        <ResultTemplate Context="emp">@emp.Display</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label mb-1" style="font-size: 0.85rem; font-weight: 500;">Vendor</label>
+                    <BlazoredTypeahead SearchMethod="SearchVendors" @bind-Value="SelectedVendor" 
+                                       Placeholder="Vendor" MaximumSuggestions="1000" EnableDropDown="true" class="blazored-typeahead">
+                        <SelectedTemplate Context="vend">@vend.VenderName</SelectedTemplate>
+                        <ResultTemplate Context="vend">@vend.VenderName</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+            </div>
+
+            <!-- Data Grid -->
+            <div class="table-responsive" style="max-height: 65vh; overflow-y: auto; position: relative !important; z-index: 1 !important;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th style="width: 130px;">Issuance No</th>
+                            <th style="width: 100px;">Date</th>
+                            <th>Issued To (Employee)</th>
+                            <th>Issued To (Vendor)</th>
+                            <th>Material</th>
+                            <th class="text-end" style="width: 100px;">Total Qty</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-5">
+                                    <div class="spinner-border text-primary mb-2" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <div class="text-muted">Fetching issuances...</div>
+                                </td>
+                            </tr>
+                        }
+                        else if (!Issuances.Any())
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-5 text-muted">
+                                    <i class="fas fa-folder-open fs-2 mb-2"></i>
+                                    <div>No issuances found matching your criteria.</div>
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var row in Issuances)
+                            {
+                                <ContextMenuTrigger WrapperTag="tr" MenuId="rowContextMenu" Data="@row">
+                                    <td class="fw-bold text-primary">@row.IssNo</td>
+                                    <td>@(row.DT?.ToString("dd-MMM-yyyy"))</td>
+                                    <td>@row.IssdToEmpID</td>
+                                    <td>@row.VenderName</td>
+                                    <td>@row.RM</td>
+                                    <td class="text-end fw-bold">@row.Total_Issued_Qty</td>
+                                </ContextMenuTrigger>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<ContextMenu Id="optionsMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <Item OnClick="NavigateToNewIssuance" CssClass="win11-menu-item">
+        <i class="fas fa-plus-circle win11-icon text-success"></i>Issue New Material
+    </Item>
+    <Item OnClick="PrintIssuanceReport" CssClass="win11-menu-item">
+        <i class="fas fa-print win11-icon text-primary"></i>Print Issuance Report
+    </Item>
+</ContextMenu>
+
+<ContextMenu Id="rowContextMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <Item OnClick="PrintSingleEntry" CssClass="win11-menu-item">
+        <i class="fas fa-print win11-icon text-primary"></i>Print This Entry
+    </Item>
+    <Seperator />
+    <Item OnClick="DeleteIssuance" CssClass="win11-menu-item text-danger">
+        <i class="fas fa-trash-alt win11-icon"></i>Delete Issuance
+    </Item>
+</ContextMenu>
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        margin: 0 !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+    }
+    .blazored-typeahead__results {
+        z-index: 1050 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    .form-control-sm, .btn-sm {
+        height: 35px !important;
+    }
+
+    /* Context Menu Styles */
+    .blazor-context-menu {
+        max-height: 40vh;
+        overflow-y: auto;
+    }
+    .win11-menu-item {
+        font-size: 0.85rem !important;
+        padding: 6px 16px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    .win11-icon {
+        width: 20px !important;
+        margin-right: 8px !important;
+        text-align: center !important;
+    }
+</style>

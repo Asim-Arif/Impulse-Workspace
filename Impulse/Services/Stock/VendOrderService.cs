@@ -13,6 +13,16 @@ namespace Impulse.Services.Stock
             _vendOrderDataAccess = vendOrderDataAccess;
         }
 
+        public Task<IEnumerable<RMPOListViewModel>> GetRMPOListAsync(RMPOListSearchFilter filter)
+        {
+            return _vendOrderDataAccess.GetRMPOListAsync(filter);
+        }
+
+        public Task UpdatePDFAttachmentAsync(string orderNo, byte[] pdfData)
+        {
+            return _vendOrderDataAccess.UpdatePDFAttachmentAsync(orderNo, pdfData);
+        }
+
         public Task<VendOrderViewModel> GetVendOrderAsync(string orderNo)
         {
             return _vendOrderDataAccess.GetVendOrderAsync(orderNo);

@@ -114,6 +114,18 @@ namespace Impulse.Constants
             public const string UrgentRequest = Folder + "UrgentRequest.rpt";
         }
 
+        // Stock Subfolder
+        public static class Stock
+        {
+            private const string Folder = ""; // Flat in RptPath
+            public const string StockLedger = Folder + "StockLedger.rpt";
+            public const string DailyStockList = Folder + "DailyStockList.rpt";
+            public const string DailyStockListZero = Folder + "DailyStockList_Zero.rpt";
+            public const string CustomerCatalogWithDetails = Folder + "CustomerCatalogWithDetails.rpt";
+            public const string CustStockList = Folder + "CustStockList.rpt";
+            public const string CustPriceList = Folder + "rptCustomerPriceList.rpt";
+        }
+
         // Company Subfolder
         public static class Company
         {

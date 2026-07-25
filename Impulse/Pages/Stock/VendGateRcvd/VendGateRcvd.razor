@@ -1,0 +1,192 @@
+@page "/stock/vend-gate-rcvd"
+@using Blazored.Typeahead
+@using Impulse.Services.Stock
+@using Impulse.Services
+@using DataAccessLibrary.Models.ViewModels.Stock
+@inject IVendGateRcvdService _vendGateRcvdService
+@inject Radzen.NotificationService NotificationService
+@inject Microsoft.AspNetCore.Components.NavigationManager NavigationManager
+@inject IReportNavigationService ReportNavigationService
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-center pb-2 mb-3 border-bottom">
+                <h5 class="mb-0 text-primary">Vendor Gate Receiving</h5>
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkShowPicture" @bind="ShowPicture">
+                    <label class="form-check-label fw-bold text-secondary" for="chkShowPicture" style="font-size: 0.8rem;">Show Picture</label>
+                </div>
+            </div>
+
+            <div class="row g-2 mb-3">
+                <div class="col-md-2">
+                    <label class="form-label mb-1" style="font-size: 0.85rem; font-weight: 500;">Receive Date</label>
+                    <input type="date" class="form-control form-control-sm" @bind="request.RcvDate" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label mb-1" style="font-size: 0.85rem; font-weight: 500;">Vendor</label>
+                    <div class="@(false ? "disabled-typeahead-wrapper" : "")">
+                        <BlazoredTypeahead SearchMethod="SearchVendors" @bind-Value="SelectedVendor" 
+                                           Placeholder="Select Vendor..." MaximumSuggestions="1000"
+                                           EnableDropDown="true"
+                                           class="blazored-typeahead">
+                            <SelectedTemplate Context="vend">
+                                @(((dynamic)vend).AccTitle)
+                            </SelectedTemplate>
+                            <ResultTemplate Context="vend">
+                                @(((dynamic)vend).AccTitle)
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label mb-1" style="font-size: 0.85rem; font-weight: 500;">Order No</label>
+                    <div class="@(SelectedVendor == null ? "disabled-typeahead-wrapper" : "")">
+                        <BlazoredTypeahead SearchMethod="SearchOrders" @bind-Value="SelectedOrder" 
+                                           Placeholder="Select Order..." MaximumSuggestions="1000"
+                                           EnableDropDown="true"
+                                           Disabled="@(SelectedVendor == null)" class="blazored-typeahead">
+                            <SelectedTemplate Context="ord">
+                                @(ord.OrderText)
+                            </SelectedTemplate>
+                            <ResultTemplate Context="ord">
+                                @(ord.OrderText)
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label mb-1" style="font-size: 0.85rem; font-weight: 500;">Description</label>
+                    <input type="text" class="form-control form-control-sm" @bind="request.Description" placeholder="Enter description..." />
+                </div>
+            </div>
+
+            @if (isLoadingItems)
+            {
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            }
+            else if (request.ReceivedItems != null && request.ReceivedItems.Any())
+            {
+                <div class="table-responsive" style="max-height: 50vh; overflow-y: auto; position: relative !important; z-index: 1 !important;">
+                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                        <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                            <tr>
+                                <th>Material ID</th>
+                                <th>Material Name</th>
+                                <th>Qty Ordered</th>
+                                <th>Qty To Rcv</th>
+                                <th style="width: 120px;">Qty Rcvd</th>
+                                <th>Store Name</th>
+                                <th style="width: 100px;">Rate</th>
+                                <th style="width: 100px;">Sheets</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in request.ReceivedItems)
+                            {
+                                <tr @onclick="() => SelectRowMaterial(item.MaterialID)" style="cursor:pointer;">
+                                    <td>@item.MaterialID</td>
+                                    <td>@item.MaterialName</td>
+                                    <td>@item.QtyOrdered @item.Unit</td>
+                                    <td>@item.QtyToRcv @item.Unit</td>
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm bg-warning-subtle" @bind="item.QtyRcvd" @bind:event="oninput" min="0" step="any" />
+                                    </td>
+                                    <td>
+                                        <select class="form-select form-select-sm" @bind="item.StoreName">
+                                            <option value="">- Select -</option>
+                                            @foreach (var store in Stores)
+                                            {
+                                                <option value="@store">@store</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm" @bind="item.Rate" @bind:event="oninput" step="any" />
+                                    </td>
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm" @bind="item.Sheets" @bind:event="oninput" />
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else if (SelectedOrder != null)
+            {
+                <div class="text-center py-4 text-muted">
+                    No items pending to receive for this order.
+                </div>
+            }
+
+            <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="chkPrint" @bind="PrintReceivingNote">
+                    <label class="form-check-label" for="chkPrint" style="font-size: 0.85rem; font-weight: 500; color: #008000;">
+                        Print Receiving Note
+                    </label>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="Close">
+                        <i class="fas fa-times me-1"></i> Close
+                    </button>
+                    <button class="btn btn-sm btn-primary" @onclick="() => Save(true)" disabled="@isSaving">
+                        <i class="fas fa-save me-1"></i> Save & New
+                    </button>
+                    <button class="btn btn-sm btn-success" @onclick="() => Save(false)" disabled="@isSaving">
+                        <i class="fas fa-check me-1"></i> Save & Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        margin: 0 !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+    }
+    .blazored-typeahead__results {
+        z-index: 1050 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    .form-control-sm, .form-select-sm, .input-group-text, .btn-sm {
+        height: 35px !important;
+    }
+    .table-responsive .form-control-sm {
+        height: 28px !important;
+        padding: 0.15rem 0.5rem !important;
+    }
+    .disabled-typeahead-wrapper .blazored-typeahead { overflow: hidden !important; border-radius: 4px; pointer-events: none; opacity: 0.6; }
+</style>
+
+<Impulse.Components.Stock.MaterialPictureViewer MaterialId="@SelectedMaterialId" ShowPicture="@ShowPicture" />

@@ -9,5 +9,7 @@ namespace Impulse.Services.Stock
         Task<string> SaveVendOrderAsync(VendOrderViewModel model);
         Task<bool> DeleteVendOrderAsync(string orderNo);
         Task<string> GetNextOrderNoAsync();
+        Task<IEnumerable<RMPOListViewModel>> GetRMPOListAsync(RMPOListSearchFilter filter);
+        Task UpdatePDFAttachmentAsync(string orderNo, byte[] pdfData);
     }
 }

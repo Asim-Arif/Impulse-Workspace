@@ -1,0 +1,299 @@
+@page "/stock/rm-issuance"
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.ViewModels.Stock
+
+<PageTitle>RM Issuance</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-3">
+            
+            <div class="d-flex justify-content-between align-items-end pb-2 mb-3 border-bottom">
+                <h5 class="mb-0 text-primary"><i class="fas fa-boxes me-2"></i>Issue Material</h5>
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkShowPicture" @bind="ShowPicture">
+                    <label class="form-check-label fw-bold text-secondary" for="chkShowPicture" style="font-size: 0.8rem;">Show Picture</label>
+                </div>
+            </div>
+
+            <!-- Header Section -->
+            <div class="row g-2 mb-3">
+                <div class="col-md-2">
+                    <div class="d-flex align-items-center mb-1" style="height: 22px;">
+                        <label class="form-label mb-0" style="font-size: 0.85rem; font-weight: 500;">Issue Date</label>
+                    </div>
+                    <input type="date" class="form-control form-control-sm" @bind="Request.DT" />
+                </div>
+                <div class="col-md-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1" style="height: 22px;">
+                        <label class="form-label mb-0" style="font-size: 0.85rem; font-weight: 500;">Issued To</label>
+                        <div class="form-check form-switch mb-0 d-flex align-items-center">
+                            <input class="form-check-input mt-0 me-1" type="checkbox" id="chkIssueToToggle" @bind="IsEmployee">
+                            <label class="form-check-label text-secondary mb-0" for="chkIssueToToggle" style="font-size: 0.75rem; line-height: 1;">
+                                @(IsEmployee ? "Employee" : "Vendor")
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        @if (IsEmployee)
+                        {
+                            <BlazoredTypeahead SearchMethod="SearchEmployees" @bind-Value="SelectedEmployee" 
+                                               Placeholder="Select Employee..." MaximumSuggestions="1000" EnableDropDown="true" class="blazored-typeahead">
+                                <SelectedTemplate Context="emp">@emp.Display</SelectedTemplate>
+                                <ResultTemplate Context="emp">@emp.Display</ResultTemplate>
+                            </BlazoredTypeahead>
+                        }
+                        else
+                        {
+                            <BlazoredTypeahead SearchMethod="SearchMakers" @bind-Value="SelectedMaker" 
+                                               Placeholder="Select Vendor..." MaximumSuggestions="1000" EnableDropDown="true" class="blazored-typeahead">
+                                <SelectedTemplate Context="vend">@vend.VenderName</SelectedTemplate>
+                                <ResultTemplate Context="vend">@vend.VenderName</ResultTemplate>
+                            </BlazoredTypeahead>
+                        }
+                    </div>
+                </div>
+                @if (!IsEmployee)
+                {
+                    <div class="col-md-2">
+                        <div class="d-flex align-items-center mb-1" style="height: 22px;">
+                            <label class="form-label mb-0" style="font-size: 0.85rem; font-weight: 500;">Prod Issuance</label>
+                        </div>
+                        <div>
+                            <BlazoredTypeahead SearchMethod="SearchProductionIssuances" @bind-Value="SelectedProductionIssuance" 
+                                               Placeholder="Select Issuance..." MaximumSuggestions="1000" EnableDropDown="true" class="blazored-typeahead">
+                                <SelectedTemplate Context="iss">@iss.Display</SelectedTemplate>
+                                <ResultTemplate Context="iss">@iss.Display</ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+                    </div>
+                }
+                <div class="@(IsEmployee ? "col-md-3" : "col-md-2")">
+                    <div class="d-flex align-items-center mb-1" style="height: 22px;">
+                        <label class="form-label mb-0" style="font-size: 0.85rem; font-weight: 500;">Authorized By</label>
+                    </div>
+                    <div>
+                        <BlazoredTypeahead SearchMethod="SearchEmployees" @bind-Value="AuthorizedBy" 
+                                           Placeholder="Select Approver..." MaximumSuggestions="1000" EnableDropDown="true" class="blazored-typeahead">
+                            <SelectedTemplate Context="emp">@emp.Display</SelectedTemplate>
+                            <ResultTemplate Context="emp">@emp.Display</ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                </div>
+                <div class="@(IsEmployee ? "col-md-4" : "col-md-3")">
+                    <div class="d-flex align-items-center mb-1" style="height: 22px;">
+                        <label class="form-label mb-0" style="font-size: 0.85rem; font-weight: 500;">Remarks</label>
+                    </div>
+                    <input type="text" class="form-control form-control-sm" @bind="Request.Remarks" placeholder="Enter remarks..." />
+                </div>
+            </div>
+
+            <!-- Add Item Section -->
+            <div class="px-0 mb-3 mt-4 pt-3 border-top">
+                <div class="row g-2 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label mb-1" style="font-size: 0.8rem;">Material</label>
+                            <BlazoredTypeahead SearchMethod="SearchMaterials" @bind-Value="SelectedMaterial" 
+                                               TValue="DataAccessLibrary.Models.ViewModels.Stock.RMLookupModel" 
+                                               TItem="DataAccessLibrary.Models.ViewModels.Stock.RMLookupModel"
+                                               Placeholder="Select Material..." MaximumSuggestions="1000" EnableDropDown="true" class="blazored-typeahead">
+                                <SelectedTemplate Context="rm">@rm.Display</SelectedTemplate>
+                                <ResultTemplate Context="rm">@rm.Display</ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label mb-1" style="font-size: 0.8rem;">Location (Batch / Lot)</label>
+                            <div class="@(SelectedMaterial == null ? "disabled-typeahead-wrapper" : "")">
+                                <BlazoredTypeahead SearchMethod="SearchLocations" @bind-Value="SelectedLocation" 
+                                                   Placeholder="Select Location..." MaximumSuggestions="1000" EnableDropDown="true" 
+                                                   Disabled="@(SelectedMaterial == null)" class="blazored-typeahead">
+                                    <SelectedTemplate Context="loc">@loc.Display</SelectedTemplate>
+                                    <ResultTemplate Context="loc">@loc.Display</ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label mb-1" style="font-size: 0.8rem;">Qty To Issue (@(CurrentUnit))</label>
+                            <input type="number" class="form-control form-control-sm" @bind="QtyToIssue" @onkeyup="HandleQtyKeyUp" min="0" step="any" disabled="@(SelectedLocation == null)" />
+                        </div>
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-sm btn-primary w-100" @onclick="AddItem" disabled="@(SelectedLocation == null || QtyToIssue <= 0)">
+                                <i class="fas fa-plus-circle me-1"></i> Add
+                            </button>
+                        </div>
+                    </div>
+                    @if (SelectedLocation != null)
+                    {
+                        <div class="row mt-1">
+                            <div class="col-12 text-end text-muted" style="font-size: 0.75rem;">
+                                In Hand: <strong>@SelectedLocation.ShelfQty</strong> @CurrentUnit
+                            </div>
+                        </div>
+                    }
+            </div>
+
+            <!-- Main Grid -->
+            <div class="table-responsive mb-3" style="min-height: 200px; max-height: 35vh; overflow-y: auto; position: relative !important; z-index: 1 !important;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th style="width: 50px;">S No.</th>
+                            <th>Material ID</th>
+                            <th>Material Name</th>
+                            <th>Store</th>
+                            <th>Location / Batch</th>
+                            <th class="text-end">Qty</th>
+                            <th>Unit</th>
+                            <th class="text-end" style="width: 60px;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Request.Rows.Any())
+                        {
+                            int sno = 1;
+                            foreach (var row in Request.Rows)
+                            {
+                                <tr>
+                                    <td>@(sno++)</td>
+                                    <td>@row.RMID1</td>
+                                    <td>@row.RMName</td>
+                                    <td>@row.Store</td>
+                                    <td>
+                                        @if(!string.IsNullOrEmpty(row.BatchNo)) {
+                                            <span class="badge bg-secondary">B: @row.BatchNo</span>
+                                        }
+                                        @if(!string.IsNullOrEmpty(row.LotNo)) {
+                                            <span class="badge bg-info">L: @row.LotNo</span>
+                                        }
+                                    </td>
+                                    <td class="text-end fw-bold">@row.Qty</td>
+                                    <td>@row.Unit</td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-link text-danger p-0" @onclick="() => RemoveItem(row)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-3">No items added.</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- History Section (Last 2 Months) -->
+            <div class="accordion mb-3" id="historyAccordion">
+                <div class="accordion-item border-0 shadow-sm">
+                    <h2 class="accordion-header" id="headingHistory">
+                        <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapseHistory" style="font-size: 0.85rem; font-weight: 600; background: #f8f9fa;">
+                            Last 2 Month's Issuance (@(IsEmployee ? SelectedEmployee?.Name : SelectedMaker?.VenderName))
+                        </button>
+                    </h2>
+                    <div id="collapseHistory" class="accordion-collapse collapse" data-bs-parent="#historyAccordion">
+                        <div class="accordion-body p-0">
+                            <div class="table-responsive" style="max-height: 20vh; overflow-y: auto;">
+                                <table class="table table-sm table-striped mb-0" style="font-size: 0.8rem;">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th>Material ID</th>
+                                            <th>Material Name</th>
+                                            <th class="text-end">Total Qty Issued</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (IssuanceHistory.Any())
+                                        {
+                                            @foreach (var hist in IssuanceHistory)
+                                            {
+                                                <tr>
+                                                    <td>@hist.RMID1</td>
+                                                    <td>@hist.RMName</td>
+                                                    <td class="text-end fw-bold">@hist.Qty</td>
+                                                </tr>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <tr>
+                                                <td colspan="3" class="text-center text-muted">No recent issuance found.</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="chkPrint" @bind="PrintWhenSaved">
+                    <label class="form-check-label text-success fw-bold" for="chkPrint" style="font-size: 0.85rem;">
+                        Print When Saved
+                    </label>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="Close">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                    <button class="btn btn-sm btn-primary" @onclick="() => SaveAsync(true)" disabled="@IsSaving">
+                        <i class="fas fa-save me-1"></i> Save & New
+                    </button>
+                    <button class="btn btn-sm btn-success" @onclick="() => SaveAsync(false)" disabled="@IsSaving">
+                        <i class="fas fa-check me-1"></i> Save & Close
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        margin: 0 !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+    }
+    .blazored-typeahead__results {
+        z-index: 1050 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    .form-control-sm, .form-select-sm, .input-group-text, .btn-sm {
+        height: 35px !important;
+    }
+    .table-responsive .form-control-sm {
+        height: 28px !important;
+        padding: 0.15rem 0.5rem !important;
+    }
+    .disabled-typeahead-wrapper .blazored-typeahead { overflow: hidden !important; border-radius: 4px; pointer-events: none; opacity: 0.6; }
+</style>
+
+<Impulse.Components.Stock.MaterialPictureViewer MaterialId="@SelectedMaterial?.RMID1" ShowPicture="@ShowPicture" />

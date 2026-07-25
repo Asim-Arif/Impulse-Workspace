@@ -1,0 +1,166 @@
+@page "/stock/stock-ledger"
+@using DataAccessLibrary.Models.ViewModels.Stock
+@using Impulse.Services.Stock
+@using Impulse.Services
+@attribute [Authorize]
+@inject IStockLedgerService LedgerService
+@inject Impulse.Services.Company.IItemService ItemService
+@inject IReportNavigationService ReportNavigation
+@inject INotificationService NotificationService
+
+<PageTitle>RM Stock Ledger</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 1200px; margin: 0 auto;">
+        <div class="card-body p-4">
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center flex-grow-1">
+                    <i class="fas fa-book-open me-2"></i> RM Stock Ledger
+                </h4>
+                <div>
+                    <button class="btn btn-sm btn-outline-secondary shadow-sm me-2" style="height: 35px; width: 120px;" @onclick="LoadLedgerAsync" disabled="@IsLoading">
+                        @if (IsLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <span>Loading...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-sync-alt me-1"></i>
+                            <span>Refresh</span>
+                        }
+                    </button>
+                    <button class="btn btn-sm btn-primary shadow-sm" style="height: 35px; width: 120px;" @onclick="PrintLedgerAsync" disabled="@(SelectedMaterial == null)">
+                        <i class="fas fa-print me-1"></i>
+                        <span>Print</span>
+                    </button>
+                </div>
+            </div>
+
+            @if (IsLoadingInitialData)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                </div>
+            }
+            else
+            {
+                <div class="row mb-3 align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Select Material</label>
+                        <BlazoredTypeahead SearchMethod="SearchMaterials" @bind-Value="SelectedMaterial" Placeholder="Search Material..." EnableDropDown="true">
+                            <SelectedTemplate>@context.RMName</SelectedTemplate>
+                            <ResultTemplate>@context.RMName</ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Date Range</label>
+                        <select class="form-select form-select-sm" @onchange="OnDateRangeChanged" style="height: 35px; font-size: 0.85rem;">
+                            <option value="0">Today</option>
+                            <option value="7">Last 7 Days</option>
+                            <option value="15">Last 15 Days</option>
+                            <option value="30">Last 30 Days</option>
+                            <option value="60" selected>Last 60 Days</option>
+                            <option value="-1">Custom Range</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">From</label>
+                        <input type="date" class="form-control form-control-sm" @bind="FromDate" disabled="@(!IsCustomDate)" style="height: 35px; font-size: 0.85rem;" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">To</label>
+                        <input type="date" class="form-control form-control-sm" @bind="ToDate" disabled="@(!IsCustomDate)" style="height: 35px; font-size: 0.85rem;" />
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    @if (Transactions != null && !IsLoading)
+    {
+        <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 1200px; margin: 0 auto;">
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
+                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                        <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                            <tr>
+                                <th style="width: 12%; padding-left: 1rem;">Date</th>
+                                <th style="width: 25%;">Description</th>
+                                <th style="width: 25%;">Reference</th>
+                                <th style="width: 13%; text-align: right;">In Qty</th>
+                                <th style="width: 13%; text-align: right;">Out Qty</th>
+                                <th style="width: 12%; text-align: right; padding-right: 1rem;">Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="table-primary">
+                                <td colspan="5" class="fw-bold text-end" style="padding-right: 2rem;">OPENING BALANCE:</td>
+                                <td class="fw-bold text-end" style="padding-right: 1rem;">@OpeningBalance.ToString("N2")</td>
+                            </tr>
+                            
+                            @if (!Transactions.Any())
+                            {
+                                <tr>
+                                    <td colspan="6" class="text-center py-4 text-muted">No transactions found for the selected period.</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var tran in Transactions)
+                                {
+                                    <tr>
+                                        <td style="padding-left: 1rem;">@tran.TransactionDate.ToString("dd-MMM-yyyy")</td>
+                                        <td>@tran.Description</td>
+                                        <td>@tran.Reference</td>
+                                        <td class="text-end">
+                                            @if (tran.Quantity > 0)
+                                            {
+                                                <span class="text-success">@tran.Quantity.ToString("N2")</span>
+                                            }
+                                        </td>
+                                        <td class="text-end">
+                                            @if (tran.Quantity < 0)
+                                            {
+                                                <span class="text-danger">@Math.Abs(tran.Quantity).ToString("N2")</span>
+                                            }
+                                        </td>
+                                        <td class="text-end fw-bold" style="padding-right: 1rem;">@tran.Balance.ToString("N2")</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+</style>

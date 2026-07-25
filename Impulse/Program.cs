@@ -118,8 +118,20 @@ builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IAccountReportingAccessService, AccountReportingAccessService>();
 
 //Stock Module Registrations
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IStockLedgerDataAccess, DataAccessLibrary.DAC.Stock.StockLedgerDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IStockLedgerService, Impulse.Services.Stock.StockLedgerService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IChangeBatchNoLotDataAccess, DataAccessLibrary.DAC.Stock.ChangeBatchNoLotDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IChangeBatchNoLotService, Impulse.Services.Stock.ChangeBatchNoLotService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IRMMovementDataAccess, DataAccessLibrary.DAC.Stock.RMMovementDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IRMMovementService, Impulse.Services.Stock.RMMovementService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IVendorRMAssignmentDataAccess, DataAccessLibrary.DAC.Stock.VendorRMAssignmentDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Stock.IVendorRMAssignmentService, Impulse.Services.Stock.VendorRMAssignmentService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IRMIssuanceDataAccess, DataAccessLibrary.DAC.Stock.RMIssuanceDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IRMIssuanceService, Impulse.Services.Stock.RMIssuanceService>();
+
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IRMIssuanceListDataAccess, DataAccessLibrary.DAC.Stock.RMIssuanceListDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IRMIssuanceListService, Impulse.Services.Stock.RMIssuanceListService>();
+
 builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IRMGroupsDataAccess, DataAccessLibrary.DAC.Stock.RMGroupsDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Stock.IRMGroupsService, Impulse.Services.Stock.RMGroupsService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.INewRMDataAccess, DataAccessLibrary.DAC.Stock.NewRMDataAccess>();
@@ -128,6 +140,26 @@ builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.INewVendorDataAcces
 builder.Services.AddScoped<Impulse.Services.Stock.INewVendorService, Impulse.Services.Stock.NewVendorService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IVendOrderDataAccess, DataAccessLibrary.DAC.Stock.VendOrderDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Stock.IVendOrderService, Impulse.Services.Stock.VendOrderService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IVendGateRcvdDataAccess, DataAccessLibrary.DAC.Stock.VendGateRcvdDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IVendGateRcvdListDataAccess, DataAccessLibrary.DAC.Stock.VendGateRcvdListDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IVendGateRcvdService, Impulse.Services.Stock.VendGateRcvdService>();
+builder.Services.AddScoped<Impulse.Services.Stock.IVendGateRcvdListService, Impulse.Services.Stock.VendGateRcvdListService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IVendGateRcvdInspectionDataAccess, DataAccessLibrary.DAC.Stock.VendGateRcvdInspectionDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IVendGateRcvdInspectionService, Impulse.Services.Stock.VendGateRcvdInspectionService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IMaterialPlacementDataAccess, DataAccessLibrary.DAC.Stock.MaterialPlacementDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IMaterialPlacementService, Impulse.Services.Stock.MaterialPlacementService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IRMDataAccess, DataAccessLibrary.DAC.Stock.RMDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IRMService, Impulse.Services.Stock.RMService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IMaterialPlacementListDataAccess, DataAccessLibrary.DAC.Stock.MaterialPlacementListDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IMaterialPlacementListService, Impulse.Services.Stock.MaterialPlacementListService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IVendorBillingListDataAccess, DataAccessLibrary.DAC.Stock.VendorBillingListDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IVendorBillingListService, Impulse.Services.Stock.VendorBillingListService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IChangeBatchNoDataAccess, DataAccessLibrary.DAC.Stock.ChangeBatchNoDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IChangeBatchNoService, Impulse.Services.Stock.ChangeBatchNoService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IVendorBillingDataAccess, DataAccessLibrary.DAC.Stock.VendorBillingDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IVendorBillingService, Impulse.Services.Stock.VendorBillingService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IRMIssuanceDataAccess, DataAccessLibrary.DAC.Stock.RMIssuanceDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IRMIssuanceService, Impulse.Services.Stock.RMIssuanceService>();
 builder.Services.AddScoped<IDepartmentDataAccess, DepartmentDataAccess>();
 builder.Services.AddScoped<IDepartmentService, DepartmentService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Company.IItemDataAccess, DataAccessLibrary.DAC.Company.ItemDataAccess>();

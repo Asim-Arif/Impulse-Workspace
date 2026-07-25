@@ -1,0 +1,233 @@
+@page "/stock/vendor-billing"
+@using DataAccessLibrary.Models.ViewModels.Stock
+@using Impulse.Services.Stock
+@using Impulse.Services
+@using Impulse.Pages.Stock.VendorBilling.Tabs
+@using Blazored.Typeahead
+
+<PageTitle>Vendor Billing</PageTitle>
+
+<style>
+    .btn-xs { padding: 0.15rem 0.4rem; font-size: 0.75rem; border-radius: 4px; }
+    .blazored-typeahead { height: 35px !important; font-size: 0.875rem !important; padding-top: 0 !important; padding-bottom: 0 !important; box-sizing: border-box !important; }
+    .disabled-typeahead-wrapper .blazored-typeahead { background-color: #e9ecef !important; overflow: hidden !important; border-radius: 4px; }
+    .blazored-typeahead__input, .blazored-typeahead__controls { height: 33px !important; padding-top: 0 !important; padding-bottom: 0 !important; box-sizing: border-box !important; }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper { height: 33px !important; display: flex !important; align-items: center !important; box-sizing: border-box !important; max-width: 100% !important; }
+    .blazored-typeahead__results { z-index: 1050 !important; }
+    .blazored-typeahead__input-icon { padding: 0 0.5rem !important; display: flex !important; align-items: center !important; }
+    .form-control-sm, .form-select-sm, .input-group-text, .btn-sm { height: 35px !important; }
+    .dropdown-row { position: relative !important; z-index: 9999 !important; }
+    .table-wrapper { position: relative !important; z-index: 1 !important; }
+    .nav-tabs .nav-link { font-size: 0.85rem; font-weight: 600; padding: 0.4rem 1rem; }
+    .nav-tabs .nav-link.active { color: #0d6efd; border-bottom: 2px solid #0d6efd; }
+    .summary-footer { background: rgba(248,249,250,0.95); border-top: 1px solid #dee2e6; border-radius: 0 0 10px 10px; }
+    .summary-stat { text-align: center; padding: 0.4rem 0.75rem; }
+    .summary-stat .label { font-size: 0.72rem; text-transform: uppercase; color: #6c757d; font-weight: 600; letter-spacing: 0.4px; }
+    .summary-stat .value { font-size: 1.05rem; font-weight: 700; }
+    .summary-stat.highlight .value { color: #0d6efd; }
+    .summary-stat.deduction .value { color: #dc3545; }
+    .summary-stat.net .value { color: #198754; }
+    .summary-divider { border-left: 1px solid #dee2e6; }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255,255,255,0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3 pb-0">
+
+            <!-- Header -->
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom justify-content-between">
+                <h5 class="mb-0 fw-bold text-dark-emphasis">
+                    <i class="fas fa-file-invoice-dollar text-primary me-2"></i>
+                    Vendor Billing
+                </h5>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-info" @onclick="PrintUnPosted"
+                            disabled="@(!BillingRows.Any(r => r.IsChecked))" title="Print draft bill for selected rows">
+                        <i class="fas fa-print me-1"></i> Print Un-Posted
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="LoadDataAsync"
+                            disabled="@IsLoadingBilling">
+                        <i class="fas fa-sync-alt me-1"></i> Refresh
+                    </button>
+                    <button type="button" class="btn btn-sm btn-success fw-semibold" @onclick="PostSelected"
+                            disabled="@(IsPosting || !BillingRows.Any(r => r.IsChecked) || string.IsNullOrEmpty(Filter.DebitHeadAccNo))">
+                        @if (IsPosting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-check-double me-1"></i>
+                        }
+                        Post Selected
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filter Row 1: Vendor + Debit Head -->
+            <div class="row g-2 align-items-end mb-2 dropdown-row">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
+                        <i class="fas fa-building me-1 text-muted"></i>Vendor <span class="text-danger">*</span>
+                    </label>
+                    <BlazoredTypeahead SearchMethod="SearchVendors"
+                                       @bind-Value="SelectedVendor"
+                                       @bind-Value:after="OnVendorSelected"
+                                       Placeholder="<Select Vendor>"
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>@(((VendorLookupModel)context).AccTitle)</SelectedTemplate>
+                        <ResultTemplate>@(((VendorLookupModel)context).AccTitle)</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
+                        <i class="fas fa-landmark me-1 text-muted"></i>Debit Head <span class="text-danger">*</span>
+                    </label>
+                    <BlazoredTypeahead SearchMethod="SearchAccounts"
+                                       @bind-Value="SelectedDebitAccount"
+                                       @bind-Value:after="OnDebitHeadSelected"
+                                       Placeholder="<Select Debit Account>"
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>@(((AccountLookupModel)context).DisplayName)</SelectedTemplate>
+                        <ResultTemplate>@(((AccountLookupModel)context).DisplayName)</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
+                        <i class="fas fa-calendar-day me-1 text-muted"></i>Posting Date <span class="text-danger">*</span>
+                    </label>
+                    <input type="date" class="form-control form-control-sm" @bind="Filter.PostingDate" />
+                </div>
+            </div>
+
+            <!-- Filter Row 2: Date Range (no dropdown-row here: equal z-index would paint this row above Row 1's expanded typeaheads) -->
+            <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Date Range</label>
+                    <select class="form-select form-select-sm" @bind="Filter.DateRangeIndex" @bind:after="OnDateRangeChanged">
+                        <option value="0">Today</option>
+                        <option value="1">Last 15 Days</option>
+                        <option value="2">Last 30 Days</option>
+                        <option value="3">Last 60 Days</option>
+                        <option value="4">Last 90 Days</option>
+                        <option value="5">Custom Date</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">From</label>
+                    <input type="date" class="form-control form-control-sm" @bind="Filter.DateFrom"
+                           disabled="@(Filter.DateRangeIndex != 5)" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">To</label>
+                    <input type="date" class="form-control form-control-sm" @bind="Filter.DateTo"
+                           disabled="@(Filter.DateRangeIndex != 5)" />
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="button" class="btn btn-sm btn-primary w-100" @onclick="LoadDataAsync"
+                            disabled="@(string.IsNullOrEmpty(Filter.VendorAccNo))">
+                        <i class="fas fa-search me-1"></i> Load
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <ul class="nav nav-tabs mb-0 border-bottom-0" id="vendorBillingTabs">
+                <li class="nav-item">
+                    <a class="nav-link @(ActiveTab == 0 ? "active" : "")" href="#" @onclick="() => ActiveTab = 0" @onclick:preventDefault>
+                        <i class="fas fa-list-check me-1"></i>
+                        Vendor Billing
+                        <span class="badge bg-primary ms-1" style="font-size:0.7rem;">@BillingRows.Count</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link @(ActiveTab == 1 ? "active" : "")" href="#" @onclick="() => ActiveTab = 1" @onclick:preventDefault>
+                        <i class="fas fa-boxes-stacked me-1"></i>
+                        Material Deductions
+                        @if (MaterialRows.Any())
+                        {
+                            <span class="badge bg-danger ms-1" style="font-size:0.7rem;">@MaterialRows.Count</span>
+                        }
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link @(ActiveTab == 2 ? "active" : "")" href="#" @onclick="() => ActiveTab = 2" @onclick:preventDefault>
+                        <i class="fas fa-hand-holding-dollar me-1"></i>
+                        Manual Deductions
+                        @if (ManualRows.Any())
+                        {
+                            <span class="badge bg-danger ms-1" style="font-size:0.7rem;">@ManualRows.Count</span>
+                        }
+                    </a>
+                </li>
+            </ul>
+
+            <div class="tab-content border border-top-0 p-3" style="border-radius: 0 0 8px 8px; background: rgba(255,255,255,0.6);">
+                @if (ActiveTab == 0)
+                {
+                    <VendorBillingTab Rows="BillingRows"
+                                      IsLoading="IsLoadingBilling"
+                                      OnDataChanged="OnBillingDataChanged"
+                                      OnRateSaved="OnRateSaved"
+                                      OnHideEntry="OnHideEntry" />
+                }
+                else if (ActiveTab == 1)
+                {
+                    <MaterialDeductionsTab Rows="MaterialRows" IsLoading="IsLoadingMaterial" />
+                }
+                else
+                {
+                    <ManualDeductionsTab Rows="ManualRows" OnDataChanged="OnManualDataChanged" />
+                }
+            </div>
+
+        </div>
+
+        <!-- Summary Footer -->
+        <div class="summary-footer px-3 py-2">
+            <div class="d-flex flex-wrap align-items-center gap-0">
+                <div class="summary-stat">
+                    <div class="label">Vendor Total – Qty</div>
+                    <div class="value text-dark">@BillingRows.Sum(r => r.NetQty).ToString("N2")</div>
+                </div>
+                <div class="summary-divider mx-1"></div>
+                <div class="summary-stat">
+                    <div class="label">Vendor Total – Value</div>
+                    <div class="value text-dark">@BillingRows.Sum(r => r.Value).ToString("N0")</div>
+                </div>
+                <div class="summary-divider mx-1"></div>
+                <div class="summary-stat highlight">
+                    <div class="label">Selected Value</div>
+                    <div class="value">@BillingRows.Where(r => r.IsChecked).Sum(r => r.Value).ToString("N0")</div>
+                </div>
+                <div class="summary-divider mx-1"></div>
+                <div class="summary-stat deduction">
+                    <div class="label">Short Term Ded.</div>
+                    <div class="value">@Summary.ShortTermDeduction.ToString("N0")</div>
+                </div>
+                <div class="summary-divider mx-1"></div>
+                <div class="summary-stat deduction">
+                    <div class="label">Long Term Ded.</div>
+                    <div class="value">@Summary.LongTermDeduction.ToString("N0")</div>
+                </div>
+                <div class="summary-divider mx-1"></div>
+                <div class="summary-stat deduction">
+                    <div class="label">Material Ded.</div>
+                    <div class="value">@MaterialRows.Sum(r => r.Amount).ToString("N0")</div>
+                </div>
+                <div class="summary-divider mx-1"></div>
+                <div class="summary-stat deduction">
+                    <div class="label">Manual Ded.</div>
+                    <div class="value">@ManualRows.Sum(r => r.Amount).ToString("N0")</div>
+                </div>
+                <div class="summary-divider mx-1"></div>
+                <div class="summary-stat net">
+                    <div class="label">Net Amount to Post</div>
+                    <div class="value">@NetAmountToPost.ToString("N0")</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

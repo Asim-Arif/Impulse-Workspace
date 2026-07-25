@@ -1,0 +1,133 @@
+/* Custom ERP Dialog Styles for Radzen DialogService */
+
+.rz-dialog-wrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.rz-dialog-mask {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1040;
+}
+
+.rz-dialog {
+    position: relative;
+    z-index: 1050;
+    
+    /* Acrylic Blue-Glass Style matching Notifications */
+    background: rgba(212, 223, 230, 0.50); /* Exactly matches notifications */
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.10), 0 0 0 1px #e3e3e3;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+
+    min-width: 450px;
+    max-width: 90vw;
+    display: flex;
+    flex-direction: column;
+}
+
+.rz-dialog-titlebar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: transparent;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08); /* subtle separator */
+    padding: 14px 20px;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+}
+
+.rz-dialog-title {
+    font-weight: 600;
+    font-size: 15px;
+    color: #000;
+    margin: 0;
+    padding: 0;
+}
+
+.rz-dialog-titlebar-close {
+    cursor: pointer;
+    color: rgba(0,0,0,0.45);
+    text-decoration: none !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 0;
+    background: none;
+    border: none;
+    transition: color 0.2s ease;
+}
+
+.rz-dialog-titlebar-close:hover {
+    color: rgba(0,0,0,0.8);
+    text-decoration: none !important;
+}
+
+.rz-dialog-content {
+    padding: 25px 20px;
+}
+
+.rz-dialog-confirm-message {
+    font-size: 14px; /* slightly larger than 13px for readability in a dialog */
+    margin-bottom: 25px;
+    color: #222;
+}
+
+.rz-dialog-confirm-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+/* Button Reset & Styles */
+.rz-dialog-confirm-buttons .rz-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+    font-size: 0.95rem;
+    padding: 8px 24px;
+    border-radius: 4px;
+    transition: all 0.15s ease-in-out;
+    border: 1px solid transparent;
+    min-width: 90px;
+    text-decoration: none !important;
+}
+
+.rz-dialog-confirm-buttons .rz-button.rz-primary {
+    color: #fff;
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+.rz-dialog-confirm-buttons .rz-button.rz-primary:hover {
+    background-color: #0b5ed7;
+    border-color: #0a58ca;
+}
+
+.rz-dialog-confirm-buttons .rz-button.rz-light {
+    color: #212529;
+    background-color: #f8f9fa;
+    border-color: #d3d9df;
+}
+.rz-dialog-confirm-buttons .rz-button.rz-light:hover {
+    background-color: #e2e6ea;
+    border-color: #c0c6cc;
+}

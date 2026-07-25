@@ -1,0 +1,39 @@
+@using Impulse.Services.Stock
+@inject IRMService RMService
+
+@if (ShowPicture && !string.IsNullOrEmpty(MaterialId))
+{
+    <div class="material-picture-container shadow-sm border rounded">
+        @if (IsLoading)
+        {
+            <div class="d-flex justify-content-center align-items-center" style="height: 150px; width: 150px;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(ImageBase64))
+        {
+            <img src="data:image/jpeg;base64,@ImageBase64" alt="Material Picture" style="max-width: 250px; max-height: 250px; object-fit: contain;" />
+        }
+        else
+        {
+            <div class="d-flex justify-content-center align-items-center bg-light text-muted" style="height: 150px; width: 150px; font-size: 0.8rem;">
+                No Picture Available
+            </div>
+        }
+    </div>
+}
+
+<style>
+    .material-picture-container {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background-color: white;
+        z-index: 1050;
+        padding: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border-radius: 8px;
+    }
+</style>

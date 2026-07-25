@@ -1,0 +1,57 @@
+@using DataAccessLibrary.Models.ViewModels.Stock
+
+<div class="table-wrapper" style="position: relative; z-index: 1; overflow-x: auto; max-height: 420px; overflow-y: auto;">
+    @if (IsLoading)
+    {
+        <div class="text-center py-4">
+            <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+            <span class="text-muted" style="font-size: 0.85rem;">Loading material deductions...</span>
+        </div>
+    }
+    else if (!Rows.Any())
+    {
+        <div class="text-center py-4 text-muted" style="font-size: 0.85rem;">
+            <i class="fas fa-check-circle me-2 text-success"></i>No material deductions found for this vendor.
+        </div>
+    }
+    else
+    {
+        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                <tr>
+                    <th style="width: 40px;">S.#</th>
+                    <th style="width: 110px;">Iss #</th>
+                    <th style="width: 90px;">Date</th>
+                    <th>Raw Material</th>
+                    <th class="text-end" style="width: 80px;">Rate</th>
+                    <th class="text-end" style="width: 80px;">Qty</th>
+                    <th class="text-end" style="width: 100px;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{ int idx = 0; }
+                @foreach (var row in Rows)
+                {
+                    idx++;
+                    <tr>
+                        <td class="text-muted">@idx</td>
+                        <td class="fw-semibold text-dark">@row.IssNo</td>
+                        <td>@row.DT.ToString("dd-MMM-yy")</td>
+                        <td>
+                            <span class="text-muted me-1" style="font-size:0.78rem;">(@row.RMID1)</span>@row.RMName
+                        </td>
+                        <td class="text-end">@row.Price.ToString("N2")</td>
+                        <td class="text-end">@row.Qty.ToString("N2")</td>
+                        <td class="text-end fw-semibold text-danger">@row.Amount.ToString("N0")</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot class="table-light" style="font-size: 0.8rem; position: sticky; bottom: 0; z-index: 2;">
+                <tr>
+                    <td colspan="6" class="text-end fw-semibold text-danger pe-2">Total Material Deduction :</td>
+                    <td class="text-end fw-bold text-danger">@Rows.Sum(r => r.Amount).ToString("N0")</td>
+                </tr>
+            </tfoot>
+        </table>
+    }
+</div>
