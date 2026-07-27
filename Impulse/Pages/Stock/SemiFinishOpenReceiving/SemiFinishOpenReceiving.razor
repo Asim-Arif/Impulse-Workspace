@@ -1,0 +1,306 @@
+@page "/stock/semi-finish-open-receiving"
+@using DataAccessLibrary.Models.ViewModels.Company
+@using DataAccessLibrary.Models.ViewModels.Stock
+@using Impulse.Services.Stock
+@using Impulse.Services
+@attribute [Authorize]
+@inject ISemiFinishOpenReceivingService Service
+@inject IReportNavigationService ReportNavigation
+@inject INotificationService NotificationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Semi Finish Open Receiving</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 1300px; margin: 0 auto; position: relative !important; z-index: 100 !important;">
+        <div class="card-body p-4">
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center flex-grow-1">
+                    <i class="fas fa-boxes-packing me-2"></i> Semi Finish Open Receiving
+                </h4>
+                <div>
+                    @if (!string.IsNullOrEmpty(ReturnUrl))
+                    {
+                        <button class="btn btn-outline-secondary btn-sm shadow-sm me-2" style="height: 35px;" @onclick="NavigateBack">
+                            <i class="fas fa-arrow-left me-1"></i> Back
+                        </button>
+                    }
+                    <button class="btn btn-outline-secondary btn-sm shadow-sm me-2" style="height: 35px;" @onclick="PrintLedgerAsync" disabled="@(SelectedArticle == null)">
+                        <i class="fas fa-print me-1"></i> Print Ledger
+                    </button>
+                    <button class="btn btn-primary btn-sm shadow-sm" style="height: 35px;" @onclick="SaveOpeningAsync" disabled="@(IsSaving || SelectedArticle == null)">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-plus-circle me-1"></i>
+                            <span>Add Entry</span>
+                        }
+                    </button>
+                </div>
+            </div>
+
+            @if (IsLoadingInitialData)
+            {
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status"></div>
+                </div>
+            }
+            else
+            {
+                <!-- Form Inputs -->
+                <div class="row g-3 mb-2" style="position: relative !important; z-index: 9999 !important;">
+                    <!-- Article -->
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Select Article (Item)</label>
+                        <BlazoredTypeahead SearchMethod="SearchArticles" @bind-Value="SelectedArticle" Placeholder="Search Article Code or Name..." EnableDropDown="true" MaximumSuggestions="1000">
+                            <SelectedTemplate>@context.ItemName</SelectedTemplate>
+                            <ResultTemplate>@context.ItemName</ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+
+                    <!-- Process -->
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Process</label>
+                        <select class="form-select form-select-sm" @bind="SelectedProcessId" style="height: 35px; font-size: 0.85rem;" disabled="@(SelectedArticle == null || !Processes.Any())">
+                            <option value="0">-- Select Process --</option>
+                            @foreach (var proc in Processes)
+                            {
+                                <option value="@proc.ProcessID">@proc.Description</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Qty -->
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Quantity</label>
+                        <input type="number" class="form-control form-control-sm text-end" @bind="Qty" style="height: 35px; font-weight: bold; font-size: 0.85rem;" min="1" />
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-2">
+                    <!-- Store -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Store</label>
+                        <select class="form-select form-select-sm" @onchange="OnStoreChanged" style="height: 35px; font-size: 0.85rem;">
+                            <option value="0">-- Select Store --</option>
+                            @foreach (var store in Stores)
+                            {
+                                <option value="@store.EntryID" selected="@(store.EntryID == SelectedStoreId)">@store.StoreName</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Location (Shelf) -->
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Location (Rack / Shelf)</label>
+                        <select class="form-select form-select-sm" @bind="SelectedShelfId" style="height: 35px; font-size: 0.85rem;" disabled="@(SelectedStoreId == 0 || !Shelves.Any())">
+                            <option value="0">-- Select Location --</option>
+                            @foreach (var shelf in Shelves)
+                            {
+                                <option value="@shelf.EntryID">@shelf.LocationDisplay</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Remarks -->
+                    <div class="col-md-5">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Remarks</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Remarks" placeholder="Enter remarks..." style="height: 35px; font-size: 0.85rem;" />
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <!-- Lot No -->
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Lot No.</label>
+                        <input type="text" class="form-control form-control-sm text-center fw-bold" @bind="LotNo" style="height: 35px; font-size: 0.85rem; background-color: #f8f9fa;" />
+                    </div>
+
+                    <!-- Batch No -->
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Batch No.</label>
+                        <input type="text" class="form-control form-control-sm text-center" @bind="BatchNo" placeholder="Enter batch no." style="height: 35px; font-size: 0.85rem;" />
+                    </div>
+
+                    <!-- Mill No -->
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Mill Cert. No.</label>
+                        <input type="text" class="form-control form-control-sm text-center" @bind="MillNo" placeholder="Enter mill no." style="height: 35px; font-size: 0.85rem;" />
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Outstanding Grid Card -->
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 1300px; margin: 0 auto; position: relative !important; z-index: 1 !important;">
+        <div class="card-body p-0">
+            <div class="px-4 py-3 border-bottom d-flex align-items-center justify-content-between">
+                <h6 class="mb-0 text-secondary fw-bold">
+                    <i class="fas fa-list me-2 text-primary"></i> Outstanding Semi Finish Open Receipts
+                    @if (SelectedArticle != null)
+                    {
+                        <span class="badge bg-primary-subtle text-primary ms-2">@SelectedArticle.ItemName</span>
+                    }
+                </h6>
+                <span class="badge bg-secondary">Total Records: @Openings.Count</span>
+            </div>
+
+            <div class="table-responsive" style="max-height: 50vh; overflow-y: auto;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th style="width: 10%; padding-left: 1rem;">Item Code</th>
+                            <th style="width: 20%;">Item Name</th>
+                            <th style="width: 12%;">Process</th>
+                            <th style="width: 8%; text-align: center;">Qty</th>
+                            <th style="width: 15%;">Location</th>
+                            <th style="width: 12%;">Remarks</th>
+                            <th style="width: 9%;">Date</th>
+                            <th style="width: 7%; text-align: center;">Lot No.</th>
+                            <th style="width: 7%; text-align: center;">Batch No.</th>
+                            <th style="width: 110px; min-width: 110px; text-align: center; padding-right: 1rem; white-space: nowrap;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoadingGrid)
+                        {
+                            <tr>
+                                <td colspan="10" class="text-center py-4">
+                                    <span class="spinner-border spinner-border-sm me-2 text-primary"></span> Loading entries...
+                                </td>
+                            </tr>
+                        }
+                        else if (!Openings.Any())
+                        {
+                            <tr>
+                                <td colspan="10" class="text-center py-4 text-muted">
+                                    @(SelectedArticle == null ? "Please select an article to view opening stock records." : "No active opening stock entries found for this article.")
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var item in Openings)
+                            {
+                                <ContextMenuTrigger MenuId="rowContextMenu" Data="@item" WrapperTag="tr">
+                                    <td style="padding-left: 1rem;" class="fw-bold text-primary">@item.ItemID</td>
+                                    <td>@item.ItemName</td>
+                                    <td><span class="badge bg-info-subtle text-info border border-info-subtle">@item.Description</span></td>
+                                    <td class="text-center fw-bold text-success">@item.AvailableQty.ToString("N0")</td>
+                                    <td>@item.StoreName (@item.Location)</td>
+                                    <td>@item.Remarks</td>
+                                    <td>@(item.DTEntry?.ToString("dd-MMM-yyyy"))</td>
+                                    <td class="text-center"><span class="badge bg-light text-dark border">@item.LotNo_Manual</span></td>
+                                    <td class="text-center"><span class="badge bg-light text-dark border">@item.BatchNo_Manual</span></td>
+                                    <td class="text-center" style="padding-right: 1rem; white-space: nowrap;">
+                                        <button class="btn btn-link text-primary p-0 me-2" title="Print Tray Card" @onclick="() => PrintTrayCard(item)">
+                                            <i class="fas fa-id-card"></i>
+                                        </button>
+                                        <button class="btn btn-link text-secondary p-0 me-2" title="Edit Remarks" @onclick="() => OpenEditRemarksModal(item)">
+                                            <i class="fas fa-pencil-alt"></i>
+                                        </button>
+                                        <button class="btn btn-link text-danger p-0" title="Delete Entry" @onclick="() => ConfirmDelete(item)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </ContextMenuTrigger>
+                            }
+                        }
+                    </tbody>
+                    @if (Openings.Any())
+                    {
+                        <tfoot class="table-light sticky-bottom" style="box-shadow: 0 -1px 0 #dee2e6;">
+                            <tr class="fw-bold">
+                                <td colspan="3" class="text-end" style="font-size: 0.85rem;">TOTAL QUANTITY:</td>
+                                <td class="text-center text-success" style="font-size: 0.95rem;">@Openings.Sum(x => x.AvailableQty).ToString("N0")</td>
+                                <td colspan="6"></td>
+                            </tr>
+                        </tfoot>
+                    }
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Context Menu -->
+<ContextMenu Id="rowContextMenu" Template="Win11Style">
+    <div class="win11-section-header">Actions</div>
+    <Item class="win11-menu-item" OnClick="OnContextPrintTrayCard">
+        <i class="fas fa-id-card fa-fw win11-icon text-primary"></i> Print Tray Card
+    </Item>
+    <Item class="win11-menu-item" OnClick="OnContextEditRemarks">
+        <i class="fas fa-pencil-alt fa-fw win11-icon text-secondary"></i> Edit Remarks
+    </Item>
+    <div class="win11-divider"></div>
+    <Item class="win11-menu-item" OnClick="OnContextDelete">
+        <i class="fas fa-trash fa-fw win11-icon text-danger"></i> Delete Entry
+    </Item>
+</ContextMenu>
+
+<!-- Edit Remarks Modal -->
+@if (ShowEditModal && EditingItem != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header border-bottom">
+                    <h5 class="modal-title text-primary"><i class="fas fa-pencil-alt me-2"></i> Edit Remarks</h5>
+                    <button type="button" class="btn-close" @onclick="CloseEditModal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-secondary" style="font-size:0.8rem;">Item</label>
+                        <input type="text" class="form-control form-control-sm" value="@EditingItem.ItemName" disabled />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-secondary" style="font-size:0.8rem;">Remarks</label>
+                        <input type="text" class="form-control form-control-sm" @bind="ModalRemarksText" placeholder="Enter updated remarks..." />
+                    </div>
+                </div>
+                <div class="modal-footer border-top">
+                    <button type="button" class="btn btn-sm btn-secondary" @onclick="CloseEditModal">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-primary" @onclick="SaveModalRemarks">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    /* Context Menu win11 styling overflow control */
+    .win11-menu-item {
+        font-size: 0.85rem !important;
+        padding: 6px 12px !important;
+    }
+</style>

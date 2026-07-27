@@ -1,0 +1,175 @@
+@page "/stock/finish-stock-movement"
+@using DataAccessLibrary.Models.ViewModels.Company
+@using DataAccessLibrary.Models.ViewModels.Stock
+@using Impulse.Services.Stock
+@using Radzen
+@attribute [Authorize]
+@inject IFinishMovementService MovementService
+@inject NotificationService NotificationService
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Finished Stock Change Location</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 950px; margin: 0 auto; position: relative !important; z-index: 100 !important;">
+        <div class="card-body p-4">
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center flex-grow-1">
+                    <i class="fas fa-exchange-alt me-2"></i> Finished Stock Change Location
+                </h4>
+                <button class="btn btn-outline-secondary btn-sm shadow-sm" style="height: 35px;" @onclick="NavigateBack">
+                    <i class="fas fa-arrow-left me-1"></i> Back
+                </button>
+            </div>
+
+            <!-- Article Selection -->
+            <div class="row g-3 mb-4" style="position: relative !important; z-index: 9999 !important;">
+                <div class="col-md-12">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Select Article (Item)</label>
+                    <div class="p-2 border rounded bg-light shadow-sm">
+                        <BlazoredTypeahead SearchMethod="SearchArticles" @bind-Value="SelectedArticle" Placeholder="Search Article Code or Name..." EnableDropDown="true" MaximumSuggestions="1000">
+                            <SelectedTemplate>@context.ItemName</SelectedTemplate>
+                            <ResultTemplate>@context.ItemName</ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4" style="position: relative !important; z-index: 1 !important;">
+                <!-- Move From Card -->
+                <div class="col-md-6">
+                    <div class="card border border-danger shadow-sm h-100">
+                        <div class="card-header bg-white border-bottom border-danger text-danger fw-bold py-2">
+                            <i class="fas fa-arrow-up me-1"></i> Move From
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">From Location / Lot</label>
+                                <select class="form-select form-select-sm custom-input-sm" @onchange="OnFromLocationChanged" disabled="@(SelectedArticle == null || !FromLocations.Any())">
+                                    <option value="0">-- Select From Location --</option>
+                                    @foreach (var loc in FromLocations)
+                                    {
+                                        <option value="@loc.EntryID" selected="@(loc.EntryID == (SelectedFromLocation?.EntryID ?? 0))">@loc.DisplayText</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Available Qty</label>
+                                <input type="text" class="form-control form-control-sm text-end fw-bold custom-input-sm text-danger" readonly value="@((SelectedFromLocation?.NetQty ?? 0).ToString("N0"))" />
+                            </div>
+                            <div class="mb-0">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Remarks</label>
+                                <input type="text" class="form-control form-control-sm custom-input-sm text-muted" readonly value="@(SelectedFromLocation?.Remarks ?? "")" placeholder="No remarks" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Move To Card -->
+                <div class="col-md-6">
+                    <div class="card border border-success shadow-sm h-100">
+                        <div class="card-header bg-white border-bottom border-success text-success fw-bold py-2">
+                            <i class="fas fa-arrow-down me-1"></i> Move To
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Target Store</label>
+                                <select class="form-select form-select-sm custom-input-sm" @onchange="OnTargetStoreChanged" disabled="@(SelectedFromLocation == null)">
+                                    <option value="0">-- Select Target Store --</option>
+                                    @foreach (var store in TargetStores)
+                                    {
+                                        <option value="@store.EntryID" selected="@(store.EntryID == SelectedTargetStoreId)">@store.StoreName</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="row gx-2 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Target Rack</label>
+                                    <select class="form-select form-select-sm custom-input-sm" @onchange="OnTargetRackChanged" disabled="@(SelectedTargetStoreId == 0 || !TargetRacks.Any())">
+                                        <option value="">-- Select Rack --</option>
+                                        @foreach (var rack in TargetRacks)
+                                        {
+                                            <option value="@rack.RackNo" selected="@(rack.RackNo == SelectedTargetRackNo)">@rack.RackNo</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Target Shelf</label>
+                                    <select class="form-select form-select-sm custom-input-sm" @onchange="OnTargetShelfChanged" disabled="@(string.IsNullOrEmpty(SelectedTargetRackNo) || !TargetShelves.Any())">
+                                        <option value="0">-- Select Shelf --</option>
+                                        @foreach (var shelf in TargetShelves)
+                                        {
+                                            <option value="@shelf.EntryID" selected="@(shelf.EntryID == (SelectedTargetShelf?.EntryID ?? 0))">@shelf.ShelfNo</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="mb-0">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Target Shelf Qty</label>
+                                <input type="text" class="form-control form-control-sm text-end fw-bold custom-input-sm text-success" readonly value="@TargetShelfQty.ToString("N0")" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Qty and Actions Footer -->
+            <div class="row mt-4 align-items-end">
+                <div class="col-md-4 offset-md-4">
+                    <label class="form-label fw-bold text-danger mb-1" style="font-size: 0.9rem;">Qty to Move</label>
+                    <input type="number" class="form-control text-end fw-bold border-danger shadow-sm text-danger" style="height: 40px; font-size: 1.1rem;" @bind="MoveQty" min="1" max="@(SelectedFromLocation?.NetQty ?? 0)" placeholder="0" />
+                </div>
+                <div class="col-md-4 text-end mt-3 mt-md-0">
+                    <button class="btn btn-sm btn-outline-secondary me-2" style="height: 35px; width: 100px;" @onclick="NavigateBack" disabled="@IsSaving">Cancel</button>
+                    <button class="btn btn-sm btn-primary shadow-sm" style="height: 35px; width: 120px;" @onclick="SaveMovementAsync" disabled="@(IsSaving || SelectedFromLocation == null || SelectedTargetShelf == null)">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-check me-1"></i>
+                            <span>Save</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .custom-input-sm {
+        height: 35px !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+</style>

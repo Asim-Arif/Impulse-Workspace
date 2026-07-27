@@ -1,0 +1,257 @@
+@page "/stock/finish-transactions"
+@using DataAccessLibrary.Models.ViewModels.Company
+@using DataAccessLibrary.Models.ViewModels.Stock
+@using Impulse.Services.Stock
+@using Impulse.Services
+@attribute [Authorize]
+@inject IFinishTransactionService TransactionService
+@inject IReportNavigationService ReportNavigation
+@inject INotificationService NotificationService
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Finish Stock Transactions</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <!-- Filter Card -->
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 1350px; margin: 0 auto; position: relative !important; z-index: 100 !important;">
+        <div class="card-body p-4">
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center flex-grow-1">
+                    <i class="fas fa-boxes-stacked me-2"></i> Finish Stock Transactions
+                </h4>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary btn-sm shadow-sm" style="height: 35px;" @onclick='() => NavigationManager.NavigateTo("/stock/finish-stock-receiving?returnUrl=/stock/finish-transactions")'>
+                        <i class="fas fa-boxes-packing me-1"></i> Receive Stock
+                    </button>
+                    <button class="btn btn-outline-success btn-sm shadow-sm" style="height: 35px;" @onclick='() => NavigationManager.NavigateTo("/stock/finish-stock-issuance?returnUrl=/stock/finish-transactions")'>
+                        <i class="fas fa-boxes-stacked me-1"></i> Issue Stock
+                    </button>
+                    <button class="btn btn-primary btn-sm shadow-sm" style="height: 35px;" @onclick="LoadTransactionsAsync" disabled="@IsLoading">
+                        @if (IsLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <span>Refreshing...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-sync-alt me-1"></i>
+                            <span>Refresh</span>
+                        }
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filters Row 1 -->
+            <div class="row g-3 mb-3 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Date Range</label>
+                    <select class="form-select form-select-sm" @onchange="OnRangeChanged" style="height: 35px; font-size: 0.85rem;">
+                        <option value="Today">Today</option>
+                        <option value="15">Last 15 Days</option>
+                        <option value="30">Last 30 Days</option>
+                        <option value="60">Last 60 Days</option>
+                        <option value="90">Last 90 Days</option>
+                        <option value="Custom">Custom Range</option>
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">From Date</label>
+                    <input type="date" class="form-control form-control-sm" @bind="FromDate" disabled="@(!IsCustomRange)" style="height: 35px; font-size: 0.85rem;" />
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">To Date</label>
+                    <input type="date" class="form-control form-control-sm" @bind="ToDate" disabled="@(!IsCustomRange)" style="height: 35px; font-size: 0.85rem;" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Store</label>
+                    <select class="form-select form-select-sm" @bind="SelectedStoreId" style="height: 35px; font-size: 0.85rem;">
+                        <option value="0">&lt;All Stores&gt;</option>
+                        @foreach (var store in Stores)
+                        {
+                            <option value="@store.EntryID">@store.StoreName</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="d-flex align-items-center gap-3 pt-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="chkIssuance" @bind="IncludeIssuance" />
+                            <label class="form-check-label fw-bold text-secondary" for="chkIssuance" style="font-size:0.85rem;">
+                                Issuance Entries
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="chkReceiving" @bind="IncludeReceiving" />
+                            <label class="form-check-label fw-bold text-secondary" for="chkReceiving" style="font-size:0.85rem;">
+                                Receiving Entries
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters Row 2 -->
+            <div class="row g-3" style="position: relative !important; z-index: 9999 !important;">
+                <div class="col-md-12">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Filter by Article (Item)</label>
+                    <BlazoredTypeahead SearchMethod="SearchArticles" @bind-Value="SelectedArticle" Placeholder="Search Article (Leave empty for All Articles)..." EnableDropDown="true" MaximumSuggestions="1000">
+                        <SelectedTemplate>@context.ItemName</SelectedTemplate>
+                        <ResultTemplate>@context.ItemName</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grid & Action Buttons Card -->
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 1350px; margin: 0 auto; position: relative !important; z-index: 1 !important;">
+        <div class="card-body p-0">
+            <div class="px-4 py-3 border-bottom d-flex align-items-center justify-content-between">
+                <h6 class="mb-0 text-secondary fw-bold">
+                    <i class="fas fa-table me-2 text-primary"></i> Transaction Records
+                </h6>
+                <span class="badge bg-primary fs-6">Total Records: @Transactions.Count</span>
+            </div>
+
+            <div class="table-responsive" style="max-height: 52vh; overflow-y: auto;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th style="width: 5%; padding-left: 1rem; text-align: center;">S#</th>
+                            <th style="width: 12%;">Entry #</th>
+                            <th style="width: 9%;">Date</th>
+                            <th style="width: 12%;">Rcvd / Issd By</th>
+                            <th style="width: 12%;">Rcvd / Issd From</th>
+                            <th style="width: 10%;">Order No</th>
+                            <th style="width: 10%;">Item Code</th>
+                            <th style="width: 15%;">Item Name</th>
+                            <th style="width: 7%; text-align: center;">Qty</th>
+                            <th style="width: 8%;">Location</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="10" class="text-center py-4">
+                                    <span class="spinner-border spinner-border-sm me-2 text-primary"></span> Loading transactions...
+                                </td>
+                            </tr>
+                        }
+                        else if (!Transactions.Any())
+                        {
+                            <tr>
+                                <td colspan="10" class="text-center py-4 text-muted">
+                                    No transactions found matching the selected filter criteria.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            int seq = 1;
+                            @foreach (var item in Transactions)
+                            {
+                                <ContextMenuTrigger MenuId="rowContextMenu" Data="@item" WrapperTag="tr">
+                                    <td style="padding-left: 1rem;" class="text-center fw-bold text-secondary">@(seq++)</td>
+                                    <td>
+                                        @if (item.EntryType == 1)
+                                        {
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">@item.EntryNo</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">@item.EntryNo</span>
+                                        }
+                                    </td>
+                                    <td>@(item.DT?.ToString("dd-MMM-yyyy"))</td>
+                                    <td>@item.RcvdBy</td>
+                                    <td>@item.RcvdFrom</td>
+                                    <td><small>@item.OrderNo</small></td>
+                                    <td class="fw-bold text-primary">@item.ItemID</td>
+                                    <td>@item.ItemName</td>
+                                    <td class="text-center fw-bold @(item.EntryType == 1 ? "text-success" : "text-danger")">
+                                        @item.SignedQty.ToString("N0")
+                                    </td>
+                                    <td><small>@item.Location</small></td>
+                                </ContextMenuTrigger>
+                            }
+                        }
+                    </tbody>
+                    @if (Transactions.Any())
+                    {
+                        <tfoot class="table-light sticky-bottom" style="box-shadow: 0 -1px 0 #dee2e6;">
+                            <tr class="fw-bold">
+                                <td colspan="8" class="text-end" style="font-size: 0.85rem;">NET TRANSACTION QUANTITY:</td>
+                                <td class="text-center @(Transactions.Sum(x => x.SignedQty) >= 0 ? "text-success" : "text-danger")" style="font-size: 0.95rem;">
+                                    @Transactions.Sum(x => x.SignedQty).ToString("N0")
+                                </td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    }
+                </table>
+            </div>
+
+            <!-- Report Action Buttons Toolbar -->
+            <div class="p-3 border-top bg-light d-flex align-items-center justify-content-end gap-2" style="border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
+                <button class="btn btn-outline-primary btn-sm shadow-sm" style="height: 35px;" @onclick="PrintTransactionsReport">
+                    <i class="fas fa-print me-1"></i> Print Transactions
+                </button>
+                <button class="btn btn-outline-secondary btn-sm shadow-sm" style="height: 35px;" @onclick="PrintFinishedStockReport">
+                    <i class="fas fa-boxes-stacked me-1"></i> Print Finished Stock
+                </button>
+                <button class="btn btn-outline-secondary btn-sm shadow-sm" style="height: 35px;" @onclick="PrintLocationWiseReport">
+                    <i class="fas fa-map-marker-alt me-1"></i> Print Location Wise Stock
+                </button>
+                <button class="btn btn-outline-secondary btn-sm shadow-sm" style="height: 35px;" @onclick="PrintRackWiseReport">
+                    <i class="fas fa-server me-1"></i> Print Rack Wise Stock
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Context Menu -->
+<ContextMenu Id="rowContextMenu" Template="Win11Style">
+    <div class="win11-section-header">Actions</div>
+    <Item class="win11-menu-item" OnClick="OnContextPrintSlip">
+        <i class="fas fa-print fa-fw win11-icon text-primary"></i> Print Slip
+    </Item>
+</ContextMenu>
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    .win11-menu-item {
+        font-size: 0.85rem !important;
+        padding: 6px 12px !important;
+    }
+</style>

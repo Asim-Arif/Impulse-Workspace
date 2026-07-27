@@ -1,0 +1,271 @@
+@page "/stock/finish-stock-receiving"
+@using DataAccessLibrary.Models.ViewModels.Company
+@using DataAccessLibrary.Models.ViewModels.Stock
+@using Impulse.Services.Stock
+@using Impulse.Services
+@attribute [Authorize]
+@inject IFinishStockReceivingService ReceivingService
+@inject INotificationService NotificationService
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Finish Stock Receiving</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 1150px; margin: 0 auto;">
+        <!-- Header -->
+        <div class="card-body p-4 border-bottom">
+            <div class="d-flex align-items-center justify-content-between">
+                <h4 class="mb-0 text-primary d-flex align-items-center">
+                    <i class="fas fa-boxes-packing me-2"></i> Finish Stock Receiving
+                </h4>
+                <div class="badge bg-primary fs-6 px-3 py-2">
+                    <i class="fas fa-barcode me-1"></i> @Master.RcvNo
+                </div>
+            </div>
+        </div>
+
+        <!-- Form & Items Container -->
+        <div class="card-body p-4">
+            <!-- Master Details Section -->
+            <div class="card border-0 bg-light mb-4" style="border-radius: 10px;">
+                <div class="card-body p-3">
+                    <h6 class="text-secondary fw-bold mb-3 border-bottom pb-2">
+                        <i class="fas fa-clipboard-list me-1 text-primary"></i> Master Information
+                    </h6>
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Receiving Date</label>
+                            <input type="date" class="form-control form-control-sm custom-input-sm" @bind="Master.DT" style="height: 35px;" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Department / Counted By</label>
+                            <input type="text" class="form-control form-control-sm custom-input-sm" @bind="Master.RcvdBy" placeholder="Department / User..." style="height: 35px;" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Received From <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-sm custom-input-sm" @bind="Master.RcvdFrom" placeholder="Received From..." style="height: 35px;" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Order No.</label>
+                            <input type="text" class="form-control form-control-sm custom-input-sm" @bind="Master.OrderNo" placeholder="Order / PO Ref..." style="height: 35px;" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Customer / Catalog</label>
+                            <select class="form-select form-select-sm custom-input-sm" @onchange="OnCustomerChanged" style="height: 35px;">
+                                @foreach (var cust in Customers)
+                                {
+                                    <option value="@cust.CustCode">@cust.DisplayText</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Line Item Entry Section -->
+            <div class="card border-0 mb-4" style="background: #fdfdfd; border: 1px solid #e9ecef !important; border-radius: 10px; position: relative !important; z-index: 100 !important;">
+                <div class="card-body p-3">
+                    <h6 class="text-secondary fw-bold mb-3 border-bottom pb-2">
+                        <i class="fas fa-plus-circle me-1 text-success"></i> Add Line Item
+                    </h6>
+
+                    <!-- Article & Unit Row -->
+                    <div class="row g-3 mb-3" style="position: relative !important; z-index: 9999 !important;">
+                        <div class="col-md-9">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Select Article (Item) <span class="text-danger">*</span></label>
+                            <BlazoredTypeahead SearchMethod="SearchArticles" @bind-Value="SelectedArticle" Placeholder="Type Article ID or Name..." EnableDropDown="true" MaximumSuggestions="1000">
+                                <SelectedTemplate>@context.ItemName</SelectedTemplate>
+                                <ResultTemplate>@context.ItemName</ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Unit</label>
+                            <input type="text" class="form-control form-control-sm custom-input-sm text-center fw-bold bg-light" readonly value="@SelectedUnit" style="height: 35px;" />
+                        </div>
+                    </div>
+
+                    <!-- Store & Target Location Row -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Target Store <span class="text-danger">*</span></label>
+                            <select class="form-select form-select-sm custom-input-sm" @onchange="OnStoreChanged" style="height: 35px;">
+                                <option value="0">-- Select Store --</option>
+                                @foreach (var st in Stores)
+                                {
+                                    <option value="@st.EntryID" selected="@(st.EntryID == SelectedStoreId)">@st.StoreName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Target Shelf / Location <span class="text-danger">*</span></label>
+                            <select class="form-select form-select-sm custom-input-sm" @onchange="OnShelfChanged" disabled="@(SelectedStoreId == 0 || !Shelves.Any())" style="height: 35px;">
+                                <option value="0">-- Select Rack / Shelf --</option>
+                                @foreach (var shelf in Shelves)
+                                {
+                                    <option value="@shelf.EntryID" selected="@(shelf.EntryID == SelectedShelfId)">@shelf.StoreName [@shelf.RackNo] [@shelf.ShelfNo]</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Lot, Batch, Mill Cert, Qty & Remarks Row -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Lot No. <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-sm custom-input-sm fw-bold" @bind="LotNoManual" placeholder="Lot No..." style="height: 35px;" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Batch No.</label>
+                            <input type="text" class="form-control form-control-sm custom-input-sm" @bind="BatchNoManual" placeholder="Batch No..." style="height: 35px;" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Mill Cert No.</label>
+                            <input type="text" class="form-control form-control-sm custom-input-sm" @bind="MillCertNo" placeholder="Mill Cert..." style="height: 35px;" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-success mb-1" style="font-size:0.8rem;">Qty to Receive <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control form-control-sm text-end fw-bold border-success text-success" @bind="LineQty" min="1" style="height: 35px; font-size: 1rem;" />
+                        </div>
+                    </div>
+
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-9">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Line Remarks</label>
+                            <input type="text" class="form-control form-control-sm custom-input-sm" @bind="LineRemarks" placeholder="Remarks..." style="height: 35px;" />
+                        </div>
+                        <div class="col-md-3 text-end">
+                            <button class="btn btn-success btn-sm w-100 shadow-sm" style="height: 35px;" @onclick="AddLineItem" disabled="@(SelectedArticle == null || SelectedShelfId == 0 || LineQty <= 0)">
+                                <i class="fas fa-plus me-1"></i> Add Item
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Items Table Section -->
+            <div class="card border-0 shadow-sm mb-4" style="border-radius: 10px; position: relative !important; z-index: 1 !important;">
+                <div class="card-body p-0">
+                    <div class="px-3 py-2 border-bottom bg-light d-flex align-items-center justify-content-between">
+                        <h6 class="mb-0 text-secondary fw-bold" style="font-size: 0.88rem;">
+                            <i class="fas fa-list me-1 text-primary"></i> Received Items List
+                        </h6>
+                        <span class="badge bg-secondary fs-7">Total Items: @LineItems.Count</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                            <thead class="table-light text-secondary" style="font-size: 0.78rem; text-transform: uppercase;">
+                                <tr>
+                                    <th style="width: 5%; text-align: center;">S#</th>
+                                    <th style="width: 15%;">Article ID</th>
+                                    <th style="width: 23%;">Article Name</th>
+                                    <th style="width: 7%; text-align: center;">Unit</th>
+                                    <th style="width: 10%; text-align: center;">Qty</th>
+                                    <th style="width: 18%;">Location</th>
+                                    <th style="width: 15%;">Lot / Batch / Mill Cert</th>
+                                    <th style="width: 7%; text-align: center;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (!LineItems.Any())
+                                {
+                                    <tr>
+                                        <td colspan="8" class="text-center py-4 text-muted">
+                                            No line items added yet. Fill the item details above and click Add Item.
+                                        </td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    @foreach (var item in LineItems)
+                                    {
+                                        <tr>
+                                            <td class="text-center fw-bold">@item.LineNo</td>
+                                            <td class="fw-bold text-primary">@item.ItemID</td>
+                                            <td>@item.ItemName</td>
+                                            <td class="text-center">@item.Unit</td>
+                                            <td class="text-center fw-bold text-success">@item.Qty.ToString("N0")</td>
+                                            <td><small>@item.LocationDisplay</small></td>
+                                            <td>
+                                                <span class="badge bg-light text-dark border">Lot: @item.LotNo_Manual</span>
+                                                @if (!string.IsNullOrEmpty(item.BatchNo_Manual))
+                                                {
+                                                    <span class="badge bg-light text-secondary border ms-1">B: @item.BatchNo_Manual</span>
+                                                }
+                                            </td>
+                                            <td class="text-center">
+                                                <button class="btn btn-link text-danger btn-sm p-0" title="Remove Item" @onclick="() => RemoveLineItem(item)">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                            @if (LineItems.Any())
+                            {
+                                <tfoot class="table-light fw-bold">
+                                    <tr>
+                                        <td colspan="4" class="text-end">TOTAL RECEIVING QUANTITY:</td>
+                                        <td class="text-center text-success fs-6">@LineItems.Sum(x => x.Qty).ToString("N0")</td>
+                                        <td colspan="3"></td>
+                                    </tr>
+                                </tfoot>
+                            }
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons Footer -->
+            <div class="d-flex align-items-center justify-content-end gap-2 pt-3 border-top">
+                <button class="btn btn-outline-secondary btn-sm" style="height: 38px; min-width: 110px;" @onclick="Cancel">
+                    <i class="fas fa-times me-1"></i> Cancel
+                </button>
+                <button class="btn btn-primary btn-sm shadow-sm" style="height: 38px; min-width: 140px;" @onclick="() => SaveAsync(false)" disabled="@(IsSaving || !LineItems.Any())">
+                    @if (IsSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        <span>Saving...</span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-save me-1"></i>
+                        <span>Save & New</span>
+                    }
+                </button>
+                <button class="btn btn-success btn-sm shadow-sm" style="height: 38px; min-width: 140px;" @onclick="() => SaveAsync(true)" disabled="@(IsSaving || !LineItems.Any())">
+                    <i class="fas fa-check-circle me-1"></i> Save & Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+</style>

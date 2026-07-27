@@ -27,9 +27,8 @@ namespace Impulse.Constants
         public const string AccountsAgingReport = "Accounts_Again_Report.rpt";
         public const string DepreciationSchedule = "DepreciationSchedule.rpt";
         public const string Accounts_Datewise = "Accounts_Datewise.rpt";
-        //public const string CapitalWorkInProgress = "CapitalWorkInProgress.rpt";
 
-        /// ///////////// Notes To Accounts
+        // Notes To Accounts
         public const string NotesToAccounts = "BalanceSheet_Notes_SIAL.rpt";
         public const string BalanceSheet = "rptBalanceSheet_SIAL.rpt";
         public const string ProfitandLoss = "rptProfitandLoss_SIAL.rpt";
@@ -119,11 +118,26 @@ namespace Impulse.Constants
         {
             private const string Folder = ""; // Flat in RptPath
             public const string StockLedger = Folder + "StockLedger.rpt";
+            public const string SFTrayCard = Folder + "SF_Tray_Card.rpt";
+            public const string SFLedger = Folder + "SF_Ledger.rpt";
+            public const string SFOpeningSlip = Folder + "SF_Opening_Slip.rpt";
+            public const string SFTransactions = Folder + "SFStockTransactions.rpt";
+            public const string SFStockDetail = Folder + "Items_SFStock_Detail.rpt";
+            public const string BinWiseSFStockStatus = Folder + "BinWiseSemiFinishStockStatus.rpt";
+            public const string RackWiseSFStockStatus = Folder + "RackWiseSemiFinishStockStatus.rpt";
             public const string DailyStockList = Folder + "DailyStockList.rpt";
             public const string DailyStockListZero = Folder + "DailyStockList_Zero.rpt";
             public const string CustomerCatalogWithDetails = Folder + "CustomerCatalogWithDetails.rpt";
             public const string CustStockList = Folder + "CustStockList.rpt";
             public const string CustPriceList = Folder + "rptCustomerPriceList.rpt";
+            public const string StockTransactions = Folder + "StockTransactions.rpt";
+            public const string FinishStockDetail = Folder + "Items_FinishedStock_Detail.rpt";
+            public const string BinWiseFinishStockStatus = Folder + "BinWiseStockStatusOfItems_Lot_Batch_Wise.rpt";
+            public const string RackWiseFinishStockStatus = Folder + "RackWiseFinishStockStatus.rpt";
+            public const string FinishStockReceivingSlip = Folder + "Finished_Stock_Receiving_Slip.rpt";
+            public const string FinishStockIssuanceSlip = Folder + "Finished_Stock_Issuance_Slip.rpt";
+            public const string FinishItemLedger = Folder + "ItemLedger.rpt";
+            public const string FinishItemLedgerBinCard = Folder + "ItemLedger_BC.rpt";
         }
 
         // Company Subfolder

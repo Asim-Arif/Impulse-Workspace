@@ -118,6 +118,22 @@ builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IAccountReportingAccessService, AccountReportingAccessService>();
 
 //Stock Module Registrations
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IFinishMovementDataAccess, DataAccessLibrary.DAC.Stock.FinishMovementDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IFinishMovementService, Impulse.Services.Stock.FinishMovementService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IFinishItemLedgerDataAccess, DataAccessLibrary.DAC.Stock.FinishItemLedgerDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IFinishItemLedgerService, Impulse.Services.Stock.FinishItemLedgerService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IFinishTransactionDataAccess, DataAccessLibrary.DAC.Stock.FinishTransactionDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IFinishTransactionService, Impulse.Services.Stock.FinishTransactionService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IFinishStockReceivingDataAccess, DataAccessLibrary.DAC.Stock.FinishStockReceivingDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IFinishStockReceivingService, Impulse.Services.Stock.FinishStockReceivingService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IFinishStockIssuanceDataAccess, DataAccessLibrary.DAC.Stock.FinishStockIssuanceDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IFinishStockIssuanceService, Impulse.Services.Stock.FinishStockIssuanceService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.ISFTransactionDataAccess, DataAccessLibrary.DAC.Stock.SFTransactionDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.ISFTransactionService, Impulse.Services.Stock.SFTransactionService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.ISFMovementDataAccess, DataAccessLibrary.DAC.Stock.SFMovementDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.ISFMovementService, Impulse.Services.Stock.SFMovementService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.ISemiFinishOpenReceivingDataAccess, DataAccessLibrary.DAC.Stock.SemiFinishOpenReceivingDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.ISemiFinishOpenReceivingService, Impulse.Services.Stock.SemiFinishOpenReceivingService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IStockLedgerDataAccess, DataAccessLibrary.DAC.Stock.StockLedgerDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Stock.IStockLedgerService, Impulse.Services.Stock.StockLedgerService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IChangeBatchNoLotDataAccess, DataAccessLibrary.DAC.Stock.ChangeBatchNoLotDataAccess>();

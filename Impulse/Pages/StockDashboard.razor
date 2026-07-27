@@ -1,5 +1,6 @@
 @page "/stock"
 @attribute [Authorize]
+@inject NavigationManager NavigationManager
 
 <PageTitle>Stock Dashboard</PageTitle>
 
@@ -47,6 +48,10 @@
             <i class="fas fa-list"></i>
             <span>Raw Materials List</span>
         </NavLink>
+        <NavLink href="/stock/stock-ledger" class="dash-card" style="text-decoration: none;">
+            <i class="fas fa-book-open"></i>
+            <span>RM Stock Ledger</span>
+        </NavLink>
         <NavLink href="/stock/new-rm-po" class="dash-card" style="text-decoration: none;">
             <i class="fas fa-file-invoice"></i>
             <span>New RM PO</span>
@@ -71,6 +76,38 @@
             <i class="fas fa-list-alt"></i>
             <span>RM Issuance List</span>
         </NavLink>
+        <NavLink href="/stock/semi-finish-open-receiving?returnUrl=/stock" class="dash-card" style="text-decoration: none;">
+            <i class="fas fa-boxes-packing"></i>
+            <span>Semi Finish Open Receiving</span>
+        </NavLink>
+        <NavLink href="/stock/sf-movement?returnUrl=/stock" class="dash-card" style="text-decoration: none;">
+            <i class="fas fa-exchange-alt"></i>
+            <span>Semi Finish Movement</span>
+        </NavLink>
+        <NavLink href="/stock/sf-transactions?returnUrl=/stock" class="dash-card" style="text-decoration: none;">
+            <i class="fas fa-history"></i>
+            <span>Semi Finish Transactions</span>
+        </NavLink>
+        <NavLink href="/stock/finish-stock-issuance?returnUrl=/stock" class="dash-card" style="text-decoration: none;">
+            <i class="fas fa-boxes-stacked"></i>
+            <span>Finish Stock Issuance</span>
+        </NavLink>
+        <NavLink href="/stock/finish-stock-receiving?returnUrl=/stock" class="dash-card" style="text-decoration: none;">
+            <i class="fas fa-boxes-packing"></i>
+            <span>Finish Stock Receiving</span>
+        </NavLink>
+        <NavLink href="/stock/finish-transactions?returnUrl=/stock" class="dash-card" style="text-decoration: none;">
+            <i class="fas fa-history"></i>
+            <span>Finish Stock Transactions</span>
+        </NavLink>
+        <NavLink href="/stock/finish-item-ledger?returnUrl=/stock" class="dash-card" style="text-decoration: none;">
+            <i class="fas fa-book-open"></i>
+            <span>Finish Item Ledger</span>
+        </NavLink>
+        <NavLink href="/stock/finish-stock-movement?returnUrl=/stock" class="dash-card" style="text-decoration: none;">
+            <i class="fas fa-right-left"></i>
+            <span>Finish Stock Movement</span>
+        </NavLink>
     </div>
 </div>
 
@@ -81,7 +118,8 @@
     .dashboard-title { font-size: 2rem; font-weight: 700; color: #1b1b1f; margin: 0; line-height: 1.2; }
     .dashboard-subtitle { color: #44474f; margin: 0.25rem 0 0; font-size: 0.95rem; }
     .dashboard-modules { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 1rem; }
-    .dash-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; padding: 1.5rem 1rem; background: #ffffff; border: 1px solid #e0e2ec; border-radius: 16px; color: #1b1b1f; font-weight: 500; font-size: 0.875rem; text-align: center; }
+    .dash-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; padding: 1.5rem 1rem; background: #ffffff; border: 1px solid #e0e2ec; border-radius: 16px; color: #1b1b1f; font-weight: 500; font-size: 0.875rem; text-align: center; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+    .dash-card:hover { transform: translateY(-3px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
     .dash-card i { font-size: 1.75rem; color: #7a3abf; }
     .dash-card.coming-soon { opacity: 0.55; cursor: default; }
 </style>

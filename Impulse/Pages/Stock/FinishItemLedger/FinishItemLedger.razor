@@ -1,0 +1,238 @@
+@page "/stock/finish-item-ledger"
+@using DataAccessLibrary.Models.ViewModels.Company
+@using DataAccessLibrary.Models.ViewModels.Stock
+@using Impulse.Services.Stock
+@using Impulse.Services
+@attribute [Authorize]
+@inject IFinishItemLedgerService LedgerService
+@inject IReportNavigationService ReportNavigation
+@inject INotificationService NotificationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Finish Item Ledger</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <!-- Filter Card -->
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 1350px; margin: 0 auto; position: relative !important; z-index: 100 !important;">
+        <div class="card-body p-4">
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center flex-grow-1">
+                    <i class="fas fa-book-open me-2"></i> Finish Item Ledger
+                </h4>
+                <button class="btn btn-primary btn-sm shadow-sm" style="height: 35px;" @onclick="LoadLedgerAsync" disabled="@(IsLoading || SelectedArticle == null)">
+                    @if (IsLoading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        <span>Loading...</span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-sync-alt me-1"></i>
+                        <span>Refresh</span>
+                    }
+                </button>
+            </div>
+
+            <!-- Filters Row -->
+            <div class="row g-3 align-items-end mb-3" style="position: relative !important; z-index: 9999 !important;">
+                <div class="col-md-6">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Select Article (Item) <span class="text-danger">*</span></label>
+                    <BlazoredTypeahead SearchMethod="SearchArticles" @bind-Value="SelectedArticle" Placeholder="Search Article Code or Name..." EnableDropDown="true" MaximumSuggestions="1000">
+                        <SelectedTemplate>@context.ItemName</SelectedTemplate>
+                        <ResultTemplate>@context.ItemName</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">From Date</label>
+                    <input type="date" class="form-control form-control-sm" @bind="FromDate" style="height: 35px; font-size: 0.85rem;" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">To Date</label>
+                    <input type="date" class="form-control form-control-sm" @bind="ToDate" style="height: 35px; font-size: 0.85rem;" />
+                </div>
+            </div>
+
+            <!-- Header Stat Badges -->
+            @if (HeaderInfo != null)
+            {
+                <div class="row g-2 pt-2 border-top">
+                    <div class="col-md-3">
+                        <div class="p-2 border rounded bg-light text-center">
+                            <span class="text-muted d-block small fw-bold" style="font-size: 0.75rem;">SIZE</span>
+                            <span class="fw-bold text-dark fs-6">@(string.IsNullOrWhiteSpace(HeaderInfo.ItemSize) ? "-" : $"{HeaderInfo.ItemSize} {HeaderInfo.SizeUnit}")</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-2 border rounded bg-light text-center">
+                            <span class="text-muted d-block small fw-bold" style="font-size: 0.75rem;">COLOR</span>
+                            <span class="fw-bold text-dark fs-6">@(string.IsNullOrWhiteSpace(HeaderInfo.ItemColor) ? "-" : HeaderInfo.ItemColor)</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-2 border rounded bg-success-subtle border-success-subtle text-center">
+                            <span class="text-success d-block small fw-bold" style="font-size: 0.75rem;">CURRENT IN STOCK</span>
+                            <span class="fw-bold text-success fs-5">@HeaderInfo.TotalStock.ToString("N0")</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-2 border rounded bg-light text-center">
+                            <span class="text-muted d-block small fw-bold" style="font-size: 0.75rem;">UNIT</span>
+                            <span class="fw-bold text-dark fs-6">@(string.IsNullOrWhiteSpace(HeaderInfo.Unit) ? "-" : HeaderInfo.Unit)</span>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Grid & Action Buttons Card -->
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 1350px; margin: 0 auto; position: relative !important; z-index: 1 !important;">
+        <div class="card-body p-0">
+            <div class="px-4 py-3 border-bottom d-flex align-items-center justify-content-between">
+                <h6 class="mb-0 text-secondary fw-bold">
+                    <i class="fas fa-list me-2 text-primary"></i> Ledger Statement
+                    @if (SelectedArticle != null)
+                    {
+                        <span class="badge bg-primary-subtle text-primary ms-2">@SelectedArticle.ItemName</span>
+                    }
+                </h6>
+                <span class="badge bg-secondary">Total Transactions: @(LedgerRows.Count > 0 ? LedgerRows.Count - 1 : 0)</span>
+            </div>
+
+            <div class="table-responsive" style="max-height: 52vh; overflow-y: auto;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th style="width: 8%; padding-left: 1rem;">Date</th>
+                            <th style="width: 12%;">Entry #</th>
+                            <th style="width: 18%;">Details / Parties</th>
+                            <th style="width: 8%; text-align: center;">Qty In</th>
+                            <th style="width: 8%; text-align: center;">Qty Out</th>
+                            <th style="width: 10%;">Customer</th>
+                            <th style="width: 10%;">Order No</th>
+                            <th style="width: 10%;">Location</th>
+                            <th style="width: 9%; text-align: center;">Stock Bal</th>
+                            <th style="width: 7%; text-align: center;">Lot #</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="10" class="text-center py-4">
+                                    <span class="spinner-border spinner-border-sm me-2 text-primary"></span> Loading ledger...
+                                </td>
+                            </tr>
+                        }
+                        else if (SelectedArticle == null)
+                        {
+                            <tr>
+                                <td colspan="10" class="text-center py-4 text-muted">
+                                    Please select an article above to view its item ledger statement.
+                                </td>
+                            </tr>
+                        }
+                        else if (!LedgerRows.Any())
+                        {
+                            <tr>
+                                <td colspan="10" class="text-center py-4 text-muted">
+                                    No ledger records found for the selected period.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var row in LedgerRows)
+                            {
+                                if (string.IsNullOrEmpty(row.RcvNo) && row.DT == null)
+                                {
+                                    <!-- Opening Balance Row -->
+                                    <tr class="table-warning border-bottom border-warning">
+                                        <td style="padding-left: 1rem;" class="fw-bold">--</td>
+                                        <td class="fw-bold text-dark">OPENING BALANCE</td>
+                                        <td class="fw-bold text-secondary">Initial Stock Balance</td>
+                                        <td class="text-center fw-bold text-success">--</td>
+                                        <td class="text-center fw-bold text-danger">--</td>
+                                        <td>--</td>
+                                        <td>--</td>
+                                        <td>--</td>
+                                        <td class="text-center fw-bold text-primary fs-6">@row.RunningBalance.ToString("N0")</td>
+                                        <td class="text-center">--</td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td style="padding-left: 1rem;">@(row.DT?.ToString("dd-MMM-yyyy"))</td>
+                                        <td>
+                                            @if (row.EntryType == 1)
+                                            {
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">@row.RcvNo</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">@row.RcvNo</span>
+                                            }
+                                        </td>
+                                        <td><small>@row.RcvdFrom @row.RcvdBy</small></td>
+                                        <td class="text-center fw-bold text-success">
+                                            @(row.QtyIn > 0 ? row.QtyIn.ToString("N0") : "-")
+                                        </td>
+                                        <td class="text-center fw-bold text-danger">
+                                            @(row.QtyOut > 0 ? row.QtyOut.ToString("N0") : "-")
+                                        </td>
+                                        <td><small>@row.CustCode</small></td>
+                                        <td><small>@row.OrderNo</small></td>
+                                        <td><small>@row.Location</small></td>
+                                        <td class="text-center fw-bold text-primary">@row.RunningBalance.ToString("N0")</td>
+                                        <td class="text-center">
+                                            <span class="badge bg-light text-dark border">@row.LotNo_Manual</span>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Report Action Buttons Toolbar -->
+            <div class="p-3 border-top bg-light d-flex align-items-center justify-content-end gap-2" style="border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
+                <button class="btn btn-outline-primary btn-sm shadow-sm" style="height: 35px;" @onclick="PrintLedgerReport" disabled="@(SelectedArticle == null)">
+                    <i class="fas fa-print me-1"></i> Print Ledger
+                </button>
+                <button class="btn btn-outline-secondary btn-sm shadow-sm" style="height: 35px;" @onclick="PrintBinCardReport" disabled="@(SelectedArticle == null)">
+                    <i class="fas fa-id-card me-1"></i> Print Bin Card
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+</style>
