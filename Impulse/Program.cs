@@ -117,6 +117,23 @@ builder.Services.AddScoped<IEmployeeDataAccess, EmployeeDataAccess>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IAccountReportingAccessService, AccountReportingAccessService>();
 
+//Payroll Module Registrations
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.ITakeAttendanceDataAccess, DataAccessLibrary.DAC.Payroll.TakeAttendanceDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.ITakeAttendanceService, Impulse.Services.Payroll.TakeAttendanceService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IOverTimeAuthDataAccess, DataAccessLibrary.DAC.Payroll.OverTimeAuthDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IOverTimeAuthService, Impulse.Services.Payroll.OverTimeAuthService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IManualAttendanceDataAccess, DataAccessLibrary.DAC.Payroll.ManualAttendanceDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IManualAttendanceService, Impulse.Services.Payroll.ManualAttendanceService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IEmployeeTransferDataAccess, DataAccessLibrary.DAC.Payroll.EmployeeTransferDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IEmployeeTransferService, Impulse.Services.Payroll.EmployeeTransferService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.ISalaryHistoryDataAccess, DataAccessLibrary.DAC.Payroll.SalaryHistoryDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.ISalaryHistoryService, Impulse.Services.Payroll.SalaryHistoryService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IBiometricLedgerDataAccess, DataAccessLibrary.DAC.Payroll.BiometricLedgerDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IBiometricLedgerService, Impulse.Services.Payroll.BiometricLedgerService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IAttendanceLedgerDataAccess, DataAccessLibrary.DAC.Payroll.AttendanceLedgerDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IAttendanceLedgerService, Impulse.Services.Payroll.AttendanceLedgerService>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IIFaceMachineService, Impulse.Services.Payroll.IFaceMachineService>();
+
 //Stock Module Registrations
 builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IFinishMovementDataAccess, DataAccessLibrary.DAC.Stock.FinishMovementDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Stock.IFinishMovementService, Impulse.Services.Stock.FinishMovementService>();

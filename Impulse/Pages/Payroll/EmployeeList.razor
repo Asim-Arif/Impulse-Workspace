@@ -59,10 +59,18 @@
                                        Placeholder="All Employees"
                                        MaximumSuggestions="1000">
                         <SelectedTemplate Context="selectedEmp">
+                            @if (!string.IsNullOrEmpty(selectedEmp?.EmpID))
+                            {
+                                <text>[@selectedEmp.EmpID] </text>
+                            }
                             @selectedEmp?.Name
                         </SelectedTemplate>
                         <ResultTemplate Context="emp">
-                            @emp.Name
+                            @if (!string.IsNullOrEmpty(emp?.EmpID))
+                            {
+                                <text>[@emp.EmpID] </text>
+                            }
+                            @emp?.Name @(string.IsNullOrEmpty(emp?.FName) ? "" : $"({emp.FName})")
                         </ResultTemplate>
                     </BlazoredTypeahead>
                 </div>
@@ -154,9 +162,10 @@
                                             @foreach (var emp in singleDeptEmps)
                                             {
                                                 bool isSelected = highlightedEmployee?.EmpID == emp.EmpID;
-                                                <tr @onclick="() => HighlightEmployee(emp)"
-                                                    class="clickable-row @(isSelected ? "table-primary" : "")"
-                                                    style="cursor: pointer; transition: background 0.15s ease;">
+                                                <ContextMenuTrigger MenuId="rowContextMenu" Data="@emp" WrapperTag="tr"
+                                                                    class="@($"clickable-row {(isSelected ? "table-primary" : "")}")"
+                                                                    style="cursor: pointer; transition: background 0.15s ease;"
+                                                                    @onclick="() => HighlightEmployee(emp)">
                                                     <td class="ps-3 fw-semibold">
                                                         <span style="color: @(emp.Active ? ConvertWin32ColorToHex(selectedDepartment.Color) : "red"); text-decoration: @(emp.Active ? "none" : "line-through");">
                                                             @emp.EmpID
@@ -171,7 +180,7 @@
                                                     <td class="text-center" @onclick:stopPropagation="true">
                                                         <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2" style="font-size: 0.8rem;" @onclick="(e) => OpenManageMenu(e, emp)">Manage</button>
                                                     </td>
-                                                </tr>
+                                                </ContextMenuTrigger>
                                             }
                                         </tbody>
                                     </table>
@@ -221,9 +230,10 @@
                                                     @foreach (var emp in deptEmployees)
                                                     {
                                                         bool isSelected = highlightedEmployee?.EmpID == emp.EmpID;
-                                                        <tr @onclick="() => HighlightEmployee(emp)"
-                                                            class="clickable-row @(isSelected ? "table-primary" : "")"
-                                                            style="cursor: pointer; transition: background 0.15s ease;">
+                                                        <ContextMenuTrigger MenuId="rowContextMenu" Data="@emp" WrapperTag="tr"
+                                                                            class="@($"clickable-row {(isSelected ? "table-primary" : "")}")"
+                                                                            style="cursor: pointer; transition: background 0.15s ease;"
+                                                                            @onclick="() => HighlightEmployee(emp)">
                                                             <td class="ps-3 fw-semibold">
                                                                 <span style="color: @(emp.Active ? ConvertWin32ColorToHex(dept.Color) : "red"); text-decoration: @(emp.Active ? "none" : "line-through");">
                                                                     @emp.EmpID
@@ -238,7 +248,7 @@
                                                             <td class="text-center" @onclick:stopPropagation="true">
                                                                 <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2" style="font-size: 0.8rem;" @onclick="(e) => OpenManageMenu(e, emp)">Manage</button>
                                                             </td>
-                                                        </tr>
+                                                        </ContextMenuTrigger>
                                                     }
                                                 }
                                             }
@@ -376,20 +386,32 @@
     }
 </ContextMenu>
 
-<!-- ── BlazorContextMenu: Manage Employee Menu ── -->
-<ContextMenu Id="manageEmployeeMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+<!-- ── BlazorContextMenu: Manage Employee Row Menu ── -->
+<ContextMenu Id="rowContextMenu" UseDefaultEventHandlers="true" Template="Win11Style">
     @if (context.Data is EmployeeListItemModel emp)
     {
-        <div class="win11-section-header">Manage: @emp.Name</div>
+        <div class="win11-section-header">Employee: @emp.Name (@emp.EmpID)</div>
         <Item class="win11-menu-item" OnClick="@(() => EditEmployee(emp.EmpID))">
             <i class="fas fa-edit fa-fw win11-icon text-primary"></i> Edit Employee
         </Item>
         <Item class="win11-menu-item" OnClick="@(() => PrintEmpDetail(emp.EmpID))">
-            <i class="fas fa-file-user fa-fw win11-icon"></i> Print Details
+            <i class="fas fa-file-invoice fa-fw win11-icon"></i> Print Details
         </Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintAppForm(emp.EmpID))">
+            <i class="fas fa-file-alt fa-fw win11-icon"></i> Print Application Form
+        </Item>
+        <div class="win11-divider"></div>
+        <div class="win11-section-header">Employee Card Options</div>
         <Item class="win11-menu-item" OnClick="@(() => PrintEmpCard(emp.EmpID))">
-            <i class="fas fa-id-badge fa-fw win11-icon"></i> Print Card
+            <i class="fas fa-id-card fa-fw win11-icon text-info"></i> Print Card (This Employee)
         </Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintEmpCard(null, emp.DeptID))">
+            <i class="fas fa-building fa-fw win11-icon text-secondary"></i> Print Cards (This Department)
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintEmpCard())">
+            <i class="fas fa-users fa-fw win11-icon text-secondary"></i> Print Cards (All Employees)
+        </Item>
+        <div class="win11-divider"></div>
         <Item class="win11-menu-item" OnClick="@(() => ToggleActiveState(emp))">
             @if (emp.Active)
             {
@@ -409,6 +431,17 @@
         }
     }
 </ContextMenu>
+
+<style>
+    .win11-menu-item {
+        font-size: 0.85rem !important;
+        padding: 6px 12px !important;
+    }
+    .win11-menu-container {
+        max-height: 50vh !important;
+        overflow-y: auto !important;
+    }
+</style>
 
 <style>
     .clickable-row:hover {

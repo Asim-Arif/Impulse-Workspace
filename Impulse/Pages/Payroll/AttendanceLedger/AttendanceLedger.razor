@@ -1,0 +1,295 @@
+@page "/payroll/attendance-ledger"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Impulse.Services.Payroll
+@using Impulse.Services
+@using BlazorContextMenu
+@attribute [Authorize]
+@inject IAttendanceLedgerService LedgerService
+@inject IReportNavigationService ReportNavigation
+@inject INotificationService NotificationService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Attendance Ledger</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <!-- Filter Card -->
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 1500px; margin: 0 auto; position: relative !important; z-index: 100 !important;">
+        <div class="card-body p-4">
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center flex-grow-1">
+                    <i class="fas fa-calendar-check me-2"></i> Employee Attendance Ledger
+                </h4>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary btn-sm shadow-sm" style="height: 35px;" @onclick="LoadLedgerAsync" disabled="@(IsLoading || SelectedEmployee == null)">
+                        @if (IsLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <span>Loading...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-sync-alt me-1"></i>
+                            <span>Refresh</span>
+                        }
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm shadow-sm" style="height: 35px;" @onclick="NavigateBack">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filters Row -->
+            <div class="row g-3 align-items-end" style="position: relative !important; z-index: 9999 !important;">
+                <div class="col-md-1">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Year</label>
+                    <select class="form-select form-select-sm" value="@SelectedYear" @onchange="OnYearChanged" style="height: 35px; font-size: 0.85rem;">
+                        @foreach (var y in Years)
+                        {
+                            <option value="@y">@y</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Month</label>
+                    <select class="form-select form-select-sm" value="@SelectedMonth" @onchange="OnMonthChanged" style="height: 35px; font-size: 0.85rem;">
+                        @for (int m = 1; m <= 12; m++)
+                        {
+                            <option value="@m">@MonthNames[m - 1]</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Department</label>
+                    <BlazoredTypeahead SearchMethod="SearchDepartments" @bind-Value="SelectedDepartment" Placeholder="<All Departments>" EnableDropDown="true" MaximumSuggestions="1000">
+                        <SelectedTemplate>@context.Name</SelectedTemplate>
+                        <ResultTemplate>@context.Name</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Employee <span class="text-danger">*</span></label>
+                    <BlazoredTypeahead SearchMethod="SearchEmployees" @bind-Value="SelectedEmployee" Placeholder="Search Employee Name or ID..." EnableDropDown="true" MaximumSuggestions="1000">
+                        <SelectedTemplate>
+                            @if (context.EmpID != "0")
+                            {
+                                <text>[@context.EmpID] </text>
+                            }
+                            @context.Name
+                        </SelectedTemplate>
+                        <ResultTemplate>
+                            @if (context.EmpID != "0")
+                            {
+                                <text>[@context.EmpID] </text>
+                            }
+                            @context.Name @(string.IsNullOrWhiteSpace(context.FName) ? "" : $"({context.FName})")
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grid & Action Buttons Card -->
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 1500px; margin: 0 auto; position: relative !important; z-index: 1 !important;">
+        <div class="card-body p-0">
+            <div class="px-4 py-3 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <h6 class="mb-0 text-secondary fw-bold">
+                    <i class="fas fa-list me-2 text-primary"></i> Monthly Attendance Ledger
+                    @if (SelectedEmployee != null && DayRows.Any())
+                    {
+                        <span class="text-muted fw-normal"> — @SelectedEmployee.Name, @MonthNames[SelectedMonth - 1] @SelectedYear</span>
+                    }
+                </h6>
+                @if (DayRows.Any())
+                {
+                    <div class="d-flex flex-wrap gap-2">
+                        <span class="badge bg-success" title="Presents">P: @PresentCount</span>
+                        <span class="badge bg-danger" title="Absents">A: @AbsentCount</span>
+                        <span class="badge bg-info text-dark" title="Leaves">L: @LeaveCount</span>
+                        @if (HalfLeaveCount > 0)
+                        {
+                            <span class="badge bg-warning text-dark" title="Half Leaves">HL: @HalfLeaveCount</span>
+                        }
+                        <span class="badge bg-secondary" title="Sundays & Holidays">Off: @OffDayCount</span>
+                    </div>
+                }
+            </div>
+
+            <div class="table-responsive" style="max-height: 56vh; overflow-y: auto;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th style="width: 9%; padding-left: 1rem;">Date</th>
+                            <th style="width: 13%;">Day</th>
+                            <th style="width: 9%; text-align: center;">Status</th>
+                            <th style="width: 7%; text-align: center;">Chk-In</th>
+                            <th style="width: 7%; text-align: center;">Brk-Out</th>
+                            <th style="width: 7%; text-align: center;">Brk-In</th>
+                            <th style="width: 7%; text-align: center;">Chk-Out</th>
+                            <th style="width: 6%; text-align: center;">Hrs</th>
+                            <th style="width: 7%; text-align: center;">OT In</th>
+                            <th style="width: 7%; text-align: center;">OT Out</th>
+                            <th style="width: 7%; text-align: center;">Late Hrs</th>
+                            <th style="width: 7%; text-align: center;">Over Time</th>
+                            <th style="width: 7%; padding-right: 1rem;">Short Leaves</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="13" class="text-center py-4">
+                                    <span class="spinner-border spinner-border-sm me-2 text-primary"></span> Loading attendance ledger...
+                                </td>
+                            </tr>
+                        }
+                        else if (SelectedEmployee == null)
+                        {
+                            <tr>
+                                <td colspan="13" class="text-center py-4 text-muted">
+                                    <i class="fas fa-user-clock me-2"></i>Select an employee to view the attendance ledger.
+                                </td>
+                            </tr>
+                        }
+                        else if (!DayRows.Any())
+                        {
+                            <tr>
+                                <td colspan="13" class="text-center py-4 text-muted">
+                                    No attendance records found for the selected month.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var row in DayRows)
+                            {
+                                <ContextMenuTrigger MenuId="rowContextMenu" Data="row" WrapperTag="tr"
+                                                    CssClass="@(row.IsOffDay ? "ledger-offday" : row.Status == "A" ? "ledger-absent" : row.Status == "L" ? "ledger-leave" : "")">
+                                    <td style="padding-left: 1rem;" class="fw-semibold">@row.Date.ToString("dd-MMM-yyyy")</td>
+                                    <td><small>@row.DayName</small></td>
+                                    <td class="text-center">
+                                        @if (!string.IsNullOrEmpty(row.Status))
+                                        {
+                                            <span class="badge @GetStatusBadgeClass(row.Status)" style="font-size: 0.75rem;">@row.Status</span>
+                                            @if (!string.IsNullOrWhiteSpace(row.LeaveType) && (row.Status == "A" || row.Status == "L"))
+                                            {
+                                                <small class="text-muted d-block" style="font-size: 0.7rem;">@row.LeaveType</small>
+                                            }
+                                        }
+                                    </td>
+                                    @if (row.ShowTimes)
+                                    {
+                                        <td class="text-center"><small>@row.FirstInTime</small></td>
+                                        <td class="text-center"><small>@row.FirstOutTime</small></td>
+                                        <td class="text-center"><small>@row.SecondInTime</small></td>
+                                        <td class="text-center"><small>@row.SecondOutTime</small></td>
+                                        <td class="text-center fw-semibold"><small>@AttendanceLedgerFormatter.GetHrsMin(row.Hrs)</small></td>
+                                        <td class="text-center"><small>@row.OTInTime</small></td>
+                                        <td class="text-center"><small>@row.OTOutTime</small></td>
+                                        <td class="text-center">
+                                            <small class="@(row.LateHours > 0 ? "text-warning fw-bold" : "")">@AttendanceLedgerFormatter.GetHrsMin(row.LateHours, true)</small>
+                                        </td>
+                                        <td class="text-center">
+                                            <small class="@(row.OTHrs > 0 ? "text-success fw-bold" : "")">@AttendanceLedgerFormatter.GetHrsMin(row.OTHrs, true)</small>
+                                        </td>
+                                    }
+                                    else
+                                    {
+                                        <td colspan="9"></td>
+                                    }
+                                    <td style="padding-right: 1rem;"><small class="text-secondary">@row.ShortLeaves</small></td>
+                                </ContextMenuTrigger>
+                            }
+                        }
+                    </tbody>
+                    @if (DayRows.Any(r => r.ShowTimes))
+                    {
+                        <tfoot class="table-light sticky-bottom" style="box-shadow: 0 -1px 0 #dee2e6;">
+                            <tr class="fw-bold">
+                                <td colspan="7" class="text-end" style="font-size: 0.85rem; padding-left: 1rem;">
+                                    TOTALS (Payable: @AttendanceLedgerFormatter.GetHrsMin(TotalPayableHrs)):
+                                </td>
+                                <td class="text-center" style="font-size: 0.85rem;">@AttendanceLedgerFormatter.GetHrsMin(TotalHrs)</td>
+                                <td colspan="2"></td>
+                                <td class="text-center text-warning" style="font-size: 0.85rem;">@AttendanceLedgerFormatter.GetHrsMin(TotalLateHrs)</td>
+                                <td class="text-center text-success" style="font-size: 0.85rem;">@AttendanceLedgerFormatter.GetHrsMin(TotalOTHrs)</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    }
+                </table>
+            </div>
+
+            <!-- Report Action Buttons Toolbar -->
+            <div class="p-3 border-top bg-light d-flex align-items-center justify-content-end gap-2" style="border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
+                <button class="btn btn-outline-primary btn-sm shadow-sm" style="height: 35px;" @onclick="PrintLedgerAsync" disabled="@(IsPrinting || !DayRows.Any())">
+                    @if (IsPrinting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        <span>Preparing...</span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-print me-1"></i>
+                        <span>Print Attendance Ledger</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Row Context Menu (legacy mnuPop actions) -->
+<ContextMenu Id="rowContextMenu" Template="Win11Style">
+    <style>
+        .win11-context-menu-container { max-height: 40vh; overflow-y: auto; }
+    </style>
+    @if (context.Data is AttendanceLedgerDayRow rowCtx)
+    {
+        <div class="win11-section-header">@rowCtx.Date.ToString("dd-MMM-yyyy") — @(string.IsNullOrEmpty(rowCtx.Status) ? "No Record" : rowCtx.Status)</div>
+        <Item OnClick="@(() => ChangeToAbsentLeave(rowCtx))" CssClass="win11-menu-item">
+            <i class="fas fa-user-times win11-icon me-2 text-danger"></i> Change Attendance To Absent / Leave
+        </Item>
+        <div class="win11-divider"></div>
+        <Item OnClick="@(() => NewShortTermAdvance(rowCtx))" CssClass="win11-menu-item">
+            <i class="fas fa-hand-holding-usd win11-icon me-2 text-primary"></i> New Short Term Advance
+        </Item>
+        <Item OnClick="@(() => NewLongTermAdvance(rowCtx))" CssClass="win11-menu-item">
+            <i class="fas fa-money-check-alt win11-icon me-2 text-primary"></i> New Long Term Advance
+        </Item>
+    }
+</ContextMenu>
+
+<style>
+    .ledger-offday td { color: #149614 !important; }
+    .ledger-absent td { color: #c0392b; }
+    .ledger-leave td { color: #1e8449; }
+
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+</style>

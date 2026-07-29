@@ -1,0 +1,205 @@
+@page "/payroll/overtime-authorization"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Impulse.Services.Payroll
+@using Impulse.Services
+@attribute [Authorize]
+@inject IOverTimeAuthService OverTimeAuthService
+@inject INotificationService NotificationService
+@inject NavigationManager NavigationManager
+@inject IReportNavigationService ReportNavigationService
+
+<PageTitle>Overtime Authorization</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <!-- Main Shell Card -->
+    <div class="card border-0 shadow-sm mb-4" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 1150px; margin: 0 auto; position: relative !important; z-index: 100 !important;">
+        <div class="card-body p-4">
+            <!-- Header -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center">
+                    <i class="fas fa-user-clock me-2"></i> Overtime Authorization
+                </h4>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-info btn-sm" @onclick="PrintDailyReport">
+                        <i class="fas fa-print me-1"></i> Print Daily Report
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="NavigateBack">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                </div>
+            </div>
+
+            <!-- Top Selection Toolbar -->
+            <div class="row g-3 align-items-end mb-4" style="position: relative !important; z-index: 9999 !important;">
+                <div class="col-md-5">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Select Department <span class="text-danger">*</span>
+                    </label>
+                    <BlazoredTypeahead SearchMethod="SearchDepartments" Value="SelectedDepartment" ValueChanged="OnDepartmentChanged" ValueExpression="@(() => SelectedDepartment)" TValue="DepartmentListItemModel" TItem="DepartmentListItemModel" Placeholder="Select Department..." EnableDropDown="true" MaximumSuggestions="1000">
+                        <SelectedTemplate>@context.Name</SelectedTemplate>
+                        <ResultTemplate>@context.Name</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Attendance Date <span class="text-danger">*</span>
+                    </label>
+                    <input type="date" class="form-control form-control-sm" Value="@AttendanceDate.ToString("yyyy-MM-dd")" @onchange="OnAttendanceDateChanged" style="height: 35px; font-size: 0.875rem;" />
+                </div>
+
+                <div class="col-md-4 d-flex align-items-center justify-content-end gap-2 pb-1">
+                    <button type="button" class="btn btn-outline-primary btn-sm shadow-xs" @onclick="AuthorizeAll" disabled="@(!FilteredRows.Any() || IsSaving)">
+                        <i class="fas fa-check-double me-1"></i> Authorize All
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm shadow-xs" @onclick="UnauthorizeAll" disabled="@(!FilteredRows.Any() || IsSaving)">
+                        <i class="fas fa-times me-1"></i> Unauthorize All
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search Filter Bar -->
+            <div class="row g-3 mb-3" style="position: relative !important; z-index: 1 !important;">
+                <div class="col-md-6">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light text-secondary border-end-0">
+                            <i class="fas fa-search"></i>
+                        </span>
+                        <input type="text" class="form-control border-start-0 ps-0" placeholder="Filter by Employee ID or Name..." @bind="SearchText" @bind:event="oninput" style="height: 35px; font-size: 0.875rem;" />
+                    </div>
+                </div>
+                <div class="col-md-6 text-end">
+                    <button type="button" class="btn btn-primary btn-sm shadow-sm px-4" style="height: 35px;" @onclick="SaveOverTimeAuthAsync" disabled="@(SelectedDepartment == null || IsSaving || !Rows.Any())">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save me-1"></i>
+                            <span>Save Authorizations</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Grid Table Card -->
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 1150px; margin: 0 auto; position: relative !important; z-index: 1 !important;">
+        <div class="card-body p-0">
+            <div class="px-4 py-3 border-bottom d-flex align-items-center justify-content-between">
+                <h6 class="mb-0 text-secondary fw-bold">
+                    <i class="fas fa-list-check me-2 text-primary"></i> Employee Overtime List
+                </h6>
+                <div class="d-flex gap-2">
+                    <span class="badge bg-secondary fs-6">Staff: @FilteredRows.Count</span>
+                    <span class="badge bg-success fs-6">Authorized: @AuthorizedCount</span>
+                </div>
+            </div>
+
+            <div class="table-responsive" style="max-height: 50vh; overflow-y: auto;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th style="width: 5%; padding-left: 1rem;" class="text-center">Auth</th>
+                            <th style="width: 12%;">Emp ID</th>
+                            <th style="width: 33%;">Employee Name</th>
+                            <th style="width: 15%; text-align: right;">OT Rate (Rs/hr)</th>
+                            <th style="width: 15%; text-align: center;">OT Hours</th>
+                            <th style="width: 20%; text-align: right; padding-right: 1.5rem;">Amount (Rs)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-4">
+                                    <span class="spinner-border spinner-border-sm me-2 text-primary"></span> Loading employee overtime list...
+                                </td>
+                            </tr>
+                        }
+                        else if (!FilteredRows.Any())
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">
+                                    No eligible employee records found for this department on @AttendanceDate.ToString("dd-MMM-yyyy").
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var row in FilteredRows)
+                            {
+                                <tr class="@(row.IsAuthorized ? "table-success-subtle" : "")">
+                                    <td style="padding-left: 1rem;" class="text-center">
+                                        <input class="form-check-input ms-0" type="checkbox" @bind="row.IsAuthorized" />
+                                    </td>
+                                    <td class="fw-bold text-primary">@row.EmpID</td>
+                                    <td>
+                                        <span class="fw-semibold">@row.EmpName</span>
+                                        @if (!string.IsNullOrWhiteSpace(row.FName))
+                                        {
+                                            <small class="text-muted ms-1">@row.Rel @row.FName</small>
+                                        }
+                                    </td>
+                                    <td class="text-end fw-semibold text-secondary">@row.OtRate.ToString("N4")</td>
+                                    <td class="text-center">
+                                        <input type="number" step="0.5" min="0" max="24" class="form-control form-control-sm text-center fw-bold d-inline-block" style="width: 100px; height: 32px;" @bind="row.OtHrs" disabled="@(!row.IsAuthorized)" />
+                                    </td>
+                                    <td class="text-end fw-bold text-success" style="padding-right: 1.5rem;">
+                                        @row.Amount.ToString("N2")
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Footer Summary Bar -->
+            <div class="px-4 py-3 bg-light border-top d-flex align-items-center justify-content-between rounded-bottom-3" style="font-size: 0.88rem;">
+                <div class="fw-bold text-secondary">
+                    Total Staff: <span class="text-dark">@FilteredRows.Count</span>
+                </div>
+                <div class="d-flex gap-4">
+                    <div class="fw-bold text-secondary">
+                        Total OT Hours: <span class="text-primary">@TotalOtHours.ToString("N2") Hrs</span>
+                    </div>
+                    <div class="fw-bold text-secondary">
+                        Total Amount: <span class="text-success fs-6">Rs. @TotalAmount.ToString("N2")</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+</style>

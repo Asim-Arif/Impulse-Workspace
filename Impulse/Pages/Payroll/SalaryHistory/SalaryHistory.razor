@@ -1,0 +1,273 @@
+@page "/payroll/salary-history"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Impulse.Services.Payroll
+@using Impulse.Services
+@attribute [Authorize]
+@inject ISalaryHistoryService SalaryHistoryService
+@inject IReportNavigationService ReportNavigation
+@inject INotificationService NotificationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Salary History</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <!-- Filter Card -->
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 1350px; margin: 0 auto; position: relative !important; z-index: 100 !important;">
+        <div class="card-body p-4">
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center flex-grow-1">
+                    <i class="fas fa-file-invoice-dollar me-2"></i> Employee Salary History
+                </h4>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary btn-sm shadow-sm" style="height: 35px;" @onclick="OpenChangeSalaryModal">
+                        <i class="fas fa-plus-circle me-1"></i> Change Salary
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm shadow-sm" style="height: 35px;" @onclick="LoadSalaryHistoryAsync" disabled="@IsLoading">
+                        @if (IsLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <span>Loading...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-sync-alt me-1"></i>
+                            <span>Refresh</span>
+                        }
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filters Row -->
+            <div class="row g-3 align-items-end" style="position: relative !important; z-index: 9999 !important;">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Department</label>
+                    <BlazoredTypeahead SearchMethod="SearchDepartments" @bind-Value="SelectedDepartment" Placeholder="<All Departments>" EnableDropDown="true" MaximumSuggestions="1000">
+                        <SelectedTemplate>@context.Name</SelectedTemplate>
+                        <ResultTemplate>@context.Name</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Employee</label>
+                    <BlazoredTypeahead SearchMethod="SearchEmployees" @bind-Value="SelectedEmployee" Placeholder="<All Employees>" EnableDropDown="true" MaximumSuggestions="1000">
+                        <SelectedTemplate>
+                            @if (context.EmpID != "0")
+                            {
+                                <text>[@context.EmpID] </text>
+                            }
+                            @context.Name
+                        </SelectedTemplate>
+                        <ResultTemplate>
+                            @if (context.EmpID != "0")
+                            {
+                                <text>[@context.EmpID] </text>
+                            }
+                            @context.Name @(string.IsNullOrWhiteSpace(context.FName) ? "" : $"({context.FName})")
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">From Date</label>
+                    <input type="date" class="form-control form-control-sm" @bind="FromDate" style="height: 35px; font-size: 0.85rem;" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">To Date</label>
+                    <input type="date" class="form-control form-control-sm" @bind="ToDate" style="height: 35px; font-size: 0.85rem;" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grid & Action Buttons Card -->
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 1350px; margin: 0 auto; position: relative !important; z-index: 1 !important;">
+        <div class="card-body p-0">
+            <div class="px-4 py-3 border-bottom d-flex align-items-center justify-content-between">
+                <h6 class="mb-0 text-secondary fw-bold">
+                    <i class="fas fa-list me-2 text-primary"></i> Salary Adjustment Records
+                </h6>
+                <span class="badge bg-primary fs-6">Total Entries: @SalaryRows.Count</span>
+            </div>
+
+            <div class="table-responsive" style="max-height: 54vh; overflow-y: auto;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th style="width: 5%; padding-left: 1rem;" class="text-center">S#</th>
+                            <th style="width: 10%;">Emp ID</th>
+                            <th style="width: 25%;">Employee Name</th>
+                            <th style="width: 15%;">Designation</th>
+                            <th style="width: 10%;">Date</th>
+                            <th style="width: 20%;">Description</th>
+                            <th style="width: 15%; text-align: right; padding-right: 1.5rem;">Salary</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center py-4">
+                                    <span class="spinner-border spinner-border-sm me-2 text-primary"></span> Loading salary history...
+                                </td>
+                            </tr>
+                        }
+                        else if (!SalaryRows.Any())
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-muted">
+                                    No salary history records found matching the filter criteria.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            int seq = 1;
+                            @foreach (var row in SalaryRows)
+                            {
+                                <tr>
+                                    <td style="padding-left: 1rem;" class="text-center fw-bold text-secondary">@(seq++)</td>
+                                    <td class="fw-bold text-primary">@row.EmpID</td>
+                                    <td>
+                                        <span class="fw-semibold">@row.Name</span>
+                                        @if (!string.IsNullOrWhiteSpace(row.FName))
+                                        {
+                                            <small class="text-muted ms-1">(@(string.IsNullOrWhiteSpace(row.Rel) ? "S/o" : row.Rel) @row.FName)</small>
+                                        }
+                                    </td>
+                                    <td><span class="badge bg-light text-dark border">@row.Designation</span></td>
+                                    <td>@(row.DT?.ToString("dd-MMM-yyyy"))</td>
+                                    <td><small class="text-secondary">@row.Description</small></td>
+                                    <td class="text-end fw-bold text-success" style="padding-right: 1.5rem; font-size: 0.95rem;">
+                                        @row.Salary.ToString("N0")
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                    @if (SalaryRows.Any())
+                    {
+                        <tfoot class="table-light sticky-bottom" style="box-shadow: 0 -1px 0 #dee2e6;">
+                            <tr class="fw-bold">
+                                <td colspan="6" class="text-end" style="font-size: 0.85rem;">AVERAGE ADJUSTED SALARY:</td>
+                                <td class="text-end text-success" style="padding-right: 1.5rem; font-size: 0.95rem;">
+                                    @SalaryRows.Average(x => x.Salary).ToString("N0")
+                                </td>
+                            </tr>
+                        </tfoot>
+                    }
+                </table>
+            </div>
+
+            <!-- Report Action Buttons Toolbar -->
+            <div class="p-3 border-top bg-light d-flex align-items-center justify-content-end gap-2" style="border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
+                <button class="btn btn-outline-primary btn-sm shadow-sm" style="height: 35px;" @onclick="PrintSalaryHistoryReport" disabled="@(!SalaryRows.Any())">
+                    <i class="fas fa-print me-1"></i> Print Salary History Report
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Change Salary -->
+@if (ShowChangeSalaryModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-primary text-white border-0 py-3" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-plus-circle me-2"></i>Change Employee Salary</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseChangeSalaryModal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.85rem;">Select Employee <span class="text-danger">*</span></label>
+                        <BlazoredTypeahead SearchMethod="SearchEmployeesModal" @bind-Value="ModalSelectedEmployee" Placeholder="Search Employee Name or ID..." EnableDropDown="true" MaximumSuggestions="1000">
+                            <SelectedTemplate>
+                                @if (context.EmpID != "0")
+                                {
+                                    <text>[@context.EmpID] </text>
+                                }
+                                @context.Name
+                            </SelectedTemplate>
+                            <ResultTemplate>
+                                @if (context.EmpID != "0")
+                                {
+                                    <text>[@context.EmpID] </text>
+                                }
+                                @context.Name @(string.IsNullOrWhiteSpace(context.FName) ? "" : $"({context.FName})")
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+
+                    @if (ModalSelectedEmployee != null && ModalSelectedEmployee.EmpID != "0")
+                    {
+                        <div class="p-2 mb-3 bg-light border rounded d-flex justify-content-between align-items-center">
+                            <span class="text-muted small fw-bold">CURRENT SALARY:</span>
+                            <span class="fw-bold text-primary fs-6">@ModalSelectedEmployee.StartingSalary.ToString("N0")</span>
+                        </div>
+                    }
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.85rem;">Effective Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control form-control-sm" @bind="ModalEffectiveDate" style="height: 35px;" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.85rem;">New Salary <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control form-control-sm text-end fw-bold text-success" @bind="ModalNewSalary" style="height: 35px;" placeholder="0" />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.85rem;">Description / Reason</label>
+                        <input type="text" class="form-control form-control-sm" @bind="ModalDescription" placeholder="e.g. Annual Increment, Promotion..." style="height: 35px;" />
+                    </div>
+                </div>
+                <div class="modal-footer border-top p-3">
+                    <button type="button" class="btn btn-secondary btn-sm shadow-sm" style="height: 35px;" @onclick="CloseChangeSalaryModal" disabled="@IsSavingModal">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm shadow-sm" style="height: 35px;" @onclick="SaveSalaryChangeAsync" disabled="@IsSavingModal">
+                        @if (IsSavingModal)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-check me-1"></i>
+                            <span>Save Salary Change</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+</style>

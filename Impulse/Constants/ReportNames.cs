@@ -69,6 +69,15 @@ namespace Impulse.Constants
             public const string EmpListWCardID         = Folder + "rptEmpListWCardID.rpt";
             public const string EmpListPercentage      = Folder + "rptEmpListPercentage.rpt";
             public const string AppForm                = Folder + "rptAppForm.rpt";
+            public const string EmpSalHistory          = Folder + "rptEmpSalHistory.rpt";
+            public const string EmpLedger              = Folder + "rptEmpLedgerWLTOT.rpt";
+            public const string DailyOverTime          = Folder + "DailyOverTime.rpt";
+
+            // Biometric Ledger / Daily Attendance Reports
+            public const string DailyAttendance        = Folder + "rptDailyAttendance.rpt";
+            public const string AbsentLeaveSummary     = Folder + "rptAbsentLeaveSummary.rpt";
+            public const string LateComers             = Folder + "LateComers.rpt";
+            public const string PresentEmpList         = Folder + "rptPresentEmpList.rpt";
         }
 
         // Export Subfolder

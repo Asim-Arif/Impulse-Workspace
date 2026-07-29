@@ -1,0 +1,230 @@
+@page "/payroll/employee-transfer"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Impulse.Services.Payroll
+@using Impulse.Services
+@attribute [Authorize]
+@inject IEmployeeTransferService EmployeeTransferService
+@inject INotificationService NotificationService
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Employee Transfer</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <!-- Form Card -->
+    <div class="card border-0 shadow-sm mb-4" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 950px; margin: 0 auto; position: relative !important; z-index: 100 !important;">
+        <div class="card-body p-4">
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center">
+                    <i class="fas fa-exchange-alt me-2"></i> Employee Department Transfer
+                </h4>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="NavigateBack">
+                    <i class="fas fa-arrow-left me-1"></i> Back
+                </button>
+            </div>
+
+            <!-- Inputs Grid -->
+            <div class="row g-3">
+                <!-- Source Department -->
+                <div class="col-md-6" style="position: relative !important; z-index: 9999 !important;">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Source Department <span class="text-danger">*</span>
+                    </label>
+                    <BlazoredTypeahead SearchMethod="SearchSourceDepartments" @bind-Value="SelectedSourceDepartment" Placeholder="Select Source Department..." EnableDropDown="true" MaximumSuggestions="1000">
+                        <SelectedTemplate>@context.Name</SelectedTemplate>
+                        <ResultTemplate>@context.Name</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <!-- Select Employee -->
+                <div class="col-md-6" style="position: relative !important; z-index: 9999 !important;">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Select Employee <span class="text-danger">*</span>
+                    </label>
+                    <div class="@(SelectedSourceDepartment == null ? "disabled-typeahead-wrapper" : "")">
+                        <BlazoredTypeahead SearchMethod="SearchEmployees" @bind-Value="SelectedEmployee" Placeholder="Select Employee..." EnableDropDown="true" MaximumSuggestions="1000" Disabled="@(SelectedSourceDepartment == null)">
+                            <SelectedTemplate>
+                                <text>[@context.EmpID] </text>@context.Name
+                            </SelectedTemplate>
+                            <ResultTemplate>
+                                <text>[@context.EmpID] </text>@context.Name @(string.IsNullOrWhiteSpace(context.FName) ? "" : $"({context.FName})")
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                </div>
+
+                <!-- Target Department -->
+                <div class="col-md-6" style="position: relative !important; z-index: 9998 !important;">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Transfer To Department <span class="text-danger">*</span>
+                    </label>
+                    <div class="@(SelectedSourceDepartment == null ? "disabled-typeahead-wrapper" : "")">
+                        <BlazoredTypeahead SearchMethod="SearchTargetDepartments" @bind-Value="SelectedTargetDepartment" Placeholder="Select Target Department..." EnableDropDown="true" MaximumSuggestions="1000" Disabled="@(SelectedSourceDepartment == null)">
+                            <SelectedTemplate>@context.Name</SelectedTemplate>
+                            <ResultTemplate>@context.Name</ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                </div>
+
+                <!-- Date of Transfer -->
+                <div class="col-md-6">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Date of Transfer <span class="text-danger">*</span>
+                    </label>
+                    <input type="date" class="form-control form-control-sm" @bind="TransferDate" style="height: 35px; font-size: 0.875rem;" />
+                </div>
+
+                <!-- Reason / Description -->
+                <div class="col-12">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Description / Reason for Transfer
+                    </label>
+                    <textarea class="form-control form-control-sm" rows="3" @bind="Description" placeholder="Enter transfer remarks or reasons..."></textarea>
+                </div>
+            </div>
+
+            <!-- Action Buttons Toolbar -->
+            <div class="d-flex align-items-center justify-content-end gap-2 pt-3 mt-3 border-top">
+                <button type="button" class="btn btn-secondary btn-sm shadow-sm px-3" style="height: 35px;" @onclick="NavigateBack" disabled="@IsSaving">
+                    <i class="fas fa-times me-1"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm shadow-sm px-3" style="height: 35px;" @onclick="() => SaveTransferAsync(false)" disabled="@IsSaving">
+                    @if (IsSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        <span>Saving...</span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-plus-circle me-1"></i>
+                        <span>Save &amp; New</span>
+                    }
+                </button>
+                <button type="button" class="btn btn-primary btn-sm shadow-sm px-4" style="height: 35px;" @onclick="() => SaveTransferAsync(true)" disabled="@IsSaving">
+                    @if (IsSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        <span>Saving...</span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-check me-1"></i>
+                        <span>Save &amp; Close</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Transfers Table Card -->
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 950px; margin: 0 auto; position: relative !important; z-index: 1 !important;">
+        <div class="card-body p-0">
+            <div class="px-4 py-3 border-bottom d-flex align-items-center justify-content-between">
+                <h6 class="mb-0 text-secondary fw-bold">
+                    <i class="fas fa-history me-2 text-primary"></i> Recent Department Transfers
+                </h6>
+                <span class="badge bg-secondary fs-6">Recent Records: @RecentTransfers.Count</span>
+            </div>
+
+            <div class="table-responsive" style="max-height: 40vh; overflow-y: auto;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th style="width: 12%; padding-left: 1rem;">Date</th>
+                            <th style="width: 12%;">Emp ID</th>
+                            <th style="width: 22%;">Employee</th>
+                            <th style="width: 20%;">From Dept</th>
+                            <th style="width: 20%;">To Dept</th>
+                            <th style="width: 14%;">User</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoadingHistory)
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-4">
+                                    <span class="spinner-border spinner-border-sm me-2 text-primary"></span> Loading transfer history...
+                                </td>
+                            </tr>
+                        }
+                        else if (!RecentTransfers.Any())
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">
+                                    No employee transfer records found.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var row in RecentTransfers)
+                            {
+                                <tr>
+                                    <td style="padding-left: 1rem;" class="fw-semibold text-secondary">@(row.TransferDT?.ToString("dd-MMM-yyyy"))</td>
+                                    <td class="fw-bold text-primary">@row.EmpID</td>
+                                    <td>
+                                        <span class="fw-semibold">@row.EmpName</span>
+                                        @if (!string.IsNullOrWhiteSpace(row.FName))
+                                        {
+                                            <small class="text-muted ms-1">(@row.FName)</small>
+                                        }
+                                    </td>
+                                    <td><span class="badge bg-light text-secondary border">@row.FromDeptName</span></td>
+                                    <td><span class="badge bg-success-subtle text-success border border-success-subtle fw-bold">@row.ToDeptName</span></td>
+                                    <td><small class="text-muted">@row.UserName</small></td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    .disabled-typeahead-wrapper {
+        border-radius: 4px;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+    }
+    .disabled-typeahead-wrapper .blazored-typeahead {
+        overflow: hidden !important;
+        border-radius: 4px;
+    }
+    .blazored-typeahead__disabled-mask {
+        border-radius: 4px !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        height: 100% !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+</style>

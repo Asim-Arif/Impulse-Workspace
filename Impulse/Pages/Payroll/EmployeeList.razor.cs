@@ -210,7 +210,7 @@ namespace Impulse.Pages.Payroll
         private async Task OpenManageMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs e, EmployeeListItemModel emp)
         {
             highlightedEmployee = emp;
-            await BlazorContextMenuService.ShowMenu("manageEmployeeMenu", (int)e.ClientX, (int)e.ClientY + 15, emp);
+            await BlazorContextMenuService.ShowMenu("rowContextMenu", (int)e.ClientX, (int)e.ClientY + 15, emp);
         }
 
         private void EditEmployee(string empId)
@@ -520,12 +520,13 @@ namespace Impulse.Pages.Payroll
             await ReportNavigation.PrintReportAsync(request);
         }
 
-        private async Task PrintAppForm()
+        private async Task PrintAppForm(string? empId = null)
         {
+            string targetEmpId = !string.IsNullOrEmpty(empId) ? empId : (highlightedEmployee?.EmpID ?? "");
             var request = new ReportRequest
             {
                 ReportName = ReportNames.Payroll.AppForm,
-                SelectionFormula = highlightedEmployee != null ? $"{{Employees.empid}}='{highlightedEmployee.EmpID}'" : ""
+                SelectionFormula = !string.IsNullOrEmpty(targetEmpId) ? $"{{Employees.empid}}='{targetEmpId}'" : ""
             };
 
             await ReportNavigation.PrintReportAsync(request);

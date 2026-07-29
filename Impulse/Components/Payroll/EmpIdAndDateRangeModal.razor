@@ -1,0 +1,114 @@
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Impulse.Services.Payroll
+@inject IOverTimeAuthService OverTimeAuthService
+@inject IManualAttendanceService AttendanceService
+
+@if (IsOpen)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 1055;" role="dialog">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 520px;">
+            <div class="modal-content border-0 shadow-lg" style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); border-radius: 14px;">
+                <div class="modal-header border-bottom py-3 px-4">
+                    <h5 class="modal-title fw-bold text-primary d-flex align-items-center">
+                        <i class="fas fa-sync-alt me-2"></i> @(string.IsNullOrWhiteSpace(Title) ? "Re-Calculate Attendance" : Title)
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal" disabled="@IsProcessing"></button>
+                </div>
+                <div class="modal-body p-4" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+                    <div class="mb-3" style="position: relative; z-index: 1050;">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.85rem;">
+                            Department
+                        </label>
+                        <BlazoredTypeahead SearchMethod="SearchDepartments" Value="SelectedDepartment" ValueChanged="OnDepartmentChanged" ValueExpression="@(() => SelectedDepartment)" TValue="DepartmentListItemModel" TItem="DepartmentListItemModel" Placeholder="Select Department..." EnableDropDown="true" MaximumSuggestions="1000">
+                            <SelectedTemplate>@context.Name</SelectedTemplate>
+                            <ResultTemplate>@context.Name</ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+
+                    <div class="mb-3" style="position: relative; z-index: 1040;">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.85rem;">
+                            Employee
+                        </label>
+                        <BlazoredTypeahead SearchMethod="SearchEmployees" Value="SelectedEmployee" ValueChanged="OnEmployeeChanged" ValueExpression="@(() => SelectedEmployee)" TValue="EmployeeListItemModel" TItem="EmployeeListItemModel" Placeholder="Select Employee..." EnableDropDown="true" MaximumSuggestions="1000">
+                            <SelectedTemplate>
+                                @if (context.EmpID != "0")
+                                {
+                                    <text>[@context.EmpID] </text>
+                                }
+                                @context.Name
+                            </SelectedTemplate>
+                            <ResultTemplate>
+                                @if (context.EmpID != "0")
+                                {
+                                    <text>[@context.EmpID] </text>
+                                }
+                                @context.Name @if (!string.IsNullOrWhiteSpace(context.FName)) { <small class="text-muted">(@context.FName)</small> }
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+
+                    <div class="row g-3 mb-2">
+                        <div class="col-6">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.85rem;">
+                                Date From <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" class="form-control form-control-sm" Value="@DateFrom.ToString("yyyy-MM-dd")" @onchange="OnDateFromChanged" style="height: 35px; font-size: 0.875rem;" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.85rem;">
+                                Date To <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" class="form-control form-control-sm" Value="@DateTo.ToString("yyyy-MM-dd")" @onchange="OnDateToChanged" style="height: 35px; font-size: 0.875rem;" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer border-top py-3 px-4 bg-light rounded-bottom-4">
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" @onclick="CloseModal" disabled="@IsProcessing">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm px-4 shadow-sm" @onclick="SubmitAsync" disabled="@IsProcessing">
+                        @if (IsProcessing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <span>Processing...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-check me-1"></i>
+                            <span>Process</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+</style>

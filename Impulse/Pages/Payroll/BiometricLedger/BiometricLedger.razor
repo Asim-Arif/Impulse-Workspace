@@ -1,0 +1,373 @@
+@page "/payroll/daily-activity"
+@page "/payroll/biometric-ledger"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Impulse.Services.Payroll
+@using Impulse.Services
+@using BlazorContextMenu
+@attribute [Authorize]
+
+<PageTitle>Daily Activity</PageTitle>
+
+<style>
+    .dept-header-row {
+        font-weight: 700;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: filter 0.15s ease;
+        user-select: none;
+    }
+    .dept-header-row:hover { filter: brightness(0.93); }
+    .dept-header-row td { padding: 0.55rem 0.6rem; }
+    .emp-row td { padding: 0.3rem 0.6rem; }
+    .emp-row.absent-row { font-weight: 600; color: #c0392b; }
+    .emp-row.late-row .late-cell { color: #d35400; font-weight: 600; }
+    .badge-stat {
+        font-size: 0.72rem;
+        padding: 0.25em 0.55em;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    /* IFace section */
+    .iface-panel {
+        background: rgba(255,255,255,0.7);
+        border: 1px solid rgba(0,0,0,0.08);
+        border-radius: 10px;
+        padding: 0.85rem 1.1rem;
+    }
+    /* Typeahead context fix */
+    .toolbar-row { position: relative !important; z-index: 9999 !important; }
+    .table-container { position: relative !important; z-index: 1 !important; }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+
+    <!-- ── Main Header Card ────────────────────────────────────────── -->
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255,255,255,0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-4">
+            <!-- Title Row -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center">
+                    <i class="fas fa-fingerprint me-2"></i> Daily Activity
+                </h4>
+                <div class="d-flex gap-2 align-items-center">
+                    <!-- Options Context Menu Button -->
+                    <ContextMenuTrigger MenuId="optionsBarMenu" MouseButtonTrigger="MouseButtonTrigger.Left">
+                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                                id="btnOptions" @onclick="@(e => OpenOptionsMenu(e))">
+                            <i class="fas fa-ellipsis-h me-1"></i> Options
+                        </button>
+                    </ContextMenuTrigger>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="NavigateBack">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Filter Toolbar ─────────────────────────────────────────── -->
+            <div class="row g-2 align-items-end mb-3 toolbar-row">
+                <!-- Department -->
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Department</label>
+                    <BlazoredTypeahead SearchMethod="SearchDepartments"
+                                       Value="SelectedDepartment"
+                                       ValueChanged="OnDepartmentChanged"
+                                       ValueExpression="@(() => SelectedDepartment)"
+                                       TValue="DepartmentListItemModel"
+                                       TItem="DepartmentListItemModel"
+                                       Placeholder="All Departments..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>@context.Name</SelectedTemplate>
+                        <ResultTemplate>@context.Name</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <!-- Employee -->
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Employee</label>
+                    <BlazoredTypeahead SearchMethod="SearchEmployees"
+                                       Value="SelectedEmployee"
+                                       ValueChanged="OnEmployeeChanged"
+                                       ValueExpression="@(() => SelectedEmployee)"
+                                       TValue="EmployeeListItemModel"
+                                       TItem="EmployeeListItemModel"
+                                       Placeholder="All Employees..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>
+                            @if (context.EmpID != "0") { <text>[@context.EmpID] </text> }@context.Name
+                        </SelectedTemplate>
+                        <ResultTemplate>
+                            @if (context.EmpID != "0") { <text>[@context.EmpID] </text> }@context.Name
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <!-- Date -->
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Date</label>
+                    <input type="date" class="form-control form-control-sm"
+                           value="@SelectedDate.ToString("yyyy-MM-dd")"
+                           @onchange="OnDateChanged"
+                           style="height: 35px; font-size: 0.875rem;" />
+                </div>
+
+                <!-- Refresh Button -->
+                <div class="col-md-2 d-flex align-items-end pb-1">
+                    <button type="button" class="btn btn-primary btn-sm w-100 shadow-sm"
+                            style="height:35px;" @onclick="LoadDataAsync" disabled="@IsLoading">
+                        @if (IsLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span><span>Loading...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-sync-alt me-1"></i><span>Refresh</span>
+                        }
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Summary Stats Bar ──────────────────────────────────────── -->
+            @if (DeptSummaries.Any())
+            {
+                <div class="d-flex flex-wrap gap-2 mb-1">
+                    <span class="badge-stat bg-primary text-white">
+                        <i class="fas fa-building me-1"></i> Depts: @DeptSummaries.Count
+                    </span>
+                    <span class="badge-stat bg-secondary text-white">
+                        <i class="fas fa-users me-1"></i> Total Emps: @DeptSummaries.Sum(d => d.TotalEmps)
+                    </span>
+                    <span class="badge-stat bg-success text-white">
+                        <i class="fas fa-user-check me-1"></i> Present: @DeptSummaries.Sum(d => d.TotalPresent)
+                    </span>
+                    <span class="badge-stat bg-danger text-white">
+                        <i class="fas fa-user-times me-1"></i> Absent: @DeptSummaries.Sum(d => d.TotalAbs)
+                    </span>
+                    <span class="badge-stat bg-warning text-dark">
+                        <i class="fas fa-clock me-1"></i> Late: @DeptSummaries.Sum(d => d.LateComing)
+                    </span>
+                    <span class="badge-stat bg-info text-white">
+                        <i class="fas fa-hourglass-half me-1"></i> Short: @DeptSummaries.Sum(d => d.ShortTimes)
+                    </span>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- ── IFace Machine Panel ────────────────────────────────────────────── -->
+    @if (IFaceMachines.Any())
+    {
+        <div class="card border-0 shadow-sm mb-3" style="background: rgba(255,255,255,0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+            <div class="card-body py-3 px-4">
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <i class="fas fa-microchip text-primary" style="font-size:1.1rem;"></i>
+                    <span class="fw-bold text-secondary" style="font-size:0.88rem;">Read from IFace Machine:</span>
+                    <div style="min-width:260px; position:relative; z-index:9998;">
+                        <select class="form-select form-select-sm" @bind="SelectedMachineId" style="height:35px;">
+                            <option value="0">-- Select Machine --</option>
+                            @foreach (var m in IFaceMachines)
+                            {
+                                <option value="@m.EntryID">@m.DisplayText</option>
+                            }
+                        </select>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm shadow-sm"
+                            style="height:35px;" @onclick="ReadFromIFaceMachineAsync"
+                            disabled="@(SelectedMachineId == 0 || IsReadingMachine)">
+                        @if (IsReadingMachine)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span><span>Reading...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-download me-1"></i><span>Read Punches</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- ── Attendance Grid Card ──────────────────────────────────────────── -->
+    <div class="card border-0 shadow-sm" style="background: rgba(255,255,255,0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-0">
+            <!-- Card Sub-Header -->
+            <div class="px-4 py-3 border-bottom d-flex align-items-center justify-content-between">
+                <h6 class="mb-0 text-secondary fw-bold">
+                    <i class="fas fa-table me-2 text-primary"></i>
+                    Attendance Sheet — @SelectedDate.ToString("dddd, dd MMM yyyy")
+                </h6>
+                <span class="badge bg-light text-dark border" style="font-size:0.78rem;">
+                    @EmployeeRows.Count employees
+                </span>
+            </div>
+
+            <div class="table-container" style="max-height: 62vh; overflow-y: auto;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top"
+                           style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th style="width:4%; text-align:center;">&nbsp;</th>
+                            <th style="width:10%;">Emp ID</th>
+                            <th style="width:28%;">Name</th>
+                            <th style="width:12%; text-align:center;">In Time</th>
+                            <th style="width:12%; text-align:center;">Out Time</th>
+                            <th style="width:10%; text-align:center;">Net Hrs</th>
+                            <th style="width:12%; text-align:center;">Late Coming</th>
+                            <th style="width:12%; text-align:center;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center py-5">
+                                    <span class="spinner-border spinner-border-sm me-2 text-primary"></span>
+                                    Loading attendance data...
+                                </td>
+                            </tr>
+                        }
+                        else if (!DeptSummaries.Any())
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center py-5 text-muted">
+                                    <i class="fas fa-calendar-times me-2"></i>
+                                    No data. Select a date and click Refresh.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var dept in DeptSummaries)
+                            {
+                                var deptEmps = EmployeeRows.Where(e => string.Equals(e.DeptID?.Trim(), dept.DeptID?.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
+                                bool expanded = ExpandedDepts.Contains(dept.DeptID);
+
+                                <!-- Department Header Row -->
+                                <tr class="dept-header-row"
+                                    style="background: @dept.HtmlColorLight; border-left: 4px solid @dept.HtmlColor;"
+                                    @onclick="() => ToggleDept(dept.DeptID)">
+                                    <td class="text-center" style="font-size:0.9rem;">
+                                        <i class="fas @(expanded ? "fa-chevron-down" : "fa-chevron-right")"
+                                           style="color: @dept.HtmlColor;"></i>
+                                    </td>
+                                    <td style="color: @dept.HtmlColor;">@dept.DeptID</td>
+                                    <td style="color: @dept.HtmlColor; font-size:0.9rem;">@dept.Name</td>
+                                    <td class="text-center">
+                                        <small style="color:#555;">In: <strong>@dept.EnterTime</strong></small>
+                                    </td>
+                                    <td class="text-center">
+                                        <small style="color:#555;">Out: <strong>@dept.ExitTime</strong></small>
+                                    </td>
+                                    <td class="text-center">
+                                        <small style="color:#555;"><strong>@dept.WorkingHrs hrs</strong></small>
+                                    </td>
+                                    <td colspan="2" style="white-space:nowrap;">
+                                        <span class="badge-stat bg-secondary text-white me-1">@dept.TotalEmps Staff</span>
+                                        <span class="badge-stat bg-success text-white me-1">✓ @dept.TotalPresent</span>
+                                        <span class="badge-stat bg-danger text-white me-1">✗ @dept.TotalAbs</span>
+                                        @if (dept.LateComing > 0)
+                                        {
+                                            <span class="badge-stat bg-warning text-dark me-1">⏱ @dept.LateComing Late</span>
+                                        }
+                                        @if (dept.ShortTimes > 0)
+                                        {
+                                            <span class="badge-stat bg-info text-white">⬇ @dept.ShortTimes Short</span>
+                                        }
+                                    </td>
+                                </tr>
+
+                                <!-- Employee Rows (collapsible) -->
+                                @if (expanded)
+                                {
+                                    string prevEmpId = string.Empty;
+                                    @foreach (var emp in deptEmps)
+                                    {
+                                        bool isFirstRowForEmp = (emp.EmpID != prevEmpId);
+                                        prevEmpId = emp.EmpID;
+                                        bool isLate = emp.LateHours > 0;
+                                        <tr class="emp-row @(emp.IsAbsent ? "absent-row" : "") @(isLate ? "late-row" : "")">
+                                            <td></td>
+                                            <td class="text-muted" style="font-size:0.83rem;">
+                                                @(isFirstRowForEmp ? emp.EmpID : "")
+                                            </td>
+                                            <td>
+                                                @(isFirstRowForEmp ? (emp.Name + (emp.IsAbsent ? " (Absent)" : "")) : "")
+                                            </td>
+                                            <td class="text-center">
+                                                @if (!string.IsNullOrEmpty(emp.InTime))
+                                                {
+                                                    <span class="badge bg-light text-dark border" style="font-size:0.8rem;">@emp.InTime</span>
+                                                }
+                                            </td>
+                                            <td class="text-center">
+                                                @if (!string.IsNullOrEmpty(emp.OutTime))
+                                                {
+                                                    <span class="badge bg-light text-dark border" style="font-size:0.8rem;">@emp.OutTime</span>
+                                                }
+                                            </td>
+                                            <td class="text-center">
+                                                @if (!string.IsNullOrEmpty(emp.NetTimeDisplay))
+                                                {
+                                                    <span style="font-size:0.83rem;">@emp.NetTimeDisplay</span>
+                                                }
+                                            </td>
+                                            <td class="text-center late-cell">
+                                                @if (!string.IsNullOrEmpty(emp.LateTimeDisplay))
+                                                {
+                                                    <span class="badge bg-warning text-dark" style="font-size:0.78rem;">@emp.LateTimeDisplay</span>
+                                                }
+                                            </td>
+                                            <td class="text-center">
+                                                @if (isFirstRowForEmp)
+                                                {
+                                                    @if (emp.IsAbsent)
+                                                    {
+                                                        <span class="badge bg-danger" style="font-size:0.75rem;">Absent</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-success" style="font-size:0.75rem;">Present</span>
+                                                    }
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+
+                                    @if (!deptEmps.Any())
+                                    {
+                                        <tr>
+                                            <td colspan="8" class="text-center text-muted py-2" style="font-size:0.82rem;">
+                                                No employees in this department.
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Options Context Menu ─────────────────────────────────────────── -->
+<ContextMenu Id="optionsBarMenu" Template="Win11Style">
+    <style>
+        .win11-context-menu-container { max-height: 40vh; overflow-y: auto; }
+    </style>
+    <Item OnClick="PrintDailyAttendance">
+        <i class="fas fa-calendar-check win11-icon me-2 text-primary"></i> Print Daily Attendance
+    </Item>
+    <Item OnClick="PrintAbsentLeaveSummary">
+        <i class="fas fa-user-times win11-icon me-2 text-danger"></i> Print Absent/Leave Summary
+    </Item>
+    <Item OnClick="PrintLateComers">
+        <i class="fas fa-clock win11-icon me-2 text-warning"></i> Print Late Comers
+    </Item>
+    <Item OnClick="PrintPresentEmployees">
+        <i class="fas fa-user-check win11-icon me-2 text-success"></i> Print Present Employees
+    </Item>
+</ContextMenu>
