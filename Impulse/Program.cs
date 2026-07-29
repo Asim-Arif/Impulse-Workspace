@@ -133,6 +133,12 @@ builder.Services.AddScoped<Impulse.Services.Payroll.IBiometricLedgerService, Imp
 builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IAttendanceLedgerDataAccess, DataAccessLibrary.DAC.Payroll.AttendanceLedgerDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Payroll.IAttendanceLedgerService, Impulse.Services.Payroll.AttendanceLedgerService>();
 builder.Services.AddScoped<Impulse.Services.Payroll.IIFaceMachineService, Impulse.Services.Payroll.IFaceMachineService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IEmployeeLeaveDataAccess, DataAccessLibrary.DAC.Payroll.EmployeeLeaveDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IEmployeeLeaveService, Impulse.Services.Payroll.EmployeeLeaveService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IMonthlyAttendanceDataAccess, DataAccessLibrary.DAC.Payroll.MonthlyAttendanceDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IMonthlyAttendanceService, Impulse.Services.Payroll.MonthlyAttendanceService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IGatePassDataAccess, DataAccessLibrary.DAC.Payroll.GatePassDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IGatePassService, Impulse.Services.Payroll.GatePassService>();
 
 //Stock Module Registrations
 builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IFinishMovementDataAccess, DataAccessLibrary.DAC.Stock.FinishMovementDataAccess>();

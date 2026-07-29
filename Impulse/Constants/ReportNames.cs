@@ -78,6 +78,7 @@ namespace Impulse.Constants
             public const string AbsentLeaveSummary     = Folder + "rptAbsentLeaveSummary.rpt";
             public const string LateComers             = Folder + "LateComers.rpt";
             public const string PresentEmpList         = Folder + "rptPresentEmpList.rpt";
+            public const string EmpLeaveBalanceMonthly = Folder + "rptEmpLeaveBalanceMonthly.rpt";
         }
 
         // Export Subfolder

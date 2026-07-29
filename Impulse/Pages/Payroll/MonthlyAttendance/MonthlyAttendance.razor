@@ -1,0 +1,201 @@
+@page "/payroll/monthly-attendance"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Impulse.Services.Payroll
+@using Impulse.Services
+@attribute [Authorize]
+
+<PageTitle>Monthly Attendance Editor</PageTitle>
+
+<style>
+    .toolbar-row { position: relative !important; z-index: 9999 !important; }
+    .table-container { position: relative !important; z-index: 1 !important; max-height: 70vh; overflow-y: auto; }
+    .sunday-row { background-color: rgba(46, 125, 50, 0.07) !important; }
+    .sunday-text { color: #2e7d32; font-weight: 600; }
+    .status-present { color: #198754; font-weight: 600; }
+    .status-absent { color: #dc3545; font-weight: 600; }
+    .status-leave { color: #fd7e14; font-weight: 600; }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <!-- Main Shell Card -->
+    <div class="card border-0 shadow-sm mb-4" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 1200px; margin: 0 auto;">
+        <div class="card-body p-4">
+            
+            <!-- Header Row -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center">
+                    <i class="fas fa-calendar-alt me-2"></i> Monthly Attendance Editor
+                </h4>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm" @onclick="SaveMonthAsync" disabled="@(IsLoading || IsSaving || SelectedEmployee == null)">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span><span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save me-1"></i><span>Save Month</span>
+                        }
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" @onclick="NavigateBack">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                </div>
+            </div>
+
+            <!-- Toolbar: Department, Employee, and Month Selector -->
+            <div class="row g-3 align-items-end mb-4 toolbar-row">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Department</label>
+                    <BlazoredTypeahead SearchMethod="SearchDepartments"
+                                       Value="SelectedDepartment"
+                                       ValueChanged="OnDepartmentChanged"
+                                       ValueExpression="@(() => SelectedDepartment)"
+                                       TValue="DepartmentListItemModel"
+                                       TItem="DepartmentListItemModel"
+                                       Placeholder="All Departments..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>@context.Name</SelectedTemplate>
+                        <ResultTemplate>@context.Name</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Employee <span class="text-danger">*</span>
+                    </label>
+                    <BlazoredTypeahead SearchMethod="SearchEmployees"
+                                       Value="SelectedEmployee"
+                                       ValueChanged="OnEmployeeChanged"
+                                       ValueExpression="@(() => SelectedEmployee)"
+                                       TValue="EmployeeListItemModel"
+                                       TItem="EmployeeListItemModel"
+                                       Placeholder="Select Employee..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>
+                            @if (context.EmpID != "0") { <text>[@context.EmpID] </text> }@context.Name
+                            @if (!string.IsNullOrEmpty(context.FName)) { <text> - @context.FName</text> }
+                            @if (!string.IsNullOrEmpty(context.Designation)) { <text> (@context.Designation)</text> }
+                        </SelectedTemplate>
+                        <ResultTemplate>
+                            @if (context.EmpID != "0") { <text>[@context.EmpID] </text> }@context.Name
+                            @if (!string.IsNullOrEmpty(context.FName)) { <text> - @context.FName</text> }
+                            @if (!string.IsNullOrEmpty(context.Designation)) { <text> (@context.Designation)</text> }
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Month & Year</label>
+                    <input type="month" class="form-control form-control-sm"
+                           value="@SelectedMonthYear"
+                           @onchange="OnMonthYearChanged" style="height:35px;" />
+                </div>
+            </div>
+
+            <!-- Grid Container -->
+            <div class="table-container border rounded">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th class="text-center" style="width:70px;">Day No</th>
+                            <th style="width:120px;">Date</th>
+                            <th style="width:130px;">Day</th>
+                            <th style="width:110px;">Status</th>
+                            <th class="text-center" style="width:160px;">In Time</th>
+                            <th class="text-center" style="width:160px;">Out Time</th>
+                            <th class="text-center" style="width:100px;">O.T. Hrs</th>
+                            <th class="text-center" style="width:90px;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center py-5">
+                                    <span class="spinner-border spinner-border-sm me-2 text-primary"></span>
+                                    Loading monthly attendance data...
+                                </td>
+                            </tr>
+                        }
+                        else if (SelectedEmployee == null)
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center py-5 text-muted">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    Please select an employee to view and edit monthly attendance.
+                                </td>
+                            </tr>
+                        }
+                        else if (!DayRows.Any())
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center py-5 text-muted">
+                                    <i class="fas fa-calendar-times me-2"></i>
+                                    No records found for the selected month.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var row in DayRows)
+                            {
+                                <tr class="@(row.IsSundayOrHoliday ? "sunday-row" : "")">
+                                    <td class="text-center fw-bold text-secondary">@row.DayNo</td>
+                                    <td>@row.Date.ToString("dd-MMM-yyyy")</td>
+                                    <td class="@(row.IsSundayOrHoliday ? "sunday-text" : "")">
+                                        @row.DayName
+                                        @if (!string.IsNullOrEmpty(row.HolidayName))
+                                        {
+                                            <span class="badge bg-success ms-1" style="font-size:0.7rem;">@row.HolidayName</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (row.Status == "Present")
+                                        {
+                                            <span class="status-present"><i class="fas fa-check-circle me-1"></i>Present</span>
+                                        }
+                                        else if (row.Status == "Leave")
+                                        {
+                                            <span class="status-leave"><i class="fas fa-calendar-minus me-1"></i>Leave</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="status-absent"><i class="fas fa-times-circle me-1"></i>Absent</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        <input type="time" class="form-control form-control-sm text-center mx-auto"
+                                               style="width:130px; height:32px;"
+                                               value="@row.InTime"
+                                               @onchange="e => OnInTimeChanged(row, e)" />
+                                    </td>
+                                    <td class="text-center">
+                                        <input type="time" class="form-control form-control-sm text-center mx-auto"
+                                               style="width:130px; height:32px;"
+                                               value="@row.OutTime"
+                                               @onchange="e => OnOutTimeChanged(row, e)" />
+                                    </td>
+                                    <td class="text-center fw-bold" style="color: #6610f2;">
+                                        @(row.OtHours > 0 ? row.OtHours.ToString("0.##") : "-")
+                                    </td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2"
+                                                style="font-size:0.75rem; height:28px;"
+                                                title="Clear Date Attendance"
+                                                @onclick="() => ClearDateAsync(row)">
+                                            <i class="fas fa-eraser"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
+</div>

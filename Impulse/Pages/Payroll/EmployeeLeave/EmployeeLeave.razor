@@ -1,0 +1,291 @@
+@page "/payroll/leaves"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Impulse.Services.Payroll
+@using Impulse.Services
+@attribute [Authorize]
+
+<PageTitle>Employee Leaves</PageTitle>
+
+<style>
+    .toolbar-row { position: relative !important; z-index: 9999 !important; }
+    .content-row { position: relative !important; z-index: 1 !important; }
+    .matrix-table th, .matrix-table td { text-align: center; font-size: 0.85rem; padding: 0.45rem 0.5rem; }
+    .matrix-hdr { font-weight: 700; background-color: #f8f9fa; }
+    .mode-card { border: 1px solid #dee2e6; border-radius: 8px; padding: 0.75rem 1rem; background: #fafafa; }
+    .mode-card.active { border-color: #0d6efd; background: #f0f7ff; }
+    .blazored-typeahead { height: 35px !important; min-height: 35px !important; padding: 0 !important; box-sizing: border-box !important; }
+    .blazored-typeahead__controls { min-height: 35px !important; height: 35px !important; }
+    .blazored-typeahead__input { height: 33px !important; }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <!-- Main Shell Card -->
+    <div class="card border-0 shadow-sm mb-4" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 1100px; margin: 0 auto;">
+        <div class="card-body p-4">
+            
+            <!-- Header Row -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center">
+                    <i class="fas fa-calendar-minus me-2"></i> Employee Leaves & Absences
+                </h4>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-info btn-sm" @onclick="PrintLeaveReportAsync" disabled="@IsLoading">
+                        <i class="fas fa-print me-1"></i> Print Leave Report
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="NavigateBack">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                </div>
+            </div>
+
+            <!-- Department & Employee Selection Toolbar -->
+            <div class="row g-3 align-items-end mb-4 toolbar-row">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Select Department
+                    </label>
+                    <BlazoredTypeahead SearchMethod="SearchDepartments"
+                                       Value="SelectedDepartment"
+                                       ValueChanged="OnDepartmentChanged"
+                                       ValueExpression="@(() => SelectedDepartment)"
+                                       TValue="DepartmentListItemModel"
+                                       TItem="DepartmentListItemModel"
+                                       Placeholder="All Departments..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>@context.Name</SelectedTemplate>
+                        <ResultTemplate>@context.Name</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-md-8">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Select Employee <span class="text-danger">*</span>
+                    </label>
+                    <BlazoredTypeahead SearchMethod="SearchEmployees"
+                                       Value="SelectedEmployee"
+                                       ValueChanged="OnEmployeeChanged"
+                                       ValueExpression="@(() => SelectedEmployee)"
+                                       TValue="EmployeeListItemModel"
+                                       TItem="EmployeeListItemModel"
+                                       Placeholder="Select Employee..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>
+                            @if (context.EmpID != "0") { <text>[@context.EmpID] </text> }@context.Name
+                            @if (!string.IsNullOrEmpty(context.FName)) { <text> - @context.FName</text> }
+                            @if (!string.IsNullOrEmpty(context.Designation)) { <text> (@context.Designation)</text> }
+                        </SelectedTemplate>
+                        <ResultTemplate>
+                            @if (context.EmpID != "0") { <text>[@context.EmpID] </text> }@context.Name
+                            @if (!string.IsNullOrEmpty(context.FName)) { <text> - @context.FName</text> }
+                            @if (!string.IsNullOrEmpty(context.Designation)) { <text> (@context.Designation)</text> }
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+            </div>
+
+            <!-- Leave Balances Matrix Card -->
+            <div class="card border mb-4 shadow-xs" style="border-radius: 10px;">
+                <div class="card-header bg-light py-2 px-3 d-flex align-items-center justify-content-between">
+                    <span class="fw-bold text-secondary" style="font-size:0.85rem;">
+                        <i class="fas fa-chart-pie me-1 text-primary"></i> Employee Leave Balances Matrix
+                    </span>
+                    @if (SelectedEmployee != null)
+                    {
+                        <span class="badge bg-primary fs-7">@SelectedEmployee.Name [@SelectedEmployee.EmpID]</span>
+                    }
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm align-middle mb-0 matrix-table">
+                            <thead class="table-light text-secondary">
+                                <tr>
+                                    <th style="width:16%;" class="text-start ps-3">Status</th>
+                                    <th style="width:14%;">Casual (CL)</th>
+                                    <th style="width:14%;">Sick (SL)</th>
+                                    <th style="width:14%;">Annual (AL)</th>
+                                    <th style="width:14%;">Special (SAL)</th>
+                                    <th style="width:14%;">LWP</th>
+                                    <th style="width:14%;">Half Day (HL)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="text-start ps-3 text-danger fw-bold">Available</td>
+                                    <td>@(Balances.CL.Available == 0 ? "-" : Balances.CL.Available.ToString("0.#"))</td>
+                                    <td>@(Balances.SL.Available == 0 ? "-" : Balances.SL.Available.ToString("0.#"))</td>
+                                    <td>@(Balances.AL.Available == 0 ? "-" : Balances.AL.Available.ToString("0.#"))</td>
+                                    <td>@(Balances.SAL.Available == 0 ? "-" : Balances.SAL.Available.ToString("0.#"))</td>
+                                    <td>@(Balances.LWP.Available == 0 ? "-" : Balances.LWP.Available.ToString("0.#"))</td>
+                                    <td>@(Balances.HL.Available == 0 ? "-" : Balances.HL.Available.ToString("0.#"))</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-start ps-3 text-danger fw-bold">Used</td>
+                                    <td>@(Balances.CL.Used == 0 ? "-" : Balances.CL.Used.ToString("0.#"))</td>
+                                    <td>@(Balances.SL.Used == 0 ? "-" : Balances.SL.Used.ToString("0.#"))</td>
+                                    <td>@(Balances.AL.Used == 0 ? "-" : Balances.AL.Used.ToString("0.#"))</td>
+                                    <td>@(Balances.SAL.Used == 0 ? "-" : Balances.SAL.Used.ToString("0.#"))</td>
+                                    <td>@(Balances.LWP.Used == 0 ? "-" : Balances.LWP.Used.ToString("0.#"))</td>
+                                    <td>@(Balances.HL.Used == 0 ? "-" : Balances.HL.Used.ToString("0.#"))</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-start ps-3 text-danger fw-bold">This Month</td>
+                                    <td class="fw-bold" style="color: #ff9f00;">@(Balances.CL.ThisMonth == 0 ? "-" : Balances.CL.ThisMonth.ToString("0.#"))</td>
+                                    <td class="fw-bold" style="color: #ff9f00;">@(Balances.SL.ThisMonth == 0 ? "-" : Balances.SL.ThisMonth.ToString("0.#"))</td>
+                                    <td class="fw-bold" style="color: #ff9f00;">@(Balances.AL.ThisMonth == 0 ? "-" : Balances.AL.ThisMonth.ToString("0.#"))</td>
+                                    <td class="fw-bold" style="color: #ff9f00;">@(Balances.SAL.ThisMonth == 0 ? "-" : Balances.SAL.ThisMonth.ToString("0.#"))</td>
+                                    <td class="fw-bold" style="color: #ff9f00;">@(Balances.LWP.ThisMonth == 0 ? "-" : Balances.LWP.ThisMonth.ToString("0.#"))</td>
+                                    <td class="fw-bold" style="color: #ff9f00;">@(Balances.HL.ThisMonth == 0 ? "-" : Balances.HL.ThisMonth.ToString("0.#"))</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-start ps-3 text-primary fw-bold">Net Balance</td>
+                                    <td class="fw-bold text-primary">@Balances.CL.Balance.ToString("0.#")</td>
+                                    <td class="fw-bold text-primary">@Balances.SL.Balance.ToString("0.#")</td>
+                                    <td class="fw-bold text-primary">@Balances.AL.Balance.ToString("0.#")</td>
+                                    <td class="fw-bold text-primary">@Balances.SAL.Balance.ToString("0.#")</td>
+                                    <td class="fw-bold text-primary">@Balances.LWP.Balance.ToString("0.#")</td>
+                                    <td class="fw-bold text-primary">@Balances.HL.Balance.ToString("0.#")</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Leave Entry Form Section -->
+            <div class="row g-3 content-row">
+                
+                <!-- Entry Type & Duration Selection -->
+                <div class="col-md-12">
+                    <div class="d-flex gap-3 align-items-center mb-2">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="entryMode" id="modeLeave" checked="@(!Input.IsAbsent)" @onchange="() => SetEntryMode(false)" />
+                            <label class="form-check-label fw-bold text-primary" for="modeLeave">
+                                <i class="fas fa-calendar-check me-1"></i> Leave Entry
+                            </label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="entryMode" id="modeAbsent" checked="@(Input.IsAbsent)" @onchange="() => SetEntryMode(true)" />
+                            <label class="form-check-label fw-bold text-danger" for="modeAbsent">
+                                <i class="fas fa-user-times me-1"></i> Mark Absent
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Date Range -->
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        From Date <span class="text-danger">*</span>
+                    </label>
+                    <input type="date" class="form-control form-control-sm"
+                           value="@Input.FromDate.ToString("yyyy-MM-dd")"
+                           @onchange="OnFromDateChanged" style="height:35px;" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        To Date <span class="text-danger">*</span>
+                    </label>
+                    <input type="date" class="form-control form-control-sm"
+                           value="@Input.ToDate.ToString("yyyy-MM-dd")"
+                           @onchange="OnToDateChanged" style="height:35px;" />
+                </div>
+
+                <!-- Leave Duration Mode (Full Day, Half Day, Short Leave) -->
+                @if (!Input.IsAbsent)
+                {
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Leave Duration</label>
+                        <div class="d-flex gap-3 pt-1">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="durationMode" id="durFull" checked="@(Input.DurationMode == "FullDay")" @onchange='() => SetDurationMode("FullDay")' />
+                                <label class="form-check-label" for="durFull">Full Day</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="durationMode" id="durHalf" checked="@(Input.DurationMode == "HalfDay")" @onchange='() => SetDurationMode("HalfDay")' />
+                                <label class="form-check-label" for="durHalf">Half Day (4 hrs)</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="durationMode" id="durShort" checked="@(Input.DurationMode == "ShortLeave")" @onchange='() => SetDurationMode("ShortLeave")' />
+                                <label class="form-check-label" for="durShort">Short Leave</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (Input.DurationMode == "ShortLeave")
+                    {
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">From Time</label>
+                            <input type="time" class="form-control form-control-sm" value="@Input.FromTime" @onchange="e => Input.FromTime = e.Value?.ToString() ?? string.Empty" style="height:35px;" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">To Time</label>
+                            <input type="time" class="form-control form-control-sm" value="@Input.ToTime" @onchange="e => Input.ToTime = e.Value?.ToString() ?? string.Empty" style="height:35px;" />
+                        </div>
+                    }
+
+                    <!-- Leave Type Dropdown -->
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                            Leave Type <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select form-select-sm" value="@Input.LeaveTypeCode" @onchange="OnLeaveTypeChanged" style="height:35px;">
+                            @foreach (var lt in LeaveTypes)
+                            {
+                                <option value="@lt.Code">@lt.Name (@lt.Code)</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Authority Person Selection -->
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                            Authority Person <span class="text-danger">*</span>
+                        </label>
+                        <BlazoredTypeahead SearchMethod="SearchUsers"
+                                           Value="SelectedAuthUser"
+                                           ValueChanged="OnAuthUserChanged"
+                                           ValueExpression="@(() => SelectedAuthUser)"
+                                           TValue="UserLookupModel"
+                                           TItem="UserLookupModel"
+                                           Placeholder="Select Approving Authority..."
+                                           EnableDropDown="true"
+                                           MaximumSuggestions="1000">
+                            <SelectedTemplate>@context.UserName</SelectedTemplate>
+                            <ResultTemplate>@context.UserName</ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                }
+
+                <!-- Reason / Remarks -->
+                <div class="col-md-12">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Reason / Remarks</label>
+                    <textarea class="form-control form-control-sm" rows="2" @bind="Input.Reason" placeholder="Enter leave reason or remarks..."></textarea>
+                </div>
+
+                <!-- Submit Action Buttons -->
+                <div class="col-md-12 text-end pt-2">
+                    <button type="button" class="btn btn-primary btn-sm px-4 shadow-sm me-2" style="height:36px;" @onclick="SaveAsync" disabled="@IsSaving">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span><span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save me-1"></i><span>Save</span>
+                        }
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm px-3 shadow-xs me-2" style="height:36px;" @onclick="SaveAndNextAsync" disabled="@IsSaving">
+                        <i class="fas fa-arrow-right me-1"></i> Save & Next
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3 shadow-xs" style="height:36px;" @onclick="ResetForm">
+                        <i class="fas fa-undo me-1"></i> Reset
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>

@@ -61,7 +61,12 @@ namespace DataAccessLibrary.DAC.Payroll
             {
                 using (IDbConnection db = new SqlConnection(_connectionString))
                 {
-                    string sql = "SELECT EmpID, Name, FName, Designation, StartingSalary, JoinDate, Active, TempEmp, Phone1, Phone2, DeptID, DeptName FROM VEmp WHERE DeptID = @DeptID";
+                    string sql = "SELECT EmpID, Name, FName, Designation, StartingSalary, JoinDate, Active, TempEmp, Phone1, Phone2, DeptID, DeptName FROM VEmp WHERE 1=1";
+
+                    if (!string.IsNullOrEmpty(deptId) && deptId != "0")
+                    {
+                        sql += " AND DeptID = @DeptID";
+                    }
 
                     if (!showInactive)
                     {
