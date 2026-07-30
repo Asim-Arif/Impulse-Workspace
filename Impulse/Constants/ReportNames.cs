@@ -79,7 +79,11 @@ namespace Impulse.Constants
             public const string LateComers             = Folder + "LateComers.rpt";
             public const string PresentEmpList         = Folder + "rptPresentEmpList.rpt";
             public const string EmpLeaveBalanceMonthly = Folder + "rptEmpLeaveBalanceMonthly.rpt";
+
+            // Advance Reports
+            public const string LongTermAdvanceReceipt = Folder + "LongTermAdvanceReceipt.rpt";
         }
+
 
         // Export Subfolder
         public static class Export

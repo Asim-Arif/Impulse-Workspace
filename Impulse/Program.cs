@@ -139,6 +139,10 @@ builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IMonthlyAttendanc
 builder.Services.AddScoped<Impulse.Services.Payroll.IMonthlyAttendanceService, Impulse.Services.Payroll.MonthlyAttendanceService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IGatePassDataAccess, DataAccessLibrary.DAC.Payroll.GatePassDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Payroll.IGatePassService, Impulse.Services.Payroll.GatePassService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IAdvanceLongDataAccess, DataAccessLibrary.DAC.Payroll.AdvanceLongDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IAdvanceLongService, Impulse.Services.Payroll.AdvanceLongService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IClearAdvanceDataAccess, DataAccessLibrary.DAC.Payroll.ClearAdvanceDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IClearAdvanceService, Impulse.Services.Payroll.ClearAdvanceService>();
 
 //Stock Module Registrations
 builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IFinishMovementDataAccess, DataAccessLibrary.DAC.Stock.FinishMovementDataAccess>();

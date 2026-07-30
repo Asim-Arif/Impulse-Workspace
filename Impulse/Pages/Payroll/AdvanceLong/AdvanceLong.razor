@@ -1,0 +1,322 @@
+@page "/payroll/advance-long"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using Impulse.Services.Payroll
+@using Impulse.Services
+@attribute [Authorize]
+
+<PageTitle>Long Term Advance Entry</PageTitle>
+
+<style>
+    .toolbar-row    { position: relative !important; z-index: 9999 !important; }
+    .table-container{ position: relative !important; z-index: 1 !important; }
+
+    /* BlazoredTypeahead sizing fixes */
+    .blazored-typeahead          { height: 35px !important; min-height: 35px !important; padding: 0 !important; box-sizing: border-box !important; }
+    .blazored-typeahead__controls{ min-height: 35px !important; height: 35px !important; }
+    .blazored-typeahead__input   { height: 33px !important; }
+
+    /* Payment mode radio cards */
+    .payment-mode-group { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .payment-mode-card  {
+        flex: 1; min-width: 130px; padding: 0.65rem 1rem;
+        border: 2px solid #dee2e6; border-radius: 10px;
+        cursor: pointer; text-align: center; font-size: 0.85rem;
+        font-weight: 600; color: #495057; transition: all 0.18s ease;
+        background: #fff; user-select: none;
+    }
+    .payment-mode-card:hover      { border-color: #0d6efd; background: #f0f6ff; }
+    .payment-mode-card.selected   { border-color: #0d6efd; background: #e8f1ff; color: #0d6efd; }
+    .payment-mode-card.selected-cpv { border-color: #198754; background: #e9f7ef; color: #198754; }
+    .payment-mode-card.selected-jv  { border-color: #6f42c1; background: #f3eeff; color: #6f42c1; }
+    .payment-mode-card.selected-bpv { border-color: #0d6efd; background: #e8f1ff; color: #0d6efd; }
+    .payment-mode-card i { display: block; font-size: 1.3rem; margin-bottom: 0.3rem; }
+
+    /* Cheque details panel */
+    .cheque-panel {
+        background: rgba(13, 110, 253, 0.04);
+        border: 1px solid rgba(13, 110, 253, 0.18);
+        border-radius: 10px; padding: 1rem 1.25rem; margin-top: 0.75rem;
+    }
+
+    /* Balance badge row */
+    .balance-badge {
+        font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: 6px;
+        border: 1px solid #dee2e6; background: #f8f9fa; color: #495057;
+        font-weight: 500;
+    }
+    .balance-badge.warning { border-color: #f0ad4e; background: #fff8ec; color: #856404; }
+
+    /* Voucher type badge */
+    .vchr-badge {
+        font-size: 0.8rem; padding: 0.3rem 0.7rem; border-radius: 20px;
+        font-weight: 700; letter-spacing: 0.04em;
+    }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm mb-4"
+         style="background: rgba(255,255,255,0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 900px; margin: 0 auto;">
+        <div class="card-body p-4">
+
+            @* ── Header ──────────────────────────────────────────── *@
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center">
+                    <i class="fas fa-hand-holding-usd me-2"></i>
+                    Long Term Advance Entry
+                    @if (IsContractor)
+                    {
+                        <span class="badge bg-warning text-dark ms-2" style="font-size:0.7rem;">CONTRACTOR</span>
+                    }
+                </h4>
+                <div class="d-flex gap-2 align-items-center">
+                    @* Voucher type badge *@
+                    <span class="vchr-badge @VchrBadgeClass">@CurrentVchrType</span>
+
+                    <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm"
+                            @onclick="SaveAsync" disabled="@(IsLoading || IsSaving)">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span><span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save me-1"></i><span>Save</span>
+                        }
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3"
+                            @onclick="NavigateBack">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                </div>
+            </div>
+
+            @* ── SECTION 1: Employee Selection ───────────────────── *@
+            <div class="row g-3 align-items-end mb-3 toolbar-row">
+                <div class="col-md-5">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Department</label>
+                    <BlazoredTypeahead SearchMethod="SearchDepartments"
+                                       Value="SelectedDepartment"
+                                       ValueChanged="OnDepartmentChanged"
+                                       ValueExpression="@(() => SelectedDepartment)"
+                                       TValue="DepartmentListItemModel"
+                                       TItem="DepartmentListItemModel"
+                                       Placeholder="All Departments..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>@context.Name</SelectedTemplate>
+                        <ResultTemplate>@context.Name</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-7">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Employee</label>
+                    <BlazoredTypeahead SearchMethod="SearchEmployees"
+                                       Value="SelectedEmployee"
+                                       ValueChanged="OnEmployeeChanged"
+                                       ValueExpression="@(() => SelectedEmployee)"
+                                       TValue="EmployeeListItemModel"
+                                       TItem="EmployeeListItemModel"
+                                       Placeholder="Search by ID, Name or Designation..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>
+                            @if (context.EmpID != "0") { <text>[@context.EmpID] </text> }@context.Name
+                        </SelectedTemplate>
+                        <ResultTemplate>
+                            @if (context.EmpID != "0") { <text>[@context.EmpID] </text> }@context.Name
+                            @if (!string.IsNullOrEmpty(context.Designation))
+                            {
+                                <small class="text-muted ms-1">— @context.Designation</small>
+                            }
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+            </div>
+
+            @* Employee balance badges *@
+            @if (SelectedEmployee != null && EmployeeSummary != null)
+            {
+                <div class="d-flex gap-2 mb-3 flex-wrap">
+                    <span class="balance-badge @(EmployeeSummary.PreviousBalance > 0 ? "warning" : "")">
+                        <i class="fas fa-wallet me-1"></i>
+                        Outstanding Balance:
+                        <strong>@EmployeeSummary.PreviousBalance.ToString("N2")</strong>
+                    </span>
+                    <span class="balance-badge">
+                        <i class="fas fa-calendar-check me-1"></i>
+                        Last Monthly Deduction:
+                        <strong>@EmployeeSummary.PreviousDeductionAmount.ToString("N2")</strong>
+                    </span>
+                </div>
+            }
+
+            @* ── SECTION 2: Advance Details ──────────────────────── *@
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Issue Date</label>
+                    <input type="date" class="form-control form-control-sm"
+                           value="@IssueDate.ToString("yyyy-MM-dd")"
+                           @onchange="OnIssueDateChanged" style="height:35px;" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Deduction Start Month</label>
+                    <input type="month" class="form-control form-control-sm"
+                           value="@DeductionStartDT.ToString("yyyy-MM")"
+                           @onchange="OnDeductionStartChanged" style="height:35px;" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Preview Vchr #
+                        @if (IsVchrNoLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm ms-1 text-secondary" style="width:0.7rem;height:0.7rem;"></span>
+                        }
+                    </label>
+                    <input type="text" class="form-control form-control-sm" readonly
+                           value="@PreviewVchrNo" style="height:35px; background:#f8f9fa; color:#6c757d;" />
+                </div>
+            </div>
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Loan Amount <span class="text-danger">*</span>
+                    </label>
+                    <input type="number" class="form-control form-control-sm" step="0.01" min="0"
+                           @bind="Amount" style="height:35px; background:#fffde7;" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Monthly Deduction</label>
+                    <input type="number" class="form-control form-control-sm" step="0.01" min="0"
+                           @bind="MonthlyDeduction" style="height:35px;" />
+                </div>
+                <div class="col-md-12">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Description</label>
+                    <textarea class="form-control form-control-sm" rows="2"
+                              @bind="Description"
+                              placeholder="Long Term Loan"></textarea>
+                </div>
+            </div>
+
+            @* ── SECTION 3: Payment Mode ─────────────────────────── *@
+            <div class="mb-3">
+                <label class="form-label fw-bold text-secondary mb-2" style="font-size:0.85rem;">Payment Mode</label>
+                <div class="payment-mode-group">
+                    <div class="payment-mode-card @(PaymentMode == AdvanceLongPaymentMode.Cash ? "selected-cpv" : "")"
+                         @onclick="@(() => SetPaymentMode(AdvanceLongPaymentMode.Cash))">
+                        <i class="fas fa-money-bill-wave"></i>
+                        Cash
+                        <div style="font-size:0.7rem; font-weight:400; opacity:0.75;">Posts CPV</div>
+                    </div>
+                    <div class="payment-mode-card @(PaymentMode == AdvanceLongPaymentMode.OtherAccount ? "selected-jv" : "")"
+                         @onclick="@(() => SetPaymentMode(AdvanceLongPaymentMode.OtherAccount))">
+                        <i class="fas fa-file-invoice"></i>
+                        Other Account
+                        <div style="font-size:0.7rem; font-weight:400; opacity:0.75;">Posts JV</div>
+                    </div>
+                    <div class="payment-mode-card @(PaymentMode == AdvanceLongPaymentMode.Bank ? "selected-bpv" : "")"
+                         @onclick="@(() => SetPaymentMode(AdvanceLongPaymentMode.Bank))">
+                        <i class="fas fa-university"></i>
+                        Bank (Cheque)
+                        <div style="font-size:0.7rem; font-weight:400; opacity:0.75;">Posts BPV</div>
+                    </div>
+                </div>
+            </div>
+
+            @* ── Payment Account Selector ─────────────────────────── *@
+            <div class="toolbar-row mb-3">
+                @if (PaymentMode == AdvanceLongPaymentMode.Cash)
+                {
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Cash In Hand Account <span class="text-danger">*</span>
+                    </label>
+                    <BlazoredTypeahead SearchMethod="SearchCashAccounts"
+                                       Value="SelectedCashAccount"
+                                       ValueChanged="OnCashAccountChanged"
+                                       ValueExpression="@(() => SelectedCashAccount)"
+                                       TValue="ChartOfAccountsModel"
+                                       TItem="ChartOfAccountsModel"
+                                       Placeholder="Select cash-in-hand account..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>[@context.AccNo] @context.AccTitle</SelectedTemplate>
+                        <ResultTemplate>[@context.AccNo] @context.AccTitle</ResultTemplate>
+                    </BlazoredTypeahead>
+                }
+                else if (PaymentMode == AdvanceLongPaymentMode.OtherAccount)
+                {
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Account <span class="text-danger">*</span>
+                    </label>
+                    <BlazoredTypeahead SearchMethod="SearchAllAccounts"
+                                       Value="SelectedOtherAccount"
+                                       ValueChanged="OnOtherAccountChanged"
+                                       ValueExpression="@(() => SelectedOtherAccount)"
+                                       TValue="ChartOfAccountsModel"
+                                       TItem="ChartOfAccountsModel"
+                                       Placeholder="Search account..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>[@context.AccNo] @context.AccTitle</SelectedTemplate>
+                        <ResultTemplate>[@context.AccNo] @context.AccTitle</ResultTemplate>
+                    </BlazoredTypeahead>
+                }
+                else if (PaymentMode == AdvanceLongPaymentMode.Bank)
+                {
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Bank Account <span class="text-danger">*</span>
+                    </label>
+                    <BlazoredTypeahead SearchMethod="SearchBankAccounts"
+                                       Value="SelectedBankAccount"
+                                       ValueChanged="OnBankAccountChanged"
+                                       ValueExpression="@(() => SelectedBankAccount)"
+                                       TValue="BankAccountInfo"
+                                       TItem="BankAccountInfo"
+                                       Placeholder="Select bank account..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>@context.Bank — @context.AccTitle</SelectedTemplate>
+                        <ResultTemplate>
+                            <strong>@context.Bank</strong>
+                            <small class="text-muted ms-1">@context.Branch · @context.AccTitle</small>
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+
+                    @* Cheque details panel (only shown when Bank is selected) *@
+                    <div class="cheque-panel mt-2">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
+                                    Cheque No. <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group input-group-sm">
+                                    <input type="text" class="form-control" @bind="ChequeNo" placeholder="e.g. 1000001" style="height:35px;" />
+                                    @if (IsChequeLoading)
+                                    {
+                                        <span class="input-group-text">
+                                            <span class="spinner-border spinner-border-sm text-primary" style="width:0.7rem;height:0.7rem;"></span>
+                                        </span>
+                                    }
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Cheque Type</label>
+                                <select class="form-select form-select-sm" @bind="ChequeType" style="height:35px;">
+                                    <option value="Open">Open</option>
+                                    <option value="Payees A/C Only">Payees A/C Only</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Cheque Date</label>
+                                <input type="date" class="form-control form-control-sm"
+                                       value="@ChequeDate.ToString("yyyy-MM-dd")"
+                                       @onchange="e => { if (DateTime.TryParse(e?.Value?.ToString(), out var d)) ChequeDate = d; }"
+                                       style="height:35px;" />
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+        </div>
+    </div>
+</div>

@@ -1,0 +1,292 @@
+@page "/payroll/clear-long-term-loan"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using Impulse.Services.Payroll
+@using Impulse.Services
+@attribute [Authorize]
+
+<PageTitle>Clear Long Term Loan</PageTitle>
+
+<style>
+    .toolbar-row    { position: relative !important; z-index: 9999 !important; }
+    .table-container{ position: relative !important; z-index: 1 !important; }
+
+    /* BlazoredTypeahead sizing fixes */
+    .blazored-typeahead          { height: 35px !important; min-height: 35px !important; padding: 0 !important; box-sizing: border-box !important; }
+    .blazored-typeahead__controls{ min-height: 35px !important; height: 35px !important; }
+    .blazored-typeahead__input   { height: 33px !important; }
+
+    /* Receipt mode radio cards */
+    .payment-mode-group { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .payment-mode-card  {
+        flex: 1; min-width: 130px; padding: 0.65rem 1rem;
+        border: 2px solid #dee2e6; border-radius: 10px;
+        cursor: pointer; text-align: center; font-size: 0.85rem;
+        font-weight: 600; color: #495057; transition: all 0.18s ease;
+        background: #fff; user-select: none;
+    }
+    .payment-mode-card:hover        { border-color: #0d6efd; background: #f0f6ff; }
+    .payment-mode-card.selected     { border-color: #0d6efd; background: #e8f1ff; color: #0d6efd; }
+    .payment-mode-card.selected-crv { border-color: #198754; background: #e9f7ef; color: #198754; }
+    .payment-mode-card.selected-jv  { border-color: #6f42c1; background: #f3eeff; color: #6f42c1; }
+    .payment-mode-card i { display: block; font-size: 1.3rem; margin-bottom: 0.3rem; }
+
+    /* Balance badge row */
+    .balance-badge {
+        font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: 6px;
+        border: 1px solid #dee2e6; background: #f8f9fa; color: #495057;
+        font-weight: 500;
+    }
+    .balance-badge.warning { border-color: #f0ad4e; background: #fff8ec; color: #856404; }
+
+    /* Voucher type badge */
+    .vchr-badge {
+        font-size: 0.8rem; padding: 0.3rem 0.7rem; border-radius: 20px;
+        font-weight: 700; letter-spacing: 0.04em;
+    }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm mb-4"
+         style="background: rgba(255,255,255,0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 900px; margin: 0 auto;">
+        <div class="card-body p-4">
+
+            @* ── Header ──────────────────────────────────────────── *@
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center">
+                    <i class="fas fa-hand-holding-usd me-2"></i>
+                    Clear Long Term Loan
+                </h4>
+                <div class="d-flex gap-2 align-items-center">
+                    @* Voucher type badge *@
+                    <span class="vchr-badge @VchrBadgeClass">@CurrentVchrType</span>
+
+                    <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm"
+                            @onclick="SaveAndNewAsync" disabled="@(IsLoading || IsSaving)">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span><span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save me-1"></i><span>Save</span>
+                        }
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3"
+                            @onclick="NavigateBack">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                </div>
+            </div>
+
+            @* ── SECTION 1: Employee Selection ───────────────────── *@
+            <div class="row g-3 align-items-start mb-3 toolbar-row">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Department</label>
+                    <BlazoredTypeahead SearchMethod="SearchDepartments"
+                                       Value="SelectedDepartment"
+                                       ValueChanged="OnDepartmentChanged"
+                                       ValueExpression="@(() => SelectedDepartment)"
+                                       TValue="DepartmentListItemModel"
+                                       TItem="DepartmentListItemModel"
+                                       Placeholder="All Departments..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>@context.Name</SelectedTemplate>
+                        <ResultTemplate>@context.Name</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Employee</label>
+                    <BlazoredTypeahead SearchMethod="SearchEmployees"
+                                       Value="SelectedEmployee"
+                                       ValueChanged="OnEmployeeChanged"
+                                       ValueExpression="@(() => SelectedEmployee)"
+                                       TValue="EmployeeListItemModel"
+                                       TItem="EmployeeListItemModel"
+                                       Placeholder="Search by ID, Name or Designation..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>
+                            @if (context.EmpID != "0") { <text>[@context.EmpID] </text> }@context.Name
+                            @if (!string.IsNullOrEmpty(context.FName)) { <text> - @context.FName</text> }
+                        </SelectedTemplate>
+                        <ResultTemplate>
+                            @if (context.EmpID != "0") { <text>[@context.EmpID] </text> }@context.Name
+                            @if (!string.IsNullOrEmpty(context.FName)) { <text> - @context.FName</text> }
+                            @if (!string.IsNullOrEmpty(context.Designation))
+                            {
+                                <small class="text-muted ms-1">@context.Designation</small>
+                            }
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-3">
+                    <div class="bg-light rounded-3 border d-flex align-items-center justify-content-center"
+                         style="height: 96px; overflow: hidden;">
+                        @if (!string.IsNullOrEmpty(EmployeePicBase64))
+                        {
+                            <img src="data:image/jpeg;base64,@EmployeePicBase64"
+                                 class="img-fluid" style="max-height: 100%; max-width: 100%; object-fit: contain;" alt="Photo" />
+                        }
+                        else
+                        {
+                            <div class="text-secondary opacity-50 text-center">
+                                <i class="fas fa-user-circle fa-3x mb-1"></i>
+                                <div style="font-size:0.7rem;">No Photo</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @* Employee balance badges *@
+            @if (SelectedEmployee != null && EmployeeSummary != null)
+            {
+                <div class="d-flex gap-2 mb-3 flex-wrap">
+                    <span class="balance-badge @(EmployeeSummary.OutstandingBalance > 0 ? "warning" : "")">
+                        <i class="fas fa-wallet me-1"></i>
+                        Outstanding Balance:
+                        <strong>@EmployeeSummary.OutstandingBalance.ToString("N2")</strong>
+                    </span>
+                    <span class="balance-badge">
+                        <i class="fas fa-calendar-check me-1"></i>
+                        Current Monthly Deduction:
+                        <strong>@EmployeeSummary.CurrentDeduction.ToString("N2")</strong>
+                    </span>
+                </div>
+            }
+
+            @* ── SECTION 2: Clearance Details ────────────────────── *@
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Clear Date</label>
+                    <input type="date" class="form-control form-control-sm"
+                           value="@ClearDate.ToString("yyyy-MM-dd")"
+                           @onchange="OnClearDateChanged" style="height:35px;" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Outstanding Amount</label>
+                    <input type="text" class="form-control form-control-sm" readonly
+                           value="@(EmployeeSummary?.OutstandingBalance.ToString("N2") ?? "0.00")"
+                           style="height:35px; background:#f8f9fa; color:#6c757d;" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Amount Received <span class="text-danger">*</span>
+                    </label>
+                    <input type="number" class="form-control form-control-sm" step="0.01" min="0"
+                           @bind="AmountReceived" style="height:35px; background:#fffde7;" />
+                </div>
+            </div>
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Current Deduction</label>
+                    <input type="text" class="form-control form-control-sm" readonly
+                           value="@(EmployeeSummary?.CurrentDeduction.ToString("N2") ?? "0.00")"
+                           style="height:35px; background:#f8f9fa; color:#6c757d;" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">New Deduction</label>
+                    <input type="number" class="form-control form-control-sm" step="0.01" min="0"
+                           @bind="NewDeduction" style="height:35px;" />
+                </div>
+                <div class="col-md-12">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Description</label>
+                    <textarea class="form-control form-control-sm" rows="2"
+                              @bind="Description"
+                              placeholder="Loan Clearance"></textarea>
+                </div>
+            </div>
+
+            @* ── SECTION 3: Receipt Account ──────────────────────── *@
+            <div class="mb-3">
+                <label class="form-label fw-bold text-secondary mb-2" style="font-size:0.85rem;">Receipt Account</label>
+                <div class="payment-mode-group">
+                    <div class="payment-mode-card @(ReceiptMode == ClearAdvanceReceiptMode.Cash ? "selected-crv" : "")"
+                         @onclick="@(() => SetReceiptMode(ClearAdvanceReceiptMode.Cash))">
+                        <i class="fas fa-money-bill-wave"></i>
+                        Cash In Hand
+                        <div style="font-size:0.7rem; font-weight:400; opacity:0.75;">Posts CRV</div>
+                    </div>
+                    <div class="payment-mode-card @(ReceiptMode == ClearAdvanceReceiptMode.OtherAccount ? "selected-jv" : "")"
+                         @onclick="@(() => SetReceiptMode(ClearAdvanceReceiptMode.OtherAccount))">
+                        <i class="fas fa-file-invoice"></i>
+                        Other Account
+                        <div style="font-size:0.7rem; font-weight:400; opacity:0.75;">Posts JV</div>
+                    </div>
+                </div>
+            </div>
+
+            @* ── Receiving Account Selector ───────────────────────── *@
+            @if (!DontPostVoucher)
+            {
+                <div class="toolbar-row mb-3">
+                    @if (ReceiptMode == ClearAdvanceReceiptMode.Cash)
+                    {
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                            Cash In Hand Account <span class="text-danger">*</span>
+                        </label>
+                        <BlazoredTypeahead SearchMethod="SearchCashAccounts"
+                                           Value="SelectedCashAccount"
+                                           ValueChanged="OnCashAccountChanged"
+                                           ValueExpression="@(() => SelectedCashAccount)"
+                                           TValue="ChartOfAccountsModel"
+                                           TItem="ChartOfAccountsModel"
+                                           Placeholder="Select cash-in-hand account..."
+                                           EnableDropDown="true"
+                                           MaximumSuggestions="1000">
+                            <SelectedTemplate>[@context.AccNo] @context.AccTitle</SelectedTemplate>
+                            <ResultTemplate>[@context.AccNo] @context.AccTitle</ResultTemplate>
+                        </BlazoredTypeahead>
+                    }
+                    else
+                    {
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                            Account <span class="text-danger">*</span>
+                        </label>
+                        <BlazoredTypeahead SearchMethod="SearchAllAccounts"
+                                           Value="SelectedOtherAccount"
+                                           ValueChanged="OnOtherAccountChanged"
+                                           ValueExpression="@(() => SelectedOtherAccount)"
+                                           TValue="ChartOfAccountsModel"
+                                           TItem="ChartOfAccountsModel"
+                                           Placeholder="Search account..."
+                                           EnableDropDown="true"
+                                           MaximumSuggestions="1000">
+                            <SelectedTemplate>[@context.AccNo] @context.AccTitle</SelectedTemplate>
+                            <ResultTemplate>[@context.AccNo] @context.AccTitle</ResultTemplate>
+                        </BlazoredTypeahead>
+                    }
+                </div>
+            }
+
+            @* ── Don't Post Voucher ──────────────────────────────── *@
+            <div class="form-check mb-3">
+                <input type="checkbox" class="form-check-input" id="dontPostVoucherCheck"
+                       @bind="DontPostVoucher" />
+                <label class="form-check-label fw-bold text-danger" for="dontPostVoucherCheck"
+                       style="font-size:0.85rem;">
+                    Don't Post Voucher
+                </label>
+            </div>
+
+            @* ── Action Buttons ──────────────────────────────────── *@
+            <div class="d-flex gap-2 pt-3 border-top">
+                <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm"
+                        @onclick="SaveAndNewAsync" disabled="@(IsLoading || IsSaving)">
+                    <i class="fas fa-save me-1"></i> Save &amp; New
+                </button>
+                <button type="button" class="btn btn-success btn-sm px-3 shadow-sm"
+                        @onclick="SaveAndCloseAsync" disabled="@(IsLoading || IsSaving)">
+                    <i class="fas fa-check me-1"></i> Save &amp; Close
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm px-3"
+                        @onclick="NavigateBack">
+                    <i class="fas fa-times me-1"></i> Cancel
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
