@@ -143,6 +143,8 @@ builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IAdvanceLongDataA
 builder.Services.AddScoped<Impulse.Services.Payroll.IAdvanceLongService, Impulse.Services.Payroll.AdvanceLongService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IClearAdvanceDataAccess, DataAccessLibrary.DAC.Payroll.ClearAdvanceDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Payroll.IClearAdvanceService, Impulse.Services.Payroll.ClearAdvanceService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IClearShortTermDataAccess, DataAccessLibrary.DAC.Payroll.ClearShortTermDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IClearShortTermService, Impulse.Services.Payroll.ClearShortTermService>();
 
 //Stock Module Registrations
 builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IFinishMovementDataAccess, DataAccessLibrary.DAC.Stock.FinishMovementDataAccess>();
