@@ -1,0 +1,221 @@
+@page "/payroll/hold-salary"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Blazored.Typeahead
+
+<style>
+    /* BlazoredTypeahead sizing fixes */
+    .blazored-typeahead          { height: 35px !important; min-height: 35px !important; padding: 0 !important; box-sizing: border-box !important; }
+    .blazored-typeahead__controls{ min-height: 35px !important; height: 35px !important; }
+    .blazored-typeahead__input   { height: 33px !important; }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    @* ── Page Header Card (Z-Index 9999 so dropdowns appear above table) ──────────────── *@
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; position: relative !important; z-index: 9999 !important;">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <div>
+                    <h5 class="mb-0 fw-bold text-dark">
+                        <i class="fas fa-hand-holding-dollar me-2 text-primary"></i>Hold Salary
+                    </h5>
+                    <small class="text-secondary">Hold or release employee salary deductions for a specific payroll month</small>
+                </div>
+                @if (!string.IsNullOrEmpty(ReturnUrl))
+                {
+                    <div class="ms-auto">
+                        <button type="button" class="btn btn-outline-secondary btn-sm px-3 shadow-sm" @onclick="GoBack">
+                            <i class="fas fa-arrow-left me-1"></i>Back
+                        </button>
+                    </div>
+                }
+            </div>
+
+            @* ── Top Filters Row (Z-Index 9999 for Dropdowns) ───────────────── *@
+            <div class="row g-2 align-items-center mb-3" style="position: relative !important; z-index: 9999 !important;">
+                <div class="col-md-3">
+                    <label class="form-label form-label-sm fw-bold mb-1 text-secondary">Department</label>
+                    <BlazoredTypeahead SearchMethod="SearchDepartments"
+                                       Value="SelectedDepartment"
+                                       ValueChanged="@((DepartmentListItemModel? d) => OnDepartmentChanged(d))"
+                                       ValueExpression="@(() => SelectedDepartment)"
+                                       TValue="DepartmentListItemModel"
+                                       TItem="DepartmentListItemModel"
+                                       placeholder="All Departments..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="dept">
+                            @dept.Name
+                        </SelectedTemplate>
+                        <ResultTemplate Context="dept">
+                            @dept.Name
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-md-5">
+                    <label class="form-label form-label-sm fw-bold mb-1 text-secondary">Employee</label>
+                    <BlazoredTypeahead SearchMethod="SearchEmployees"
+                                       Value="SelectedEmployee"
+                                       ValueChanged="@((EmployeeListItemModel? emp) => OnEmployeeChanged(emp))"
+                                       ValueExpression="@(() => SelectedEmployee)"
+                                       TValue="EmployeeListItemModel"
+                                       TItem="EmployeeListItemModel"
+                                       placeholder="Select Employee..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="emp">
+                            @if (emp.EmpID != "0")
+                            {
+                                <text>[@emp.EmpID] </text>
+                            }
+                            @emp.Name
+                        </SelectedTemplate>
+                        <ResultTemplate Context="emp">
+                            @if (emp.EmpID != "0")
+                            {
+                                <text>[@emp.EmpID] </text>
+                            }
+                            @emp.Name
+                            @if (!string.IsNullOrEmpty(emp.Designation))
+                            {
+                                <small class="text-muted ms-1">(@emp.Designation)</small>
+                            }
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label form-label-sm fw-bold mb-1 text-secondary">Month</label>
+                    <select class="form-select form-select-sm shadow-sm" @bind="SelectedMonth" @bind:after="OnMonthOrYearChanged" style="height: 35px !important;">
+                        @for (int m = 1; m <= 12; m++)
+                        {
+                            <option value="@m">@(new DateTime(2000, m, 1).ToString("MMMM"))</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label form-label-sm fw-bold mb-1 text-secondary">Year</label>
+                    <select class="form-select form-select-sm shadow-sm" @bind="SelectedYear" @bind:after="OnMonthOrYearChanged" style="height: 35px !important;">
+                        @for (int y = 2002; y <= DateTime.Today.Year + 1; y++)
+                        {
+                            <option value="@y">@y</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            @* ── Hold Salary Input / Status Card ────────────────────────────── *@
+            @if (SelectedEmployee != null)
+            {
+                <div class="card border-0 bg-light p-3 mb-2" style="border-radius: 8px;">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-3">
+                            <span class="d-block text-secondary small fw-bold text-uppercase">Available Salary Balance</span>
+                            <span class="fs-6 fw-bold text-success">@Summary.AvailableBalance.ToString("N0")</span>
+                        </div>
+                        <div class="col-md-3">
+                            <span class="d-block text-secondary small fw-bold text-uppercase">Existing Hold Amount</span>
+                            <span class="fs-6 fw-bold @(Summary.ExistingHoldAmt > 0 ? "text-danger" : "text-dark")">
+                                @Summary.ExistingHoldAmt.ToString("N0")
+                            </span>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label form-label-sm fw-bold mb-1">Hold Amount</label>
+                            <InputNumber class="form-control form-control-sm" @bind-Value="Dto.HoldAmt" placeholder="0" style="height: 35px !important;" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label form-label-sm fw-bold mb-1">Description / Remarks</label>
+                            <InputText class="form-control form-control-sm" @bind-Value="Dto.Description" placeholder="Reason for holding salary..." style="height: 35px !important;" />
+                        </div>
+                        <div class="col-md-1">
+                            <label class="form-label form-label-sm fw-bold mb-1 d-block">&nbsp;</label>
+                            <button type="button" class="btn btn-primary btn-sm px-2 fw-bold shadow-sm w-100"
+                                    @onclick="SaveHoldSalaryAsync" disabled="@IsSaving" style="height: 35px !important;">
+                                @if (IsSaving)
+                                {
+                                    <span class="spinner-border spinner-border-sm"></span>
+                                }
+                                else
+                                {
+                                    <i class="fas fa-save"></i>
+                                }
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    @* ── Existing Hold Salaries Table Card (Z-Index 1) ──────────────── *@
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; position: relative !important; z-index: 1 !important;">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="fw-bold text-secondary text-uppercase" style="font-size: 0.78rem;">
+                    Held Salaries for @(new DateTime(2000, SelectedMonth, 1).ToString("MMMM")) @SelectedYear (@HoldSalariesList.Count)
+                </span>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="RefreshGridAsync" style="height: 31px !important;">
+                    <i class="fas fa-sync-alt me-1"></i>Refresh
+                </button>
+            </div>
+
+            <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th>Emp ID</th>
+                            <th>Employee Name</th>
+                            <th>Department</th>
+                            <th class="text-end">Hold Amount</th>
+                            <th>Description</th>
+                            <th>Entry Date</th>
+                            <th>User</th>
+                            <th class="text-center" style="width: 60px;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center py-4 text-muted">
+                                    <span class="spinner-border spinner-border-sm me-2"></span>Loading held salaries...
+                                </td>
+                            </tr>
+                        }
+                        else if (!HoldSalariesList.Any())
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center py-4 text-muted">
+                                    No salary holds recorded for @(new DateTime(2000, SelectedMonth, 1).ToString("MMMM")) @SelectedYear.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var item in HoldSalariesList)
+                            {
+                                <tr>
+                                    <td class="fw-bold text-primary">@item.EmpID</td>
+                                    <td>@item.EmpName</td>
+                                    <td>@item.DeptName</td>
+                                    <td class="text-end fw-bold text-danger">@item.HoldAmt.ToString("N0")</td>
+                                    <td>@item.Description</td>
+                                    <td>@item.DTEntry?.ToString("dd-MMM-yyyy")</td>
+                                    <td>@item.UserName</td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-outline-danger btn-sm px-2"
+                                                title="Remove Hold"
+                                                @onclick="() => DeleteHoldSalaryAsync(item)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

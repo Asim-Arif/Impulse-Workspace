@@ -1,0 +1,467 @@
+@page "/payroll/salary-sheet"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Impulse.Services.Payroll
+@using Impulse.Services
+@attribute [Authorize]
+
+<PageTitle>Salary Sheet</PageTitle>
+
+<style>
+    .toolbar-row     { position: relative !important; z-index: 9999 !important; }
+    .table-container { position: relative !important; z-index: 1 !important; }
+
+    /* BlazoredTypeahead sizing fixes */
+    .blazored-typeahead          { height: 35px !important; min-height: 35px !important; padding: 0 !important; box-sizing: border-box !important; }
+    .blazored-typeahead__controls{ min-height: 35px !important; height: 35px !important; }
+    .blazored-typeahead__input   { height: 33px !important; }
+
+    /* Metric cards */
+    .kpi-card {
+        background: #fff; border-radius: 10px; border: 1px solid #e3e6f0;
+        padding: 0.85rem 1rem; transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+    .kpi-card .kpi-title { font-size: 0.73rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6c757d; }
+    .kpi-card .kpi-value { font-size: 1.3rem; font-weight: 700; }
+
+    /* Row status highlighting */
+    tr.row-paid       { color: #0d6efd !important; background-color: rgba(13, 110, 253, 0.03) !important; }
+    tr.row-negative   { color: #dc3545 !important; background-color: rgba(220, 53, 69, 0.04) !important; }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm mb-4"
+         style="background: rgba(255,255,255,0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-4">
+
+            @* ── Header Bar ──────────────────────────────────────── *@
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center">
+                    <h4 class="mb-0 text-primary d-flex align-items-center">
+                        <i class="fas fa-file-invoice-dollar me-2"></i>
+                        Salary Sheet
+                    </h4>
+                    @if (IsFinalized)
+                    {
+                        <span class="badge bg-success ms-3" style="font-size:0.75rem;"><i class="fas fa-lock me-1"></i>FINALIZED</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-warning text-dark ms-3" style="font-size:0.75rem;"><i class="fas fa-edit me-1"></i>UNFINALIZED (LIVE CALCULATION)</span>
+                    }
+                    @if (IsContractor)
+                    {
+                        <span class="badge bg-secondary ms-2" style="font-size:0.75rem;">CONTRACTOR</span>
+                    }
+                </div>
+
+                <div class="d-flex gap-2 align-items-center">
+                    @if (!IsFinalized)
+                    {
+                        <button type="button" class="btn btn-success btn-sm px-3 shadow-sm"
+                                @onclick="FinalizeSalarySheetAsync" disabled="@(IsLoading || IsSaving || !SalaryRows.Any())">
+                            @if (IsSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span><span>Finalizing...</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-check-circle me-1"></i><span>Make This Sheet Final</span>
+                            }
+                        </button>
+                    }
+
+                    @if (!IsFinalized && HasNegativeSalaries)
+                    {
+                        <button type="button" class="btn btn-outline-danger btn-sm px-3 shadow-sm"
+                                @onclick="TransferNegativeSalariesAsync" disabled="@(IsLoading || IsSaving)"
+                                title="Transfer Negative Salary to Short Term Advance">
+                            <i class="fas fa-exchange-alt me-1"></i>
+                            <span>Transfer Negative</span>
+                        </button>
+                    }
+
+                    <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm"
+                            @onclick="RefreshAsync" disabled="@IsLoading">
+                        <i class="fas fa-sync-alt me-1 @(IsLoading ? "fa-spin" : "")"></i>
+                        <span>Refresh</span>
+                    </button>
+
+                    <button type="button" class="btn btn-info btn-sm px-3 shadow-sm text-white" id="optionsBarMenuButton"
+                            @onclick="OpenPrintMenu" title="Print & Reports">
+                        <i class="fas fa-print me-1"></i>
+                        <span>Print</span>
+                    </button>
+
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3"
+                            @onclick="NavigateBack">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                </div>
+            </div>
+
+            @* ── Filter Bar Row 1: Year, Month, Department, Employee ─ *@
+            <div class="row g-3 align-items-end mb-3 toolbar-row">
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Year</label>
+                    <select class="form-select form-select-sm" @bind="Filter.Year" style="height:35px;">
+                        @for (int y = 2002; y <= DateTime.Today.Year; y++)
+                        {
+                            <option value="@y">@y</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Month</label>
+                    <select class="form-select form-select-sm" @bind="Filter.Month" style="height:35px;">
+                        <option value="1">Jan (01)</option>
+                        <option value="2">Feb (02)</option>
+                        <option value="3">Mar (03)</option>
+                        <option value="4">Apr (04)</option>
+                        <option value="5">May (05)</option>
+                        <option value="6">Jun (06)</option>
+                        <option value="7">Jul (07)</option>
+                        <option value="8">Aug (08)</option>
+                        <option value="9">Sep (09)</option>
+                        <option value="10">Oct (10)</option>
+                        <option value="11">Nov (11)</option>
+                        <option value="12">Dec (12)</option>
+                    </select>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Department</label>
+                    <BlazoredTypeahead SearchMethod="SearchDepartments"
+                                       Value="SelectedDepartment"
+                                       ValueChanged="OnDepartmentChanged"
+                                       ValueExpression="@(() => SelectedDepartment)"
+                                       TValue="DepartmentListItemModel"
+                                       TItem="DepartmentListItemModel"
+                                       Placeholder="All Departments..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>@context.Name</SelectedTemplate>
+                        <ResultTemplate>@context.Name</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Employee</label>
+                    <BlazoredTypeahead SearchMethod="SearchEmployees"
+                                       Value="SelectedEmployee"
+                                       ValueChanged="OnEmployeeChanged"
+                                       ValueExpression="@(() => SelectedEmployee)"
+                                       TValue="EmployeeListItemModel"
+                                       TItem="EmployeeListItemModel"
+                                       Placeholder="All Employees..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>
+                            @if (context.EmpID != "0") { <text>[@context.EmpID] </text> }@context.Name
+                        </SelectedTemplate>
+                        <ResultTemplate>
+                            @if (context.EmpID != "0") { <text>[@context.EmpID] </text> }@context.Name
+                            @if (!string.IsNullOrEmpty(context.Designation))
+                            {
+                                <small class="text-muted ms-1">— @context.Designation</small>
+                            }
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+            </div>
+
+            @* ── KPI Summary Cards Header Row ────────────────────── *@
+            <div class="row g-3 mb-4">
+                <div class="col-md-2">
+                    <div class="kpi-card border-start border-secondary border-4 shadow-sm">
+                        <div class="kpi-title">Total Employees</div>
+                        <div class="kpi-value text-secondary">@KpiSummary.TotalEmployees</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="kpi-card border-start border-primary border-4 shadow-sm">
+                        <div class="kpi-title">Gross Earned Salary</div>
+                        <div class="kpi-value text-primary">@KpiSummary.GrossEarnedSalary.ToString("N2")</div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="kpi-card border-start border-info border-4 shadow-sm">
+                        <div class="kpi-title">Total Overtime</div>
+                        <div class="kpi-value text-info">@KpiSummary.TotalOvertime.ToString("N2")</div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="kpi-card border-start border-danger border-4 shadow-sm">
+                        <div class="kpi-title">Total Deductions</div>
+                        <div class="kpi-value text-danger">@KpiSummary.TotalDeductions.ToString("N2")</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="kpi-card border-start border-success border-4 shadow-sm">
+                        <div class="kpi-title">Net Payable Salary</div>
+                        <div class="kpi-value text-success">@KpiSummary.NetPayableSalary.ToString("N2")</div>
+                    </div>
+                </div>
+            </div>
+
+            @* ── Data Table ──────────────────────────────────────── *@
+            <div class="table-responsive border rounded shadow-sm table-container" style="max-height:550px;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                    <thead class="table-light text-secondary sticky-top"
+                           style="font-size: 0.75rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th>Employee</th>
+                            <th>Dept</th>
+                            <th class="text-end">Base Sal</th>
+                            <th class="text-end">Earned Days</th>
+                            <th class="text-end">Earned Sal</th>
+                            <th class="text-end">OT Amt</th>
+                            <th class="text-end">Short Amt</th>
+                            <th class="text-end fw-bold">Gross Earned</th>
+                            <th class="text-end">ST Adv</th>
+                            <th class="text-end">LT Loan</th>
+                            <th class="text-end">Adv Sal</th>
+                            <th class="text-end">Tax</th>
+                            <th class="text-end">Fine</th>
+                            <th class="text-end fw-bold text-success" style="width: 120px;">Net Payable</th>
+                            <th class="text-center" style="width: 90px;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="15" class="text-center py-5 text-muted">
+                                    <span class="spinner-border spinner-border-sm me-2 text-primary"></span> Processing Salary Sheet Calculations...
+                                </td>
+                            </tr>
+                        }
+                        else if (!FilteredSalaryRows.Any())
+                        {
+                            <tr>
+                                <td colspan="15" class="text-center py-5 text-muted">
+                                    <i class="fas fa-inbox fs-3 mb-2 d-block text-secondary"></i>
+                                    No salary records found for the selected criteria.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var row in FilteredSalaryRows)
+                            {
+                                string rowClass = row.IsPaid ? "row-paid" : (row.NetPayable < 0 ? "row-negative" : "");
+                                <ContextMenuTrigger MenuId="salaryContextMenu" Data="row" WrapperTag="tr" class="@rowClass">
+                                    <td>
+                                        <div class="fw-bold">
+                                            @if (!string.IsNullOrEmpty(row.EmpName) && row.EmpName != row.EmpID)
+                                            {
+                                                <text>[@row.EmpID] @row.EmpName</text>
+                                            }
+                                            else
+                                            {
+                                                <text>@row.EmpID</text>
+                                            }
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(row.Designation))
+                                        {
+                                            <small class="text-muted">@row.Designation</small>
+                                        }
+                                    </td>
+                                    <td class="text-secondary fw-semibold">@row.DeptName</td>
+                                    <td class="text-end">@row.BasicSalary.ToString("N0")</td>
+                                    <td class="text-end fw-semibold">@row.EarnedDays.ToString("0.0")</td>
+                                    <td class="text-end fw-semibold">@row.EarnedSalary.ToString("N0")</td>
+                                    <td class="text-end text-info">@row.OTAmount.ToString("N0")</td>
+                                    <td class="text-end text-danger">@row.ShortHoursDeduction.ToString("N0")</td>
+                                    <td class="text-end fw-bold">@row.GrossEarnings.ToString("N0")</td>
+                                    <td class="text-end text-danger">@row.ShortTermAdvanceDeduction.ToString("N0")</td>
+                                    <td class="text-end text-danger">@row.LongTermLoanDeduction.ToString("N0")</td>
+                                    <td class="text-end text-danger">@row.AdvSalaryPaid.ToString("N0")</td>
+                                    <td class="text-end text-danger">@row.TaxDeduction.ToString("N0")</td>
+                                    <td class="text-end text-danger">@row.FineDeduction.ToString("N0")</td>
+                                    <td class="text-end fw-bold fs-6 @(row.NetPayable < 0 ? "text-danger" : "text-success")">
+                                        @row.NetPayable.ToString("N2")
+                                    </td>
+                                    <td class="text-center">
+                                        @if (row.IsPaid)
+                                        {
+                                            <span class="badge bg-primary" style="font-size:0.7rem;"><i class="fas fa-check me-1"></i>Paid</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary" style="font-size:0.7rem;">Unpaid</span>
+                                        }
+                                    </td>
+                                </ContextMenuTrigger>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mt-2 px-1 text-muted" style="font-size:0.8rem;">
+                <div>Showing <strong>@FilteredSalaryRows.Count</strong> of <strong>@SalaryRows.Count</strong> employees</div>
+                <small><i class="fas fa-info-circle me-1"></i> Right-click any row to mark paid/unpaid or override long-term deduction.</small>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@* ── Context Menu (Print & Reports Options) ────────────────────── *@
+<ContextMenu Id="optionsBarMenu" Template="Win11Style">
+    <div class="win11-section-header">Salary Sheets</div>
+    <Item class="win11-menu-item" OnClick="() => PrintSalarySheetDetail(false)">
+        <i class="fas fa-file-invoice-dollar fa-fw win11-icon text-primary"></i> Print Salary Sheet (Detail)
+    </Item>
+    <Item class="win11-menu-item" OnClick="() => PrintSalarySheetDetail(true)">
+        <i class="fas fa-file-invoice fa-fw win11-icon text-danger"></i> Print Salary Sheet (Negative)
+    </Item>
+    <Item class="win11-menu-item" OnClick="() => PrintNegativeEmpList()">
+        <i class="fas fa-user-minus fa-fw win11-icon text-danger"></i> Print Negative Emp. List
+    </Item>
+    <Item class="win11-menu-item" OnClick="() => PrintSalarySheetSummary()">
+        <i class="fas fa-file-alt fa-fw win11-icon text-info"></i> Print Salary Sheet (Summary)
+    </Item>
+    <Item class="win11-menu-item" OnClick="() => PrintSalarySheetInternal()">
+        <i class="fas fa-file-contract fa-fw win11-icon text-secondary"></i> Print Salary Sheet (Internal)
+    </Item>
+
+    <div class="win11-divider"></div>
+    <div class="win11-section-header">Employee &amp; Currency Lists</div>
+    <Item class="win11-menu-item" OnClick="() => PrintLateEmpList()">
+        <i class="fas fa-user-clock fa-fw win11-icon text-warning"></i> Print Employee List With Late Coming Deduction
+    </Item>
+    <Item class="win11-menu-item" OnClick="() => PrintCurrencyDenomination()">
+        <i class="fas fa-coins fa-fw win11-icon text-success"></i> Print Currency Denomination
+    </Item>
+
+    <div class="win11-divider"></div>
+    <div class="win11-section-header">PaySlips &amp; Packets</div>
+    <Item class="win11-menu-item" OnClick="() => PrintPaySlips(0)">
+        <i class="fas fa-receipt fa-fw win11-icon text-primary"></i> Print PaySlips
+    </Item>
+    <Item class="win11-menu-item" OnClick="() => PrintPaySlips(1)">
+        <i class="fas fa-file-alt fa-fw win11-icon text-secondary"></i> Print Payslip (Rule 9)
+    </Item>
+    <Item class="win11-menu-item" OnClick="() => PrintPaySlips(2)">
+        <i class="fas fa-scroll fa-fw win11-icon text-info"></i> Print Payslip Mini
+    </Item>
+    <Item class="win11-menu-item" OnClick="() => PrintPaySlips(3)">
+        <i class="fas fa-file-invoice fa-fw win11-icon text-primary"></i> Print Payslip (Full)
+    </Item>
+    <Item class="win11-menu-item" OnClick="() => PrintSalaryPacket()">
+        <i class="fas fa-envelope fa-fw win11-icon text-warning"></i> Print Salary Packet
+    </Item>
+    <Item class="win11-menu-item" OnClick="() => PrintPayslipsInternal()">
+        <i class="fas fa-user-secret fa-fw win11-icon text-secondary"></i> Print Payslips (Internal)
+    </Item>
+    <Item class="win11-menu-item" OnClick="() => PrintOTPaySheet()">
+        <i class="fas fa-clock fa-fw win11-icon text-success"></i> Print Over Time Payment Sheet
+    </Item>
+
+    <div class="win11-divider"></div>
+    <div class="win11-section-header">Administration</div>
+    <Item class="win11-menu-item" OnClick="() => RePostSalaryVouchers()">
+        <i class="fas fa-sync-alt fa-fw win11-icon text-danger"></i> Re-Post Salary Vouchers
+    </Item>
+</ContextMenu>
+
+@* ── Change Long Term Deduction Modal ──────────────────────────────── *@
+@if (ShowChangeLTDeductionModal && SelectedRowForLTDeduction != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.45); backdrop-filter: blur(4px); z-index: 1050;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-warning text-dark border-0 py-3" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <h6 class="modal-title fw-bold mb-0">
+                        <i class="fas fa-edit me-2"></i>Change Long Term Deduction
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="CloseChangeLTDeductionModal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label text-secondary fw-bold" style="font-size: 0.85rem;">Employee</label>
+                        <div class="p-2 bg-light rounded border">
+                            <span class="fw-bold">@SelectedRowForLTDeduction.EmpID</span> — @SelectedRowForLTDeduction.EmpName
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary fw-bold" style="font-size: 0.85rem;">Outstanding Long Term Loan Balance</label>
+                        <div class="p-2 bg-light rounded border fw-bold text-primary">
+                            @MaxAllowedLTDeduction.ToString("N2")
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary fw-bold" style="font-size: 0.85rem;">New Monthly Deduction Amount</label>
+                        <input type="number" class="form-control form-control-sm"
+                               @bind="NewLTDeductionAmount" @bind:event="oninput"
+                               min="0" max="@MaxAllowedLTDeduction" step="0.01" />
+                        <div class="form-text text-muted" style="font-size: 0.78rem;">
+                            Enter an amount between 0 and @MaxAllowedLTDeduction.ToString("N2").
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top p-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" @onclick="CloseChangeLTDeductionModal">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                    <button type="button" class="btn btn-warning btn-sm px-3 text-dark fw-bold shadow-sm"
+                            @onclick="SaveChangeLTDeductionAsync" disabled="@IsSavingLTDeduction">
+                        @if (IsSavingLTDeduction)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span><span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save me-1"></i><span>Save Deduction</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* ── Context Menu (Row Right-Click) ──────────────────────────── *@
+<ContextMenu Id="salaryContextMenu" Template="Win11Style">
+    @if (context.Data is SalarySheetRowModel row)
+    {
+        <div class="win11-section-header">Salary Actions</div>
+        @if (!IsFinalized)
+        {
+            <Item OnClick="@((ItemClickEventArgs e) => OpenChangeLTDeductionModal(e))">
+                <div class="win11-menu-item">
+                    <i class="fas fa-edit win11-icon text-warning"></i>
+                    <span>Change Long Term Deduction</span>
+                </div>
+            </Item>
+            <Item OnClick="() => StopAllLTDeductionClicked()">
+                <div class="win11-menu-item">
+                    <i class="fas fa-ban win11-icon text-danger"></i>
+                    <span>Stop All Long Term Deduction</span>
+                </div>
+            </Item>
+            <div class="win11-divider"></div>
+        }
+        <Item OnClick="@((ItemClickEventArgs e) => TogglePaidStatusClicked(e))">
+            <div class="win11-menu-item">
+                <i class="fas fa-check-circle win11-icon @(row.IsPaid ? "text-secondary" : "text-primary")"></i>
+                <span>@(row.IsPaid ? "Mark Salary as Unpaid" : "Mark Salary as Paid")</span>
+            </div>
+        </Item>
+    }
+</ContextMenu>
+
+<style>
+    .win11-section-header  { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: #6c757d; padding: 6px 12px; }
+    .win11-menu-item       { display: flex; align-items: center; gap: 8px; font-size: 0.85rem !important; padding: 6px 12px !important; cursor: pointer; }
+    .win11-icon            { width: 16px; text-align: center; }
+    .win11-menu-container  { max-height: 40vh !important; overflow-y: auto !important; }
+
+    /* Legacy VB6 Row Styling: Paid rows display in blue */
+    .row-paid              { background-color: rgba(13, 110, 253, 0.08) !important; }
+    .row-paid td           { color: #0d6efd !important; font-weight: 600 !important; }
+    .row-negative td       { color: #dc3545 !important; }
+</style>

@@ -1,0 +1,174 @@
+@page "/payroll/adjust-deduction-amount"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Impulse.Services.Payroll
+@using Impulse.Services
+@attribute [Authorize]
+
+<PageTitle>Adjust Deduction Amount</PageTitle>
+
+<style>
+    .toolbar-row     { position: relative !important; z-index: 9999 !important; }
+    .table-container { position: relative !important; z-index: 1 !important; }
+
+    /* BlazoredTypeahead sizing fixes */
+    .blazored-typeahead          { height: 35px !important; min-height: 35px !important; padding: 0 !important; box-sizing: border-box !important; }
+    .blazored-typeahead__controls{ min-height: 35px !important; height: 35px !important; }
+    .blazored-typeahead__input   { height: 33px !important; }
+
+    /* Info card styling */
+    .info-panel {
+        background: rgba(13, 110, 253, 0.04);
+        border: 1px solid rgba(13, 110, 253, 0.18);
+        border-radius: 10px; padding: 1.25rem; margin-top: 1rem;
+    }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm mb-4"
+         style="background: rgba(255,255,255,0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 800px; margin: 0 auto;">
+        <div class="card-body p-4">
+
+            @* ── Header ──────────────────────────────────────────── *@
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center">
+                    <i class="fas fa-edit me-2"></i>
+                    Adjust Deduction Amount
+                </h4>
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm"
+                            @onclick="SaveAsync" disabled="@(IsLoading || IsSaving || SelectedEmployee == null || DeductionInfo == null || !DeductionInfo.HasActiveLoan)">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span><span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save me-1"></i><span>Save Changes</span>
+                        }
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3"
+                            @onclick="NavigateBack">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                </div>
+            </div>
+
+            @* ── SECTION 1: Department & Employee Selection ──────── *@
+            <div class="row g-3 align-items-end mb-3 toolbar-row">
+                <div class="col-md-5">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Department</label>
+                    <BlazoredTypeahead SearchMethod="SearchDepartments"
+                                       Value="SelectedDepartment"
+                                       ValueChanged="OnDepartmentChanged"
+                                       ValueExpression="@(() => SelectedDepartment)"
+                                       TValue="DepartmentListItemModel"
+                                       TItem="DepartmentListItemModel"
+                                       Placeholder="All Departments..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>@context.Name</SelectedTemplate>
+                        <ResultTemplate>@context.Name</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-7">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Employee <span class="text-danger">*</span>
+                    </label>
+                    <BlazoredTypeahead SearchMethod="SearchEmployees"
+                                       Value="SelectedEmployee"
+                                       ValueChanged="OnEmployeeChanged"
+                                       ValueExpression="@(() => SelectedEmployee)"
+                                       TValue="EmployeeListItemModel"
+                                       TItem="EmployeeListItemModel"
+                                       Placeholder="Search by ID, Name or Designation..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>
+                            @if (context.EmpID != "0") { <text>[@context.EmpID] </text> }@context.Name
+                        </SelectedTemplate>
+                        <ResultTemplate>
+                            @if (context.EmpID != "0") { <text>[@context.EmpID] </text> }@context.Name
+                            @if (!string.IsNullOrEmpty(context.Designation))
+                            {
+                                <small class="text-muted ms-1">— @context.Designation</small>
+                            }
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+            </div>
+
+            @* ── SECTION 2: Active Loan Info Panel ───────────────── *@
+            @if (SelectedEmployee != null)
+            {
+                @if (IsDeductionLoading)
+                {
+                    <div class="p-4 text-center text-muted">
+                        <span class="spinner-border spinner-border-sm me-2 text-primary"></span> Loading Loan Details...
+                    </div>
+                }
+                else if (DeductionInfo != null && DeductionInfo.HasActiveLoan)
+                {
+                    <div class="info-panel mb-4">
+                        <h6 class="fw-bold text-primary mb-3">
+                            <i class="fas fa-file-invoice-dollar me-2"></i> Current Long Term Loan Details
+                        </h6>
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <small class="text-secondary fw-bold d-block">Original Loan Amount</small>
+                                <span class="fs-6 text-dark fw-bold">@DeductionInfo.LoanAmount.ToString("N2")</span>
+                            </div>
+                            <div class="col-md-3">
+                                <small class="text-secondary fw-bold d-block">Remaining Balance</small>
+                                <span class="fs-6 text-danger fw-bold">@DeductionInfo.Balance.ToString("N2")</span>
+                            </div>
+                            <div class="col-md-3">
+                                <small class="text-secondary fw-bold d-block">Current Deduction</small>
+                                <span class="fs-6 text-success fw-bold">@DeductionInfo.CurrentDAmount.ToString("N2")</span>
+                            </div>
+                            <div class="col-md-3">
+                                <small class="text-secondary fw-bold d-block">Issue Date</small>
+                                <span class="fs-6 text-dark">@(DeductionInfo.IssueDate?.ToString("dd-MMM-yyyy") ?? "N/A")</span>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(DeductionInfo.Description))
+                            {
+                                <div class="col-md-12">
+                                    <small class="text-secondary fw-bold d-block">Description</small>
+                                    <span class="text-muted">@DeductionInfo.Description</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    @* ── SECTION 3: New Monthly Deduction Input ─────────── *@
+                    <div class="card border-0 bg-light p-3 mb-3">
+                        <div class="row g-3 align-items-center">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-dark mb-1" style="font-size:0.9rem;">
+                                    New Monthly Deduction Amount <span class="text-danger">*</span>
+                                </label>
+                                <input type="number" class="form-control form-control-lg" step="0.01" min="0"
+                                       @bind="NewDAmount" style="background:#fffde7; font-weight:700; color:#0d6efd;" />
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted d-block mt-4">
+                                    Enter the revised monthly deduction amount to be deducted in monthly salary sheets for this employee.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-warning d-flex align-items-center mt-3" role="alert">
+                        <i class="fas fa-exclamation-triangle fs-4 me-3"></i>
+                        <div>
+                            <strong>No Deduction Feeded For This Employee</strong>
+                            <div class="small">This employee does not currently have an active Long Term loan record.</div>
+                        </div>
+                    </div>
+                }
+            }
+
+        </div>
+    </div>
+</div>

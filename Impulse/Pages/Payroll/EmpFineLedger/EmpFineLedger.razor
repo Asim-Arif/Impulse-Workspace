@@ -1,0 +1,245 @@
+@page "/payroll/emp-fine-ledger"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Impulse.Services.Payroll
+@using Impulse.Services
+@attribute [Authorize]
+
+<PageTitle>Employee Fine Register</PageTitle>
+
+<style>
+    .toolbar-row     { position: relative !important; z-index: 9999 !important; }
+    .table-container { position: relative !important; z-index: 1 !important; }
+
+    /* BlazoredTypeahead sizing fixes */
+    .blazored-typeahead          { height: 35px !important; min-height: 35px !important; padding: 0 !important; box-sizing: border-box !important; }
+    .blazored-typeahead__controls{ min-height: 35px !important; height: 35px !important; }
+    .blazored-typeahead__input   { height: 33px !important; }
+
+    /* Metric cards */
+    .kpi-card {
+        background: #fff; border-radius: 10px; border: 1px solid #e3e6f0;
+        padding: 0.9rem 1.1rem; transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+    .kpi-card .kpi-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6c757d; }
+    .kpi-card .kpi-value { font-size: 1.35rem; font-weight: 700; }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm mb-4"
+         style="background: rgba(255,255,255,0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-4">
+
+            @* ── Header Bar ──────────────────────────────────────── *@
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center">
+                    <i class="fas fa-file-invoice me-2"></i>
+                    Employee Fine Register
+                    @if (IsContractor)
+                    {
+                        <span class="badge bg-warning text-dark ms-2" style="font-size:0.7rem;">CONTRACTOR</span>
+                    }
+                </h4>
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm"
+                            @onclick="RefreshAsync" disabled="@IsLoading">
+                        <i class="fas fa-sync-alt me-1 @(IsLoading ? "fa-spin" : "")"></i>
+                        <span>Refresh</span>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3"
+                            @onclick="NavigateBack">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                </div>
+            </div>
+
+            @* ── Filter Bar Row: Dept, Emp, Dates, Search ────────── *@
+            <div class="row g-3 align-items-end mb-4 toolbar-row">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Department</label>
+                    <BlazoredTypeahead SearchMethod="SearchDepartments"
+                                       Value="SelectedDepartment"
+                                       ValueChanged="OnDepartmentChanged"
+                                       ValueExpression="@(() => SelectedDepartment)"
+                                       TValue="DepartmentListItemModel"
+                                       TItem="DepartmentListItemModel"
+                                       Placeholder="All Departments..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>@context.Name</SelectedTemplate>
+                        <ResultTemplate>@context.Name</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Employee</label>
+                    <BlazoredTypeahead SearchMethod="SearchEmployees"
+                                       Value="SelectedEmployee"
+                                       ValueChanged="OnEmployeeChanged"
+                                       ValueExpression="@(() => SelectedEmployee)"
+                                       TValue="EmployeeListItemModel"
+                                       TItem="EmployeeListItemModel"
+                                       Placeholder="All Employees..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate>
+                            @if (context.EmpID != "0") { <text>[@context.EmpID] </text> }@context.Name
+                        </SelectedTemplate>
+                        <ResultTemplate>
+                            @if (context.EmpID != "0") { <text>[@context.EmpID] </text> }@context.Name
+                            @if (!string.IsNullOrEmpty(context.Designation))
+                            {
+                                <small class="text-muted ms-1">— @context.Designation</small>
+                            }
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">From Date</label>
+                    <input type="date" class="form-control form-control-sm"
+                           value="@Filter.FromDate.ToString("yyyy-MM-dd")"
+                           @onchange="OnFromDateChanged" style="height:35px;" />
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">To Date</label>
+                    <input type="date" class="form-control form-control-sm"
+                           value="@Filter.ToDate.ToString("yyyy-MM-dd")"
+                           @onchange="OnToDateChanged" style="height:35px;" />
+                </div>
+
+                <div class="col-md-1">
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control form-control-sm" @bind="SearchQuery" @bind:event="oninput"
+                               placeholder="Filter..." style="height:35px;" />
+                    </div>
+                </div>
+            </div>
+
+            @* ── KPI Summary Cards Header Row ────────────────────── *@
+            <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <div class="kpi-card border-start border-secondary border-4 shadow-sm">
+                        <div class="kpi-title">Opening Balance</div>
+                        <div class="kpi-value text-secondary">@KpiSummary.OpeningBalance.ToString("N2")</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="kpi-card border-start border-danger border-4 shadow-sm">
+                        <div class="kpi-title">Total Fines Issued</div>
+                        <div class="kpi-value text-danger">@KpiSummary.TotalFinePosted.ToString("N2")</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="kpi-card border-start border-success border-4 shadow-sm">
+                        <div class="kpi-title">Total Fines Cleared</div>
+                        <div class="kpi-value text-success">@KpiSummary.TotalFineCleared.ToString("N2")</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="kpi-card border-start border-primary border-4 shadow-sm">
+                        <div class="kpi-title">Closing Balance</div>
+                        <div class="kpi-value text-primary">@KpiSummary.ClosingBalance.ToString("N2")</div>
+                    </div>
+                </div>
+            </div>
+
+            @* ── Data Table with Context Menu ────────────────────── *@
+            <div class="table-responsive border rounded shadow-sm table-container" style="max-height:550px;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top"
+                           style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th style="width: 120px;">Date</th>
+                            <th>Employee</th>
+                            <th>Department</th>
+                            <th>Description / Reason</th>
+                            <th class="text-end" style="width: 130px;">Amount</th>
+                            <th class="text-end" style="width: 140px;">Running Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-5 text-muted">
+                                    <span class="spinner-border spinner-border-sm me-2 text-primary"></span> Loading Fine Register Records...
+                                </td>
+                            </tr>
+                        }
+                        else if (!FilteredLedgerItems.Any())
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-5 text-muted">
+                                    <i class="fas fa-inbox fs-3 mb-2 d-block text-secondary"></i>
+                                    No fine records found matching the selected filters.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var item in FilteredLedgerItems)
+                            {
+                                @if (item.IsOpeningBalance)
+                                {
+                                    <tr class="table-secondary fw-bold">
+                                        <td>@item.DT.ToString("dd-MMM-yyyy")</td>
+                                        <td colspan="2">@item.EmpName</td>
+                                        <td><em>@item.Description</em></td>
+                                        <td class="text-end">—</td>
+                                        <td class="text-end text-dark">@item.RunningBalance.ToString("N2")</td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    <ContextMenuTrigger MenuId="fineContextMenu" Data="item" WrapperTag="tr">
+                                        <td class="fw-semibold text-secondary">@item.DT.ToString("dd-MMM-yyyy")</td>
+                                        <td>
+                                            <div class="fw-bold text-dark">[@item.EmpID] @item.EmpName</div>
+                                            @if (!string.IsNullOrEmpty(item.Designation))
+                                            {
+                                                <small class="text-muted">@item.Designation</small>
+                                            }
+                                        </td>
+                                        <td class="text-secondary">@item.DeptName</td>
+                                        <td>@item.Description</td>
+                                        <td class="text-end fw-semibold @(item.Amount > 0 ? "text-danger" : "text-success")">
+                                            @item.Amount.ToString("N2")
+                                        </td>
+                                        <td class="text-end fw-bold text-dark">
+                                            @item.RunningBalance.ToString("N2")
+                                        </td>
+                                    </ContextMenuTrigger>
+                                }
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mt-2 px-1 text-muted" style="font-size:0.8rem;">
+                <div>Showing <strong>@FilteredLedgerItems.Count</strong> entries</div>
+                <small><i class="fas fa-info-circle me-1"></i> Right-click any fine record row to delete.</small>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@* ── Context Menu (Row Right-Click) ──────────────────────────── *@
+<ContextMenu Id="fineContextMenu" Template="Win11Style">
+    <div class="win11-section-header">Actions</div>
+    <Item OnClick="@((ItemClickEventArgs e) => OnDeleteFineClicked(e))">
+        <div class="win11-menu-item text-danger">
+            <i class="fas fa-trash win11-icon text-danger"></i>
+            <span>Delete Fine Record</span>
+        </div>
+    </Item>
+</ContextMenu>
+
+<style>
+    .win11-section-header { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #888; padding: 4px 12px; }
+    .win11-menu-item       { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; padding: 4px 8px; }
+    .win11-icon            { width: 16px; text-align: center; }
+</style>

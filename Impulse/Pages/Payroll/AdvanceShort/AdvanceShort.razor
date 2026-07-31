@@ -1,11 +1,11 @@
-@page "/payroll/advance-long"
+@page "/payroll/advance-short"
 @using DataAccessLibrary.Models.ViewModels.Payroll
 @using DataAccessLibrary.Models.ViewModels.Accounts
 @using Impulse.Services.Payroll
 @using Impulse.Services
 @attribute [Authorize]
 
-<PageTitle>Long Term Advance Entry</PageTitle>
+<PageTitle>Short Term Advance Entry</PageTitle>
 
 <style>
     .toolbar-row    { position: relative !important; z-index: 9999 !important; }
@@ -63,7 +63,7 @@
             <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
                 <h4 class="mb-0 text-primary d-flex align-items-center">
                     <i class="fas fa-hand-holding-usd me-2"></i>
-                    Long Term Advance Entry
+                    Short Term Advance Entry
                     @if (IsContractor)
                     {
                         <span class="badge bg-warning text-dark ms-2" style="font-size:0.7rem;">CONTRACTOR</span>
@@ -137,15 +137,10 @@
             @if (SelectedEmployee != null && EmployeeSummary != null)
             {
                 <div class="d-flex gap-2 mb-3 flex-wrap">
-                    <span class="balance-badge @(EmployeeSummary.PreviousBalance > 0 ? "warning" : "")">
+                    <span class="balance-badge @(EmployeeSummary.PreviousShortTermBalance > 0 ? "warning" : "")">
                         <i class="fas fa-wallet me-1"></i>
-                        Outstanding Balance:
-                        <strong>@EmployeeSummary.PreviousBalance.ToString("N2")</strong>
-                    </span>
-                    <span class="balance-badge">
-                        <i class="fas fa-calendar-check me-1"></i>
-                        Last Monthly Deduction:
-                        <strong>@EmployeeSummary.PreviousDeductionAmount.ToString("N2")</strong>
+                        Previous Short Term Balance:
+                        <strong>@EmployeeSummary.PreviousShortTermBalance.ToString("N2")</strong>
                     </span>
                 </div>
             }
@@ -179,21 +174,16 @@
             <div class="row g-3 mb-3">
                 <div class="col-md-4">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
-                        Loan Amount <span class="text-danger">*</span>
+                        Advance Amount <span class="text-danger">*</span>
                     </label>
                     <input type="number" class="form-control form-control-sm" step="0.01" min="0"
                            @bind="Amount" style="height:35px; background:#fffde7;" />
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Monthly Deduction</label>
-                    <input type="number" class="form-control form-control-sm" step="0.01" min="0"
-                           @bind="MonthlyDeduction" style="height:35px;" />
-                </div>
-                <div class="col-md-12">
+                <div class="col-md-8">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Description</label>
-                    <textarea class="form-control form-control-sm" rows="2"
+                    <textarea class="form-control form-control-sm" rows="1"
                               @bind="Description"
-                              placeholder="Long Term Loan"></textarea>
+                              placeholder="Short Term"></textarea>
                 </div>
             </div>
 
@@ -201,20 +191,20 @@
             <div class="mb-3">
                 <label class="form-label fw-bold text-secondary mb-2" style="font-size:0.85rem;">Payment Mode</label>
                 <div class="payment-mode-group">
-                    <div class="payment-mode-card @(PaymentMode == AdvanceLongPaymentMode.Cash ? "selected-cpv" : "")"
-                         @onclick="@(() => SetPaymentMode(AdvanceLongPaymentMode.Cash))">
+                    <div class="payment-mode-card @(PaymentMode == AdvanceShortPaymentMode.Cash ? "selected-cpv" : "")"
+                         @onclick="@(() => SetPaymentMode(AdvanceShortPaymentMode.Cash))">
                         <i class="fas fa-money-bill-wave"></i>
                         Cash
                         <div style="font-size:0.7rem; font-weight:400; opacity:0.75;">Posts CPV</div>
                     </div>
-                    <div class="payment-mode-card @(PaymentMode == AdvanceLongPaymentMode.OtherAccount ? "selected-jv" : "")"
-                         @onclick="@(() => SetPaymentMode(AdvanceLongPaymentMode.OtherAccount))">
+                    <div class="payment-mode-card @(PaymentMode == AdvanceShortPaymentMode.OtherAccount ? "selected-jv" : "")"
+                         @onclick="@(() => SetPaymentMode(AdvanceShortPaymentMode.OtherAccount))">
                         <i class="fas fa-file-invoice"></i>
                         Other Account
                         <div style="font-size:0.7rem; font-weight:400; opacity:0.75;">Posts JV</div>
                     </div>
-                    <div class="payment-mode-card @(PaymentMode == AdvanceLongPaymentMode.Bank ? "selected-bpv" : "")"
-                         @onclick="@(() => SetPaymentMode(AdvanceLongPaymentMode.Bank))">
+                    <div class="payment-mode-card @(PaymentMode == AdvanceShortPaymentMode.Bank ? "selected-bpv" : "")"
+                         @onclick="@(() => SetPaymentMode(AdvanceShortPaymentMode.Bank))">
                         <i class="fas fa-university"></i>
                         Bank (Cheque)
                         <div style="font-size:0.7rem; font-weight:400; opacity:0.75;">Posts BPV</div>
@@ -224,7 +214,7 @@
 
             @* ── Payment Account Selector ─────────────────────────── *@
             <div class="toolbar-row mb-3">
-                @if (PaymentMode == AdvanceLongPaymentMode.Cash)
+                @if (PaymentMode == AdvanceShortPaymentMode.Cash)
                 {
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
                         Cash In Hand Account <span class="text-danger">*</span>
@@ -242,7 +232,7 @@
                         <ResultTemplate>[@context.AccNo] @context.AccTitle</ResultTemplate>
                     </BlazoredTypeahead>
                 }
-                else if (PaymentMode == AdvanceLongPaymentMode.OtherAccount)
+                else if (PaymentMode == AdvanceShortPaymentMode.OtherAccount)
                 {
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
                         Account <span class="text-danger">*</span>
@@ -260,7 +250,7 @@
                         <ResultTemplate>[@context.AccNo] @context.AccTitle</ResultTemplate>
                     </BlazoredTypeahead>
                 }
-                else if (PaymentMode == AdvanceLongPaymentMode.Bank)
+                else if (PaymentMode == AdvanceShortPaymentMode.Bank)
                 {
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
                         Bank Account <span class="text-danger">*</span>

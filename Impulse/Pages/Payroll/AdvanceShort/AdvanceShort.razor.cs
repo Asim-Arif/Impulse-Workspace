@@ -9,22 +9,22 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Impulse.Pages.Payroll.AdvanceLong
+namespace Impulse.Pages.Payroll.AdvanceShort
 {
-    public partial class AdvanceLong : ComponentBase
+    public partial class AdvanceShort : ComponentBase
     {
         // ── Injected Services ─────────────────────────────────────────────────
-        [Inject] private IAdvanceLongService     _advanceLongService  { get; set; } = null!;
-        [Inject] private IEmployeeService         _employeeService     { get; set; } = null!;
-        [Inject] private IVoucherService          _voucherService      { get; set; } = null!;
-        [Inject] private IDBHelperService         _dbHelperService     { get; set; } = null!;
+        [Inject] private IAdvanceShortService    _advanceShortService { get; set; } = null!;
+        [Inject] private IEmployeeService        _employeeService     { get; set; } = null!;
+        [Inject] private IVoucherService         _voucherService      { get; set; } = null!;
+        [Inject] private IDBHelperService        _dbHelperService     { get; set; } = null!;
         [Inject] private INotificationService    _notificationService { get; set; } = null!;
         [Inject] private IReportNavigationService _reportNavService   { get; set; } = null!;
         [Inject] private NavigationManager       _navManager          { get; set; } = null!;
 
         // ── Query Parameters ──────────────────────────────────────────────────
-        [Parameter][SupplyParameterFromQuery] public string? returnUrl    { get; set; }
-        [Parameter][SupplyParameterFromQuery] public bool   contractors  { get; set; } = false;
+        [Parameter][SupplyParameterFromQuery] public string? returnUrl   { get; set; }
+        [Parameter][SupplyParameterFromQuery] public bool   contractors { get; set; } = false;
 
         // ── UI State ──────────────────────────────────────────────────────────
         private bool IsLoading    { get; set; } = true;
@@ -32,21 +32,20 @@ namespace Impulse.Pages.Payroll.AdvanceLong
         private bool IsContractor { get; set; } = false;
 
         // ── Employee / Department ─────────────────────────────────────────────
-        private List<DepartmentListItemModel>  AllDepartments { get; set; } = new();
-        private List<EmployeeListItemModel>    AllEmployees   { get; set; } = new();
-        private DepartmentListItemModel?       SelectedDepartment { get; set; }
-        private EmployeeListItemModel?         SelectedEmployee   { get; set; }
-        private AdvanceLongSummaryModel?       EmployeeSummary    { get; set; }
+        private List<DepartmentListItemModel> AllDepartments        { get; set; } = new();
+        private List<EmployeeListItemModel>   AllEmployees          { get; set; } = new();
+        private DepartmentListItemModel?      SelectedDepartment    { get; set; }
+        private EmployeeListItemModel?        SelectedEmployee      { get; set; }
+        private AdvanceShortSummaryModel?     EmployeeSummary       { get; set; }
 
         // ── Advance Fields ────────────────────────────────────────────────────
         private DateTime IssueDate        { get; set; } = DateTime.Today;
         private DateTime DeductionStartDT { get; set; } = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
         private decimal  Amount           { get; set; } = 0;
-        private decimal  MonthlyDeduction { get; set; } = 0;
-        private string   Description      { get; set; } = "Long Term Loan";
+        private string   Description      { get; set; } = "Short Term";
 
         // ── Payment Mode ──────────────────────────────────────────────────────
-        private AdvanceLongPaymentMode PaymentMode { get; set; } = AdvanceLongPaymentMode.Cash;
+        private AdvanceShortPaymentMode PaymentMode { get; set; } = AdvanceShortPaymentMode.Cash;
 
         // ── Account Lookups ───────────────────────────────────────────────────
         private List<ChartOfAccountsModel> CashAccounts  { get; set; } = new();
@@ -58,33 +57,33 @@ namespace Impulse.Pages.Payroll.AdvanceLong
         private BankAccountInfo?      SelectedBankAccount  { get; set; }
 
         // ── Cheque Fields (BPV) ───────────────────────────────────────────────
-        private string   ChequeNo   { get; set; } = string.Empty;
-        private string   ChequeType { get; set; } = "Open";
-        private DateTime ChequeDate { get; set; } = DateTime.Today;
+        private string   ChequeNo        { get; set; } = string.Empty;
+        private string   ChequeType      { get; set; } = "Open";
+        private DateTime ChequeDate      { get; set; } = DateTime.Today;
         private bool     IsChequeLoading { get; set; } = false;
 
         // ── Voucher Number Preview ────────────────────────────────────────────
         private string PreviewVchrNo   { get; set; } = string.Empty;
         private bool   IsVchrNoLoading { get; set; } = false;
 
-        // ── EmpLongTermAccNo (validated on init) ──────────────────────────────
-        private string EmpLongTermAccNo { get; set; } = string.Empty;
+        // ── EmpShortTermAccNo (validated on init) ─────────────────────────────
+        private string EmpShortTermAccNo { get; set; } = string.Empty;
 
         // ── Computed Properties ───────────────────────────────────────────────
         private string CurrentVchrType => PaymentMode switch
         {
-            AdvanceLongPaymentMode.Cash         => "CPV",
-            AdvanceLongPaymentMode.OtherAccount => "JV",
-            AdvanceLongPaymentMode.Bank         => "BPV",
-            _                                   => "CPV"
+            AdvanceShortPaymentMode.Cash         => "CPV",
+            AdvanceShortPaymentMode.OtherAccount => "JV",
+            AdvanceShortPaymentMode.Bank         => "BPV",
+            _                                    => "CPV"
         };
 
         private string VchrBadgeClass => PaymentMode switch
         {
-            AdvanceLongPaymentMode.Cash         => "badge bg-success",
-            AdvanceLongPaymentMode.OtherAccount => "badge bg-secondary", // purple-ish secondary
-            AdvanceLongPaymentMode.Bank         => "badge bg-primary",
-            _                                   => "badge bg-success"
+            AdvanceShortPaymentMode.Cash         => "badge bg-success",
+            AdvanceShortPaymentMode.OtherAccount => "badge bg-secondary",
+            AdvanceShortPaymentMode.Bank         => "badge bg-primary",
+            _                                    => "badge bg-success"
         };
 
         // ── Lifecycle ─────────────────────────────────────────────────────────
@@ -120,13 +119,13 @@ namespace Impulse.Pages.Payroll.AdvanceLong
                     CashAccounts = new List<ChartOfAccountsModel>(AllAccounts);
                 }
 
-                // Validate EmpLongTermAccNo is configured
-                EmpLongTermAccNo = await _advanceLongService.GetEmpLongTermAccNoAsync();
-                if (string.IsNullOrWhiteSpace(EmpLongTermAccNo))
+                // Validate EmpShortTermAccNo is configured
+                EmpShortTermAccNo = await _advanceShortService.GetEmpShortTermAccNoAsync();
+                if (string.IsNullOrWhiteSpace(EmpShortTermAccNo))
                 {
                     _notificationService.ShowWarning(
                         "Configuration Missing",
-                        "EmpLongTermAccNo is not set in General Data. Saving will not work until an administrator configures it.");
+                        "EmpShortTermAccNo is not set in General Data. Saving will not work until an administrator configures it.");
                 }
 
                 // Set default cash account (Petty Cash if exists)
@@ -166,7 +165,7 @@ namespace Impulse.Pages.Payroll.AdvanceLong
             SelectedEmployee = emp;
             if (emp != null)
             {
-                EmployeeSummary = await _advanceLongService.GetEmployeeSummaryAsync(emp.EmpID);
+                EmployeeSummary = await _advanceShortService.GetEmployeeSummaryAsync(emp.EmpID);
             }
             else
             {
@@ -193,14 +192,14 @@ namespace Impulse.Pages.Payroll.AdvanceLong
             }
         }
 
-        private async Task SetPaymentMode(AdvanceLongPaymentMode mode)
+        private async Task SetPaymentMode(AdvanceShortPaymentMode mode)
         {
             PaymentMode = mode;
             // Clear cheque fields when switching away from Bank
-            if (mode != AdvanceLongPaymentMode.Bank)
+            if (mode != AdvanceShortPaymentMode.Bank)
             {
-                ChequeNo = string.Empty;
-                ChequeType = "Open";
+                ChequeNo            = string.Empty;
+                ChequeType          = "Open";
                 SelectedBankAccount = null;
             }
             await RefreshVchrNoPreviewAsync();
@@ -227,7 +226,7 @@ namespace Impulse.Pages.Payroll.AdvanceLong
                     var chequeInfo = await _voucherService.GetNewChequeNumbersByBankAccount(bank.AccNo);
                     if (chequeInfo != null)
                     {
-                        ChequeNo  = chequeInfo.ChqNo ?? string.Empty;
+                        ChequeNo = chequeInfo.ChqNo ?? string.Empty;
                     }
                 }
                 finally
@@ -248,7 +247,7 @@ namespace Impulse.Pages.Payroll.AdvanceLong
             IsVchrNoLoading = true;
             try
             {
-                PreviewVchrNo = await _advanceLongService.GetPreviewVchrNoAsync(IssueDate, PaymentMode);
+                PreviewVchrNo = await _advanceShortService.GetPreviewVchrNoAsync(IssueDate, PaymentMode);
             }
             catch
             {
@@ -329,18 +328,13 @@ namespace Impulse.Pages.Payroll.AdvanceLong
             }
             if (Amount <= 0)
             {
-                _notificationService.ShowWarning("Validation", "Loan Amount must be greater than zero.");
+                _notificationService.ShowWarning("Validation", "Advance Amount must be greater than zero.");
                 return;
             }
-            if (MonthlyDeduction > Amount)
-            {
-                _notificationService.ShowWarning("Validation", "Monthly Deduction cannot exceed the Loan Amount.");
-                return;
-            }
-            if (string.IsNullOrWhiteSpace(EmpLongTermAccNo))
+            if (string.IsNullOrWhiteSpace(EmpShortTermAccNo))
             {
                 _notificationService.ShowError("Configuration Error",
-                    "EmpLongTermAccNo is not configured in General Data. Cannot save.");
+                    "EmpShortTermAccNo is not configured in General Data. Cannot save.");
                 return;
             }
 
@@ -349,7 +343,7 @@ namespace Impulse.Pages.Payroll.AdvanceLong
 
             switch (PaymentMode)
             {
-                case AdvanceLongPaymentMode.Cash:
+                case AdvanceShortPaymentMode.Cash:
                     if (SelectedCashAccount == null)
                     {
                         _notificationService.ShowWarning("Validation", "Please select a Cash In Hand account.");
@@ -358,7 +352,7 @@ namespace Impulse.Pages.Payroll.AdvanceLong
                     paymentAccNo = SelectedCashAccount.AccNo;
                     break;
 
-                case AdvanceLongPaymentMode.OtherAccount:
+                case AdvanceShortPaymentMode.OtherAccount:
                     if (SelectedOtherAccount == null)
                     {
                         _notificationService.ShowWarning("Validation", "Please select an Account.");
@@ -367,7 +361,7 @@ namespace Impulse.Pages.Payroll.AdvanceLong
                     paymentAccNo = SelectedOtherAccount.AccNo;
                     break;
 
-                case AdvanceLongPaymentMode.Bank:
+                case AdvanceShortPaymentMode.Bank:
                     if (SelectedBankAccount == null)
                     {
                         _notificationService.ShowWarning("Validation", "Please select a Bank Account.");
@@ -389,14 +383,13 @@ namespace Impulse.Pages.Payroll.AdvanceLong
             }
 
             // ── Build DTO ─────────────────────────────────────────────────────
-            var dto = new AdvanceLongDto
+            var dto = new AdvanceShortDto
             {
                 EmpID            = SelectedEmployee.EmpID,
                 IssueDate        = IssueDate,
                 DeductionStartDT = DeductionStartDT,
                 Amount           = Amount,
-                DAmount          = MonthlyDeduction,
-                Description      = string.IsNullOrWhiteSpace(Description) ? "Long Term Loan" : Description,
+                Description      = string.IsNullOrWhiteSpace(Description) ? "Short Term" : Description,
                 PaymentMode      = PaymentMode,
                 PaymentAccNo     = paymentAccNo,
                 IsContractor     = IsContractor,
@@ -410,11 +403,11 @@ namespace Impulse.Pages.Payroll.AdvanceLong
             IsSaving = true;
             try
             {
-                string postedVchrNo = await _advanceLongService.SaveAsync(dto);
+                string postedVchrNo = await _advanceShortService.SaveAsync(dto);
 
                 _notificationService.ShowSuccess(
                     "Saved Successfully",
-                    $"Long Term Advance recorded. Voucher: {postedVchrNo}");
+                    $"Short Term Advance recorded. Voucher: {postedVchrNo}");
 
                 // Print voucher
                 await _reportNavService.PrintVoucher(postedVchrNo);
@@ -436,20 +429,19 @@ namespace Impulse.Pages.Payroll.AdvanceLong
 
         private async Task ResetForm()
         {
-            SelectedEmployee   = null;
-            EmployeeSummary    = null;
-            Amount             = 0;
-            MonthlyDeduction   = 0;
-            Description        = "Long Term Loan";
-            IssueDate          = DateTime.Today;
-            DeductionStartDT   = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+            SelectedEmployee     = null;
+            EmployeeSummary      = null;
+            Amount               = 0;
+            Description          = "Short Term";
+            IssueDate            = DateTime.Today;
+            DeductionStartDT     = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
             SelectedCashAccount  = null;
             SelectedOtherAccount = null;
             SelectedBankAccount  = null;
-            ChequeNo   = string.Empty;
-            ChequeType = "Open";
-            ChequeDate = DateTime.Today;
-            PaymentMode = AdvanceLongPaymentMode.Cash;
+            ChequeNo             = string.Empty;
+            ChequeType           = "Open";
+            ChequeDate           = DateTime.Today;
+            PaymentMode          = AdvanceShortPaymentMode.Cash;
             await RefreshVchrNoPreviewAsync();
         }
 

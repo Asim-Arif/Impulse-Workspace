@@ -141,10 +141,26 @@ builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IGatePassDataAcce
 builder.Services.AddScoped<Impulse.Services.Payroll.IGatePassService, Impulse.Services.Payroll.GatePassService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IAdvanceLongDataAccess, DataAccessLibrary.DAC.Payroll.AdvanceLongDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Payroll.IAdvanceLongService, Impulse.Services.Payroll.AdvanceLongService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IAdvanceShortDataAccess, DataAccessLibrary.DAC.Payroll.AdvanceShortDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IAdvanceShortService, Impulse.Services.Payroll.AdvanceShortService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IEmpToEmpTransferDataAccess, DataAccessLibrary.DAC.Payroll.EmpToEmpTransferDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IEmpToEmpTransferService, Impulse.Services.Payroll.EmpToEmpTransferService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IAdjustDedAmtDataAccess, DataAccessLibrary.DAC.Payroll.AdjustDedAmtDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IAdjustDedAmtService, Impulse.Services.Payroll.AdjustDedAmtService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IAdvanceLedgerDataAccess, DataAccessLibrary.DAC.Payroll.AdvanceLedgerDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IAdvanceLedgerService, Impulse.Services.Payroll.AdvanceLedgerService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IPostFineDataAccess, DataAccessLibrary.DAC.Payroll.PostFineDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IPostFineService, Impulse.Services.Payroll.PostFineService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IEmpFineLedgerDataAccess, DataAccessLibrary.DAC.Payroll.EmpFineLedgerDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IEmpFineLedgerService, Impulse.Services.Payroll.EmpFineLedgerService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.ISalarySheetDataAccess, DataAccessLibrary.DAC.Payroll.SalarySheetDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.ISalarySheetService, Impulse.Services.Payroll.SalarySheetService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IClearAdvanceDataAccess, DataAccessLibrary.DAC.Payroll.ClearAdvanceDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Payroll.IClearAdvanceService, Impulse.Services.Payroll.ClearAdvanceService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IClearShortTermDataAccess, DataAccessLibrary.DAC.Payroll.ClearShortTermDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Payroll.IClearShortTermService, Impulse.Services.Payroll.ClearShortTermService>();
+builder.Services.AddScoped<DataAccessLibrary.DAC.Payroll.IHoldSalaryDataAccess, DataAccessLibrary.DAC.Payroll.HoldSalaryDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IHoldSalaryService, Impulse.Services.Payroll.HoldSalaryService>();
 
 //Stock Module Registrations
 builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IFinishMovementDataAccess, DataAccessLibrary.DAC.Stock.FinishMovementDataAccess>();

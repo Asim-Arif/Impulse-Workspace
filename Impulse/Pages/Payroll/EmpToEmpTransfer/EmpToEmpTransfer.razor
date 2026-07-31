@@ -1,0 +1,245 @@
+@page "/payroll/emp-to-emp-transfer"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Impulse.Services.Payroll
+@using Impulse.Services
+@attribute [Authorize]
+
+<PageTitle>Emp. to Emp. Transfer</PageTitle>
+
+<style>
+    .toolbar-row     { position: relative !important; z-index: 9999 !important; }
+    .table-container { position: relative !important; z-index: 1 !important; }
+
+    /* BlazoredTypeahead sizing fixes */
+    .blazored-typeahead          { height: 35px !important; min-height: 35px !important; padding: 0 !important; box-sizing: border-box !important; }
+    .blazored-typeahead__controls{ min-height: 35px !important; height: 35px !important; }
+    .blazored-typeahead__input   { height: 33px !important; }
+
+    /* Balance badge styling */
+    .balance-badge {
+        font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: 6px;
+        border: 1px solid #dee2e6; background: #f8f9fa; color: #495057;
+        font-weight: 500;
+    }
+    .balance-badge.warning { border-color: #f0ad4e; background: #fff8ec; color: #856404; }
+    .balance-badge.info    { border-color: #0dcaf0; background: #f0fcfd; color: #055160; }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm mb-4"
+         style="background: rgba(255,255,255,0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 950px; margin: 0 auto;">
+        <div class="card-body p-4">
+
+            @* ── Header ──────────────────────────────────────────── *@
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center">
+                    <i class="fas fa-exchange-alt me-2"></i>
+                    Emp. to Emp. Transfer
+                    @if (IsContractor)
+                    {
+                        <span class="badge bg-warning text-dark ms-2" style="font-size:0.7rem;">CONTRACTOR</span>
+                    }
+                </h4>
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm"
+                            @onclick="SaveAsync" disabled="@(IsLoading || IsSaving)">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span><span>Transferring...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save me-1"></i><span>Execute Transfer</span>
+                        }
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3"
+                            @onclick="NavigateBack">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                </div>
+            </div>
+
+            @* ── Side-by-Side Red (From) & Green (To) Employee Selection Cards ──────── *@
+            <div class="row g-4 mb-4 toolbar-row">
+                
+                @* 🔴 1. Transfer From (Source Employee) *@
+                <div class="col-md-6">
+                    <div class="card border border-danger shadow-sm h-100">
+                        <div class="card-header bg-white border-bottom border-danger text-danger fw-bold py-2 d-flex align-items-center justify-content-between">
+                            <span><i class="fas fa-arrow-up me-1"></i> Transfer From (Source)</span>
+                            <span class="badge bg-danger">OUTGOING</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Department</label>
+                                <BlazoredTypeahead SearchMethod="SearchFromDepartments"
+                                                   Value="SelectedFromDepartment"
+                                                   ValueChanged="OnFromDepartmentChanged"
+                                                   ValueExpression="@(() => SelectedFromDepartment)"
+                                                   TValue="DepartmentListItemModel"
+                                                   TItem="DepartmentListItemModel"
+                                                   Placeholder="All Departments..."
+                                                   EnableDropDown="true"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate>@context.Name</SelectedTemplate>
+                                    <ResultTemplate>@context.Name</ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
+                                    Source Employee <span class="text-danger">*</span>
+                                </label>
+                                <BlazoredTypeahead SearchMethod="SearchFromEmployees"
+                                                   Value="SelectedFromEmployee"
+                                                   ValueChanged="OnFromEmployeeChanged"
+                                                   ValueExpression="@(() => SelectedFromEmployee)"
+                                                   TValue="EmployeeListItemModel"
+                                                   TItem="EmployeeListItemModel"
+                                                   Placeholder="Search Source Employee..."
+                                                   EnableDropDown="true"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate>
+                                        @if (context.EmpID != "0") { <text>[@context.EmpID] </text> }@context.Name
+                                    </SelectedTemplate>
+                                    <ResultTemplate>
+                                        @if (context.EmpID != "0") { <text>[@context.EmpID] </text> }@context.Name
+                                        @if (!string.IsNullOrEmpty(context.Designation))
+                                        {
+                                            <small class="text-muted ms-1">— @context.Designation</small>
+                                        }
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+
+                            @* Outstanding Balances for Source Employee *@
+                            @if (SelectedFromEmployee != null && FromEmployeeSummary != null)
+                            {
+                                <div class="p-2 border rounded bg-light mt-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <small class="text-secondary fw-bold">L.T. Loan Balance:</small>
+                                        <span class="badge bg-danger fs-6">@FromEmployeeSummary.LTBalance.ToString("N2")</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small class="text-secondary fw-bold">S.T. Advance Balance:</small>
+                                        <span class="badge bg-warning text-dark fs-6">@FromEmployeeSummary.STBalance.ToString("N2")</span>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                @* 🟢 2. Transfer To (Destination Employee) *@
+                <div class="col-md-6">
+                    <div class="card border border-success shadow-sm h-100">
+                        <div class="card-header bg-white border-bottom border-success text-success fw-bold py-2 d-flex align-items-center justify-content-between">
+                            <span><i class="fas fa-arrow-down me-1"></i> Transfer To (Destination)</span>
+                            <span class="badge bg-success">INCOMING</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Department</label>
+                                <BlazoredTypeahead SearchMethod="SearchToDepartments"
+                                                   Value="SelectedToDepartment"
+                                                   ValueChanged="OnToDepartmentChanged"
+                                                   ValueExpression="@(() => SelectedToDepartment)"
+                                                   TValue="DepartmentListItemModel"
+                                                   TItem="DepartmentListItemModel"
+                                                   Placeholder="All Departments..."
+                                                   EnableDropDown="true"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate>@context.Name</SelectedTemplate>
+                                    <ResultTemplate>@context.Name</ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
+                                    Destination Employee <span class="text-danger">*</span>
+                                </label>
+                                <BlazoredTypeahead SearchMethod="SearchToEmployees"
+                                                   Value="SelectedToEmployee"
+                                                   ValueChanged="OnToEmployeeChanged"
+                                                   ValueExpression="@(() => SelectedToEmployee)"
+                                                   TValue="EmployeeListItemModel"
+                                                   TItem="EmployeeListItemModel"
+                                                   Placeholder="Search Destination Employee..."
+                                                   EnableDropDown="true"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate>
+                                        @if (context.EmpID != "0") { <text>[@context.EmpID] </text> }@context.Name
+                                    </SelectedTemplate>
+                                    <ResultTemplate>
+                                        @if (context.EmpID != "0") { <text>[@context.EmpID] </text> }@context.Name
+                                        @if (!string.IsNullOrEmpty(context.Designation))
+                                        {
+                                            <small class="text-muted ms-1">— @context.Designation</small>
+                                        }
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                            @if (SelectedToEmployee != null)
+                            {
+                                <div class="p-2 border border-success rounded bg-success bg-opacity-10 mt-3">
+                                    <small class="text-success fw-bold d-block">Target Employee Selected:</small>
+                                    <strong>[@SelectedToEmployee.EmpID] @SelectedToEmployee.Name</strong>
+                                    <small class="text-muted d-block">@SelectedToEmployee.DeptName — @SelectedToEmployee.Designation</small>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            @* ── Transfer Amounts & Parameters Section ──────────────── *@
+            <div class="card border shadow-sm p-3 mb-3 bg-light">
+                <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">
+                    <i class="fas fa-sliders-h me-1"></i> Transfer Parameters & Amounts
+                </h6>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Transfer Date</label>
+                        <input type="date" class="form-control form-control-sm"
+                               value="@TransferDate.ToString("yyyy-MM-dd")"
+                               @onchange="OnTransferDateChanged" style="height:35px;" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Deduction Start Month</label>
+                        <input type="month" class="form-control form-control-sm"
+                               value="@DeductionStartDT.ToString("yyyy-MM")"
+                               @onchange="OnDeductionStartChanged" style="height:35px;" />
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">L.T. Loan Transfer Amount</label>
+                        <input type="number" class="form-control form-control-sm" step="0.01" min="0"
+                               @bind="LTAmt" style="height:35px; background:#fffde7;" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">L.T. Monthly Deduction (New)</label>
+                        <input type="number" class="form-control form-control-sm" step="0.01" min="0"
+                               @bind="LTDeduct" style="height:35px;" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">S.T. Advance Transfer Amount</label>
+                        <input type="number" class="form-control form-control-sm" step="0.01" min="0"
+                               @bind="STAmt" style="height:35px; background:#e8f5e9;" />
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Remarks / Description</label>
+                        <textarea class="form-control form-control-sm" rows="2"
+                                  @bind="Description"
+                                  placeholder="Employee to Employee Loan Transfer"></textarea>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>

@@ -82,6 +82,22 @@ namespace Impulse.Constants
 
             // Advance Reports
             public const string LongTermAdvanceReceipt = Folder + "LongTermAdvanceReceipt.rpt";
+
+            // Salary Sheet & Payslip Reports
+            public const string SalarySheet             = Folder + "SalarySheet.rpt";
+            public const string SalarySheetDetail       = Folder + "rptSalarySheet.rpt";
+            public const string SalarySheetUnFinal      = Folder + "rptSalarySheetUnFinal.rpt";
+            public const string SalarySheetSummary      = Folder + "rptSalarySummary.rpt";
+            public const string SalarySheetInternal     = Folder + "rptSalarySheetInternal.rpt";
+            public const string EmpListNegativeSalaries = Folder + "EmpListNegativeSalaries.rpt";
+            public const string LateEmpList             = Folder + "rptLateEmpList.rpt";
+            public const string RupeeStructure          = Folder + "rptRupeeStructure.rpt";
+            public const string PaySlipRule9            = Folder + "rptPayslip_Rule9.rpt";
+            public const string PaySlipMini             = Folder + "rptPayslip_Mini.rpt";
+            public const string PaySlipFull             = Folder + "rptPayslip_Full.rpt";
+            public const string SalaryPacket            = Folder + "rptSalaryPacket.rpt";
+            public const string PaySlipInternal         = Folder + "rptPayslipInternal.rpt";
+            public const string OverTimePaymentSheet    = Folder + "rptOverTimePaymentSheet.rpt";
         }
 
 
