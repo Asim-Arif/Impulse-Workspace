@@ -1,0 +1,211 @@
+@page "/payroll/settings"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Blazored.Typeahead
+
+<style>
+    /* BlazoredTypeahead sizing fixes */
+    .blazored-typeahead          { height: 35px !important; min-height: 35px !important; padding: 0 !important; box-sizing: border-box !important; }
+    .blazored-typeahead__controls{ min-height: 35px !important; height: 35px !important; }
+    .blazored-typeahead__input   { height: 33px !important; }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    @* ── Top Header & Title ─────────────────── *@
+    <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+        <div>
+            <h5 class="mb-0 fw-bold text-dark">
+                <i class="fas fa-sliders-h me-2 text-primary"></i>Payroll Settings
+            </h5>
+            <small class="text-secondary">Configure department shift timings, lunch breaks, Friday hours, and payroll category rules</small>
+        </div>
+        <div>
+            <button type="button" class="btn btn-outline-secondary btn-sm px-3 shadow-sm" @onclick="GoBack">
+                <i class="fas fa-arrow-left me-1"></i>Back
+            </button>
+        </div>
+    </div>
+
+    @* ── Department Settings Selector Card (Z-Index 9999 for dropdown overlay) ────── *@
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; position: relative !important; z-index: 9999 !important;">
+        <div class="card-header bg-light py-2 px-3 border-bottom fw-bold text-secondary" style="font-size: 0.85rem; border-top-left-radius: 12px; border-top-right-radius: 12px;">
+            <i class="fas fa-building me-2 text-primary"></i>Departement Settings
+        </div>
+        <div class="card-body py-3 px-3">
+            <div class="row align-items-center">
+                <label class="col-md-2 col-form-label form-label-sm fw-bold text-end text-dark">Settings For :</label>
+                <div class="col-md-8">
+                    <BlazoredTypeahead SearchMethod="SearchDepartments"
+                                       Value="SelectedDepartment"
+                                       ValueChanged="@((DepartmentListItemModel? d) => OnDepartmentChangedAsync(d))"
+                                       ValueExpression="@(() => SelectedDepartment)"
+                                       TValue="DepartmentListItemModel"
+                                       TItem="DepartmentListItemModel"
+                                       placeholder="Select Department..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="dept">
+                            @dept.Name
+                        </SelectedTemplate>
+                        <ResultTemplate Context="dept">
+                            @dept.Name
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Timings Section Card (Z-Index 1) ─────────────────── *@
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; position: relative !important; z-index: 1 !important;">
+        <div class="card-header bg-light py-2 px-3 border-bottom fw-bold text-secondary" style="font-size: 0.85rem; border-top-left-radius: 12px; border-top-right-radius: 12px;">
+            <i class="fas fa-clock me-2 text-info"></i>Timings
+        </div>
+        <div class="card-body py-3 px-3">
+            @if (IsLoading)
+            {
+                <div class="text-center py-3 text-muted">
+                    <span class="spinner-border spinner-border-sm me-2"></span>Loading Timings...
+                </div>
+            }
+            else
+            {
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label form-label-sm fw-bold text-secondary mb-1">Check In :</label>
+                        <input type="time" class="form-control form-control-sm text-center fw-bold shadow-sm"
+                               @bind="EnterTimeOnly" style="height: 35px !important;" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label form-label-sm fw-bold text-secondary mb-1">Lunch Start :</label>
+                        <input type="time" class="form-control form-control-sm text-center fw-bold shadow-sm"
+                               @bind="LunchInTimeOnly" style="height: 35px !important;" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label form-label-sm fw-bold text-secondary mb-1">Lunch End :</label>
+                        <input type="time" class="form-control form-control-sm text-center fw-bold shadow-sm"
+                               @bind="LunchOutTimeOnly" style="height: 35px !important;" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label form-label-sm fw-bold text-secondary mb-1">Check Out :</label>
+                        <input type="time" class="form-control form-control-sm text-center fw-bold shadow-sm"
+                               @bind="ExitTimeOnly" style="height: 35px !important;" />
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label form-label-sm fw-bold text-secondary mb-1">Friday Break Start :</label>
+                        <input type="time" class="form-control form-control-sm text-center fw-bold shadow-sm"
+                               @bind="FridayBreakStartOnly" style="height: 35px !important;" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label form-label-sm fw-bold text-secondary mb-1">Friday Break End :</label>
+                        <input type="time" class="form-control form-control-sm text-center fw-bold shadow-sm"
+                               @bind="FridayBreakEndOnly" style="height: 35px !important;" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label form-label-sm fw-bold text-secondary mb-1">Friday Check Out :</label>
+                        <input type="time" class="form-control form-control-sm text-center fw-bold shadow-sm"
+                               @bind="FridayCheckOutOnly" style="height: 35px !important;" />
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+
+    @* ── Payroll Catagory Section Card ─────────────────── *@
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-header bg-light py-2 px-3 border-bottom fw-bold text-secondary" style="font-size: 0.85rem; border-top-left-radius: 12px; border-top-right-radius: 12px;">
+            <i class="fas fa-list-ul me-2 text-warning"></i>Payroll Catagory
+        </div>
+        <div class="card-body py-3 px-3">
+            <div class="row align-items-center mb-3">
+                <label class="col-md-2 col-form-label form-label-sm fw-bold text-dark">Catagory # :</label>
+                <div class="col-md-4">
+                    <select class="form-select form-select-sm shadow-sm"
+                            value="@Model.EmpAttCat_RefID"
+                            @onchange="OnCategoryChangedAsync" style="height: 35px !important;">
+                        @foreach (var cat in Categories)
+                        {
+                            <option value="@cat.EntryID">@cat.EntryID - @(string.IsNullOrWhiteSpace(cat.Remarks) ? "Category #" + cat.EntryID : cat.Remarks)</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            @* ── Category Settings Grid ─────────────────── *@
+            <div class="table-responsive border rounded-3 overflow-hidden shadow-sm">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary" style="font-size: 0.78rem; text-transform: uppercase;">
+                        <tr>
+                            <th style="width: 40%;">Setting</th>
+                            <th style="width: 60%;">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!CategoryRules.Any())
+                        {
+                            <tr>
+                                <td colspan="2" class="text-center py-3 text-muted">No rules configured for selected category.</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var rule in CategoryRules)
+                            {
+                                <tr>
+                                    <td class="fw-semibold text-dark ps-3">@rule.SettingName</td>
+                                    <td class="@(rule.SettingName.Contains("Over Time Rate") ? "fw-bold text-primary" : "text-secondary")">@rule.SettingValue</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    @* ── Bottom Action Buttons ─────────────────── *@
+    <div class="d-flex align-items-center justify-content-end gap-2 pt-2 mb-4">
+        <button type="button" class="btn btn-outline-primary btn-sm px-3 shadow-sm"
+                @onclick="UpdateAllDepartmentsAsync" disabled="@(IsUpdatingAll || IsSaving)">
+            @if (IsUpdatingAll)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span><span>Updating All...</span>
+            }
+            else
+            {
+                <i class="fas fa-globe me-1"></i><span>Update All Departments</span>
+            }
+        </button>
+
+        <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm"
+                @onclick="() => SaveSettingsAsync(false)" disabled="@(IsSaving || IsUpdatingAll)">
+            @if (IsSaving)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span><span>Saving...</span>
+            }
+            else
+            {
+                <i class="fas fa-plus me-1"></i><span>Save &amp; New</span>
+            }
+        </button>
+
+        <button type="button" class="btn btn-success btn-sm px-4 shadow-sm fw-bold"
+                @onclick="() => SaveSettingsAsync(true)" disabled="@(IsSaving || IsUpdatingAll)">
+            @if (IsSaving)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span><span>Saving...</span>
+            }
+            else
+            {
+                <i class="fas fa-check me-1"></i><span>Save &amp; Close</span>
+            }
+        </button>
+
+        <button type="button" class="btn btn-outline-secondary btn-sm px-3 shadow-sm" @onclick="GoBack">
+            <i class="fas fa-times me-1"></i>Cancel
+        </button>
+    </div>
+</div>

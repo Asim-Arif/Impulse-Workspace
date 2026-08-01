@@ -161,6 +161,22 @@ builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IClearShortTermDa
 builder.Services.AddScoped<Impulse.Services.Payroll.IClearShortTermService, Impulse.Services.Payroll.ClearShortTermService>();
 builder.Services.AddScoped<DataAccessLibrary.DAC.Payroll.IHoldSalaryDataAccess, DataAccessLibrary.DAC.Payroll.HoldSalaryDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Payroll.IHoldSalaryService, Impulse.Services.Payroll.HoldSalaryService>();
+builder.Services.AddScoped<DataAccessLibrary.DAC.Payroll.IGratuityDataAccess, DataAccessLibrary.DAC.Payroll.GratuityDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IGratuityService, Impulse.Services.Payroll.GratuityService>();
+builder.Services.AddScoped<DataAccessLibrary.DAC.Payroll.IAbsentSheetDataAccess, DataAccessLibrary.DAC.Payroll.AbsentSheetDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IAbsentSheetService, Impulse.Services.Payroll.AbsentSheetService>();
+builder.Services.AddScoped<DataAccessLibrary.DAC.Payroll.ISocialSecurityDataAccess, DataAccessLibrary.DAC.Payroll.SocialSecurityDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.ISocialSecurityService, Impulse.Services.Payroll.SocialSecurityService>();
+builder.Services.AddScoped<DataAccessLibrary.DAC.Payroll.IEOBIDataAccess, DataAccessLibrary.DAC.Payroll.EOBIDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IEOBIService, Impulse.Services.Payroll.EOBIService>();
+builder.Services.AddScoped<DataAccessLibrary.DAC.Payroll.IDesignationDataAccess, DataAccessLibrary.DAC.Payroll.DesignationDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IDesignationService, Impulse.Services.Payroll.DesignationService>();
+builder.Services.AddScoped<DataAccessLibrary.DAC.Payroll.IPayrollSettingsDataAccess, DataAccessLibrary.DAC.Payroll.PayrollSettingsDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IPayrollSettingsService, Impulse.Services.Payroll.PayrollSettingsService>();
+builder.Services.AddScoped<DataAccessLibrary.DAC.Payroll.IPayrollPoliciesDataAccess, DataAccessLibrary.DAC.Payroll.PayrollPoliciesDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IPayrollPoliciesService, Impulse.Services.Payroll.PayrollPoliciesService>();
+builder.Services.AddScoped<DataAccessLibrary.DAC.Payroll.IHolidayDataAccess, DataAccessLibrary.DAC.Payroll.HolidayDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IHolidayService, Impulse.Services.Payroll.HolidayService>();
 
 //Stock Module Registrations
 builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IFinishMovementDataAccess, DataAccessLibrary.DAC.Stock.FinishMovementDataAccess>();
@@ -223,6 +239,27 @@ builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IRMIssuanceDataAcce
 builder.Services.AddScoped<Impulse.Services.Stock.IRMIssuanceService, Impulse.Services.Stock.RMIssuanceService>();
 builder.Services.AddScoped<IDepartmentDataAccess, DepartmentDataAccess>();
 builder.Services.AddScoped<IDepartmentService, DepartmentService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IShortTermSheetDataAccess, DataAccessLibrary.DAC.Payroll.ShortTermSheetDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Payroll.IShortTermSheetService, Impulse.Services.Payroll.ShortTermSheetService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Accounts.IMakerShortTermLoanDataAccess, DataAccessLibrary.DAC.Accounts.MakerShortTermLoanDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Accounts.IMakerShortTermLoanService, Impulse.Services.Accounts.MakerShortTermLoanService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Accounts.IMakerLongTermLoanDataAccess, DataAccessLibrary.DAC.Accounts.MakerLongTermLoanDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Accounts.IMakerLongTermLoanService, Impulse.Services.Accounts.MakerLongTermLoanService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Accounts.IMakerShortLoanLedgerDataAccess, DataAccessLibrary.DAC.Accounts.MakerShortLoanLedgerDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Accounts.IMakerShortLoanLedgerService, Impulse.Services.Accounts.MakerShortLoanLedgerService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Accounts.IMakerLongLoanLedgerDataAccess, DataAccessLibrary.DAC.Accounts.MakerLongLoanLedgerDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Accounts.IMakerLongLoanLedgerService, Impulse.Services.Accounts.MakerLongLoanLedgerService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Accounts.IMakerLoanClearanceDataAccess, DataAccessLibrary.DAC.Accounts.MakerLoanClearanceDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Accounts.IMakerLoanClearanceService, Impulse.Services.Accounts.MakerLoanClearanceService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Accounts.IMakerLoanTransferDataAccess, DataAccessLibrary.DAC.Accounts.MakerLoanTransferDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Accounts.IMakerLoanTransferService, Impulse.Services.Accounts.MakerLoanTransferService>();
+
+
+
+
+
+
+
 builder.Services.AddScoped<DataAccessLibrary.Interface.Company.IItemDataAccess, DataAccessLibrary.DAC.Company.ItemDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Company.IItemService, Impulse.Services.Company.ItemService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Company.ICustomerCatalogDataAccess, DataAccessLibrary.DAC.Company.CustomerCatalogDataAccess>();

@@ -1,0 +1,181 @@
+@page "/payroll/absent-sheet"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Blazored.Typeahead
+
+<style>
+    /* BlazoredTypeahead sizing fixes */
+    .blazored-typeahead          { height: 35px !important; min-height: 35px !important; padding: 0 !important; box-sizing: border-box !important; }
+    .blazored-typeahead__controls{ min-height: 35px !important; height: 35px !important; }
+    .blazored-typeahead__input   { height: 33px !important; }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    @* ── Page Header & Toolbar Card (Z-Index 9999 for dropdown overlay) ────── *@
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; position: relative !important; z-index: 9999 !important;">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <div>
+                    <div class="d-flex align-items-center">
+                        <h5 class="mb-0 fw-bold text-dark">
+                            <i class="fas fa-user-slash me-2 text-danger"></i>Absent Sheet
+                        </h5>
+                        <span class="badge bg-danger ms-3" style="font-size: 0.75rem;">
+                            Total Absents: @FilteredRows.Count()
+                        </span>
+                    </div>
+                    <small class="text-secondary">View and analyze employee absent records by department and date range</small>
+                </div>
+                <div class="ms-auto d-flex gap-2">
+                    <button type="button" class="btn btn-outline-primary btn-sm px-3 shadow-sm"
+                            @onclick="PrintSummaryReport" style="height: 35px !important;">
+                        <i class="fas fa-print me-1"></i>Print Summary
+                    </button>
+                    <button type="button" class="btn btn-outline-info btn-sm px-3 shadow-sm"
+                            @onclick="PrintDetailedReport" style="height: 35px !important;">
+                        <i class="fas fa-file-alt me-1"></i>Print Detail
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm"
+                            @onclick="LoadAbsentSheetAsync" disabled="@IsLoading" style="height: 35px !important;">
+                        <i class="fas fa-sync-alt me-1 @(IsLoading ? "fa-spin" : "")"></i>Refresh
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3 shadow-sm"
+                            @onclick="GoBack" style="height: 35px !important;">
+                        <i class="fas fa-arrow-left me-1"></i>Back
+                    </button>
+                </div>
+            </div>
+
+            @* ── Filters Row (Range Option, From Date, To Date, Department, Search) ── *@
+            <div class="row g-2 align-items-center" style="position: relative !important; z-index: 9999 !important;">
+                <div class="col-md-2">
+                    <label class="form-label form-label-sm fw-bold mb-1 text-secondary">Date Range</label>
+                    <select class="form-select form-select-sm shadow-sm"
+                            value="@Filter.RangeOption"
+                            @onchange="@(async (ChangeEventArgs e) => await OnRangeOptionChangedAsync(int.Parse(e.Value?.ToString() ?? "0")))"
+                            style="height: 35px !important;">
+                        <option value="0">Today</option>
+                        <option value="1">Current Month</option>
+                        <option value="2">Custom Date Range</option>
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label form-label-sm fw-bold mb-1 text-secondary">From Date</label>
+                    <input type="date" class="form-control form-control-sm shadow-sm"
+                           @bind="Filter.FromDate"
+                           disabled="@(Filter.RangeOption != 2)"
+                           style="height: 35px !important;" />
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label form-label-sm fw-bold mb-1 text-secondary">To Date</label>
+                    <input type="date" class="form-control form-control-sm shadow-sm"
+                           @bind="Filter.ToDate"
+                           disabled="@(Filter.RangeOption != 2)"
+                           style="height: 35px !important;" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label form-label-sm fw-bold mb-1 text-secondary">Department</label>
+                    <BlazoredTypeahead SearchMethod="SearchDepartments"
+                                       Value="SelectedDepartment"
+                                       ValueChanged="@((DepartmentListItemModel? d) => OnDepartmentChangedAsync(d))"
+                                       ValueExpression="@(() => SelectedDepartment)"
+                                       TValue="DepartmentListItemModel"
+                                       TItem="DepartmentListItemModel"
+                                       placeholder="All Departments..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="dept">
+                            @dept.Name
+                        </SelectedTemplate>
+                        <ResultTemplate Context="dept">
+                            @dept.Name
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label form-label-sm fw-bold mb-1 text-secondary">Search Employees</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                        <input type="text" class="form-control form-control-sm shadow-sm"
+                               placeholder="Search ID, name, designation..."
+                               @bind="SearchText" @bind:event="oninput" style="height: 35px !important;" />
+                        @if (!string.IsNullOrEmpty(SearchText))
+                        {
+                            <button class="btn btn-outline-secondary" type="button" @onclick="() => SearchText = string.Empty">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Absent Data Grid Card (Z-Index 1) ────────────────────────── *@
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; position: relative !important; z-index: 1 !important;">
+        <div class="card-body py-2 px-3">
+            <div class="table-responsive" style="max-height: 65vh; overflow-y: auto;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th style="width: 100px;">Emp ID</th>
+                            <th>Employee Name</th>
+                            <th>Department</th>
+                            <th>Designation</th>
+                            <th style="width: 130px;">Day</th>
+                            <th style="width: 140px;">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-5 text-muted">
+                                    <span class="spinner-border spinner-border-sm me-2"></span>Loading absent records...
+                                </td>
+                            </tr>
+                        }
+                        else if (!FilteredRows.Any())
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-5 text-muted">
+                                    No absent records found for the selected criteria.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var r in FilteredRows)
+                            {
+                                <tr>
+                                    <td class="fw-bold text-primary">@r.EmpID</td>
+                                    <td class="fw-semibold text-dark">@r.EmpName</td>
+                                    <td>@r.DeptName</td>
+                                    <td class="text-muted small">@r.Designation</td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border">
+                                            @r.DayName
+                                        </span>
+                                    </td>
+                                    <td class="fw-bold text-danger">@r.FormattedDate</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                    @if (Result.Rows.Any())
+                    {
+                        <tfoot class="table-light sticky-bottom fw-bold" style="font-size: 0.88rem; box-shadow: 0 -1px 0 #dee2e6;">
+                            <tr>
+                                <td colspan="5" class="text-end">Total Absents:</td>
+                                <td class="text-start text-danger fs-6">@Result.TotalAbsents</td>
+                            </tr>
+                        </tfoot>
+                    }
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

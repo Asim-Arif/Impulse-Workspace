@@ -70,15 +70,30 @@ namespace Impulse.Constants
             public const string EmpListPercentage      = Folder + "rptEmpListPercentage.rpt";
             public const string AppForm                = Folder + "rptAppForm.rpt";
             public const string EmpSalHistory          = Folder + "rptEmpSalHistory.rpt";
-            public const string EmpLedger              = Folder + "rptEmpLedgerWLTOT.rpt";
+            public const string EmpSalaryLedger        = Folder + "EmpSalaryLedger.rpt";
+            public const string TerminatedEmployees        = Folder + "TerminatedEmployees.rpt";
+            public const string NewHiredEmployees          = Folder + "NewHiredEmployees.rpt";
+            public const string EmployeesTargetsPerformance = Folder + "Employees_Targets_Performance.rpt";
+            public const string AdvanceSalaryReportFilled   = Folder + "AdvanceSalaryReport_Filled.rpt";
+            public const string AdvanceSalarySlip           = Folder + "AdvanceSalary_Slip.rpt";
+            public const string EmpLedger                  = Folder + "rptEmpLedgerWLTOT.rpt";
+
+
             public const string DailyOverTime          = Folder + "DailyOverTime.rpt";
 
             // Biometric Ledger / Daily Attendance Reports
+            public const string MonthlyAttendanceStatus = Folder + "MonthlyAttendanceStatus.rpt";
+            public const string MissingAttendance       = Folder + "MissingAttendance.rpt";
+            public const string LateAttReportDeptwise   = Folder + "LateAttReportDeptwise.rpt";
             public const string DailyAttendance        = Folder + "rptDailyAttendance.rpt";
+
+
             public const string AbsentLeaveSummary     = Folder + "rptAbsentLeaveSummary.rpt";
+            public const string LeavesList             = Folder + "LeavesList.rpt";
             public const string LateComers             = Folder + "LateComers.rpt";
             public const string PresentEmpList         = Folder + "rptPresentEmpList.rpt";
             public const string EmpLeaveBalanceMonthly = Folder + "rptEmpLeaveBalanceMonthly.rpt";
+            public const string Holidays               = Folder + "rptHolidays.rpt";
 
             // Advance Reports
             public const string LongTermAdvanceReceipt = Folder + "LongTermAdvanceReceipt.rpt";
@@ -98,6 +113,19 @@ namespace Impulse.Constants
             public const string SalaryPacket            = Folder + "rptSalaryPacket.rpt";
             public const string PaySlipInternal         = Folder + "rptPayslipInternal.rpt";
             public const string OverTimePaymentSheet    = Folder + "rptOverTimePaymentSheet.rpt";
+
+            // Social Security Reports
+            public const string SocialSecuritySheet     = Folder + "rptSocialSecurity.rpt";
+            public const string SocialSecurityForm      = Folder + "rptSSForm.rpt";
+            public const string NonSocialSecurity       = Folder + "rptNonSocialSecurity.rpt";
+
+            // EOBI Reports
+            public const string EOBISheet               = Folder + "rptEOBI.rpt";
+            public const string NonEOBI                = Folder + "rptNonEOBI.rpt";
+
+            // Designation Reports
+            public const string DesignationsList        = Folder + "Designations.rpt";
+            public const string DesignationDetail      = Folder + "Designation.rpt";
         }
 
 

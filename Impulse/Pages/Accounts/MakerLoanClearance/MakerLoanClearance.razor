@@ -1,0 +1,183 @@
+@page "/accounts/maker-loan-clearance"
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using Impulse.Services.Accounts
+@attribute [Authorize]
+
+<PageTitle>Maker Loan Clearance</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm mb-4"
+         style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 800px; margin: 0 auto;">
+        <div class="card-body p-4">
+
+            @* ── Header ──────────────────────────────────────────── *@
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center fw-bold" style="font-size: 1.25rem;">
+                    <i class="fas fa-check-double me-2"></i>
+                    Maker Loan Clearance
+                </h4>
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-sm btn-success px-3 shadow-sm"
+                            @onclick="SaveAndNewAsync" disabled="@(IsLoading || IsSaving)">
+                        <i class="fas fa-plus me-1"></i> Save &amp; New
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary px-3 shadow-sm"
+                            @onclick="SaveAndCloseAsync" disabled="@(IsLoading || IsSaving)">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span><span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save me-1"></i><span>Save &amp; Close</span>
+                        }
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-3"
+                            @onclick="NavigateBack">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                </div>
+            </div>
+
+            @* ── SECTION 1: Maker & Clearance Date ─────────────── *@
+            <div class="row g-3 align-items-end mb-3" style="position: relative !important; z-index: 10002 !important;">
+                <div class="col-md-8">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Maker Account <span class="text-danger">*</span>
+                    </label>
+                    <BlazoredTypeahead SearchMethod="SearchMakersAsync"
+                                       @bind-Value="SelectedMaker"
+                                       Placeholder="Search maker account..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="m">
+                            @(!string.IsNullOrWhiteSpace(m.MakerNo) ? $"[{m.MakerNo}] " : $"[{m.AccNo}] ")@m.MakerName
+                        </SelectedTemplate>
+                        <ResultTemplate Context="m">
+                            <strong>@(!string.IsNullOrWhiteSpace(m.MakerNo) ? $"[{m.MakerNo}]" : $"[{m.AccNo}]")</strong> <span class="ms-1">@m.MakerName</span>
+                        </ResultTemplate>
+                        <NotFoundTemplate>No maker found.</NotFoundTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Clearance Date <span class="text-danger">*</span>
+                    </label>
+                    <input type="date" class="form-control form-control-sm fw-bold" @bind="ClearanceDate" style="height:35px;" />
+                </div>
+            </div>
+
+            @* ── SECTION 2: Current Balances Metrics Cards ───────── *@
+            <div class="row g-2 mb-3">
+                <div class="col-md-4">
+                    <div class="p-2 rounded bg-light border text-center shadow-sm">
+                        <small class="text-uppercase text-muted d-block fw-bold" style="font-size: 0.68rem;">Long Term Balance</small>
+                        <span class="fw-bold fs-6 font-monospace @(Balances.LTBalance > 0 ? "text-danger" : "text-success")">
+                            PKR @Balances.LTBalance.ToString("N2")
+                        </span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="p-2 rounded bg-light border text-center shadow-sm">
+                        <small class="text-uppercase text-muted d-block fw-bold" style="font-size: 0.68rem;">L.T Deduction / Month</small>
+                        <span class="fw-bold fs-6 font-monospace text-primary">
+                            PKR @Balances.LTDeductionAmount.ToString("N2")
+                        </span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="p-2 rounded bg-light border text-center shadow-sm">
+                        <small class="text-uppercase text-muted d-block fw-bold" style="font-size: 0.68rem;">Short Term Balance</small>
+                        <span class="fw-bold fs-6 font-monospace @(Balances.STBalance > 0 ? "text-danger" : "text-success")">
+                            PKR @Balances.STBalance.ToString("N2")
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            @* ── SECTION 3: Clearance Amounts & Ded Rate Update ─── *@
+            <div class="card border-0 bg-light rounded-3 p-3 mb-3">
+                <h6 class="fw-bold mb-3 text-dark d-flex align-items-center">
+                    <i class="fas fa-hand-holding-usd text-primary me-2"></i>
+                    Clearance Amounts &amp; Repayment Rate
+                </h6>
+
+                <div class="row g-3">
+                    @* Long Term Loan Clearance *@
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                            L.T Amount to Clear
+                        </label>
+                        <input type="number" class="form-control form-control-sm font-monospace fw-bold" step="0.01" min="0" max="@Balances.LTBalance"
+                               @bind="LTToClear" style="height:35px; background:#fffde7;" placeholder="0.00" />
+                        @if (LTToClear > Balances.LTBalance)
+                        {
+                            <small class="text-danger d-block mt-1" style="font-size:0.75rem;">Cannot exceed LT Balance (PKR @Balances.LTBalance.ToString("N2"))</small>
+                        }
+                    </div>
+
+                    @* Short Term Loan Clearance *@
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                            S.T Amount to Clear
+                        </label>
+                        <input type="number" class="form-control form-control-sm font-monospace fw-bold" step="0.01" min="0" max="@Balances.STBalance"
+                               @bind="STToClear" style="height:35px; background:#fffde7;" placeholder="0.00" />
+                        @if (STToClear > Balances.STBalance)
+                        {
+                            <small class="text-danger d-block mt-1" style="font-size:0.75rem;">Cannot exceed ST Balance (PKR @Balances.STBalance.ToString("N2"))</small>
+                        }
+                    </div>
+
+                    @* Update Monthly Deduction Amount *@
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                            New Deduction Amount (Monthly Rate)
+                        </label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" class="form-control form-control-sm font-monospace fw-bold" step="0.01" min="0"
+                                   @bind="NewLTDeductionAmount" style="height:35px;" placeholder="0.00" />
+                            <button type="button" class="btn btn-primary px-3 shadow-sm" @onclick="UpdateDeductionAmountAsync" disabled="@(IsUpdatingDed || SelectedMaker == null)">
+                                @if (IsUpdatingDed)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span><span>Updating...</span>
+                                }
+                                else
+                                {
+                                    <i class="fas fa-edit me-1"></i><span>Update Ded. Amount</span>
+                                }
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            @* ── SECTION 4: Remarks / Notes ──────────────────────── *@
+            <div class="mb-3">
+                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Remarks / Notes</label>
+                <textarea class="form-control form-control-sm" rows="3"
+                          @bind="Remarks"
+                          placeholder="Enter clearance details or reference note..."></textarea>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        min-height: 35px !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead .blazored-typeahead__controls {
+        height: 35px !important;
+        min-height: 35px !important;
+    }
+    .blazored-typeahead .blazored-typeahead__input {
+        height: 33px !important;
+        font-size: 0.88rem;
+    }
+</style>

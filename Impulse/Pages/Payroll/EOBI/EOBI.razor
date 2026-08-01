@@ -1,0 +1,281 @@
+@page "/payroll/eobi"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Blazored.Typeahead
+@using BlazorContextMenu
+
+<style>
+    /* BlazoredTypeahead sizing fixes */
+    .blazored-typeahead          { height: 35px !important; min-height: 35px !important; padding: 0 !important; box-sizing: border-box !important; }
+    .blazored-typeahead__controls{ min-height: 35px !important; height: 35px !important; }
+    .blazored-typeahead__input   { height: 33px !important; }
+
+    /* Win11 Context Menu styling */
+    .blazor-context-menu { max-height: 40vh !important; overflow-y: auto; z-index: 100000 !important; }
+    .win11-section-header { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: #6c757d; padding: 6px 12px 2px 12px; }
+    .win11-menu-item { font-size: 0.84rem; padding: 6px 12px; cursor: pointer; color: #212529; }
+    .win11-menu-item:hover { background-color: #f1f3f5; color: #0d6efd; }
+    .win11-icon { margin-right: 8px; width: 16px; text-align: center; }
+    .win11-divider { height: 1px; background-color: #e9ecef; margin: 4px 0; }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    @* ── Page Header & Toolbar Card (Z-Index 9999 for dropdown overlay) ────── *@
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; position: relative !important; z-index: 9999 !important;">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <div>
+                    <div class="d-flex align-items-center">
+                        <h5 class="mb-0 fw-bold text-dark">
+                            <i class="fas fa-building-user me-2 text-info"></i>EOBI Sheet
+                        </h5>
+                        @if (Sheet.IsSaved)
+                        {
+                            <span class="badge bg-success ms-3" style="font-size: 0.75rem;">
+                                <i class="fas fa-check-circle me-1"></i>SAVED RECORD
+                            </span>
+                        }
+                        else if (Sheet.Rows.Any())
+                        {
+                            <span class="badge bg-warning text-dark ms-3" style="font-size: 0.75rem;">
+                                <i class="fas fa-edit me-1"></i>LIVE CALCULATION (UNSAVED)
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary ms-3" style="font-size: 0.75rem;">
+                                <i class="fas fa-exclamation-circle me-1"></i>NOT CALCULATED
+                            </span>
+                        }
+                    </div>
+                    <small class="text-secondary">Manage and record monthly employee EOBI (Employees' Old-Age Benefits Institution) deductions</small>
+                </div>
+                <div class="ms-auto d-flex gap-2">
+                    @if (!Sheet.IsSaved)
+                    {
+                        <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm fw-bold"
+                                @onclick="GenerateSheetAsync" disabled="@(IsGenerating || IsLoading)" style="height: 35px !important;">
+                            @if (IsGenerating)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span><span>Calculating...</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-calculator me-1"></i><span>Calculate / Generate Sheet</span>
+                            }
+                        </button>
+
+                        @if (Sheet.Rows.Any())
+                        {
+                            <button type="button" class="btn btn-success btn-sm px-3 shadow-sm fw-bold"
+                                    @onclick="SaveSheetAsync" disabled="@(IsSaving || IsLoading)" style="height: 35px !important;">
+                                @if (IsSaving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span><span>Saving...</span>
+                                }
+                                else
+                                {
+                                    <i class="fas fa-save me-1"></i><span>Save Sheet</span>
+                                }
+                            </button>
+                        }
+                    }
+
+                    <button type="button" class="btn btn-outline-primary btn-sm px-3 shadow-sm"
+                            @onclick="LoadSheetAsync" disabled="@IsLoading" style="height: 35px !important;">
+                        <i class="fas fa-sync-alt me-1 @(IsLoading ? "fa-spin" : "")"></i>Refresh
+                    </button>
+
+                    <button type="button" class="btn btn-outline-info btn-sm px-3 shadow-sm"
+                            @onclick="ShowPrintMenu" style="height: 35px !important;">
+                        <i class="fas fa-print me-1"></i>Print Options <i class="fas fa-chevron-down ms-1 small"></i>
+                    </button>
+
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3 shadow-sm"
+                            @onclick="GoBack" style="height: 35px !important;">
+                        <i class="fas fa-arrow-left me-1"></i>Back
+                    </button>
+                </div>
+            </div>
+
+            @* ── Filters Row (Month, Year, Department, Search) ─────────────────── *@
+            <div class="row g-2 align-items-center" style="position: relative !important; z-index: 9999 !important;">
+                <div class="col-md-2">
+                    <label class="form-label form-label-sm fw-bold mb-1 text-secondary">Month</label>
+                    <select class="form-select form-select-sm shadow-sm"
+                            @bind="Filter.Month" @bind:after="OnMonthYearChangedAsync" style="height: 35px !important;">
+                        <option value="1">January</option>
+                        <option value="2">February</option>
+                        <option value="3">March</option>
+                        <option value="4">April</option>
+                        <option value="5">May</option>
+                        <option value="6">June</option>
+                        <option value="7">July</option>
+                        <option value="8">August</option>
+                        <option value="9">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label form-label-sm fw-bold mb-1 text-secondary">Year</label>
+                    <select class="form-select form-select-sm shadow-sm"
+                            @bind="Filter.Year" @bind:after="OnMonthYearChangedAsync" style="height: 35px !important;">
+                        @for (int y = 2002; y <= DateTime.Today.Year + 1; y++)
+                        {
+                            <option value="@y">@y</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label form-label-sm fw-bold mb-1 text-secondary">Department</label>
+                    <BlazoredTypeahead SearchMethod="SearchDepartments"
+                                       Value="SelectedDepartment"
+                                       ValueChanged="@((DepartmentListItemModel? d) => OnDepartmentChangedAsync(d))"
+                                       ValueExpression="@(() => SelectedDepartment)"
+                                       TValue="DepartmentListItemModel"
+                                       TItem="DepartmentListItemModel"
+                                       placeholder="All Departments..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="dept">
+                            @dept.Name
+                        </SelectedTemplate>
+                        <ResultTemplate Context="dept">
+                            @dept.Name
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label form-label-sm fw-bold mb-1 text-secondary">Search Employees</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                        <input type="text" class="form-control form-control-sm shadow-sm"
+                               placeholder="Search ID, name, EOBI no..."
+                               @bind="SearchText" @bind:event="oninput" style="height: 35px !important;" />
+                        @if (!string.IsNullOrEmpty(SearchText))
+                        {
+                            <button class="btn btn-outline-secondary" type="button" @onclick="() => SearchText = string.Empty">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ── EOBI Data Grid Card (Z-Index 1) ─────────────────── *@
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; position: relative !important; z-index: 1 !important;">
+        <div class="card-body py-2 px-3">
+            @if (!Sheet.IsSaved && !Sheet.Rows.Any() && !IsLoading && !IsGenerating)
+            {
+                <div class="alert alert-info border-0 shadow-sm my-3 p-4 text-center rounded-3">
+                    <i class="fas fa-info-circle fa-2x text-info mb-2"></i>
+                    <h6 class="fw-bold mb-1">EOBI Sheet Not Calculated</h6>
+                    <p class="text-secondary small mb-3">EOBI sheet for the selected month has not been calculated or saved yet.</p>
+                    <button type="button" class="btn btn-primary btn-sm px-4 fw-bold shadow-sm" @onclick="GenerateSheetAsync">
+                        <i class="fas fa-calculator me-1"></i>Calculate / Generate Sheet Now
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive" style="max-height: 65vh; overflow-y: auto;">
+                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                        <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                            <tr>
+                                <th style="width: 40px;" class="text-center">
+                                    <input type="checkbox" class="form-check-input"
+                                           checked="@(FilteredRows.Any() && FilteredRows.All(r => r.IsSelected))"
+                                           @onchange="@((ChangeEventArgs e) => ToggleAllRows((bool)(e.Value ?? false)))" />
+                                </th>
+                                <th style="width: 90px;">Emp ID</th>
+                                <th>Employee Name</th>
+                                <th>Father Name</th>
+                                <th>EOBI No</th>
+                                <th>Designation</th>
+                                <th class="text-center">Status</th>
+                                <th class="text-end">Salary</th>
+                                <th class="text-center">Days Worked</th>
+                                <th class="text-end">Net Salary</th>
+                                <th class="text-end">EOBI Amt</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (IsLoading || IsGenerating)
+                            {
+                                <tr>
+                                    <td colspan="11" class="text-center py-5 text-muted">
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                        @(IsGenerating ? "Computing EOBI figures..." : "Loading EOBI Sheet...")
+                                    </td>
+                                </tr>
+                            }
+                            else if (!FilteredRows.Any())
+                            {
+                                <tr>
+                                    <td colspan="11" class="text-center py-5 text-muted">
+                                        No EOBI employee records found.
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var r in FilteredRows)
+                                {
+                                    <tr class="@(r.IsSelected ? "" : "opacity-50")">
+                                        <td class="text-center">
+                                            <input type="checkbox" class="form-check-input" @bind="r.IsSelected" />
+                                        </td>
+                                        <td class="fw-bold text-primary">@r.EmpID</td>
+                                        <td class="fw-semibold">@r.EmpName</td>
+                                        <td class="text-secondary small">@r.FName</td>
+                                        <td class="fw-semibold text-dark">@r.EOBINo</td>
+                                        <td class="text-muted small">@r.Designation</td>
+                                        <td class="text-center">
+                                            <span class="badge @(string.Equals(r.EmpStatus, "Permanent", StringComparison.OrdinalIgnoreCase) ? "bg-primary" : "bg-info")">
+                                                @r.EmpStatus
+                                            </span>
+                                        </td>
+                                        <td class="text-end fw-semibold">@r.Salary.ToString("N0")</td>
+                                        <td class="text-center">@r.DaysWorked</td>
+                                        <td class="text-end fw-bold text-dark">@r.NetSalary.ToString("N2")</td>
+                                        <td class="text-end fw-bold text-info">@r.EOBIAmt.ToString("N2")</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                        @if (Sheet.Rows.Any())
+                        {
+                            <tfoot class="table-light sticky-bottom fw-bold" style="font-size: 0.88rem; box-shadow: 0 -1px 0 #dee2e6;">
+                                <tr>
+                                    <td colspan="7" class="text-end">Total (@Sheet.Rows.Count(r => r.IsSelected) Employees):</td>
+                                    <td class="text-end text-dark">@Sheet.TotalSalary.ToString("N0")</td>
+                                    <td></td>
+                                    <td class="text-end text-dark fs-6">@Sheet.TotalNetSalary.ToString("N2")</td>
+                                    <td class="text-end text-info fs-6">@Sheet.TotalEOBIAmt.ToString("N2")</td>
+                                </tr>
+                            </tfoot>
+                        }
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- ── BlazorContextMenu: Print Options Menu ── -->
+<ContextMenu Id="eobiPrintMenu" Template="Win11Style">
+    <div class="win11-section-header">EOBI Reports</div>
+    <Item class="win11-menu-item" OnClick="PrintEOBISheet">
+        <i class="fas fa-file-alt fa-fw win11-icon text-primary"></i> Print EOBI Sheet
+    </Item>
+    <div class="win11-divider"></div>
+    <Item class="win11-menu-item" OnClick="PrintNonEOBI">
+        <i class="fas fa-user-slash fa-fw win11-icon text-warning"></i> Print Non-EOBI Employees
+    </Item>
+</ContextMenu>

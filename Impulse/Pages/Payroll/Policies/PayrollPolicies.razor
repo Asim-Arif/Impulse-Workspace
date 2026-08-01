@@ -1,0 +1,279 @@
+@page "/payroll/policies"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    @* ── Header Card ─────────────────── *@
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; position: relative !important; z-index: 9999 !important;">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <div>
+                    <h5 class="mb-0 fw-bold text-dark">
+                        <i class="fas fa-file-contract me-2 text-primary"></i>Payroll Policies &amp; Attendance Categories
+                    </h5>
+                    <small class="text-secondary">Define attendance category policies, overtime rates, late deduction rules, and holiday penalties</small>
+                </div>
+                <div class="ms-auto d-flex gap-2">
+                    @* Hidden per user request - re-enable @if(true) if needed *@
+                    @if (false)
+                    {
+                        <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm fw-bold"
+                                @onclick="OpenAddModal" style="height: 35px !important;">
+                            <i class="fas fa-plus-circle me-1"></i>Add New Category
+                        </button>
+                    }
+
+                    <button type="button" class="btn btn-outline-primary btn-sm px-3 shadow-sm"
+                            @onclick="LoadCategoriesAsync" disabled="@IsLoading" style="height: 35px !important;">
+                        <i class="fas fa-sync-alt me-1 @(IsLoading ? "fa-spin" : "")"></i>Refresh
+                    </button>
+
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3 shadow-sm"
+                            @onclick="GoBack" style="height: 35px !important;">
+                        <i class="fas fa-arrow-left me-1"></i>Back
+                    </button>
+                </div>
+            </div>
+
+            @* ── Category Selector Row ─────────────────── *@
+            <div class="row align-items-center">
+                <label class="col-md-2 col-form-label form-label-sm fw-bold text-dark">Select Category # :</label>
+                <div class="col-md-6">
+                    <select class="form-select form-select-sm shadow-sm fw-semibold text-primary"
+                            value="@Model.EntryID"
+                            @onchange="OnCategoryChanged" style="height: 35px !important;">
+                        @foreach (var cat in Categories)
+                        {
+                            <option value="@cat.EntryID">Category #@cat.EntryID - @(string.IsNullOrWhiteSpace(cat.Remarks) ? "Default Category" : cat.Remarks)</option>
+                        }
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Policy Settings Form Card (Z-Index 1) ─────────────────── *@
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; position: relative !important; z-index: 1 !important;">
+        <div class="card-header bg-light py-2 px-3 border-bottom fw-bold text-secondary" style="font-size: 0.85rem; border-top-left-radius: 12px; border-top-right-radius: 12px;">
+            <i class="fas fa-sliders-h me-2 text-info"></i>Policy Rules &amp; Overtime Settings (Category #@Model.EntryID)
+        </div>
+        <div class="card-body py-3 px-3">
+            @if (IsLoading)
+            {
+                <div class="text-center py-5 text-muted">
+                    <span class="spinner-border spinner-border-sm me-2"></span>Loading Category Policies...
+                </div>
+            }
+            else
+            {
+                @* ── Section 1: Title / Remarks ─────────────────── *@
+                <div class="mb-4">
+                    <label class="form-label form-label-sm fw-bold text-secondary mb-1">Category Title / Description</label>
+                    <input type="text" class="form-control form-control-sm shadow-sm"
+                           placeholder="e.g. Standard Shift Policy, Executive Category"
+                           @bind="Model.Remarks" style="height: 35px !important;" />
+                </div>
+
+                @* ── Section 2: Numerical Parameters ─────────────────── *@
+                <h6 class="fw-bold text-primary mb-3 pb-1 border-bottom" style="font-size: 0.9rem;">
+                    <i class="fas fa-calculator me-2"></i>Rates &amp; Deduction Limits
+                </h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <label class="form-label form-label-sm fw-bold text-secondary mb-1">Overtime Rate (Multiplier)</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-white"><i class="fas fa-percentage text-muted"></i></span>
+                            <input type="number" step="0.1" class="form-control form-control-sm shadow-sm fw-bold text-primary"
+                                   @bind="Model.OTRate" style="height: 35px !important;" />
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label form-label-sm fw-bold text-secondary mb-1">Deduction Percentage (%)</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-white"><i class="fas fa-minus-circle text-muted"></i></span>
+                            <input type="number" class="form-control form-control-sm shadow-sm fw-bold text-dark"
+                                   @bind="Model.DeductionPercentage" style="height: 35px !important;" />
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label form-label-sm fw-bold text-secondary mb-1">Deduct Late After (Mins)</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-white"><i class="fas fa-hourglass-start text-muted"></i></span>
+                            <input type="text" class="form-control form-control-sm shadow-sm text-center fw-bold"
+                                   @bind="Model.LateDeductionAfter" placeholder="10" style="height: 35px !important;" />
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label form-label-sm fw-bold text-secondary mb-1">Saturday Early Out (Mins)</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-white"><i class="fas fa-clock text-muted"></i></span>
+                            <input type="number" class="form-control form-control-sm shadow-sm text-center fw-bold"
+                                   @bind="Model.Saturday_Early_Out_Mins" placeholder="0" style="height: 35px !important;" />
+                        </div>
+                    </div>
+                </div>
+
+                @* ── Section 3: Policy Toggles (Switches) ─────────────────── *@
+                <h6 class="fw-bold text-primary mb-3 pb-1 border-bottom" style="font-size: 0.9rem;">
+                    <i class="fas fa-toggle-on me-2"></i>Attendance Policy Rules
+                </h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <div class="card border shadow-none p-2 bg-light rounded-3">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" role="switch" id="swLunch"
+                                       checked="@(Model.LunchTimeScanning ?? false)"
+                                       @onchange="@((ChangeEventArgs e) => Model.LunchTimeScanning = (bool)(e.Value ?? false))" />
+                                <label class="form-check-label fw-bold text-dark ms-2" for="swLunch">
+                                    Lunch Scanning Required
+                                </label>
+                            </div>
+                            <small class="text-muted ms-4" style="font-size: 0.75rem;">Mandatory biometric scan during lunch break</small>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card border shadow-none p-2 bg-light rounded-3">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" role="switch" id="swLate"
+                                       checked="@(Model.LateDeduction ?? false)"
+                                       @onchange="@((ChangeEventArgs e) => Model.LateDeduction = (bool)(e.Value ?? false))" />
+                                <label class="form-check-label fw-bold text-dark ms-2" for="swLate">
+                                    Time Deduction Enabled
+                                </label>
+                            </div>
+                            <small class="text-muted ms-4" style="font-size: 0.75rem;">Deduct salary for late arrivals exceeding threshold</small>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card border shadow-none p-2 bg-light rounded-3">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" role="switch" id="swGate"
+                                       checked="@(Model.GatePassRequired ?? false)"
+                                       @onchange="@((ChangeEventArgs e) => Model.GatePassRequired = (bool)(e.Value ?? false))" />
+                                <label class="form-check-label fw-bold text-dark ms-2" for="swGate">
+                                    Gate Pass Required
+                                </label>
+                            </div>
+                            <small class="text-muted ms-4" style="font-size: 0.75rem;">Require official gate pass for early departures</small>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card border shadow-none p-2 bg-light rounded-3">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" role="switch" id="swLeaves"
+                                       checked="@(Model.LeavesRecorded ?? false)"
+                                       @onchange="@((ChangeEventArgs e) => Model.LeavesRecorded = (bool)(e.Value ?? false))" />
+                                <label class="form-check-label fw-bold text-dark ms-2" for="swLeaves">
+                                    Leaves Recorded
+                                </label>
+                            </div>
+                            <small class="text-muted ms-4" style="font-size: 0.75rem;">Record and deduct formal leave quota</small>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card border shadow-none p-2 bg-light rounded-3">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" role="switch" id="swOT"
+                                       checked="@(Model.OverTimePaid ?? false)"
+                                       @onchange="@((ChangeEventArgs e) => Model.OverTimePaid = (bool)(e.Value ?? false))" />
+                                <label class="form-check-label fw-bold text-dark ms-2" for="swOT">
+                                    Overtime Paid
+                                </label>
+                            </div>
+                            <small class="text-muted ms-4" style="font-size: 0.75rem;">Calculate and pay extra overtime hours</small>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card border shadow-none p-2 bg-light rounded-3">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" role="switch" id="swSandwich"
+                                       checked="@(Model.DeductionSpecialAbsents ?? false)"
+                                       @onchange="@((ChangeEventArgs e) => Model.DeductionSpecialAbsents = (bool)(e.Value ?? false))" />
+                                <label class="form-check-label fw-bold text-dark ms-2" for="swSandwich">
+                                    Sandwich Leaves Deduction
+                                </label>
+                            </div>
+                            <small class="text-muted ms-4" style="font-size: 0.75rem;">Deduct Sunday/Holiday if absent on both Friday &amp; Monday</small>
+                        </div>
+                    </div>
+                </div>
+
+                @* ── Action Buttons Row ─────────────────── *@
+                <div class="d-flex align-items-center justify-content-end pt-2 border-top">
+                    @* Hidden per user request - re-enable @if(true) if needed *@
+                    @if (false)
+                    {
+                        <button type="button" class="btn btn-outline-danger btn-sm px-3 shadow-sm me-auto"
+                                @onclick="DeleteCategoryAsync" disabled="@(IsDeleting || Categories.Count <= 1)">
+                            <i class="fas fa-trash me-1"></i>Delete Category
+                        </button>
+                    }
+
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-success btn-sm px-4 shadow-sm fw-bold"
+                                @onclick="() => SaveCategoryAsync(false)" disabled="@IsSaving">
+                            @if (IsSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span><span>Saving...</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-check me-1"></i><span>Save Policy Changes</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@* ── Add New Category Modal Dialog ─────────────────── *@
+@if (ShowAddModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); z-index: 100050;">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 14px;">
+                <div class="modal-header bg-light border-bottom py-2 px-3">
+                    <h6 class="modal-title fw-bold text-dark mb-0">
+                        <i class="fas fa-plus-circle text-primary me-2"></i>Add New Attendance Category Policy
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="CloseAddModal"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div class="mb-3">
+                        <label class="form-label form-label-sm fw-bold text-secondary">Category Title / Description <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control form-control-sm shadow-sm"
+                               placeholder="e.g. Contract Employees, Security Staff"
+                               @bind="NewCategoryModel.Remarks" />
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label form-label-sm fw-bold text-secondary">Overtime Rate Multiplier</label>
+                            <input type="number" step="0.1" class="form-control form-control-sm shadow-sm"
+                                   @bind="NewCategoryModel.OTRate" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label form-label-sm fw-bold text-secondary">Deduction Percentage (%)</label>
+                            <input type="number" class="form-control form-control-sm shadow-sm"
+                                   @bind="NewCategoryModel.DeductionPercentage" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top py-2 px-3">
+                    <button type="button" class="btn btn-secondary btn-sm px-3 shadow-sm" @onclick="CloseAddModal">
+                        <i class="fas fa-times me-1"></i>Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm px-4 fw-bold shadow-sm" @onclick="() => SaveCategoryAsync(true)">
+                        <i class="fas fa-check me-1"></i><span>Create Category</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

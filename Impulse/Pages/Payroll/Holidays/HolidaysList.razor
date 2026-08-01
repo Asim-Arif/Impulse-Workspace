@@ -1,0 +1,200 @@
+@page "/payroll/holidays"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using BlazorContextMenu
+
+<style>
+    /* Win11 Context Menu styling */
+    .blazor-context-menu { max-height: 40vh !important; overflow-y: auto; z-index: 100000 !important; }
+    .win11-section-header { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: #6c757d; padding: 6px 12px 2px 12px; }
+    .win11-menu-item { font-size: 0.84rem; padding: 6px 12px; cursor: pointer; color: #212529; }
+    .win11-menu-item:hover { background-color: #f1f3f5; color: #0d6efd; }
+    .win11-icon { margin-right: 8px; width: 16px; text-align: center; }
+    .win11-divider { height: 1px; background-color: #e9ecef; margin: 4px 0; }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    @* ── Top Header & Title ─────────────────── *@
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; position: relative !important; z-index: 9999 !important;">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex align-items-center justify-content-between pb-2 border-bottom">
+                <div>
+                    <h5 class="mb-0 fw-bold text-dark">
+                        <i class="fas fa-calendar-alt me-2 text-primary"></i>Company Holidays Setup
+                    </h5>
+                    <small class="text-secondary">Manage official company annual holidays, schedule days off, and print holiday rosters</small>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-outline-primary btn-sm px-3 shadow-sm dropdown-toggle" @onclick="ShowOptionsMenu">
+                        <i class="fas fa-print me-1"></i>Print Options
+                    </button>
+
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3 shadow-sm" @onclick="GoBack">
+                        <i class="fas fa-arrow-left me-1"></i>Back
+                    </button>
+                </div>
+            </div>
+
+            @* ── Year Selection Bar ─────────────────── *@
+            <div class="row align-items-center pt-2">
+                <label class="col-md-2 col-form-label form-label-sm fw-bold text-dark text-end">Calendar Year :</label>
+                <div class="col-md-4">
+                    <select class="form-select form-select-sm shadow-sm fw-semibold text-primary"
+                            value="@SelectedYear"
+                            @onchange="OnYearChanged" style="height: 35px !important;">
+                        @foreach (var y in Years)
+                        {
+                            <option value="@y">Year @y</option>
+                        }
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Win11 Style Context Menu for Top Print Options ─────────────────── *@
+    <ContextMenu Id="optionsBarMenu" Template="Win11Style">
+        <div class="win11-section-header">
+            <i class="fas fa-file-pdf win11-icon me-1 text-danger"></i> Holiday Reports (@SelectedYear)
+        </div>
+        <Item OnClick="PrintHolidaysReport">
+            <i class="fas fa-print win11-icon me-2 text-primary"></i> Print Holidays Roster
+        </Item>
+    </ContextMenu>
+
+    @* ── Quick Add Holiday Section Card ─────────────────── *@
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; position: relative !important; z-index: 1 !important;">
+        <div class="card-header bg-light py-2 px-3 border-bottom fw-bold text-secondary" style="font-size: 0.85rem; border-top-left-radius: 12px; border-top-right-radius: 12px;">
+            <i class="fas fa-plus-circle me-2 text-success"></i>Add New Holiday for Year @SelectedYear
+        </div>
+        <div class="card-body py-3 px-3">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label form-label-sm fw-bold text-secondary mb-1">Holiday Date :</label>
+                    <input type="date" class="form-control form-control-sm shadow-sm font-monospace text-center fw-bold"
+                           value="@NewDate.ToString("yyyy-MM-dd")"
+                           @onchange="@((ChangeEventArgs e) => { if(DateTime.TryParse(Convert.ToString(e.Value), out var d)) NewDate = d; })"
+                           min="@(new DateTime(SelectedYear, 1, 1).ToString("yyyy-MM-dd"))"
+                           max="@(new DateTime(SelectedYear, 12, 31).ToString("yyyy-MM-dd"))"
+                           style="height: 35px !important;" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label form-label-sm fw-bold text-secondary mb-1">Holiday Description / Event Name :</label>
+                    <input type="text" class="form-control form-control-sm shadow-sm"
+                           placeholder="e.g. Independence Day, Labour Day, Eid-ul-Fitr"
+                           @bind="NewDescription" style="height: 35px !important;" />
+                </div>
+                <div class="col-md-3">
+                    <button type="button" class="btn btn-primary btn-sm w-100 shadow-sm fw-bold"
+                            @onclick="AddHolidayAsync" disabled="@IsAdding" style="height: 35px !important;">
+                        @if (IsAdding)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span><span>Adding...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-plus me-1"></i><span>Add Holiday</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Holidays Table Data Grid ─────────────────── *@
+    <div class="card border-0 shadow-sm mb-4" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; position: relative !important; z-index: 1 !important;">
+        <div class="card-header bg-light py-2 px-3 border-bottom d-flex align-items-center justify-content-between" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+            <span class="fw-bold text-secondary" style="font-size: 0.85rem;">
+                <i class="fas fa-list me-2 text-primary"></i>Holidays List (@Holidays.Count total)
+            </span>
+        </div>
+        <div class="card-body p-0">
+            @if (IsLoading)
+            {
+                <div class="text-center py-5 text-muted">
+                    <span class="spinner-border spinner-border-sm me-2"></span>Loading Holidays...
+                </div>
+            }
+            else if (!Holidays.Any())
+            {
+                <div class="text-center py-5 text-muted">
+                    <i class="fas fa-calendar-times fs-2 mb-2 text-secondary opacity-50 d-block"></i>
+                    No holidays recorded for calendar year <strong>@SelectedYear</strong>.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                        <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                            <tr>
+                                <th class="ps-3" style="width: 20%;">Day</th>
+                                <th style="width: 25%;">Date</th>
+                                <th style="width: 40%;">Description / Reason</th>
+                                <th class="text-end pe-3" style="width: 15%;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Holidays)
+                            {
+                                <tr>
+                                    <td class="ps-3 fw-bold text-primary">
+                                        <i class="fas fa-calendar-day me-2 text-info opacity-75"></i>@item.DayName
+                                    </td>
+                                    <td class="font-monospace text-dark fw-semibold">@item.DateFormatted</td>
+                                    <td class="text-dark">@item.Description</td>
+                                    <td class="text-end pe-3">
+                                        <button type="button" class="btn btn-outline-primary btn-sm me-1 px-2 py-0"
+                                                title="Edit Description" @onclick="() => OpenEditModal(item)">
+                                            <i class="fas fa-pencil-alt"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-danger btn-sm px-2 py-0"
+                                                title="Delete Holiday" @onclick="() => DeleteHolidayAsync(item)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@* ── Edit Holiday Description Modal Dialog ─────────────────── *@
+@if (ShowEditModal && EditingHoliday != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); z-index: 100050;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 14px;">
+                <div class="modal-header bg-light border-bottom py-2 px-3">
+                    <h6 class="modal-title fw-bold text-dark mb-0">
+                        <i class="fas fa-pencil-alt text-primary me-2"></i>Edit Holiday Description (@EditingHoliday.DateFormatted)
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="CloseEditModal"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div class="mb-3">
+                        <label class="form-label form-label-sm fw-bold text-secondary">Date :</label>
+                        <input type="text" class="form-control form-control-sm bg-light font-monospace fw-bold"
+                               value="@EditingHoliday.DateFormatted (@EditingHoliday.DayName)" readonly />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label form-label-sm fw-bold text-secondary">Description / Reason <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control form-control-sm shadow-sm"
+                               @bind="EditDescription" />
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top py-2 px-3">
+                    <button type="button" class="btn btn-secondary btn-sm px-3 shadow-sm" @onclick="CloseEditModal">
+                        <i class="fas fa-times me-1"></i>Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm px-4 fw-bold shadow-sm" @onclick="SaveEditAsync">
+                        <i class="fas fa-check me-1"></i><span>Save Changes</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

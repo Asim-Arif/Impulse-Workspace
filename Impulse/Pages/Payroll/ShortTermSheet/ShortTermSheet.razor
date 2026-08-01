@@ -1,0 +1,362 @@
+@page "/payroll/short-term-sheet"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Blazored.Typeahead
+@using BlazorContextMenu
+@attribute [Authorize]
+
+<PageTitle>Short Term Sheet</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <!-- Main Card Shell -->
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-3">
+            
+            <!-- Page Header -->
+            <div class="d-flex align-items-center justify-content-between pb-3 mb-3 border-bottom flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="bg-primary text-white rounded-3 d-flex align-items-center justify-content-center shadow-sm" style="width: 42px; height: 42px; font-size: 1.25rem;">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                    </div>
+                    <div>
+                        <div class="d-flex align-items-center gap-2">
+                            <h4 class="fw-bold mb-0 text-dark" style="font-size: 1.25rem;">Short Term Sheet</h4>
+                            @if (PostingStatus.IsPosted)
+                            {
+                                <span class="badge bg-success shadow-sm" style="font-size:0.75rem;">
+                                    <i class="fas fa-check-circle me-1"></i> Posted @(!string.IsNullOrEmpty(PostingStatus.CashVchrNo) ? $"({PostingStatus.CashVchrNo})" : "")
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary shadow-sm" style="font-size:0.75rem;">
+                                    <i class="fas fa-clock me-1"></i> Not Posted
+                                </span>
+                            }
+                        </div>
+                        <small class="text-muted">Manage employee short-term advances and monthly advance approvals.</small>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-3" style="border-radius: 6px;" @onclick="GoBack">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-primary px-3" style="border-radius: 6px;" @onclick="LoadDataAsync" disabled="@IsLoading">
+                        <i class="fas fa-sync-alt me-1 @(IsLoading ? "fa-spin" : "")"></i> Refresh
+                    </button>
+                    <button type="button" class="btn btn-sm btn-success px-3 fw-bold shadow-sm" style="border-radius: 6px;" @onclick="SaveAsync" disabled="@(IsLoading || IsSaving)">
+                        <i class="fas fa-save me-1"></i> @(IsSaving ? "Saving..." : "Save")
+                    </button>
+
+                    <!-- Print Options Win11 Context Menu Trigger Button -->
+                    <button type="button" class="btn btn-sm btn-outline-dark px-3" style="border-radius: 6px;" @onclick="ShowPrintMenu">
+                        <i class="fas fa-print me-1"></i> Print Options <i class="fas fa-chevron-down ms-1" style="font-size: 0.75rem;"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Posting Details Section ──────────────────────────────── -->
+            <div class="card border-0 bg-light rounded-3 p-3 mb-3" style="border-left: 4px solid #0d6efd !important; position: relative !important; z-index: 10000 !important;">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fas fa-file-invoice text-primary"></i>
+                        <h6 class="fw-bold mb-0 text-dark">Posting & Voucher Details</h6>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary px-3" type="button" @onclick="TogglePostingSection" style="border-radius: 6px;">
+                        <i class="fas @(ShowPostingSection ? "fa-chevron-up" : "fa-chevron-down") me-1"></i>
+                        @(ShowPostingSection ? "Hide Posting Panel" : "Posting Options")
+                    </button>
+                </div>
+
+                @if (ShowPostingSection)
+                {
+                    <div class="row g-3 mt-1 align-items-end" style="position: relative !important; z-index: 10001 !important;">
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold text-secondary mb-2" style="font-size:0.85rem;">Payment Mode</label>
+                            <div class="payment-mode-group">
+                                <div class="payment-mode-card @(PaymentMode == ShortTermPostingMode.Cash ? "selected-cpv" : "")"
+                                     @onclick="@(() => SetPaymentMode(ShortTermPostingMode.Cash))">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                    Cash (CPV)
+                                </div>
+                                <div class="payment-mode-card @(PaymentMode == ShortTermPostingMode.OtherAccount ? "selected-jv" : "")"
+                                     @onclick="@(() => SetPaymentMode(ShortTermPostingMode.OtherAccount))">
+                                    <i class="fas fa-file-invoice"></i>
+                                    Other Account (JV)
+                                </div>
+                                <div class="payment-mode-card @(PaymentMode == ShortTermPostingMode.Bank ? "selected-bpv" : "")"
+                                     @onclick="@(() => SetPaymentMode(ShortTermPostingMode.Bank))">
+                                    <i class="fas fa-university"></i>
+                                    Bank Cheque (BPV)
+                                </div>
+                            </div>
+                        </div>
+
+                        @if (PaymentMode == ShortTermPostingMode.Cash)
+                        {
+                            <div class="col-md-6" style="position: relative !important; z-index: 10002 !important;">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Cash In Hand Account <span class="text-danger">*</span></label>
+                                <BlazoredTypeahead SearchMethod="SearchCashAccountsAsync"
+                                                   @bind-Value="SelectedCashAccount"
+                                                   Placeholder="Select cash-in-hand account..."
+                                                   EnableDropDown="true"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate>[@context.AccNo] @context.AccTitle</SelectedTemplate>
+                                    <ResultTemplate>[@context.AccNo] @context.AccTitle</ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                        }
+                        else if (PaymentMode == ShortTermPostingMode.OtherAccount)
+                        {
+                            <div class="col-md-6" style="position: relative !important; z-index: 10002 !important;">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Account <span class="text-danger">*</span></label>
+                                <BlazoredTypeahead SearchMethod="SearchAllAccountsAsync"
+                                                   @bind-Value="SelectedOtherAccount"
+                                                   Placeholder="Search chart of accounts..."
+                                                   EnableDropDown="true"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate>[@context.AccNo] @context.AccTitle</SelectedTemplate>
+                                    <ResultTemplate>[@context.AccNo] @context.AccTitle</ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                        }
+                        else if (PaymentMode == ShortTermPostingMode.Bank)
+                        {
+                            <div class="col-md-6" style="position: relative !important; z-index: 10002 !important;">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Bank Account <span class="text-danger">*</span></label>
+                                <BlazoredTypeahead SearchMethod="SearchBankAccountsAsync"
+                                                   @bind-Value="SelectedBankAccount"
+                                                   Placeholder="Select bank account..."
+                                                   EnableDropDown="true"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="bank">@bank.Bank — @bank.AccTitle</SelectedTemplate>
+                                    <ResultTemplate Context="bank">
+                                        <strong>@bank.Bank</strong>
+                                        <small class="text-muted ms-1">@bank.Branch · @bank.AccTitle</small>
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="cheque-panel">
+                                    <div class="row g-2">
+                                        <div class="col-4">
+                                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Cheque No. <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control form-control-sm" @bind="ChequeNo" placeholder="e.g. 100001" style="height:35px;" />
+                                        </div>
+                                        <div class="col-4">
+                                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Cheque Type</label>
+                                            <select class="form-select form-select-sm" @bind="ChequeType" style="height:35px;">
+                                                <option value="Open">Open</option>
+                                                <option value="Payees A/C Only">Payees A/C Only</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-4">
+                                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Cheque Date</label>
+                                            <input type="date" class="form-control form-control-sm" @bind="ChequeDate" style="height:35px;" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        }
+
+                        <div class="col-12 d-flex align-items-center justify-content-between pt-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="dontPostCheck" @bind="DontPostVoucher" />
+                                <label class="form-check-label text-muted" for="dontPostCheck" style="font-size: 0.85rem;">
+                                    Don't post voucher (Record advances only)
+                                </label>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-primary px-4 fw-bold shadow-sm" @onclick="PostVoucherAsync" disabled="@(IsLoading || IsPosting || PostingStatus.IsPosted)">
+                                <i class="fas fa-paper-plane me-1"></i> @(IsPosting ? "Posting..." : "Post Voucher & Advances")
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- Filters Row -->
+            <div class="row g-3 mb-3 align-items-center" style="position: relative !important; z-index: 1000 !important;">
+                <div class="col-md-3">
+
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Month & Year:</label>
+                    <input type="month" class="form-control form-control-sm" value="@SelectedMonthYear" @onchange="OnMonthChanged" style="height: 35px !important;" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Department:</label>
+                    <BlazoredTypeahead SearchMethod="SearchDepartmentsAsync"
+                                       @bind-Value="SelectedDepartment"
+                                       Placeholder="Search department..."
+                                       MaximumSuggestions="1000"
+                                       EnableDropDown="true">
+                        <SelectedTemplate Context="dept">
+                            @if (dept.DeptID != "0") { <text>[@dept.DeptID] </text> }@dept.Name
+                        </SelectedTemplate>
+                        <ResultTemplate Context="dept">
+                            @if (dept.DeptID != "0") { <text>[@dept.DeptID] </text> }@dept.Name
+                        </ResultTemplate>
+                        <NotFoundTemplate>
+                            No department found.
+                        </NotFoundTemplate>
+                    </BlazoredTypeahead>
+
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Search Employee:</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light text-secondary"><i class="fas fa-search"></i></span>
+                        <input type="text" class="form-control" placeholder="Search by Emp ID, Name or Designation..." @bind="SearchText" @bind:event="oninput" style="height: 35px !important;" />
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Data Table Container -->
+            <div class="table-responsive rounded-3 border" style="max-height: 550px; overflow-y: auto; position: relative; z-index: 1;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th class="text-center py-2" style="width: 50px;">S #</th>
+                            <th class="py-2">Employee</th>
+                            <th class="py-2">Designation</th>
+                            <th class="text-end py-2" style="width: 120px;">Salary</th>
+                            <th class="text-end py-2" style="width: 130px;">Earned</th>
+                            <th class="text-end py-2" style="width: 160px;">Approved</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-5 text-muted">
+                                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                                    Loading Short Term Sheet data...
+                                </td>
+                            </tr>
+                        }
+                        else if (!FilteredItems.Any())
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">
+                                    <i class="fas fa-info-circle me-1"></i> No employee record found matching criteria.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            int serialNo = 1;
+                            @foreach (var item in FilteredItems)
+                            {
+                                <tr>
+                                    <td class="text-center text-muted fw-normal">@(serialNo++)</td>
+                                    <td>
+                                        <span class="badge bg-light text-dark font-monospace border me-1">[@item.EmpID]</span>
+                                        <span class="fw-semibold text-dark">@item.Name</span>
+                                    </td>
+                                    <td class="text-secondary">@item.Designation</td>
+                                    <td class="text-end font-monospace text-dark">@item.StartingSalary.ToString("N0")</td>
+                                    <td class="text-end font-monospace text-primary fw-semibold">@item.CalculatedPayable.ToString("N0")</td>
+                                    <td class="text-end">
+                                        <input type="number" 
+                                               class="form-control form-control-sm text-end font-monospace fw-bold border-primary-subtle" 
+                                               style="max-width: 140px; margin-left: auto; background: rgba(13, 110, 253, 0.03);"
+                                               @bind="item.Approved" 
+                                               @bind:event="oninput" 
+                                               min="0" step="500" />
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Footer Summary Bar -->
+            <div class="row g-2 mt-3 pt-3 border-top align-items-center">
+                <div class="col-md-3 col-6">
+                    <div class="p-2 rounded bg-light border text-center">
+                        <small class="text-uppercase text-muted d-block" style="font-size: 0.7rem; letter-spacing: 0.5px;">Total Employees</small>
+                        <span class="fw-bold text-dark fs-6">@FilteredItems.Count()</span>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="p-2 rounded bg-light border text-center">
+                        <small class="text-uppercase text-muted d-block" style="font-size: 0.7rem; letter-spacing: 0.5px;">Total Salary</small>
+                        <span class="fw-bold text-dark fs-6 font-monospace">@FilteredItems.Sum(x => x.StartingSalary).ToString("N0")</span>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="p-2 rounded bg-light border text-center">
+                        <small class="text-uppercase text-muted d-block" style="font-size: 0.7rem; letter-spacing: 0.5px;">Total Earned</small>
+                        <span class="fw-bold text-primary fs-6 font-monospace">@FilteredItems.Sum(x => x.CalculatedPayable).ToString("N0")</span>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="p-2 rounded bg-primary text-white border text-center shadow-sm">
+                        <small class="text-uppercase opacity-75 d-block" style="font-size: 0.7rem; letter-spacing: 0.5px;">Total Approved</small>
+                        <span class="fw-bold fs-6 font-monospace">@FilteredItems.Sum(x => x.Approved).ToString("N0")</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ── BlazorContextMenu: Print Options Menu ── -->
+<ContextMenu Id="printOptionsMenu" Template="Win11Style">
+    <div class="win11-section-header">Print Options</div>
+    <Item class="win11-menu-item" OnClick="() => PrintReportAsync(bAllDepartments: false)">
+        <i class="fas fa-file-alt fa-fw win11-icon text-primary"></i> Print Dept Report
+    </Item>
+    <Item class="win11-menu-item" OnClick="() => PrintReportAsync(bAllDepartments: true)">
+        <i class="fas fa-file-invoice fa-fw win11-icon text-info"></i> Print All Departments
+    </Item>
+    <div class="win11-divider"></div>
+    <Item class="win11-menu-item" OnClick="PrintSlipsAsync">
+        <i class="fas fa-receipt fa-fw win11-icon text-warning"></i> Print Salary Slips
+    </Item>
+</ContextMenu>
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        min-height: 35px !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead .blazored-typeahead__controls {
+        height: 35px !important;
+        min-height: 35px !important;
+    }
+    .blazored-typeahead .blazored-typeahead__input {
+        height: 33px !important;
+        font-size: 0.88rem;
+    }
+    .blazor-context-menu {
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+        z-index: 999999 !important;
+    }
+    .payment-mode-group { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .payment-mode-card {
+        flex: 1; min-width: 130px; padding: 0.65rem 1rem;
+        border: 2px solid #dee2e6; border-radius: 10px;
+        cursor: pointer; text-align: center; font-size: 0.85rem;
+        font-weight: 600; color: #495057; transition: all 0.18s ease;
+        background: #fff; user-select: none;
+    }
+    .payment-mode-card:hover { border-color: #0d6efd; background: #f0f6ff; }
+    .payment-mode-card.selected-cpv { border-color: #198754; background: #e9f7ef; color: #198754; }
+    .payment-mode-card.selected-jv { border-color: #6f42c1; background: #f3eeff; color: #6f42c1; }
+    .payment-mode-card.selected-bpv { border-color: #0d6efd; background: #e8f1ff; color: #0d6efd; }
+    .payment-mode-card i { display: block; font-size: 1.3rem; margin-bottom: 0.3rem; }
+    .cheque-panel {
+        background: rgba(13, 110, 253, 0.04);
+        border: 1px solid rgba(13, 110, 253, 0.18);
+        border-radius: 10px; padding: 0.75rem 1rem;
+    }
+</style>
+
+
+

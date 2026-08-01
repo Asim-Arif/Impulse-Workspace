@@ -1,4 +1,4 @@
-﻿using Impulse.Configurations;
+using Impulse.Configurations;
 using Microsoft.JSInterop;
 using System;
 using System.Net.Http;
@@ -185,7 +185,9 @@ namespace Impulse.Services
     {
         public string ReportName { get; set; }
         public string SelectionFormula { get; set; }
+        public string GroupSelectionFormula { get; set; }
         public string Format { get; set; } = "pdf";
+
         // Parameters
         public Dictionary<string, object> Parameters { get; set; }
 

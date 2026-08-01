@@ -1,0 +1,294 @@
+@page "/accounts/maker-long-term-loan"
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using Impulse.Services.Accounts
+@using Impulse.Services
+@attribute [Authorize]
+
+<PageTitle>Maker Long Term Loan Entry</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm mb-4"
+         style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; max-width: 900px; margin: 0 auto;">
+        <div class="card-body p-4">
+
+            @* ── Header ──────────────────────────────────────────── *@
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center fw-bold" style="font-size: 1.25rem;">
+                    <i class="fas fa-hand-holding-usd me-2"></i>
+                    Maker Long Term Loan Entry
+                </h4>
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-sm btn-success px-3 shadow-sm"
+                            @onclick="SaveAndNewAsync" disabled="@(IsLoading || IsSaving)">
+                        <i class="fas fa-plus me-1"></i> Save &amp; New
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary px-3 shadow-sm"
+                            @onclick="SaveAndCloseAsync" disabled="@(IsLoading || IsSaving)">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span><span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save me-1"></i><span>Save &amp; Close</span>
+                        }
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-3"
+                            @onclick="NavigateBack">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                </div>
+            </div>
+
+            @* ── SECTION 1: Maker Selection & Balance ─────────────── *@
+            <div class="row g-3 align-items-end mb-3" style="position: relative !important; z-index: 10002 !important;">
+                <div class="col-md-7">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Maker Account <span class="text-danger">*</span>
+                    </label>
+                    <BlazoredTypeahead SearchMethod="SearchMakersAsync"
+                                       @bind-Value="SelectedMaker"
+                                       Placeholder="Search maker account..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="m">
+                            @(!string.IsNullOrWhiteSpace(m.MakerNo) ? $"[{m.MakerNo}] " : $"[{m.AccNo}] ")@m.MakerName
+                        </SelectedTemplate>
+                        <ResultTemplate Context="m">
+                            <strong>@(!string.IsNullOrWhiteSpace(m.MakerNo) ? $"[{m.MakerNo}]" : $"[{m.AccNo}]")</strong> <span class="ms-1">@m.MakerName</span>
+                        </ResultTemplate>
+                        <NotFoundTemplate>No maker found.</NotFoundTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-5">
+                    <div class="p-2 rounded bg-light border text-center shadow-sm">
+                        <small class="text-uppercase text-muted d-block fw-bold" style="font-size: 0.7rem;">Previous L.T Loan Balance</small>
+                        <span class="fw-bold fs-6 font-monospace @(PreviousBalance > 0 ? "text-danger" : "text-success")">
+                            PKR @PreviousBalance.ToString("N2")
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            @* ── SECTION 2: Master PO Selection & Details (Optional) ── *@
+            <div class="row g-3 align-items-end mb-3" style="position: relative !important; z-index: 10001 !important;">
+                <div class="col-md-6">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Master PO # (Optional)</label>
+                    <BlazoredTypeahead SearchMethod="SearchMasterPOsAsync"
+                                       @bind-Value="SelectedMasterPO"
+                                       Placeholder="@(SelectedMaker == null ? "Select maker account first..." : MasterPOs.Any() ? "Select PO..." : "No POs found for maker")"
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="po">@po.MasterPONo</SelectedTemplate>
+                        <ResultTemplate Context="po">@po.MasterPONo</ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+            </div>
+
+            @if (SelectedMasterPO != null && !string.IsNullOrWhiteSpace(SelectedMasterPO.MasterPONo))
+            {
+                <div class="row g-2 mb-3">
+                    <div class="col-md-3">
+                        <div class="p-2 rounded bg-light border text-center shadow-sm">
+                            <small class="text-uppercase text-muted d-block fw-bold" style="font-size: 0.68rem;">PO Value</small>
+                            <span class="fw-bold fs-6 font-monospace text-primary">PKR @SelectedMasterPO.POValue.ToString("N2")</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-2 rounded bg-light border text-center shadow-sm">
+                            <small class="text-uppercase text-muted d-block fw-bold" style="font-size: 0.68rem;">L.T Advance Taken</small>
+                            <span class="fw-bold fs-6 font-monospace text-secondary">PKR @SelectedMasterPO.LTTaken.ToString("N2")</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-2 rounded bg-light border text-center shadow-sm">
+                            <small class="text-uppercase text-muted d-block fw-bold" style="font-size: 0.68rem;">S.T Loan Taken</small>
+                            <span class="fw-bold fs-6 font-monospace text-secondary">PKR @SelectedMasterPO.STTaken.ToString("N2")</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-2 rounded bg-light border text-center shadow-sm @(SelectedMasterPO.POLimit < Amount ? "border-danger bg-danger-subtle" : "")">
+                            <small class="text-uppercase text-muted d-block fw-bold" style="font-size: 0.68rem;">50% PO Limit Remaining</small>
+                            <span class="fw-bold fs-6 font-monospace @(SelectedMasterPO.POLimit < Amount ? "text-danger" : "text-success")">PKR @SelectedMasterPO.POLimit.ToString("N2")</span>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @* ── SECTION 3: Loan Details ──────────────────────────── *@
+            <div class="row g-3 align-items-end mb-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Issue Date <span class="text-danger">*</span>
+                    </label>
+                    <input type="date" class="form-control form-control-sm" @bind="IssueDate" style="height:35px;" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        New Loan Amount <span class="text-danger">*</span>
+                    </label>
+                    <input type="number" class="form-control form-control-sm font-monospace fw-bold" step="0.01" min="0"
+                           @bind="Amount" style="height:35px; background:#fffde7;" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Monthly Deduction Rate
+                    </label>
+                    <input type="number" class="form-control form-control-sm font-monospace fw-bold" step="0.01" min="0"
+                           @bind="DAmount" style="height:35px;" placeholder="e.g. 5000" />
+                </div>
+                <div class="col-md-12">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Description</label>
+                    <textarea class="form-control form-control-sm" rows="2"
+                              @bind="Description"
+                              placeholder="Enter loan description..."></textarea>
+                </div>
+            </div>
+
+            @* ── SECTION 4: Posting & Voucher Details ────────────── *@
+            <div class="card border-0 bg-light rounded-3 p-3 mb-3" style="border-left: 4px solid #0d6efd !important; position: relative !important; z-index: 10000 !important;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fas fa-file-invoice text-primary"></i>
+                        <h6 class="fw-bold mb-0 text-dark">Posting &amp; Voucher Details</h6>
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-1 align-items-end" style="position: relative !important; z-index: 10001 !important;">
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold text-secondary mb-2" style="font-size:0.85rem;">Payment Mode</label>
+                        <div class="payment-mode-group">
+                            <div class="payment-mode-card @(PaymentMode == MakerLoanPaymentMode.Cash ? "selected-cpv" : "")"
+                                 @onclick="@(() => SetPaymentMode(MakerLoanPaymentMode.Cash))">
+                                <i class="fas fa-money-bill-wave"></i>
+                                Cash (CPV)
+                            </div>
+                            <div class="payment-mode-card @(PaymentMode == MakerLoanPaymentMode.OtherAccount ? "selected-jv" : "")"
+                                 @onclick="@(() => SetPaymentMode(MakerLoanPaymentMode.OtherAccount))">
+                                <i class="fas fa-file-invoice"></i>
+                                Other Account (JV)
+                            </div>
+                            <div class="payment-mode-card @(PaymentMode == MakerLoanPaymentMode.Bank ? "selected-bpv" : "")"
+                                 @onclick="@(() => SetPaymentMode(MakerLoanPaymentMode.Bank))">
+                                <i class="fas fa-university"></i>
+                                Bank Cheque (BPV)
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (PaymentMode == MakerLoanPaymentMode.Cash)
+                    {
+                        <div class="col-md-6" style="position: relative !important; z-index: 10002 !important;">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Cash In Hand Account <span class="text-danger">*</span></label>
+                            <BlazoredTypeahead SearchMethod="SearchCashAccountsAsync"
+                                               @bind-Value="SelectedCashAccount"
+                                               Placeholder="Select cash-in-hand account..."
+                                               EnableDropDown="true"
+                                               MaximumSuggestions="1000">
+                                <SelectedTemplate>[@context.AccNo] @context.AccTitle</SelectedTemplate>
+                                <ResultTemplate>[@context.AccNo] @context.AccTitle</ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+                    }
+                    else if (PaymentMode == MakerLoanPaymentMode.OtherAccount)
+                    {
+                        <div class="col-md-6" style="position: relative !important; z-index: 10002 !important;">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Account <span class="text-danger">*</span></label>
+                            <BlazoredTypeahead SearchMethod="SearchAllAccountsAsync"
+                                               @bind-Value="SelectedOtherAccount"
+                                               Placeholder="Search chart of accounts..."
+                                               EnableDropDown="true"
+                                               MaximumSuggestions="1000">
+                                <SelectedTemplate>[@context.AccNo] @context.AccTitle</SelectedTemplate>
+                                <ResultTemplate>[@context.AccNo] @context.AccTitle</ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+                    }
+                    else if (PaymentMode == MakerLoanPaymentMode.Bank)
+                    {
+                        <div class="col-md-6" style="position: relative !important; z-index: 10002 !important;">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Bank Account <span class="text-danger">*</span></label>
+                            <BlazoredTypeahead SearchMethod="SearchBankAccountsAsync"
+                                               @bind-Value="SelectedBankAccount"
+                                               Placeholder="Select bank account..."
+                                               EnableDropDown="true"
+                                               MaximumSuggestions="1000">
+                                <SelectedTemplate Context="bank">@bank.Bank — @bank.AccTitle</SelectedTemplate>
+                                <ResultTemplate Context="bank">
+                                    <strong>@bank.Bank</strong>
+                                    <small class="text-muted ms-1">@bank.Branch · @bank.AccTitle</small>
+                                </ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="cheque-panel">
+                                <div class="row g-2">
+                                    <div class="col-4">
+                                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Cheque No. <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control form-control-sm" @bind="ChequeNo" placeholder="e.g. 100001" style="height:35px;" />
+                                    </div>
+                                    <div class="col-4">
+                                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Cheque Type</label>
+                                        <select class="form-select form-select-sm" @bind="ChequeType" style="height:35px;">
+                                            <option value="Open">Open</option>
+                                            <option value="Payees A/C Only">Payees A/C Only</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-4">
+                                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Cheque Date</label>
+                                        <input type="date" class="form-control form-control-sm" @bind="ChequeDate" style="height:35px;" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="col-12 pt-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="dontPostCheckMakerLT" @bind="DontPostVoucher" />
+                            <label class="form-check-label text-muted" for="dontPostCheckMakerLT" style="font-size: 0.85rem;">
+                                Don't post voucher (Record long term loan entry only)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        min-height: 35px !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead .blazored-typeahead__controls {
+        height: 35px !important;
+        min-height: 35px !important;
+    }
+    .blazored-typeahead .blazored-typeahead__input {
+        height: 33px !important;
+        font-size: 0.88rem;
+    }
+    .payment-mode-group { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .payment-mode-card {
+        flex: 1; min-width: 130px; padding: 0.65rem 1rem;
+        border: 2px solid #dee2e6; border-radius: 10px;
+        cursor: pointer; text-align: center; font-size: 0.85rem;
+        font-weight: 600; color: #495057; transition: all 0.18s ease;
+        background: #fff; user-select: none;
+    }
+    .payment-mode-card:hover { border-color: #0d6efd; background: #f0f6ff; }
+    .payment-mode-card.selected-cpv { border-color: #198754; background: #e9f7ef; color: #198754; }
+    .payment-mode-card.selected-jv { border-color: #6f42c1; background: #f3eeff; color: #6f42c1; }
+    .payment-mode-card.selected-bpv { border-color: #0d6efd; background: #e8f1ff; color: #0d6efd; }
+    .payment-mode-card i { display: block; font-size: 1.3rem; margin-bottom: 0.3rem; }
+    .cheque-panel {
+        background: rgba(13, 110, 253, 0.04);
+        border: 1px solid rgba(13, 110, 253, 0.18);
+        border-radius: 10px; padding: 0.75rem 1rem;
+    }
+</style>

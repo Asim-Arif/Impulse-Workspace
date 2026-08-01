@@ -1,0 +1,219 @@
+@page "/accounts/maker-long-term-loan-ledger"
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using Impulse.Services.Accounts
+@using Impulse.Services
+@attribute [Authorize]
+
+<PageTitle>Vendor Long Term Loan Ledger</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm mb-3"
+         style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-3">
+
+            @* ── Header ──────────────────────────────────────────── *@
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <h4 class="mb-0 text-primary d-flex align-items-center fw-bold" style="font-size: 1.25rem;">
+                    <i class="fas fa-book-open me-2"></i>
+                    Vendor Long Term Loan Ledger
+                </h4>
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-sm btn-primary px-3 shadow-sm"
+                            @onclick="RefreshLedgerAsync" disabled="@IsLoading">
+                        @if (IsLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span><span>Loading...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-sync-alt me-1"></i><span>Refresh</span>
+                        }
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-3"
+                            @onclick="PrintLedgerAsync" disabled="@(IsLoading || SelectedMaker == null)">
+                        <i class="fas fa-print me-1"></i> Print Ledger
+                    </button>
+                </div>
+            </div>
+
+            @* ── Filter Controls Row ─────────────────────────────── *@
+            <div class="row g-2 align-items-end mb-3" style="position: relative !important; z-index: 10000 !important;">
+                <div class="col-md-5">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">
+                        Maker / Vendor Account <span class="text-danger">*</span>
+                    </label>
+                    <BlazoredTypeahead SearchMethod="SearchMakersAsync"
+                                       @bind-Value="SelectedMaker"
+                                       Placeholder="Search maker/vendor account..."
+                                       EnableDropDown="true"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="m">
+                            @(!string.IsNullOrWhiteSpace(m.MakerNo) ? $"[{m.MakerNo}] " : $"[{m.AccNo}] ")@m.MakerName
+                        </SelectedTemplate>
+                        <ResultTemplate Context="m">
+                            <strong>@(!string.IsNullOrWhiteSpace(m.MakerNo) ? $"[{m.MakerNo}]" : $"[{m.AccNo}]")</strong> <span class="ms-1">@m.MakerName</span>
+                        </ResultTemplate>
+                        <NotFoundTemplate>No account found.</NotFoundTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">From Date</label>
+                    <input type="date" class="form-control form-control-sm" @bind="FromDate" style="height:35px;" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">To Date</label>
+                    <input type="date" class="form-control form-control-sm" @bind="ToDate" style="height:35px;" />
+                </div>
+            </div>
+
+            @* ── Ledger Summary Metrics Row ─────────────────────── *@
+            <div class="row g-2 mb-3">
+                <div class="col-md-3">
+                    <div class="p-2 rounded bg-light border text-center shadow-sm">
+                        <small class="text-uppercase text-muted d-block fw-bold" style="font-size: 0.68rem;">Opening Balance</small>
+                        <span class="fw-bold fs-6 font-monospace text-secondary">PKR @LedgerData.OpeningBalance.ToString("N2")</span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-2 rounded bg-light border text-center shadow-sm">
+                        <small class="text-uppercase text-muted d-block fw-bold" style="font-size: 0.68rem;">Total Advances</small>
+                        <span class="fw-bold fs-6 font-monospace text-primary">PKR @LedgerData.TotalAdvances.ToString("N2")</span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-2 rounded bg-light border text-center shadow-sm">
+                        <small class="text-uppercase text-muted d-block fw-bold" style="font-size: 0.68rem;">Total Deductions</small>
+                        <span class="fw-bold fs-6 font-monospace text-success">PKR @LedgerData.TotalDeductions.ToString("N2")</span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-2 rounded bg-light border text-center shadow-sm">
+                        <small class="text-uppercase text-muted d-block fw-bold" style="font-size: 0.68rem;">Net Closing Balance</small>
+                        <span class="fw-bold fs-6 font-monospace @(LedgerData.ClosingBalance > 0 ? "text-danger" : "text-success")">
+                            PKR @LedgerData.ClosingBalance.ToString("N2")
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            @* ── Ledger Table Data Grid ─────────────────────────── *@
+            <div class="table-responsive border rounded-3 shadow-sm bg-white" style="max-height: 520px; overflow-y: auto;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th style="width: 120px;">Date</th>
+                            <th>Description</th>
+                            <th style="width: 130px;">Voucher #</th>
+                            <th class="text-end" style="width: 110px;">Debit</th>
+                            <th class="text-end" style="width: 110px;">Credit</th>
+                            <th class="text-end" style="width: 110px;">Ded/Month</th>
+                            <th class="text-end" style="width: 130px;">Running Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-muted">
+                                    <div class="spinner-border spinner-border-sm me-2 text-primary" role="status"></div>
+                                    Loading long term loan ledger...
+                                </td>
+                            </tr>
+                        }
+                        else if (SelectedMaker == null)
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-muted">
+                                    <i class="fas fa-info-circle me-1"></i> Please select a maker / vendor account to load ledger history.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @* ── Opening Balance Initial Row ── *@
+                            <tr class="bg-light fw-bold text-muted" style="font-size: 0.85rem;">
+                                <td>@FromDate.ToString("dd-MMM-yyyy")</td>
+                                <td><em>Opening Balance</em></td>
+                                <td>—</td>
+                                <td class="text-end">—</td>
+                                <td class="text-end">—</td>
+                                <td class="text-end">—</td>
+                                <td class="text-end font-monospace">@LedgerData.OpeningBalance.ToString("N2")</td>
+                            </tr>
+
+                            @if (!LedgerData.Entries.Any())
+                            {
+                                <tr>
+                                    <td colspan="7" class="text-center py-3 text-muted">
+                                        No loan transactions found between @FromDate.ToString("dd-MMM-yyyy") and @ToDate.ToString("dd-MMM-yyyy").
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var item in LedgerData.Entries)
+                                {
+                                    <tr>
+                                        <td>@item.DT.ToString("dd-MMM-yyyy")</td>
+                                        <td>@item.FullDescription</td>
+                                        <td>
+                                            @if (!string.IsNullOrWhiteSpace(item.AccVoucherNo))
+                                            {
+                                                <span class="badge bg-light text-dark border font-monospace">@item.AccVoucherNo</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">—</span>
+                                            }
+                                        </td>
+                                        <td class="text-end font-monospace @(item.Amount > 0 ? "text-primary fw-bold" : "")">
+                                            @(item.Amount > 0 ? item.Amount.ToString("N2") : "—")
+                                        </td>
+                                        <td class="text-end font-monospace @(item.Amount < 0 ? "text-success fw-bold" : "")">
+                                            @(item.Amount < 0 ? Math.Abs(item.Amount).ToString("N2") : "—")
+                                        </td>
+                                        <td class="text-end font-monospace text-secondary">
+                                            @(item.DAmount > 0 ? item.DAmount.ToString("N2") : "—")
+                                        </td>
+                                        <td class="text-end font-monospace fw-bold @(item.RunningBalance > 0 ? "text-danger" : "text-success")">
+                                            @item.RunningBalance.ToString("N2")
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        }
+                    </tbody>
+                    <tfoot class="table-light fw-bold sticky-bottom" style="font-size: 0.88rem; box-shadow: 0 -1px 0 #dee2e6;">
+                        <tr>
+                            <td colspan="3" class="text-end">Totals / Net Closing:</td>
+                            <td class="text-end font-monospace text-primary">@LedgerData.TotalAdvances.ToString("N2")</td>
+                            <td class="text-end font-monospace text-success">@LedgerData.TotalDeductions.ToString("N2")</td>
+                            <td></td>
+                            <td class="text-end font-monospace @(LedgerData.ClosingBalance > 0 ? "text-danger" : "text-success")">
+                                PKR @LedgerData.ClosingBalance.ToString("N2")
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        min-height: 35px !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead .blazored-typeahead__controls {
+        height: 35px !important;
+        min-height: 35px !important;
+    }
+    .blazored-typeahead .blazored-typeahead__input {
+        height: 33px !important;
+        font-size: 0.88rem;
+    }
+</style>
