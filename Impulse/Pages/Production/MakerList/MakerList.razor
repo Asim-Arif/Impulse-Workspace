@@ -1,0 +1,198 @@
+@page "/production/maker-list"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Production
+@using BlazorContextMenu
+@using Impulse.Services
+
+<PageTitle>Maker List</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <!-- Header & Filter Row -->
+            <div class="row g-2 mb-3 align-items-center border-bottom pb-3">
+                <div class="col-md-4 d-flex align-items-center">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-users-gear text-primary me-2"></i>
+                        Maker Directory
+                    </h5>
+                    <span class="badge bg-secondary ms-2">@FilteredMakers.Count()</span>
+                </div>
+
+                <div class="col-md-8 d-flex align-items-center justify-content-end gap-2 flex-wrap" style="position: relative !important; z-index: 9999 !important;">
+                    <!-- Search Input -->
+                    <div class="input-group input-group-sm" style="max-width: 250px;">
+                        <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-secondary"></i></span>
+                        <input type="text" class="form-control form-control-sm border-start-0 ps-0" @bind="SearchText" @bind:event="oninput" placeholder="Search maker, code, CNIC name..." />
+                    </div>
+
+                    <!-- Include Inactive Checkbox -->
+                    <div class="form-check form-check-inline mb-0 me-2">
+                        <input class="form-check-input" type="checkbox" id="chkIncludeInactive" checked="@IncludeInactive" @onchange="OnIncludeInactiveChanged" />
+                        <label class="form-check-label fw-semibold text-secondary" for="chkIncludeInactive" style="font-size:0.82rem;">
+                            Show Inactive
+                        </label>
+                    </div>
+
+                    <!-- Add New Maker Button -->
+                    <button type="button" class="btn btn-sm btn-primary" @onclick="NavigateToNewMaker">
+                        <i class="fas fa-plus-circle me-1"></i> Add New Maker
+                    </button>
+
+                    <!-- Top Options Button -->
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="OpenOptionsMenu">
+                        <i class="fas fa-cog me-1"></i> Options
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading Spinner -->
+            @if (IsLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading makers...</span>
+                    </div>
+                    <p class="text-muted mt-2 mb-0" style="font-size:0.85rem;">Loading maker directory...</p>
+                </div>
+            }
+            else
+            {
+                <!-- Data Table Container -->
+                <div class="table-responsive border rounded" style="position: relative !important; z-index: 1 !important; max-height: 65vh;">
+                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                        <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                            <tr>
+                                <th style="width: 110px;">Maker Code</th>
+                                <th>Maker Name</th>
+                                <th>Name as per CNIC</th>
+                                <th>Second Name</th>
+                                <th>Phone 1</th>
+                                <th>Phone 2</th>
+                                <th>Fax</th>
+                                <th>Type</th>
+                                <th class="text-center" style="width: 90px;">Status</th>
+                                <th class="text-end" style="width: 80px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in FilteredMakers)
+                            {
+                                <ContextMenuTrigger WrapperTag="tr" MenuId="rowContextMenu" Data="item" @ondblclick="() => EditMaker(item.VendID)" class="@(item.Active ? "" : "table-light text-muted")">
+                                    <td class="fw-bold text-primary">@item.VendID1</td>
+                                    <td class="fw-semibold">@item.VenderName</td>
+                                    <td>@(string.IsNullOrEmpty(item.CompanyName) ? "-" : item.CompanyName)</td>
+                                    <td>@(string.IsNullOrEmpty(item.Maker_Second_Name) ? "-" : item.Maker_Second_Name)</td>
+                                    <td>@(string.IsNullOrEmpty(item.Phone1) ? "-" : item.Phone1)</td>
+                                    <td>@(string.IsNullOrEmpty(item.Phone2) ? "-" : item.Phone2)</td>
+                                    <td>@(string.IsNullOrEmpty(item.Phone3) ? "-" : item.Phone3)</td>
+                                    <td><span class="badge bg-light text-dark border">@(string.IsNullOrEmpty(item.MakerType) ? "Standard" : item.MakerType)</span></td>
+                                    <td class="text-center">
+                                        @if (item.Active)
+                                        {
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Inactive</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        <button type="button" class="btn btn-xs btn-outline-primary py-0 px-2" @onclick="() => EditMaker(item.VendID)" title="Edit Maker">
+                                            <i class="fas fa-pencil-alt"></i>
+                                        </button>
+                                    </td>
+                                </ContextMenuTrigger>
+                            }
+
+                            @if (!FilteredMakers.Any())
+                            {
+                                <tr>
+                                    <td colspan="10" class="text-center text-muted py-4">
+                                        <i class="fas fa-folder-open fa-2x mb-2 d-block"></i>
+                                        No maker records found matching the specified filter.
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+        </div>
+    </div>
+</div>
+
+<!-- =====================================================
+     ROW CONTEXT MENU (Right-Click on Table Row)
+   ===================================================== -->
+<ContextMenu Id="rowContextMenu" Template="Win11Style">
+    <div class="win11-section-header">Maker Operations</div>
+    <Item OnClick="OnEditRowClick">
+        <i class="fas fa-pencil-alt win11-icon text-primary"></i> Edit Maker Information
+    </Item>
+    <Item OnClick="OnToggleActiveRowClick">
+        <i class="fas fa-ban win11-icon text-warning"></i> Toggle Active/Inactive Status
+    </Item>
+    <Seperator />
+    <div class="win11-section-header">Reports &amp; Labels</div>
+    <Item OnClick="OnPrintProfileClick">
+        <i class="fas fa-print win11-icon text-secondary"></i> Print Maker Profile
+    </Item>
+    <Item OnClick="OnPrintDetailsClick">
+        <i class="fas fa-print win11-icon text-secondary"></i> Print Maker Details
+    </Item>
+    <Item OnClick="OnPrintLabelClick">
+        <i class="fas fa-tag win11-icon text-secondary"></i> Print Maker Label
+    </Item>
+    <Item OnClick="OnPrintFileLabelClick">
+        <i class="fas fa-file-alt win11-icon text-secondary"></i> Print Maker File Label
+    </Item>
+    <Item OnClick="OnPrintShippingLabelClick">
+        <i class="fas fa-shipping-fast win11-icon text-secondary"></i> Print Shipping Label
+    </Item>
+</ContextMenu>
+
+<!-- =====================================================
+     TOP OPTIONS MENU (Triggered by Options Button)
+   ===================================================== -->
+<ContextMenu Id="optionsBarMenu" Template="Win11Style">
+    <div class="win11-section-header">Global Actions</div>
+    <Item OnClick="OnNewMakerOptionClick">
+        <i class="fas fa-plus-circle win11-icon text-success"></i> Add New Maker
+    </Item>
+    <Item OnClick="OnRefreshListOptionClick">
+        <i class="fas fa-sync win11-icon text-primary"></i> Refresh Directory
+    </Item>
+    <Seperator />
+    <Item OnClick="OnPrintMakerListOptionClick">
+        <i class="fas fa-print win11-icon text-dark"></i> Print Maker List Report
+    </Item>
+</ContextMenu>
+
+<!-- Scoped CSS for BlazorContextMenu alignment & cutoff prevention -->
+<style>
+    .win11-context-menu-container {
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+        border-radius: 8px !important;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15) !important;
+    }
+    .win11-section-header {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #8c9099;
+        padding: 4px 12px;
+        letter-spacing: 0.05em;
+    }
+    .win11-menu-item {
+        font-size: 0.83rem;
+        padding: 6px 12px;
+    }
+    .win11-icon {
+        width: 18px;
+        margin-right: 8px;
+    }
+</style>

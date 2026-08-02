@@ -254,6 +254,29 @@ builder.Services.AddScoped<Impulse.Services.Accounts.IMakerLoanClearanceService,
 builder.Services.AddScoped<DataAccessLibrary.Interface.Accounts.IMakerLoanTransferDataAccess, DataAccessLibrary.DAC.Accounts.MakerLoanTransferDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Accounts.IMakerLoanTransferService, Impulse.Services.Accounts.MakerLoanTransferService>();
 
+// Production Module Registrations
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IMakerDataAccess, DataAccessLibrary.DAC.Production.MakerDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IMakerService, Impulse.Services.Production.MakerService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IMakerListDataAccess, DataAccessLibrary.DAC.Production.MakerListDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IMakerListService, Impulse.Services.Production.MakerListService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IMakerItemAssignmentDataAccess, DataAccessLibrary.DAC.Production.MakerItemAssignmentDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IMakerItemAssignmentService, Impulse.Services.Production.MakerItemAssignmentService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IMakerPODataAccess, DataAccessLibrary.DAC.Production.MakerPODataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IMakerPOService, Impulse.Services.Production.MakerPOService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IProductionSequenceDataAccess, DataAccessLibrary.DAC.Production.ProductionSequenceDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IProductionSequenceService, Impulse.Services.Production.ProductionSequenceService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IMakerIssuanceFromSFDataAccess, DataAccessLibrary.DAC.Production.MakerIssuanceFromSFDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IMakerIssuanceFromSFService, Impulse.Services.Production.MakerIssuanceFromSFService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IReceiveAgainstPODataAccess, DataAccessLibrary.DAC.Production.ReceiveAgainstPODataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IReceiveAgainstPOService, Impulse.Services.Production.ReceiveAgainstPOService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IReceiveLotDataAccess, DataAccessLibrary.DAC.Production.ReceiveLotDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IReceiveLotService, Impulse.Services.Production.ReceiveLotService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.ILotIssuanceDataAccess, DataAccessLibrary.DAC.Production.LotIssuanceDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.ILotIssuanceService, Impulse.Services.Production.LotIssuanceService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IAuthorizeReceivedDataAccess, DataAccessLibrary.DAC.Production.AuthorizeReceivedDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IAuthorizeReceivedService, Impulse.Services.Production.AuthorizeReceivedService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IMakerPOListDataAccess, DataAccessLibrary.DAC.Production.MakerPOListDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IMakerPOListService, Impulse.Services.Production.MakerPOListService>();
 
 
 

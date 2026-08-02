@@ -1,0 +1,85 @@
+@using DataAccessLibrary.Models.ViewModels.Production
+
+<div class="card border mb-3" style="background:#f8f9fb; border-radius:8px;">
+    <div class="card-header py-2 d-flex align-items-center justify-content-between" style="background:#eef0f7; border-radius:8px 8px 0 0;">
+        <span class="fw-bold text-secondary" style="font-size:0.85rem;">
+            <i class="fas fa-gears me-1 text-primary"></i> Production Processes Assignment
+        </span>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-primary rounded-pill">@SelectedCount / @Processes.Count Selected</span>
+            <button type="button" class="btn btn-xs btn-outline-secondary py-0" @onclick="SelectAll" style="font-size:0.75rem;">Select All</button>
+            <button type="button" class="btn btn-xs btn-outline-secondary py-0" @onclick="ClearAll" style="font-size:0.75rem;">Clear All</button>
+        </div>
+    </div>
+    <div class="card-body py-3">
+        <!-- Search filter input -->
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white"><i class="fas fa-search text-secondary"></i></span>
+                    <input type="text" class="form-control" @bind="SearchFilter" @bind:event="oninput" placeholder="Search processes by description or code..." />
+                </div>
+            </div>
+        </div>
+
+        <!-- Processes Checkbox Grid -->
+        <div class="row g-2 overflow-auto pe-1" style="max-height: 380px;">
+            @foreach (var proc in FilteredProcesses)
+            {
+                <div class="col-md-6 col-lg-4">
+                    <div class="p-2 border rounded bg-white d-flex align-items-center justify-content-between shadow-xs hover-shadow"
+                         style="cursor: pointer; transition: all 0.15s ease-in-out; @(proc.IsSelected ? "border-color: #0d6efd !important; background-color: #f0f7ff !important;" : "")"
+                         @onclick="() => ToggleProcess(proc)">
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="checkbox" checked="@proc.IsSelected" @onchange="() => {}" id="@($"proc_{proc.ProcessID}")" />
+                            <label class="form-check-label fw-semibold text-dark ms-1" style="font-size: 0.82rem; cursor: pointer;" for="@($"proc_{proc.ProcessID}")">
+                                @proc.SNo. @proc.Description
+                            </label>
+                        </div>
+                        @if (!string.IsNullOrEmpty(proc.Code))
+                        {
+                            <span class="badge bg-light text-secondary border ms-2" style="font-size: 0.7rem;">@proc.Code</span>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (!FilteredProcesses.Any())
+            {
+                <div class="col-12 text-center text-muted py-4">
+                    <i class="fas fa-filter me-1"></i> No matching processes found.
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public List<ProcessModel> Processes { get; set; } = new List<ProcessModel>();
+
+    private string SearchFilter { get; set; } = string.Empty;
+
+    private IEnumerable<ProcessModel> FilteredProcesses =>
+        string.IsNullOrWhiteSpace(SearchFilter)
+            ? Processes
+            : Processes.Where(p => p.Description.Contains(SearchFilter, StringComparison.OrdinalIgnoreCase)
+                                || (p.Code != null && p.Code.Contains(SearchFilter, StringComparison.OrdinalIgnoreCase)));
+
+    private int SelectedCount => Processes.Count(p => p.IsSelected);
+
+    private void ToggleProcess(ProcessModel proc)
+    {
+        proc.IsSelected = !proc.IsSelected;
+    }
+
+    private void SelectAll()
+    {
+        foreach (var p in Processes) p.IsSelected = true;
+    }
+
+    private void ClearAll()
+    {
+        foreach (var p in Processes) p.IsSelected = false;
+    }
+}

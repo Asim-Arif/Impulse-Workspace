@@ -1,0 +1,534 @@
+@page "/production/maker-po"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Production
+@using Blazored.Typeahead
+
+<PageTitle>Maker PO — Vendor Item Issuance</PageTitle>
+
+<style>
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .disabled-typeahead-wrapper .blazored-typeahead {
+        background-color: #e9ecef !important;
+        overflow: hidden !important;
+        border-radius: 4px;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__results {
+        z-index: 10000 !important;
+    }
+    .card-header-row {
+        position: relative !important;
+        z-index: 9999 !important;
+    }
+    .card-item-row {
+        position: relative !important;
+        z-index: 9998 !important;
+    }
+    .card-staged-row {
+        position: relative !important;
+        z-index: 1 !important;
+    }
+    .nav-tabs .nav-link.active {
+        font-weight: 700;
+        border-bottom: 3px solid #0d6efd;
+    }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <!-- Title Header -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <h5 class="mb-0 fw-bold text-dark-emphasis">
+                    <i class="fas fa-file-invoice-dollar text-primary me-2"></i>
+                    Maker PO — Vendor Production Item Issuance
+                </h5>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkPrintSlip" @bind="PrintSlip" />
+                        <label class="form-check-label fw-bold text-secondary style-sm" for="chkPrintSlip" style="font-size:0.82rem;">
+                            Auto Print Issuance Slip
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 1: GENERAL PO HEADER PANEL -->
+            <div class="card mb-3 border card-header-row" style="background:#f8f9fb; border-radius:8px;">
+                <div class="card-header py-2 bg-light fw-bold text-secondary" style="font-size:0.85rem; border-radius:8px 8px 0 0;">
+                    <i class="fas fa-sliders me-1 text-primary"></i> General PO Header &amp; Parameters
+                </div>
+                <div class="card-body py-3">
+                    <div class="row g-3">
+
+                        <!-- Issuance Date -->
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Issuance Date</label>
+                            <input type="date" class="form-control form-control-sm" @bind="Header.DT" />
+                        </div>
+
+                        <!-- Select Process -->
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
+                                Production Process <span class="text-danger">*</span>
+                            </label>
+                            <BlazoredTypeahead SearchMethod="SearchProcesses"
+                                               @bind-Value="SelectedProcess"
+                                               Placeholder="Select Process..."
+                                               EnableDropDown="true"
+                                               MaximumSuggestions="1000">
+                                <SelectedTemplate Context="p">
+                                    @p.Description
+                                </SelectedTemplate>
+                                <ResultTemplate Context="p">
+                                    @p.SNO. @p.Description
+                                </ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+
+                        <!-- Select Maker -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
+                                Maker / Contractor <span class="text-danger">*</span>
+                            </label>
+                            <div class="@(SelectedProcess == null ? "disabled-typeahead-wrapper" : "")">
+                                <BlazoredTypeahead SearchMethod="SearchMakers"
+                                                   @bind-Value="SelectedMaker"
+                                                   Placeholder="Select Maker..."
+                                                   EnableDropDown="true"
+                                                   Disabled="SelectedProcess == null"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="m">
+                                        @m.DisplayText
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="m">
+                                        @m.DisplayText
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                        </div>
+
+                        <!-- Issuing Employee -->
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Issuing Employee</label>
+                            <BlazoredTypeahead SearchMethod="SearchEmployees"
+                                               @bind-Value="SelectedIssEmp"
+                                               Placeholder="Select Employee..."
+                                               EnableDropDown="true"
+                                               MaximumSuggestions="1000">
+                                <SelectedTemplate Context="e">
+                                    @e.DisplayText
+                                </SelectedTemplate>
+                                <ResultTemplate Context="e">
+                                    @e.DisplayText
+                                </ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+
+                        <!-- Counted By Employee -->
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Counted By</label>
+                            <BlazoredTypeahead SearchMethod="SearchEmployees"
+                                               @bind-Value="SelectedCountedBy"
+                                               Placeholder="Counted By..."
+                                               EnableDropDown="true"
+                                               MaximumSuggestions="1000">
+                                <SelectedTemplate Context="e">
+                                    @e.DisplayText
+                                </SelectedTemplate>
+                                <ResultTemplate Context="e">
+                                    @e.DisplayText
+                                </ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+
+                        <!-- Steel Type Selector -->
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Steel Type</label>
+                            <BlazoredTypeahead SearchMethod="SearchSteelTypes"
+                                               @bind-Value="SelectedSteelType"
+                                               Placeholder="Select Steel Type..."
+                                               EnableDropDown="true"
+                                               MaximumSuggestions="1000">
+                                <SelectedTemplate Context="st">
+                                    @st.SteelType
+                                </SelectedTemplate>
+                                <ResultTemplate Context="st">
+                                    @st.SteelType
+                                </ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+
+                        <!-- Excess Qty % -->
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Excess Qty %</label>
+                            <input type="number" step="0.1" class="form-control form-control-sm text-end" @bind="Header.ExcessQtyPercentage" placeholder="0.0" />
+                        </div>
+
+                        <!-- Max Receivings -->
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Max Receivings</label>
+                            <input type="number" class="form-control form-control-sm text-end" @bind="Header.MaximumRcvingsAgainstPO" placeholder="1" />
+                        </div>
+
+                        <!-- Provision Flags -->
+                        <div class="col-md-12 d-flex flex-wrap gap-4 pt-1">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="chkSample" @bind="Header.SampleProvided" />
+                                <label class="form-check-label fw-semibold text-dark" for="chkSample" style="font-size:0.83rem;">Sample Provided</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="chkDrawing" @bind="Header.DrawingProvided" />
+                                <label class="form-check-label fw-semibold text-dark" for="chkDrawing" style="font-size:0.83rem;">Drawing Provided</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="chkForging" @bind="Header.ForgingProvided" />
+                                <label class="form-check-label fw-semibold text-dark" for="chkForging" style="font-size:0.83rem;">Forging Provided</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="chkSteel" @bind="Header.SteelProvided" />
+                                <label class="form-check-label fw-semibold text-dark" for="chkSteel" style="font-size:0.83rem;">Steel Provided</label>
+                            </div>
+                        </div>
+
+                        <!-- Special Instructions -->
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Special Instructions</label>
+                            <input type="text" class="form-control form-control-sm" @bind="Header.SpecialInstructions" placeholder="Enter special instructions for this PO..." />
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 2: ITEM SELECTION & ISSUABLE ORDERS PANEL -->
+            <div class="card mb-3 border card-item-row" style="background:#ffffff; border-radius:8px;">
+                <div class="card-header py-2 bg-light fw-bold text-secondary d-flex align-items-center justify-content-between" style="font-size:0.85rem; border-radius:8px 8px 0 0;">
+                    <span><i class="fas fa-boxes-stacked me-1 text-primary"></i> Item &amp; Pending Order Lines Selection</span>
+                </div>
+                <div class="card-body py-3">
+                    <div class="row g-3 align-items-end mb-3" style="position: relative; z-index: 9999;">
+                        <div class="col-md-5">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
+                                Select Assigned Production Item <span class="text-danger">*</span>
+                            </label>
+                            <div class="@(SelectedMaker == null ? "disabled-typeahead-wrapper" : "")">
+                                <BlazoredTypeahead SearchMethod="SearchAssignedItems"
+                                                   @bind-Value="SelectedItem"
+                                                   Placeholder="Select Item..."
+                                                   EnableDropDown="true"
+                                                   Disabled="SelectedMaker == null"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="i">
+                                        @i.DisplayText
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="i">
+                                        @i.DisplayText
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Available Issuable Orders Grid from IssueItems_SP -->
+                    @if (SelectedItem != null)
+                    {
+                        <div class="table-responsive mb-3" style="max-height: 220px; position: relative; z-index: 1;">
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase;">
+                                    <tr>
+                                        <th style="width: 40px;">Sel</th>
+                                        <th>Order No</th>
+                                        <th>Internal Ref</th>
+                                        <th>Item ID</th>
+                                        <th>Description</th>
+                                        <th class="text-end">Total Order Qty</th>
+                                        <th class="text-end">Pending Issuable Qty</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (IsLoadingIssuableOrders)
+                                    {
+                                        <tr>
+                                            <td colspan="7" class="text-center py-3 text-muted">
+                                                <div class="spinner-border spinner-border-sm text-primary" role="status"></div> Loading pending orders...
+                                            </td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var order in IssuableOrders)
+                                        {
+                                            <tr @onclick="() => SelectIssuableOrder(order)" style="cursor:pointer;" class="@(SelectedIssuableOrder == order ? "table-primary" : "")">
+                                                <td class="text-center">
+                                                    <input type="radio" name="orderSelection" checked="@(SelectedIssuableOrder == order)" />
+                                                </td>
+                                                <td class="fw-bold text-dark">@order.OrderNo</td>
+                                                <td class="text-muted">@(string.IsNullOrEmpty(order.InternalRefNo) ? "-" : order.InternalRefNo)</td>
+                                                <td class="fw-bold text-primary">@order.CompItemID</td>
+                                                <td>@order.ItemName</td>
+                                                <td class="text-end">@order.OrderQty.ToString("N0")</td>
+                                                <td class="text-end fw-bold text-success">@order.CalculatedIssQty.ToString("N0")</td>
+                                            </tr>
+                                        }
+
+                                        @if (!IssuableOrders.Any())
+                                        {
+                                            <tr>
+                                                <td colspan="7" class="text-center text-muted py-3">
+                                                    <i class="fas fa-info-circle me-1"></i> No pending orders available for this item.
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Line Entry Input Controls -->
+                        <div class="row g-2 align-items-end p-2 bg-light rounded border" style="position: relative; z-index: 1;">
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Qty to Issue</label>
+                                <input type="number" class="form-control form-control-sm text-end fw-bold" @bind="LineIssQty" placeholder="0" />
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Unit Rate (Pcs)</label>
+                                <input type="number" step="0.01" class="form-control form-control-sm text-end fw-bold text-success" @bind="LineRate" placeholder="0.00" />
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Rate (Dozen)</label>
+                                <input type="text" class="form-control form-control-sm text-end text-muted" value="@((LineRate * 12m).ToString("N2"))" readonly />
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Expected Return Date</label>
+                                <input type="date" class="form-control form-control-sm" @bind="LineReturnDT" />
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Batch No.</label>
+                                <input type="text" class="form-control form-control-sm text-center fw-bold" @bind="LineBatchNo" />
+                            </div>
+                            <div class="col-md-2">
+                                <button type="button" class="btn btn-sm btn-success w-100" @onclick="AddLineToPO" disabled="@(SelectedIssuableOrder == null || LineIssQty <= 0)">
+                                    <i class="fas fa-plus-circle me-1"></i> Add Line
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- SECTION 3: STAGED DRAFT PO LINES GRID -->
+            <div class="card mb-3 border card-staged-row" style="background:#ffffff; border-radius:8px;">
+                <div class="card-header py-2 bg-light fw-bold text-secondary d-flex align-items-center justify-content-between" style="font-size:0.85rem; border-radius:8px 8px 0 0;">
+                    <span><i class="fas fa-list-ol me-1 text-primary"></i> Staged PO Lines (@StagedLines.Count)</span>
+                    <span class="badge bg-primary fs-6">Total Value: @TotalStagedValue.ToString("N2")</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 250px;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase;">
+                                <tr>
+                                    <th style="width: 40px;">#</th>
+                                    <th>Order No</th>
+                                    <th>Item Code</th>
+                                    <th>Item Name</th>
+                                    <th class="text-end">Issued Qty</th>
+                                    <th class="text-end">Rate (Pcs)</th>
+                                    <th class="text-end">Rate (Dzn)</th>
+                                    <th class="text-end">Total Value</th>
+                                    <th>Return Date</th>
+                                    <th class="text-center">Batch No</th>
+                                    <th class="text-end" style="width: 70px;">Remove</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var line in StagedLines)
+                                {
+                                    <tr>
+                                        <td class="fw-bold text-muted">@line.LineNo</td>
+                                        <td class="fw-semibold">@line.OrderNo</td>
+                                        <td class="fw-bold text-primary">@line.ItemCode</td>
+                                        <td>@line.ItemName</td>
+                                        <td class="text-end fw-bold text-dark">@line.IssQty.ToString("N0")</td>
+                                        <td class="text-end fw-bold text-success">@line.Rate.ToString("N2")</td>
+                                        <td class="text-end text-secondary">@line.RateDozen.ToString("N2")</td>
+                                        <td class="text-end fw-bold text-primary">@line.Value.ToString("N2")</td>
+                                        <td>@line.ReturnDT.ToString("dd-MMM-yyyy")</td>
+                                        <td class="text-center"><span class="badge bg-light text-dark border">@line.BatchNo</span></td>
+                                        <td class="text-end">
+                                            <button type="button" class="btn btn-xs btn-outline-danger" @onclick="() => RemoveStagedLine(line)">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+
+                                @if (!StagedLines.Any())
+                                {
+                                    <tr>
+                                        <td colspan="11" class="text-center text-muted py-4">
+                                            <i class="fas fa-info-circle me-1"></i> No line items added to draft PO yet. Select an item and order line above to stage items.
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                            @if (StagedLines.Any())
+                            {
+                                <tfoot class="table-light fw-bold">
+                                    <tr>
+                                        <td colspan="4" class="text-end">Total Summary:</td>
+                                        <td class="text-end text-dark fs-6">@TotalStagedQty.ToString("N0")</td>
+                                        <td colspan="2"></td>
+                                        <td class="text-end text-primary fs-6">@TotalStagedValue.ToString("N2")</td>
+                                        <td colspan="3"></td>
+                                    </tr>
+                                </tfoot>
+                            }
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer py-2 bg-light d-flex justify-content-end gap-2" style="border-radius: 0 0 8px 8px;">
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-3" @onclick="ClearForm">
+                        <i class="fas fa-rotate-left me-1"></i> Clear Draft
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary px-4 fw-bold" @onclick="SavePO" disabled="@(!StagedLines.Any() || IsSaving)">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-check-circle me-1"></i>
+                        }
+                        Post &amp; Save Maker PO
+                    </button>
+                </div>
+            </div>
+
+            <!-- SECTION 4: MAKER STOCK BALANCE & ISSUANCE HISTORY DRAWER -->
+            @if (SelectedMaker != null)
+            {
+                <div class="card border" style="background:#ffffff; border-radius:8px;">
+                    <div class="card-header bg-light py-2">
+                        <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                            <li class="nav-item">
+                                <button class="nav-link @(ActiveTab == "balance" ? "active" : "") text-dark" @onclick='() => ActiveTab = "balance"'>
+                                    <i class="fas fa-scale-balanced me-1 text-primary"></i> Current Stock Balances with Maker
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link @(ActiveTab == "history" ? "active" : "") text-dark" @onclick='() => ActiveTab = "history"'>
+                                    <i class="fas fa-clock-rotate-left me-1 text-secondary"></i> Recent 10 Issuance Transactions
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card-body p-0">
+                        @if (ActiveTab == "balance")
+                        {
+                            <div class="table-responsive" style="max-height: 200px;">
+                                <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.83rem;">
+                                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.75rem; text-transform: uppercase;">
+                                        <tr>
+                                            <th>Process Name</th>
+                                            <th>Item Code</th>
+                                            <th>Item Name</th>
+                                            <th class="text-end">Pending Balance Qty</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var bal in MakerBalances)
+                                        {
+                                            <tr>
+                                                <td class="fw-semibold">@bal.ProcessName</td>
+                                                <td class="fw-bold text-primary">@bal.ItemCode</td>
+                                                <td>@bal.ItemName</td>
+                                                <td class="text-end fw-bold text-danger">@bal.RemQty.ToString("N0")</td>
+                                            </tr>
+                                        }
+
+                                        @if (!MakerBalances.Any())
+                                        {
+                                            <tr>
+                                                <td colspan="4" class="text-center text-muted py-3">
+                                                    No pending balances found for this maker.
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive" style="max-height: 200px;">
+                                <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.83rem;">
+                                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.75rem; text-transform: uppercase;">
+                                        <tr>
+                                            <th>Process</th>
+                                            <th>Item Code</th>
+                                            <th>Item Name</th>
+                                            <th>Date</th>
+                                            <th class="text-end">Iss Qty</th>
+                                            <th class="text-end">Rate</th>
+                                            <th class="text-end">Value</th>
+                                            <th>Return Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var hist in MakerHistory)
+                                        {
+                                            <tr>
+                                                <td>@hist.ProcessName</td>
+                                                <td class="fw-bold text-primary">@hist.ItemCode</td>
+                                                <td>@hist.ItemName</td>
+                                                <td>@hist.DT.ToString("dd-MMM-yyyy")</td>
+                                                <td class="text-end fw-bold text-dark">@hist.IssQty.ToString("N0")</td>
+                                                <td class="text-end text-success fw-bold">@hist.Rate.ToString("N2")</td>
+                                                <td class="text-end text-primary fw-bold">@hist.IssValue.ToString("N2")</td>
+                                                <td>@hist.ReturnDT.ToString("dd-MMM-yyyy")</td>
+                                            </tr>
+                                        }
+
+                                        @if (!MakerHistory.Any())
+                                        {
+                                            <tr>
+                                                <td colspan="8" class="text-center text-muted py-3">
+                                                    No recent issuance history found for this maker.
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+        </div>
+    </div>
+</div>

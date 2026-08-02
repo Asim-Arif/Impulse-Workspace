@@ -1,0 +1,338 @@
+@page "/production/receive-against-po"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Production
+@using Blazored.Typeahead
+
+<PageTitle>Receive against PO — Production</PageTitle>
+
+<style>
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .disabled-typeahead-wrapper .blazored-typeahead {
+        background-color: #e9ecef !important;
+        overflow: hidden !important;
+        border-radius: 4px;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__results {
+        z-index: 10000 !important;
+    }
+    .item-thumb-btn {
+        width: 32px;
+        height: 32px;
+        object-fit: cover;
+        border-radius: 4px;
+        cursor: pointer;
+        border: 1px solid #dee2e6;
+        transition: transform 0.2s ease-in-out;
+    }
+    .item-thumb-btn:hover {
+        transform: scale(1.15);
+        border-color: #0d6efd;
+    }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <!-- Title Header & Top Controls -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <h5 class="mb-0 fw-bold text-dark-emphasis">
+                    <i class="fas fa-truck-ramp-box text-primary me-2"></i>
+                    Receive against PO
+                </h5>
+                <div class="d-flex align-items-center gap-3">
+                    <div class="input-group input-group-sm" style="width: 320px;">
+                        <span class="input-group-text bg-light fw-bold text-secondary">M-ISU-</span>
+                        <input type="text" class="form-control fw-bold border-primary text-uppercase"
+                               placeholder="Enter PO Receipt No..."
+                               @bind="SearchReceiptNo"
+                               @onkeyup="HandleSearchKeyUp" />
+                        <button type="button" class="btn btn-primary" @onclick="SearchMasterPOAsync" disabled="@IsSearching">
+                            @if (IsSearching)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-search me-1"></i>
+                            }
+                            Fetch
+                        </button>
+                    </div>
+
+                    <div class="form-check form-switch mb-0 ms-2">
+                        <input class="form-check-input" type="checkbox" id="chkPrintSlip" @bind="PrintSlip" />
+                        <label class="form-check-label fw-bold text-secondary" for="chkPrintSlip" style="font-size:0.82rem;">
+                            Auto Print Slip
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 1: MASTER PO READ-ONLY SUMMARY PANEL -->
+            @if (MasterPO != null)
+            {
+                <div class="card mb-3 border" style="background:#f8f9fb; border-radius:8px;">
+                    <div class="card-header py-2 bg-light fw-bold text-secondary d-flex align-items-center justify-content-between" style="font-size:0.85rem; border-radius:8px 8px 0 0;">
+                        <span><i class="fas fa-file-invoice me-1 text-primary"></i> Master PO Details — @MasterPO.RecieptID</span>
+                        @if (MasterPO.Closed)
+                        {
+                            <span class="badge bg-danger">Closed PO</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-success">Active PO</span>
+                        }
+                    </div>
+                    <div class="card-body py-2">
+                        <div class="row g-3 align-items-center">
+                            <div class="col-md-3">
+                                <div class="text-secondary fw-semibold small">Process Name</div>
+                                <span class="badge bg-primary fs-6 px-3 py-2">@MasterPO.ProcessName</span>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-secondary fw-semibold small">Vendor / Maker Name</div>
+                                <span class="badge bg-dark fs-6 px-3 py-2">[@MasterPO.VendID1] @MasterPO.VendorName</span>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="text-secondary fw-semibold small">Issuance Date</div>
+                                <span class="fw-bold text-dark fs-6">@MasterPO.DT.ToString("dd-MMM-yyyy")</span>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-0" style="font-size:0.78rem;">Mil No. (Material Cert)</label>
+                                <input type="text" class="form-control form-control-sm border-info" @bind="MillCertNo" placeholder="Enter Mil No..." />
+                            </div>
+                            <div class="col-md-1 text-end">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ClearForm">
+                                    <i class="fas fa-rotate-left"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 2: FACTORY EMPLOYEES PANEL (IF IN-HOUSE FACTORY MAKER) -->
+                @if (MasterPO.IsFactoryMaker)
+                {
+                    <div class="card mb-3 border" style="background:#ffffff; border-radius:8px;">
+                        <div class="card-header py-2 bg-light fw-bold text-secondary" style="font-size:0.85rem; border-radius:8px 8px 0 0;">
+                            <i class="fas fa-users me-1 text-primary"></i> In-House Factory Workers Selection
+                        </div>
+                        <div class="card-body py-2">
+                            <div class="row g-2 align-items-center">
+                                <div class="col-md-6">
+                                    <BlazoredTypeahead SearchMethod="SearchEmployees"
+                                                       @bind-Value="SelectedWorker"
+                                                       Placeholder="Search and select worker..."
+                                                       EnableDropDown="true"
+                                                       MinimumLength="0"
+                                                       MaximumSuggestions="1000">
+                                        <SelectedTemplate Context="e">
+                                            @if (e != null)
+                                            {
+                                                @if (!string.IsNullOrEmpty(e.EmpID) && e.EmpID != "0") { <text>[@e.EmpID] </text> }@e.Name
+                                            }
+                                        </SelectedTemplate>
+                                        <ResultTemplate Context="e">
+                                            @if (e != null)
+                                            {
+                                                @if (!string.IsNullOrEmpty(e.EmpID) && e.EmpID != "0") { <text>[@e.EmpID] </text> }@e.Name @(string.IsNullOrEmpty(e.Designation) ? "" : $"({e.Designation})")
+                                            }
+                                        </ResultTemplate>
+                                    </BlazoredTypeahead>
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-sm btn-success w-100" @onclick="AddWorker" disabled="@(SelectedWorker == null)">
+                                        <i class="fas fa-user-plus me-1"></i> Add Worker
+                                    </button>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="d-flex flex-wrap gap-1">
+                                        @foreach (var emp in SelectedWorkers)
+                                        {
+                                            <span class="badge bg-secondary d-flex align-items-center gap-1 py-1 px-2">
+                                                @emp.Name
+                                                <i class="fas fa-times cursor-pointer ms-1" @onclick="() => RemoveWorker(emp)"></i>
+                                            </span>
+                                        }
+
+                                        @if (!SelectedWorkers.Any())
+                                        {
+                                            <span class="text-muted small italic">No factory workers selected yet.</span>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <!-- SECTION 3: ISSUED LINE ITEMS & RECEIVING INPUT GRID -->
+                <div class="card mb-3 border" style="background:#ffffff; border-radius:8px;">
+                    <div class="card-header py-2 bg-light fw-bold text-secondary d-flex align-items-center justify-content-between" style="font-size:0.85rem; border-radius:8px 8px 0 0;">
+                        <span><i class="fas fa-list-check me-1 text-primary"></i> Issued Items &amp; Receiving Input Lines (@Lines.Count)</span>
+                        <span class="badge bg-success fs-6">Total Receiving Qty: @TotalReceivingQty.ToString("N0")</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="max-height: 350px;">
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase;">
+                                    <tr>
+                                        <th style="width: 40px;">#</th>
+                                        <th style="width: 48px;" class="text-center">Pic</th>
+                                        <th>Order No</th>
+                                        <th>Item Code</th>
+                                        <th>Item Name</th>
+                                        <th class="text-end">Issued Qty</th>
+                                        <th class="text-end">Prev Rcvd</th>
+                                        <th class="text-end">Pending Qty</th>
+                                        <th class="text-end" style="width: 140px;">Receiving Qty</th>
+                                        <th style="width: 180px;">Counted By (Optional)</th>
+                                        <th class="text-end">Rate (Pcs)</th>
+                                        <th class="text-end">Receiving Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @{ int idx = 1; }
+                                    @foreach (var line in Lines)
+                                    {
+                                        <tr>
+                                            <td class="fw-bold text-muted">@(idx++)</td>
+                                            <td class="text-center py-1">
+                                                @if (!string.IsNullOrEmpty(line.ItemPicBase64))
+                                                {
+                                                    <img src="@line.ItemPicBase64" class="item-thumb-btn" alt="Pic" @onclick="() => OpenImagePreview(line.ItemPicBase64, line.ItemCode)" title="Click to enlarge" />
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted" style="font-size: 0.75rem;"><i class="fas fa-image text-black-50"></i></span>
+                                                }
+                                            </td>
+                                            <td class="fw-semibold">@(string.IsNullOrEmpty(line.OrderNo) ? "-" : line.OrderNo)</td>
+                                            <td class="fw-bold text-primary">@line.ItemCode</td>
+                                            <td>@line.ItemName</td>
+                                            <td class="text-end fw-semibold text-secondary">@line.IssQty.ToString("N0")</td>
+                                            <td class="text-end text-muted">@line.PrevRcvdQty.ToString("N0")</td>
+                                            <td class="text-end fw-bold text-danger">@line.PendingQty.ToString("N0")</td>
+                                            <td class="text-end">
+                                                <input type="number" class="form-control form-control-sm text-end fw-bold text-success border-success"
+                                                       @bind="line.ReceivingQty"
+                                                       placeholder="0"
+                                                       min="0"
+                                                       max="@line.PendingQty" />
+                                            </td>
+                                            <td>
+                                                <input type="text" class="form-control form-control-sm"
+                                                       @bind="line.CountedBy"
+                                                       placeholder="Counted by..." />
+                                            </td>
+                                            <td class="text-end fw-semibold text-dark">@line.Rate.ToString("N2")</td>
+                                            <td class="text-end fw-bold text-primary">@((line.ReceivingQty * line.Rate).ToString("N2"))</td>
+                                        </tr>
+                                    }
+
+                                    @if (!Lines.Any())
+                                    {
+                                        <tr>
+                                            <td colspan="12" class="text-center text-muted py-4">
+                                                <i class="fas fa-info-circle me-1"></i> No issued line items found under this Master PO.
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                @if (Lines.Any())
+                                {
+                                    <tfoot class="table-light fw-bold">
+                                        <tr>
+                                            <td colspan="5" class="text-end">Total Summary:</td>
+                                            <td class="text-end">@TotalIssuedQty.ToString("N0")</td>
+                                            <td class="text-end">@TotalPrevRcvdQty.ToString("N0")</td>
+                                            <td class="text-end text-danger fs-6">@TotalPendingQty.ToString("N0")</td>
+                                            <td class="text-end text-success fs-6">@TotalReceivingQty.ToString("N0")</td>
+                                            <td colspan="2"></td>
+                                            <td class="text-end text-primary fs-6">@TotalReceivingValue.ToString("N2")</td>
+                                        </tr>
+                                    </tfoot>
+                                }
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card-footer py-2 bg-light d-flex justify-content-end gap-2" style="border-radius: 0 0 8px 8px;">
+                        <button type="button" class="btn btn-sm btn-outline-secondary px-3" @onclick="ClearForm">
+                            <i class="fas fa-rotate-left me-1"></i> Clear
+                        </button>
+                        <button type="button" class="btn btn-sm btn-primary px-4 fw-bold" @onclick="SaveReceiving" disabled="@(TotalReceivingQty <= 0 || IsSaving)">
+                            @if (IsSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-check-circle me-1"></i>
+                            }
+                            Post &amp; Save Receiving
+                        </button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="card border border-dashed py-5 text-center bg-light" style="border-radius: 8px;">
+                    <div class="card-body">
+                        <i class="fas fa-receipt text-muted mb-2" style="font-size: 2.5rem;"></i>
+                        <h6 class="fw-bold text-secondary">Enter Master PO Receipt ID Above</h6>
+                        <p class="text-muted small mb-0">Type an issuance receipt number (e.g. <code>M-ISU-0208261</code> or <code>0208261</code>) and click Fetch to load pending lines for receiving.</p>
+                    </div>
+                </div>
+            }
+
+        </div>
+    </div>
+</div>
+
+<!-- ITEM PICTURE PREVIEW MODAL -->
+@if (ShowImagePreviewModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0, 0, 0, 0.6); z-index: 1055;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0" style="border-radius: 12px;">
+                <div class="modal-header py-2 bg-light">
+                    <h6 class="modal-title fw-bold text-primary">
+                        <i class="fas fa-image me-1"></i> Item Picture — @PreviewItemCode
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="CloseImagePreview"></button>
+                </div>
+                <div class="modal-body text-center p-3">
+                    <img src="@PreviewImageBase64" class="img-fluid rounded border shadow-sm" style="max-height: 400px;" alt="Item Picture" />
+                </div>
+                <div class="modal-footer py-1 bg-light">
+                    <button type="button" class="btn btn-sm btn-secondary" @onclick="CloseImagePreview">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

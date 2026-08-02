@@ -1,0 +1,391 @@
+@page "/production/lot-issuance"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Production
+@using Blazored.Typeahead
+
+<PageTitle>Lot Issuance — Production</PageTitle>
+
+<style>
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .disabled-typeahead-wrapper .blazored-typeahead {
+        background-color: #e9ecef !important;
+        overflow: hidden !important;
+        border-radius: 4px;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__results {
+        z-index: 10000 !important;
+    }
+    .item-thumb-btn {
+        width: 32px;
+        height: 32px;
+        object-fit: cover;
+        border-radius: 4px;
+        cursor: pointer;
+        border: 1px solid #dee2e6;
+        transition: transform 0.2s ease-in-out;
+    }
+    .item-thumb-btn:hover {
+        transform: scale(1.15);
+        border-color: #0d6efd;
+    }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <!-- Title Header & Top Controls -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <h5 class="mb-0 fw-bold text-dark-emphasis">
+                    <i class="fas fa-boxes-packing text-primary me-2"></i>
+                    Lot Issuance
+                </h5>
+                <div class="d-flex align-items-center gap-3">
+                    <div class="form-check form-switch mb-0 ms-2">
+                        <input class="form-check-input" type="checkbox" id="chkPrintIssSlip" @bind="PrintSlip" />
+                        <label class="form-check-label fw-bold text-secondary" for="chkPrintIssSlip" style="font-size:0.82rem;">
+                            Auto Print Slip
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 1: LOT NO SEARCH & HEADER CONTROLS -->
+            <div class="card mb-3 border" style="background:#f8f9fb; border-radius:8px;">
+                <div class="card-body py-3">
+                    <div class="row g-3 align-items-center">
+                        
+                        <!-- 1. Lot No Search Input (First Control) -->
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-primary mb-1" style="font-size:0.82rem;">
+                                Enter Lot No. <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-primary text-white"><i class="fas fa-barcode"></i></span>
+                                <input type="text" class="form-control form-control-sm fw-bold text-uppercase border-primary"
+                                       placeholder="Type Lot No &amp; Press Enter..."
+                                       @bind="SearchLotNo"
+                                       @onkeyup="HandleLotSearchKeyUp"
+                                       autofocus />
+                                <button type="button" class="btn btn-primary btn-sm fw-bold" @onclick="LookupLotAsync" disabled="@IsSearching">
+                                    @if (IsSearching)
+                                    {
+                                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                    }
+                                    else
+                                    {
+                                        <i class="fas fa-search me-1"></i> <text>Fetch</text>
+                                    }
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 2. Target Process (Read-Only / Disabled) -->
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
+                                Target Process
+                            </label>
+                            <select class="form-select form-select-sm fw-bold bg-light" disabled value="@SelectedProcessID">
+                                <option value="0">-- Auto Process --</option>
+                                @foreach (var proc in Processes)
+                                {
+                                    <option value="@proc.ProcessID">@proc.Description</option>
+                                }
+                            </select>
+                        </div>
+
+                        <!-- 3. Target Maker / Vendor -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
+                                Target Maker / Vendor <span class="text-danger">*</span>
+                            </label>
+                            <BlazoredTypeahead SearchMethod="SearchMakers"
+                                               @bind-Value="SelectedMaker"
+                                               Placeholder="Select maker/vendor..."
+                                               EnableDropDown="true"
+                                               MinimumLength="0"
+                                               MaximumSuggestions="1000">
+                                <SelectedTemplate Context="m">
+                                    @m.DisplayText
+                                </SelectedTemplate>
+                                <ResultTemplate Context="m">
+                                    @m.DisplayText
+                                </ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+
+                        <!-- 4. Batch No (Auto-populated) -->
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
+                                Batch No.
+                            </label>
+                            <input type="text" class="form-control form-control-sm fw-bold text-center bg-light"
+                                   @bind="BatchNo"
+                                   placeholder="Batch No..." />
+                        </div>
+                    </div>
+
+                    <!-- SECOND ROW: WORKER, COUNTED BY & CHECKBOX OPTIONS -->
+                    <div class="row g-3 align-items-center mt-1 pt-2 border-top">
+                        <!-- Single Worker (Saved in VendIssued.IssEmpID) -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
+                                Factory Worker @(IsFactoryMaker ? "(Required)" : "(Optional)")
+                            </label>
+                            <BlazoredTypeahead SearchMethod="SearchEmployees"
+                                               @bind-Value="SelectedWorker"
+                                               Placeholder="Select factory worker..."
+                                               EnableDropDown="true"
+                                               MinimumLength="0"
+                                               MaximumSuggestions="1000">
+                                <SelectedTemplate Context="e">
+                                    @if (e != null)
+                                    {
+                                        @if (!string.IsNullOrEmpty(e.EmpID) && e.EmpID != "0") { <text>[@e.EmpID] </text> }@e.Name
+                                    }
+                                </SelectedTemplate>
+                                <ResultTemplate Context="e">
+                                    @if (e != null)
+                                    {
+                                        @if (!string.IsNullOrEmpty(e.EmpID) && e.EmpID != "0") { <text>[@e.EmpID] </text> }@e.Name @(string.IsNullOrEmpty(e.Designation) ? "" : $"({e.Designation})")
+                                    }
+                                </ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+
+                        <!-- Counted By Employee (Saved in VendIssdDetail.CountedBy) -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
+                                Counted By
+                            </label>
+                            <BlazoredTypeahead SearchMethod="SearchEmployees"
+                                               @bind-Value="SelectedCountedBy"
+                                               Placeholder="Select counted by..."
+                                               EnableDropDown="true"
+                                               MinimumLength="0"
+                                               MaximumSuggestions="1000">
+                                <SelectedTemplate Context="e">
+                                    @if (e != null)
+                                    {
+                                        @if (!string.IsNullOrEmpty(e.EmpID) && e.EmpID != "0") { <text>[@e.EmpID] </text> }@e.Name
+                                    }
+                                </SelectedTemplate>
+                                <ResultTemplate Context="e">
+                                    @if (e != null)
+                                    {
+                                        @if (!string.IsNullOrEmpty(e.EmpID) && e.EmpID != "0") { <text>[@e.EmpID] </text> }@e.Name
+                                    }
+                                </ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+
+                        <!-- Reset Button -->
+                        <div class="col-md-4 text-end align-self-end">
+                            <button type="button" class="btn btn-sm btn-outline-secondary px-3" @onclick="ClearForm">
+                                <i class="fas fa-rotate-left me-1"></i> Reset Form
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- THIRD ROW: CHECKBOX OPTIONS -->
+                    <div class="row g-3 align-items-center mt-1 pt-2 border-top">
+                        <div class="col-auto">
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="chkSampleProvided" @bind="SampleProvided" />
+                                <label class="form-check-label fw-bold text-dark" for="chkSampleProvided" style="font-size:0.82rem;">
+                                    Sample Provided
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="chkDrawingProvided" @bind="DrawingProvided" />
+                                <label class="form-check-label fw-bold text-dark" for="chkDrawingProvided" style="font-size:0.82rem;">
+                                    Drawing Provided
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="chkForgingProvided" @bind="ForgingProvided" />
+                                <label class="form-check-label fw-bold text-dark" for="chkForgingProvided" style="font-size:0.82rem;">
+                                    Forging Provided
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="chkSteelProvided" @bind="SteelProvided" />
+                                <label class="form-check-label fw-bold text-dark" for="chkSteelProvided" style="font-size:0.82rem;">
+                                    Steel Provided
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 2: STAGED ISSUANCE ITEMS GRID -->
+            <div class="card mb-3 border" style="background:#ffffff; border-radius:8px;">
+                <div class="card-header py-2 bg-light fw-bold text-secondary d-flex align-items-center justify-content-between" style="font-size:0.85rem; border-radius:8px 8px 0 0;">
+                    <span><i class="fas fa-boxes-stacked me-1 text-primary"></i> Staged Items for Lot Issuance (@StagedItems.Count)</span>
+                    <span class="badge bg-primary fs-6">Total Issuance Qty: @TotalIssuanceQty.ToString("N0")</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 380px;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase;">
+                                <tr>
+                                    <th style="width: 40px;">#</th>
+                                    <th style="width: 48px;" class="text-center">Pic</th>
+                                    <th>Order No</th>
+                                    <th>Item Code</th>
+                                    <th>Item Name</th>
+                                    <th>Lot No</th>
+                                    <th class="text-end">Avail Qty</th>
+                                    <th class="text-end" style="width: 130px;">Issuance Qty</th>
+                                    <th style="width: 160px;">Return Process</th>
+                                    <th class="text-end">Rate (Pcs)</th>
+                                    <th class="text-end">Total Amount</th>
+                                    <th style="width: 40px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{ int idx = 1; }
+                                @foreach (var item in StagedItems)
+                                {
+                                    <tr>
+                                        <td class="fw-bold text-muted">@(idx++)</td>
+                                        <td class="text-center py-1">
+                                            @if (!string.IsNullOrEmpty(item.ItemPicBase64))
+                                            {
+                                                <img src="@item.ItemPicBase64" class="item-thumb-btn" alt="Pic" @onclick="() => OpenImagePreview(item.ItemPicBase64, item.ItemCode)" title="Click to enlarge" />
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted" style="font-size: 0.75rem;"><i class="fas fa-image text-black-50"></i></span>
+                                            }
+                                        </td>
+                                        <td class="fw-semibold">@(string.IsNullOrEmpty(item.OrderNo) ? "-" : item.OrderNo)</td>
+                                        <td class="fw-bold text-primary">@item.ItemCode</td>
+                                        <td>@item.ItemName</td>
+                                        <td>
+                                            <span class="badge bg-light text-dark border">@item.LotNo</span>
+                                        </td>
+                                        <td class="text-end fw-semibold text-secondary">@item.AvailableQty.ToString("N0")</td>
+                                        <!-- Locked / Read-Only Issuance Quantity -->
+                                        <td class="text-end">
+                                            <input type="number" class="form-control form-control-sm text-end fw-bold text-primary border-primary bg-light"
+                                                   @bind="item.IssuanceQty"
+                                                   readonly
+                                                   placeholder="0" />
+                                        </td>
+                                        <!-- Locked / Read-Only Return Process -->
+                                        <td>
+                                            <span class="badge bg-light text-dark border">@(string.IsNullOrEmpty(item.ReturnProcessName) ? "Default Process" : item.ReturnProcessName)</span>
+                                        </td>
+                                        <td class="text-end fw-semibold text-dark">@item.Rate.ToString("N2")</td>
+                                        <td class="text-end fw-bold text-success">@((item.IssuanceQty * item.Rate).ToString("N2"))</td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-xs btn-outline-danger" @onclick="() => RemoveStagedItem(item)">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+
+                                @if (!StagedItems.Any())
+                                {
+                                    <tr>
+                                        <td colspan="12" class="text-center text-muted py-5">
+                                            <i class="fas fa-barcode me-1" style="font-size: 1.8rem;"></i>
+                                            <div class="mt-2 fw-semibold">No Lot Loaded for Issuance</div>
+                                            <div class="small">Enter a Lot No in the search box above and press Enter/Fetch to load lot details.</div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                            @if (StagedItems.Any())
+                            {
+                                <tfoot class="table-light fw-bold">
+                                    <tr>
+                                        <td colspan="6" class="text-end">Total Summary:</td>
+                                        <td class="text-end">@TotalAvailableQty.ToString("N0")</td>
+                                        <td class="text-end text-primary fs-6">@TotalIssuanceQty.ToString("N0")</td>
+                                        <td colspan="2"></td>
+                                        <td class="text-end text-success fs-6">@TotalIssuanceValue.ToString("N2")</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            }
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer py-2 bg-light d-flex justify-content-end gap-2" style="border-radius: 0 0 8px 8px;">
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-3" @onclick="ClearForm">
+                        <i class="fas fa-rotate-left me-1"></i> Clear Form
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary px-4 fw-bold" @onclick="SaveLotIssuance" disabled="@(!StagedItems.Any() || TotalIssuanceQty <= 0 || IsSaving)">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-paper-plane me-1"></i>
+                        }
+                        Post &amp; Save Lot Issuance
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ITEM PICTURE PREVIEW MODAL -->
+@if (ShowImagePreviewModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0, 0, 0, 0.6); z-index: 1055;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0" style="border-radius: 12px;">
+                <div class="modal-header py-2 bg-light">
+                    <h6 class="modal-title fw-bold text-primary">
+                        <i class="fas fa-image me-1"></i> Item Picture — @PreviewItemCode
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="CloseImagePreview"></button>
+                </div>
+                <div class="modal-body text-center p-3">
+                    <img src="@PreviewImageBase64" class="img-fluid rounded border shadow-sm" style="max-height: 400px;" alt="Item Picture" />
+                </div>
+                <div class="modal-footer py-1 bg-light">
+                    <button type="button" class="btn btn-sm btn-secondary" @onclick="CloseImagePreview">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

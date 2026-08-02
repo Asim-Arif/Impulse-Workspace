@@ -1,0 +1,107 @@
+@using DataAccessLibrary.Models.ViewModels.Production
+@inject Radzen.NotificationService NotificationService
+
+<div class="row g-3 align-items-stretch">
+    <!-- Options & Settings Section -->
+    <div class="col-md-8">
+        <div class="card border h-100 mb-0" style="background:#f8f9fb; border-radius:8px;">
+            <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; border-radius:8px 8px 0 0; font-size:0.85rem;">
+                <i class="fas fa-sliders me-1 text-primary"></i> General Settings &amp; Identifications
+            </div>
+            <div class="card-body py-3">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Authorization Required</label>
+                        <select class="form-select form-select-sm" @bind="AuthRequiredHelper">
+                            <option value="false">No</option>
+                            <option value="true">Yes</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Show Rate On PO</label>
+                        <select class="form-select form-select-sm" @bind="ShowRateOnPoHelper">
+                            <option value="false">No</option>
+                            <option value="true">Yes</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Maker Name (Urdu)</label>
+                        <input type="text" class="form-control form-control-sm text-end fw-bold" @bind="Model.MakerNameUrdu" placeholder="اردو نام درج کریں" dir="rtl" />
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">CNIC Attached Document (PDF)</label>
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control form-control-sm" value="@Model.CNIC_PDF_FileName" readonly placeholder="No document attached" />
+                            <button class="btn btn-outline-secondary" type="button" @onclick="NotifyAttachmentFeature">
+                                <i class="fas fa-paperclip me-1"></i> Browse...
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Media Attachments (Photo & Thumb) -->
+    <div class="col-md-4">
+        <div class="card border h-100 mb-0" style="background:#f8f9fb; border-radius:8px;">
+            <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; border-radius:8px 8px 0 0; font-size:0.85rem;">
+                <i class="fas fa-camera me-1 text-primary"></i> Picture &amp; Signature
+            </div>
+            <div class="card-body py-3 d-flex flex-column align-items-center gap-3">
+                <!-- Photo Box -->
+                <div class="text-center w-100">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Maker Photo</label>
+                    <div class="border rounded p-3 d-flex flex-column align-items-center justify-content-center bg-white shadow-sm"
+                         style="height: 120px; cursor: pointer; border-style: dashed !important;"
+                         @onclick="NotifyAttachmentFeature">
+                        <i class="fas fa-user-circle fa-3x text-secondary mb-1"></i>
+                        <span class="text-primary fw-semibold" style="font-size: 0.75rem;">Click to upload picture</span>
+                    </div>
+                </div>
+
+                <!-- Thumb Box -->
+                <div class="text-center w-100">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Thumb Impression / Signature</label>
+                    <div class="border rounded p-3 d-flex flex-column align-items-center justify-content-center bg-white shadow-sm"
+                         style="height: 100px; cursor: pointer; border-style: dashed !important;"
+                         @onclick="NotifyAttachmentFeature">
+                        <i class="fas fa-fingerprint fa-2x text-secondary mb-1"></i>
+                        <span class="text-primary fw-semibold" style="font-size: 0.75rem;">Click to upload thumb/sig</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter]
+    public MakerDto Model { get; set; } = default!;
+
+    public string AuthRequiredHelper
+    {
+        get => Model.AuthRequired ? "true" : "false";
+        set => Model.AuthRequired = bool.TryParse(value, out var res) && res;
+    }
+
+    public string ShowRateOnPoHelper
+    {
+        get => Model.ShowRateOnPO ? "true" : "false";
+        set => Model.ShowRateOnPO = bool.TryParse(value, out var res) && res;
+    }
+
+    private void NotifyAttachmentFeature()
+    {
+        NotificationService.Notify(new Radzen.NotificationMessage
+        {
+            Severity = Radzen.NotificationSeverity.Info,
+            Summary = "Feature Notice",
+            Detail = "File and image upload attachment functionality will be enabled in the upcoming storage update.",
+            Duration = 3500
+        });
+    }
+}

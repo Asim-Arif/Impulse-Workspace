@@ -1,0 +1,262 @@
+@page "/production/new-maker"
+@page "/production/new-maker/{VendId:long?}"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Production
+@using Impulse.Components.Production.NewMakerTabs
+@using Blazored.Typeahead
+
+<PageTitle>New Maker</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <!-- Page Title Header -->
+            <div class="row g-2 mb-3 align-items-end border-bottom pb-2">
+                <div class="col-auto d-flex align-items-end pb-1">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-person-digging text-primary me-2"></i>
+                        @(IsEditMode ? "Edit Maker Information" : "New Maker Setup")
+                    </h5>
+                </div>
+            </div>
+
+            <EditForm Model="Model" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger mb-3" />
+
+                <!-- =====================================================
+                     MASTER HEADER PANEL (Maker Name, Code & Acc#)
+                   ===================================================== -->
+                <div class="card mb-3 border" style="background:#f8f9fb; border-radius:8px;">
+                    <div class="card-body py-2">
+                        <div class="row g-3 align-items-end">
+
+                            <div class="col-md-5">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
+                                    Maker / Company Name <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" class="form-control form-control-sm" @bind="Model.VenderName" placeholder="Enter Maker or Company Name" required />
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Maker Code</label>
+                                <input type="text" class="form-control form-control-sm fw-bold text-primary" value="@Model.VendID1" readonly style="background:#f0f2f5;" />
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Account No.</label>
+                                <input type="text" class="form-control form-control-sm fw-bold text-secondary" value="@Model.AccNo" readonly style="background:#f0f2f5;" placeholder="Auto-generated on category select" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Maker Name as per CNIC</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Model.CompanyName" placeholder="Full name as printed on CNIC" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Maker Second Name</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Model.Maker_Second_Name" placeholder="Second or Alias Name" />
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- =====================================================
+                     ALWAYS-VISIBLE CONTACT INFORMATION PANEL
+                     (Matches legacy Frame1 at Top=420)
+                   ===================================================== -->
+                <div class="card mb-3 border" style="background:#ffffff; border-radius:8px;">
+                    <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; border-radius:8px 8px 0 0; font-size:0.85rem;">
+                        <i class="fas fa-address-book me-1 text-primary"></i> Contact &amp; Account Information
+                    </div>
+                    <div class="card-body py-2">
+                        <div class="row g-3">
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Phone 1</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Model.Phone1" placeholder="Phone 1" />
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Phone 2</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Model.Phone2" placeholder="Phone 2" />
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Fax / Phone 3</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Model.Phone3" placeholder="Fax" />
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Mobile</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Model.Mobile" placeholder="Mobile Number" />
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
+                                    NIC No. <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" class="form-control form-control-sm" @bind="Model.NICNo" placeholder="xxxxx-xxxxxxx-x" required />
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">NTN No.</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Model.NTNNo" placeholder="NTN Number" />
+                            </div>
+
+                            <div class="col-md-6 d-flex flex-column">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Address</label>
+                                <textarea class="form-control form-control-sm flex-grow-1" style="min-height: 95px; resize: vertical;" @bind="Model.Address" placeholder="Full address..."></textarea>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="row g-2">
+                                    <div class="col-md-12">
+                                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Bank Account No.</label>
+                                        <input type="text" class="form-control form-control-sm" @bind="Model.BankAccNo" placeholder="Bank Account Number" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Max Limit</label>
+                                        <input type="number" class="form-control form-control-sm text-end" @bind="Model.MaxLimit" placeholder="0" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Time Limit (Days)</label>
+                                        <input type="number" class="form-control form-control-sm text-end" @bind="Model.TimeLimit" placeholder="0" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-12">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
+                                    Maker Category <span class="text-danger">*</span>
+                                </label>
+                                <BlazoredTypeahead SearchMethod="SearchCategories"
+                                                   EnableDropDown="true"
+                                                   Data="Categories"
+                                                   TValue="MakerCategoryModel"
+                                                   TItem="MakerCategoryModel"
+                                                   Value="SelectedCategory"
+                                                   ValueChanged="OnCategorySelected"
+                                                   ValueExpression="@(() => SelectedCategory)"
+                                                   Disabled="IsEditMode"
+                                                   Placeholder="Select Category (Master Account)"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="cat">
+                                        @cat?.AccTitle (@cat?.AccNo)
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="cat">
+                                        [@cat.AccNo] @cat.AccTitle
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- =====================================================
+                     MD3 TAB NAVIGATION
+                   ===================================================== -->
+                <ul class="nav nav-tabs md3-tabs mb-3" id="makerTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "GeneralInfo" ? "active" : "")"
+                                @onclick='() => ChangeTab("GeneralInfo")'
+                                type="button" role="tab">
+                            <i class="fas fa-info-circle me-1"></i> General Info
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "OtherInfo" ? "active" : "")"
+                                @onclick='() => ChangeTab("OtherInfo")'
+                                type="button" role="tab">
+                            <i class="fas fa-ellipsis-h me-1"></i> Other Info
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "Processes" ? "active" : "")"
+                                @onclick='() => ChangeTab("Processes")'
+                                type="button" role="tab">
+                            <i class="fas fa-gears me-1"></i> Processes
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Cascaded Model to Child Tabs -->
+                <CascadingValue Value="Model">
+                    <div class="tab-content" id="makerTabsContent">
+                        @if (ActiveTab == "GeneralInfo")
+                        {
+                            <GeneralInfoTab />
+                        }
+                        else if (ActiveTab == "OtherInfo")
+                        {
+                            <OtherInfoTab PaymentTermsList="PaymentTermsList" />
+                        }
+                        else if (ActiveTab == "Processes")
+                        {
+                            <ProcessesTab Processes="Processes" />
+                        }
+                    </div>
+                </CascadingValue>
+
+                <!-- =====================================================
+                     ACTION BUTTONS (FOOTER)
+                   ===================================================== -->
+                <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                    <button type="button" class="btn btn-sm btn-primary px-3" @onclick="() => Save(closeAfter: false)" disabled="@IsSaving">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-plus-circle me-1"></i>
+                        }
+                        Save &amp; New
+                    </button>
+
+                    <button type="button" class="btn btn-sm btn-success px-3" @onclick="() => Save(closeAfter: true)" disabled="@IsSaving">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-check me-1"></i>
+                        }
+                        Save &amp; Close
+                    </button>
+
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-3" @onclick="Cancel" disabled="@IsSaving">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                </div>
+
+            </EditForm>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    .md3-tabs .nav-link {
+        color: #495057;
+        font-weight: 600;
+        font-size: 0.88rem;
+        border: none;
+        border-bottom: 3px solid transparent;
+        padding: 0.5rem 1.25rem;
+        transition: all 0.2s ease-in-out;
+    }
+    .md3-tabs .nav-link:hover {
+        border-color: #cbd5e1;
+        color: #0d6efd;
+    }
+    .md3-tabs .nav-link.active {
+        color: #0d6efd;
+        border-bottom-color: #0d6efd;
+        background: transparent;
+    }
+</style>

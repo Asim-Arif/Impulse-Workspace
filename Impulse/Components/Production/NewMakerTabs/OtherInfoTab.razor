@@ -1,0 +1,111 @@
+@using DataAccessLibrary.Models.ViewModels.Production
+@using Blazored.Typeahead
+
+<div class="row g-3 align-items-stretch">
+    <!-- Capacity & Limits Card -->
+    <div class="col-md-5">
+        <div class="card border h-100 mb-0" style="background:#f8f9fb; border-radius:8px;">
+            <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; border-radius:8px 8px 0 0; font-size:0.85rem;">
+                <i class="fas fa-boxes-stacked me-1 text-primary"></i> Payment &amp; Production Operational Parameters
+            </div>
+            <div class="card-body py-3">
+                <div class="row g-3">
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Payment Terms</label>
+                        <BlazoredTypeahead SearchMethod="SearchPaymentTerms"
+                                           EnableDropDown="true"
+                                           Data="PaymentTermsList"
+                                           TValue="string"
+                                           TItem="string"
+                                           Value="Model.PaymentTerms"
+                                           ValueChanged="OnPaymentTermsChanged"
+                                           ValueExpression="@(() => Model.PaymentTerms)"
+                                           Placeholder="Select or type terms"
+                                           MaximumSuggestions="1000">
+                            <SelectedTemplate Context="term">
+                                @term
+                            </SelectedTemplate>
+                            <ResultTemplate Context="term">
+                                @term
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Excess Qty Percentage (%)</label>
+                        <input type="number" step="0.01" class="form-control form-control-sm text-end" @bind="Model.ExcessQtyPercentage" placeholder="0.00" />
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Max. Receivings Against PO</label>
+                        <input type="number" class="form-control form-control-sm text-end" @bind="Model.MaximumRcvingsAgainstPO" placeholder="0" />
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Maker Daily Capacity (Units)</label>
+                        <input type="number" class="form-control form-control-sm text-end" @bind="Model.MakerCapacity" placeholder="0" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Referral Information Card -->
+    <div class="col-md-7">
+        <div class="card border h-100 mb-0" style="background:#f8f9fb; border-radius:8px;">
+            <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; border-radius:8px 8px 0 0; font-size:0.85rem;">
+                <i class="fas fa-user-shield me-1 text-primary"></i> Referral / Guarantor Information
+            </div>
+            <div class="card-body py-3">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Referred By (Name)</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Model.RefBy" placeholder="Referrer Name" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Father's Name</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Model.RefByFName" placeholder="Father's Name" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Referee Phone 1</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Model.RefByPhone1" placeholder="Phone 1" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Referee Phone 2</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Model.RefByPhone2" placeholder="Phone 2" />
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Referee Address</label>
+                        <textarea class="form-control form-control-sm" rows="3" @bind="Model.RefByAddress" placeholder="Full address of referrer..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter]
+    public MakerDto Model { get; set; } = default!;
+
+    [Parameter]
+    public List<string> PaymentTermsList { get; set; } = new List<string>();
+
+    private Task<IEnumerable<string>> SearchPaymentTerms(string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return Task.FromResult<IEnumerable<string>>(PaymentTermsList);
+
+        return Task.FromResult<IEnumerable<string>>(
+            PaymentTermsList.Where(p => p.Contains(searchText, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private void OnPaymentTermsChanged(string val)
+    {
+        Model.PaymentTerms = val;
+    }
+}

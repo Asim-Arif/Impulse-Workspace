@@ -1,0 +1,408 @@
+@page "/production/maker-item-assignment"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Production
+@using BlazorContextMenu
+
+<PageTitle>Maker Item Assignment</PageTitle>
+
+<style>
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .disabled-typeahead-wrapper .blazored-typeahead {
+        background-color: #e9ecef !important;
+        overflow: hidden !important;
+        border-radius: 4px;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__results {
+        z-index: 1050 !important;
+    }
+    .dropdown-row {
+        position: relative !important;
+        z-index: 9999 !important;
+    }
+    .table-wrapper {
+        position: relative !important;
+        z-index: 1 !important;
+    }
+    /* Win11 Context Menu Custom Styling */
+    .win11-section-header {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #6c757d;
+        padding: 4px 12px;
+    }
+    .win11-icon {
+        width: 16px;
+        text-align: center;
+    }
+    .win11-context-menu-container, .blazor-context-menu {
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+    }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <!-- Title -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <h5 class="mb-0 fw-bold text-dark-emphasis">
+                    <i class="fas fa-link text-primary me-2"></i>
+                    Maker Item Assignment
+                </h5>
+                @if (SelectedMaker != null && SelectedProcess != null)
+                {
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="PrintReport">
+                        <i class="fas fa-print me-1"></i> Print Assignment
+                    </button>
+                }
+            </div>
+
+            <!-- Selection & Assignment Header Panel -->
+            <div class="card mb-3 border dropdown-row" style="background:#f8f9fb; border-radius:8px;">
+                <div class="card-body py-3">
+                    <div class="row g-3 align-items-end">
+
+                        <!-- Select Maker -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
+                                Select Maker / Contractor <span class="text-danger">*</span>
+                            </label>
+                            <BlazoredTypeahead SearchMethod="SearchMakers"
+                                               @bind-Value="SelectedMaker"
+                                               Placeholder="Select Maker..."
+                                               EnableDropDown="true"
+                                               MaximumSuggestions="1000">
+                                <SelectedTemplate Context="m">
+                                    @m.DisplayText
+                                </SelectedTemplate>
+                                <ResultTemplate Context="m">
+                                    @m.DisplayText
+                                </ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+
+                        <!-- Select Process -->
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
+                                Select Process <span class="text-danger">*</span>
+                            </label>
+                            <div class="@(SelectedMaker == null ? "disabled-typeahead-wrapper" : "")">
+                                <BlazoredTypeahead SearchMethod="SearchProcesses"
+                                                   @bind-Value="SelectedProcess"
+                                                   Placeholder="Select Process..."
+                                                   EnableDropDown="true"
+                                                   Disabled="SelectedMaker == null"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="p">
+                                        @p.Description
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="p">
+                                        @p.SNO. @p.Description
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                        </div>
+
+                        <!-- Unassigned Items Dropdown -->
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
+                                Unassigned Items
+                            </label>
+                            <div class="@(SelectedProcess == null ? "disabled-typeahead-wrapper" : "")">
+                                <BlazoredTypeahead SearchMethod="SearchUnassignedItems"
+                                                   @bind-Value="SelectedUnassignedItem"
+                                                   Placeholder="Search Item..."
+                                                   EnableDropDown="true"
+                                                   Disabled="SelectedProcess == null"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="item">
+                                        @item.DisplayText
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="item">
+                                        @item.DisplayText
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                        </div>
+
+                        <!-- Assign Action Button -->
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-sm btn-primary w-100" @onclick="AssignSelectedItem" disabled="@(SelectedUnassignedItem == null || IsAssigning)">
+                                @if (IsAssigning)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                }
+                                else
+                                {
+                                    <i class="fas fa-plus-circle me-1"></i>
+                                }
+                                Assign Item
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assigned Items Table Panel -->
+            @if (SelectedMaker != null && SelectedProcess != null)
+            {
+                <div class="card border table-wrapper" style="background:#ffffff; border-radius:8px;">
+                    <div class="card-header py-2 d-flex align-items-center justify-content-between" style="background:#eef0f7; border-radius:8px 8px 0 0;">
+                        <span class="fw-bold text-secondary" style="font-size:0.85rem;">
+                            <i class="fas fa-list-check me-1 text-primary"></i> Assigned Items (@FilteredAssignedItems.Count())
+                        </span>
+                        <div class="input-group input-group-sm" style="max-width: 220px;">
+                            <span class="input-group-text bg-white"><i class="fas fa-search text-secondary"></i></span>
+                            <input type="text" class="form-control" @bind="SearchText" @bind:event="oninput" placeholder="Search assigned list..." />
+                        </div>
+                    </div>
+
+                    <div class="card-body p-0">
+                        @if (IsLoadingItems)
+                        {
+                            <div class="text-center py-4">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                <span class="ms-2 text-muted" style="font-size:0.85rem;">Loading assigned items...</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive" style="max-height: 450px;">
+                                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                        <tr>
+                                            <th style="width: 100px;">Item ID</th>
+                                            <th>Item Name</th>
+                                            <th>Group</th>
+                                            <th class="text-end" style="width: 110px;">Rate (Pcs)</th>
+                                            <th class="text-end" style="width: 110px;">Rate (Dzn)</th>
+                                            <th style="width: 80px;">Unit</th>
+                                            <th>Remarks</th>
+                                            <th>Maker Description</th>
+                                            <th class="text-end" style="width: 110px;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in FilteredAssignedItems)
+                                        {
+                                            <ContextMenuTrigger WrapperTag="tr" MenuId="itemRowContextMenu" Data="item">
+                                                <td class="fw-bold text-primary">@item.ItemID</td>
+                                                <td class="fw-semibold">@item.ItemName</td>
+                                                <td>@(string.IsNullOrEmpty(item.Description) ? "-" : item.Description)</td>
+                                                <td class="text-end fw-bold text-success">@item.Rate.ToString("N2")</td>
+                                                <td class="text-end text-secondary">@item.RateDozen.ToString("N2")</td>
+                                                <td><span class="badge bg-light text-dark border">@(string.IsNullOrEmpty(item.AssignedUnit) ? "Pcs" : item.AssignedUnit)</span></td>
+                                                <td class="text-muted" style="font-size: 0.82rem;">@(string.IsNullOrEmpty(item.Remarks) ? "-" : item.Remarks)</td>
+                                                <td class="text-muted" style="font-size: 0.82rem;">@(string.IsNullOrEmpty(item.MakerDescription) ? "-" : item.MakerDescription)</td>
+                                                <td class="text-end">
+                                                    <button type="button" class="btn btn-xs btn-outline-primary me-1" @onclick="() => OpenEditModal(item)" title="Edit Rate & Remarks">
+                                                        <i class="fas fa-pencil-alt"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-xs btn-outline-danger" @onclick="() => ConfirmUnassign(item)" title="Unassign Item">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </ContextMenuTrigger>
+                                        }
+
+                                        @if (!FilteredAssignedItems.Any())
+                                        {
+                                            <tr>
+                                                <td colspan="9" class="text-center text-muted py-4">
+                                                    <i class="fas fa-info-circle me-1"></i> No assigned items found for this maker and process.
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-info border-0 shadow-xs rounded-3 text-center py-4 mb-0" style="background: #eef7ff; color: #055160;">
+                    <i class="fas fa-arrow-up fa-2x mb-2 d-block"></i>
+                    Please select a <strong>Maker / Contractor</strong> and <strong>Process</strong> to view and assign items.
+                </div>
+            }
+
+        </div>
+    </div>
+</div>
+
+<!-- =====================================================
+     ROW CONTEXT MENU (Win11 Style)
+   ===================================================== -->
+<ContextMenu Id="itemRowContextMenu" Template="Win11Style">
+    <div class="win11-section-header">Item Options</div>
+    <Item OnClick="OnShowHistoryContextClick">
+        <i class="fas fa-history win11-icon text-primary me-2"></i> Show History
+    </Item>
+    <Item OnClick="OnEditContextClick">
+        <i class="fas fa-pencil-alt win11-icon text-secondary me-2"></i> Edit Rate &amp; Remarks
+    </Item>
+    <Seperator />
+    <Item OnClick="OnUnassignContextClick">
+        <i class="fas fa-trash win11-icon text-danger me-2"></i> Unassign Item
+    </Item>
+</ContextMenu>
+
+<!-- =====================================================
+     EDIT RATE & REMARKS MODAL
+   ===================================================== -->
+@if (EditingItem != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header py-2" style="background:#eef0f7; border-radius: 12px 12px 0 0;">
+                    <h6 class="modal-title fw-bold text-dark mb-0">
+                        <i class="fas fa-pencil-alt me-1 text-primary"></i> Edit Rate &amp; Remarks — [@EditingItem.ItemID]
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="CloseEditModal"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <div class="mb-2">
+                        <span class="fw-bold">Item Name:</span> @EditingItem.ItemName
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Rate (per Piece)</label>
+                        <input type="number" step="0.01" class="form-control form-control-sm text-end fw-bold" @bind="EditRateValue" placeholder="0.00" />
+                        <div class="form-text text-end" style="font-size:0.75rem;">Rate per Dozen: <strong>@((EditRateValue * 12m).ToString("N2"))</strong></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Remarks</label>
+                        <textarea class="form-control form-control-sm" rows="3" @bind="EditRemarksValue" placeholder="Enter remarks..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer py-2" style="background:#f8f9fb; border-radius: 0 0 12px 12px;">
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-3" @onclick="CloseEditModal">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-primary px-3" @onclick="SaveEditModal" disabled="@IsSavingEdit">
+                        @if (IsSavingEdit)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        }
+                        Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- =====================================================
+     REVISION HISTORY MODAL
+   ===================================================== -->
+@if (HistoryItem != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header py-2" style="background:#eef0f7; border-radius: 12px 12px 0 0;">
+                    <h6 class="modal-title fw-bold text-dark mb-0">
+                        <i class="fas fa-history me-1 text-primary"></i> Rate Revision History — [@HistoryItem.ItemID] @HistoryItem.ItemName
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="CloseHistoryModal"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <div class="row g-2 mb-3 bg-light p-2 rounded border" style="font-size:0.85rem;">
+                        <div class="col-md-6">
+                            <strong>Maker / Contractor:</strong> @SelectedMaker?.VenderName
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Process:</strong> @SelectedProcess?.Description
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Current Rate (Pcs):</strong> <span class="text-success fw-bold">@HistoryItem.Rate.ToString("N2")</span>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Current Rate (Dozen):</strong> <span class="text-secondary fw-bold">@HistoryItem.RateDozen.ToString("N2")</span>
+                        </div>
+                    </div>
+
+                    @if (IsLoadingHistory)
+                    {
+                        <div class="text-center py-4">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                            <span class="ms-2 text-muted" style="font-size:0.85rem;">Loading revision history...</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive" style="max-height: 350px;">
+                            <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.85rem;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase;">
+                                    <tr>
+                                        <th style="width: 50px;">#</th>
+                                        <th style="width: 150px;">Date &amp; Time</th>
+                                        <th style="width: 140px;">User Name</th>
+                                        <th class="text-end" style="width: 110px;">Rate (Pcs)</th>
+                                        <th class="text-end" style="width: 110px;">Rate (Dzn)</th>
+                                        <th>Remarks</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @{ int idx = 1; }
+                                    @foreach (var rev in RevisionHistory)
+                                    {
+                                        <tr>
+                                            <td class="text-muted fw-bold">@(idx++)</td>
+                                            <td>@rev.DTEntry.ToString("dd-MMM-yyyy HH:mm")</td>
+                                            <td class="fw-semibold text-dark">@rev.UserName</td>
+                                            <td class="text-end fw-bold text-success">@rev.Rate.ToString("N2")</td>
+                                            <td class="text-end text-secondary">@rev.RateDozen.ToString("N2")</td>
+                                            <td class="text-muted">@(string.IsNullOrEmpty(rev.Remarks) ? "-" : rev.Remarks)</td>
+                                        </tr>
+                                    }
+
+                                    @if (!RevisionHistory.Any())
+                                    {
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted py-3">
+                                                <i class="fas fa-info-circle me-1"></i> No historical rate revisions recorded for this item.
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer py-2" style="background:#f8f9fb; border-radius: 0 0 12px 12px;">
+                    <button type="button" class="btn btn-sm btn-secondary px-4" @onclick="CloseHistoryModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+

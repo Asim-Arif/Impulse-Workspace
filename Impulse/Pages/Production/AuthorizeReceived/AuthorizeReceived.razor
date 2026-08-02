@@ -1,0 +1,457 @@
+@page "/production/authorize-received"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Production
+@using Blazored.Typeahead
+
+<PageTitle>Authorize Received — Production</PageTitle>
+
+<style>
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .disabled-typeahead-wrapper .blazored-typeahead {
+        background-color: #e9ecef !important;
+        overflow: hidden !important;
+        border-radius: 4px;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__results {
+        z-index: 10000 !important;
+    }
+    .clickable-badge {
+        cursor: pointer;
+        transition: transform 0.15s ease-in-out;
+    }
+    .clickable-badge:hover {
+        transform: scale(1.1);
+    }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <!-- Title Header & Top Controls -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <h5 class="mb-0 fw-bold text-dark-emphasis">
+                    <i class="fas fa-clipboard-check text-primary me-2"></i>
+                    Authorize Received Entries
+                </h5>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="LoadPendingItemsAsync">
+                        <i class="fas fa-sync-alt me-1"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- SECTION 1: SEARCH & FILTER BAR -->
+            <div class="card mb-3 border" style="background:#f8f9fb; border-radius:8px;">
+                <div class="card-body py-3">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Date From</label>
+                            <input type="date" class="form-control form-control-sm" @bind="Filter.DateFrom" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Date To</label>
+                            <input type="date" class="form-control form-control-sm" @bind="Filter.DateTo" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Vendor / Maker</label>
+                            <select class="form-select form-select-sm" @bind="Filter.VendID">
+                                <option value="0">-- All Vendors --</option>
+                                @foreach (var m in AvailableMakers)
+                                {
+                                    <option value="@m.VendID">@m.DisplayText</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Process</label>
+                            <select class="form-select form-select-sm" @bind="Filter.ProcessID">
+                                <option value="0">-- All Processes --</option>
+                                @foreach (var p in AvailableProcesses)
+                                {
+                                    <option value="@p.ProcessID">@p.Description</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-2 text-end align-self-end">
+                            <button type="button" class="btn btn-sm btn-primary w-100 fw-bold" @onclick="LoadPendingItemsAsync" disabled="@IsLoading">
+                                @if (IsLoading)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                }
+                                else
+                                {
+                                    <i class="fas fa-search me-1"></i>
+                                }
+                                Filter Entries
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 2: TOOLBAR & INSPECTOR SELECTOR -->
+            <div class="d-flex align-items-center justify-content-between bg-light p-2 rounded mb-3 border">
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-xs btn-outline-primary" @onclick="SelectAll">
+                        <i class="fas fa-check-double me-1"></i> Select All
+                    </button>
+                    <button type="button" class="btn btn-xs btn-outline-secondary" @onclick="UnselectAll">
+                        <i class="fas fa-times me-1"></i> Unselect All
+                    </button>
+                    <span class="text-muted ms-2" style="font-size:0.82rem;">
+                        Selected: <strong class="text-primary">@SelectedCount</strong> / @PendingItems.Count
+                    </span>
+                </div>
+
+                <div class="d-flex align-items-center gap-3">
+                    <div class="d-flex align-items-center gap-2" style="min-width: 280px;">
+                        <label class="form-label fw-bold text-secondary mb-0" style="font-size:0.82rem; white-space:nowrap;">
+                            Inspector:
+                        </label>
+                        <BlazoredTypeahead SearchMethod="SearchInspectors"
+                                           @bind-Value="SelectedInspector"
+                                           Placeholder="Select Inspector..."
+                                           EnableDropDown="true"
+                                           MinimumLength="0"
+                                           MaximumSuggestions="1000">
+                            <SelectedTemplate Context="e">
+                                @if (e != null) { <text>[@e.EmpID] @e.Name</text> }
+                            </SelectedTemplate>
+                            <ResultTemplate Context="e">
+                                @if (e != null) { <text>[@e.EmpID] @e.Name @(string.IsNullOrEmpty(e.Designation) ? "" : $"({e.Designation})")</text> }
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+
+                    <button type="button" class="btn btn-sm btn-success px-4 fw-bold" @onclick="SaveAuthorization" disabled="@(!PendingItems.Any(i => i.IsChecked) || IsSaving)">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-check-circle me-1"></i>
+                        }
+                        Post Authorization
+                    </button>
+                </div>
+            </div>
+
+            <!-- SECTION 3: PENDING AUTHORIZE RECEIVED GRID -->
+            <div class="card mb-3 border" style="background:#ffffff; border-radius:8px;">
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 520px;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase;">
+                                <tr>
+                                    <th style="width: 35px;" class="text-center">
+                                        <input class="form-check-input" type="checkbox" checked="@AllSelected" @onchange="ToggleSelectAll" />
+                                    </th>
+                                    <th>Receipt ID</th>
+                                    <th>Vendor</th>
+                                    <th>Order No</th>
+                                    <th>Item Code</th>
+                                    <th>Item Name</th>
+                                    <th>Lot No</th>
+                                    <th>Process</th>
+                                    <th class="text-end">Rcvd Qty</th>
+                                    <th class="text-end" style="width: 100px;">Wastage</th>
+                                    <th class="text-end" style="width: 90px;">Lost Qty</th>
+                                    <th class="text-end" style="width: 100px;">Rework Qty</th>
+                                    <th class="text-end">Repair Amt</th>
+                                    <th class="text-center" style="width: 110px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in PendingItems)
+                                {
+                                    <tr class="@(item.IsChecked ? "table-active" : "")">
+                                        <td class="text-center">
+                                            <input class="form-check-input" type="checkbox" @bind="item.IsChecked" />
+                                        </td>
+                                        <td class="fw-bold text-primary">@item.RecieptID</td>
+                                        <td class="fw-semibold">@item.DisplayVendor</td>
+                                        <td>@(string.IsNullOrEmpty(item.OrderNo) ? "-" : item.OrderNo)</td>
+                                        <td class="fw-bold text-dark">@item.ItemCode</td>
+                                        <td>@item.ItemDescription</td>
+                                        <td><span class="badge bg-light text-dark border">@item.LotNo</span></td>
+                                        <td>@item.Process</td>
+                                        <td class="text-end fw-bold text-success">@item.RcvdQty.ToString("N0")</td>
+                                        
+                                        <!-- WASTAGE (EDITABLE / DOUBLE CLICK FOR MODAL) -->
+                                        <td class="text-end" @ondblclick="() => OpenWastageModal(item)">
+                                            <div class="d-flex align-items-center justify-content-end gap-1">
+                                                <input type="number" class="form-control form-control-sm text-end fw-bold text-danger py-0"
+                                                       style="height: 28px; width: 65px;"
+                                                       @bind="item.Wastage"
+                                                       min="0" />
+                                                <span class="badge bg-danger clickable-badge" title="Click to edit Wastage Breakdown" @onclick="() => OpenWastageModal(item)">
+                                                    @item.WastageBreakdowns.Count
+                                                </span>
+                                            </div>
+                                        </td>
+
+                                        <!-- LOST QTY -->
+                                        <td class="text-end">
+                                            <input type="number" class="form-control form-control-sm text-end fw-bold text-warning-emphasis py-0"
+                                                   style="height: 28px; width: 65px;"
+                                                   @bind="item.LostQty"
+                                                   min="0" />
+                                        </td>
+
+                                        <!-- REWORK QTY (EDITABLE / DOUBLE CLICK FOR MODAL) -->
+                                        <td class="text-end" @ondblclick="() => OpenReWorkModal(item)">
+                                            <div class="d-flex align-items-center justify-content-end gap-1">
+                                                <input type="number" class="form-control form-control-sm text-end fw-bold text-warning py-0"
+                                                       style="height: 28px; width: 65px;"
+                                                       @bind="item.ReWorkQty"
+                                                       min="0" />
+                                                <span class="badge bg-warning text-dark clickable-badge" title="Click to edit Rework Breakdown" @onclick="() => OpenReWorkModal(item)">
+                                                    @item.ReWorkBreakdowns.Count
+                                                </span>
+                                            </div>
+                                        </td>
+
+                                        <!-- REPAIR AMT -->
+                                        <td class="text-end fw-semibold">
+                                            <input type="number" class="form-control form-control-sm text-end py-0"
+                                                   style="height: 28px; width: 75px;"
+                                                   @bind="item.RepairAmt"
+                                                   min="0" />
+                                        </td>
+
+                                        <!-- ACTIONS -->
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-xs btn-outline-danger me-1" @onclick="() => OpenWastageModal(item)" title="Wastage Breakdown">
+                                                <i class="fas fa-dumpster"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-xs btn-outline-warning" @onclick="() => OpenReWorkModal(item)" title="Rework Breakdown">
+                                                <i class="fas fa-wrench"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+
+                                @if (!PendingItems.Any() && !IsLoading)
+                                {
+                                    <tr>
+                                        <td colspan="14" class="text-center text-muted py-5">
+                                            <i class="fas fa-check-circle text-success me-1" style="font-size: 2rem;"></i>
+                                            <div class="mt-2 fw-semibold">No Received Entries Pending Authorization</div>
+                                            <div class="small">All received lot entries are currently authorized.</div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- WASTAGE BREAKDOWN MODAL -->
+@if (ShowWastageModal && CurrentModalItem != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0, 0, 0, 0.6); z-index: 1055;">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0" style="border-radius: 12px;">
+                <div class="modal-header py-2 bg-danger text-white">
+                    <h6 class="modal-title fw-bold">
+                        <i class="fas fa-dumpster me-1"></i> Wastage Breakdown — Lot [@CurrentModalItem.LotNo] (@CurrentModalItem.ItemCode)
+                    </h6>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseWastageModal"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-bold text-dark" style="font-size:0.88rem;">Total Wastage Qty: <strong class="text-danger fs-6">@TempWastageList.Sum(w => w.Qty)</strong></span>
+                        <button type="button" class="btn btn-xs btn-success fw-bold" @onclick="AddWastageRow">
+                            <i class="fas fa-plus me-1"></i> Add Line
+                        </button>
+                    </div>
+
+                    <div class="table-responsive" style="max-height: 300px;">
+                        <table class="table table-sm table-bordered align-middle" style="font-size: 0.82rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Wastage Type</th>
+                                    <th style="width: 110px;" class="text-end">Qty</th>
+                                    <th style="width: 180px;">Charge To</th>
+                                    <th style="width: 200px;">Target Vendor / Employee</th>
+                                    <th style="width: 40px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var w in TempWastageList)
+                                {
+                                    <tr>
+                                        <td>
+                                            <select class="form-select form-select-sm" @bind="w.Wastage_RefID">
+                                                <option value="0">-- Select Wastage Type --</option>
+                                                @foreach (var wt in AvailableWastageTypes)
+                                                {
+                                                    <option value="@wt.EntryID">@wt.Description</option>
+                                                }
+                                            </select>
+                                        </td>
+                                        <td class="text-end">
+                                            <input type="number" class="form-control form-control-sm text-end fw-bold text-danger" @bind="w.Qty" min="1" />
+                                        </td>
+                                        <td>
+                                            <select class="form-select form-select-sm" @bind="w.WastageType">
+                                                <option value="1">1. Charge to Vendor</option>
+                                                <option value="2">2. Charge to Originator</option>
+                                                <option value="3">3. Charge to Selection</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            @if (w.WastageType == 3)
+                                            {
+                                                <select class="form-select form-select-sm" @bind="w.VendID">
+                                                    <option value="0">-- Select Vendor --</option>
+                                                    @foreach (var m in AvailableMakers)
+                                                    {
+                                                        <option value="@m.VendID">@m.DisplayText</option>
+                                                    }
+                                                </select>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted small">Auto (Current/Originator)</span>
+                                            }
+                                        </td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-xs btn-outline-danger" @onclick="() => RemoveWastageRow(w)">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+
+                                @if (!TempWastageList.Any())
+                                {
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted py-3">No wastage breakdown entries. Click "Add Line" to add.</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer py-2 bg-light">
+                    <button type="button" class="btn btn-sm btn-secondary" @onclick="CloseWastageModal">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-danger fw-bold px-3" @onclick="SaveWastageModal">Apply Wastage</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- REWORK BREAKDOWN MODAL -->
+@if (ShowReWorkModal && CurrentModalItem != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0, 0, 0, 0.6); z-index: 1055;">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0" style="border-radius: 12px;">
+                <div class="modal-header py-2 bg-warning text-dark">
+                    <h6 class="modal-title fw-bold">
+                        <i class="fas fa-wrench me-1"></i> Rework Breakdown — Lot [@CurrentModalItem.LotNo] (@CurrentModalItem.ItemCode)
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="CloseReWorkModal"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-bold text-dark" style="font-size:0.88rem;">Total Rework Qty: <strong class="text-warning-emphasis fs-6">@TempReWorkList.Sum(r => r.Qty)</strong></span>
+                        <button type="button" class="btn btn-xs btn-success fw-bold" @onclick="AddReWorkRow">
+                            <i class="fas fa-plus me-1"></i> Add Line
+                        </button>
+                    </div>
+
+                    <div class="table-responsive" style="max-height: 300px;">
+                        <table class="table table-sm table-bordered align-middle" style="font-size: 0.82rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Repair / Rework Type</th>
+                                    <th style="width: 130px;" class="text-end">Qty</th>
+                                    <th style="width: 220px;">Return Process</th>
+                                    <th style="width: 40px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var r in TempReWorkList)
+                                {
+                                    <tr>
+                                        <td>
+                                            <select class="form-select form-select-sm" @bind="r.Repair_RefID">
+                                                <option value="0">-- Select Repair Type --</option>
+                                                @foreach (var rt in AvailableRepairTypes)
+                                                {
+                                                    <option value="@rt.EntryID">@rt.Description</option>
+                                                }
+                                            </select>
+                                        </td>
+                                        <td class="text-end">
+                                            <input type="number" class="form-control form-control-sm text-end fw-bold text-warning-emphasis" @bind="r.Qty" min="1" />
+                                        </td>
+                                        <td>
+                                            <select class="form-select form-select-sm" @bind="r.ReturnProcessID">
+                                                <option value="0">-- Select Process --</option>
+                                                @foreach (var p in AvailableProcesses)
+                                                {
+                                                    <option value="@p.ProcessID">@p.Description</option>
+                                                }
+                                            </select>
+                                        </td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-xs btn-outline-danger" @onclick="() => RemoveReWorkRow(r)">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+
+                                @if (!TempReWorkList.Any())
+                                {
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-3">No rework breakdown entries. Click "Add Line" to add.</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer py-2 bg-light">
+                    <button type="button" class="btn btn-sm btn-secondary" @onclick="CloseReWorkModal">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-warning text-dark fw-bold px-3" @onclick="SaveReWorkModal">Apply Rework</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
