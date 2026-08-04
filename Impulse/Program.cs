@@ -277,6 +277,8 @@ builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IAuthorizeRece
 builder.Services.AddScoped<Impulse.Services.Production.IAuthorizeReceivedService, Impulse.Services.Production.AuthorizeReceivedService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IMakerPOListDataAccess, DataAccessLibrary.DAC.Production.MakerPOListDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Production.IMakerPOListService, Impulse.Services.Production.MakerPOListService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IMakerRcvListDataAccess, DataAccessLibrary.DAC.Production.MakerRcvListDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IMakerRcvListService, Impulse.Services.Production.MakerRcvListService>();
 
 
 
