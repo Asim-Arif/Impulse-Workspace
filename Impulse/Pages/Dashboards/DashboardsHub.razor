@@ -1,0 +1,149 @@
+@page "/dashboards"
+@page "/dashboard"
+@attribute [Authorize]
+
+<PageTitle>Dashboards Hub | Impulse ERP</PageTitle>
+
+<div class="dashboard-shell">
+    <div class="dashboard-hero">
+        <div class="dashboard-icon-wrap" style="background: linear-gradient(135deg, #1565C0, #42A5F5); color: #ffffff;">
+            <i class="fas fa-gauge-high"></i>
+        </div>
+        <div>
+            <h1 class="dashboard-title">Dashboards &amp; Intelligence</h1>
+            <p class="dashboard-subtitle">Executive analytics, demand forecasting, shop floor tracking, and capacity intelligence</p>
+        </div>
+    </div>
+
+    <!-- Featured Flagship Dashboard -->
+    <div class="featured-dash-banner mb-4">
+        <div class="featured-dash-content">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-primary text-white px-2 py-1 fw-bold" style="font-size: 0.75rem;">FLAGSHIP</span>
+                <span class="text-primary fw-bold small text-uppercase">Demand &amp; Production Intelligence</span>
+            </div>
+            <h2 class="featured-dash-title">Production Planning Dashboard</h2>
+            <p class="featured-dash-desc">
+                Live demand-supply equation balancing active customer orders, minimum buffer stock, work-in-process lots, maker POs, and multi-location inventory with weighted milestone completion tracking.
+            </p>
+            <a href="/dashboards/production-planning" class="btn btn-primary fw-bold px-4 py-2 rounded-pill shadow-sm">
+                <i class="fas fa-chart-line me-2"></i> Launch Production Planning Dashboard
+            </a>
+        </div>
+        <div class="featured-dash-icon-bg">
+            <i class="fas fa-bullseye"></i>
+        </div>
+    </div>
+
+    <!-- Dashboard Module Grid -->
+    <h5 class="fw-bold text-dark mb-3">All Dashboards</h5>
+    <div class="dashboard-modules">
+        <a class="dash-card primary-featured" href="/dashboards/command-center" style="border-color: #1976d2; background: linear-gradient(135deg, rgba(25, 118, 210, 0.06), #ffffff);">
+            <i class="fas fa-tower-control text-primary"></i>
+            <span class="fw-bold">Command Center</span>
+            <small class="text-muted" style="font-size: 0.75rem;">Executive Enterprise Cockpit</small>
+        </a>
+
+        <a class="dash-card primary-featured" href="/dashboards/production-planning">
+            <i class="fas fa-bullseye text-primary"></i>
+            <span class="fw-bold">Production Planning</span>
+            <small class="text-muted" style="font-size: 0.75rem;">Demand &amp; Inventory Balance</small>
+        </a>
+
+        <a class="dash-card" href="/production/statistics">
+            <i class="fas fa-chart-pie text-info"></i>
+            <span>Production Statistics</span>
+            <small class="text-muted" style="font-size: 0.75rem;">Output &amp; Lots Running</small>
+        </a>
+
+        <a class="dash-card" href="/production/item-list">
+            <i class="fas fa-layer-group text-primary"></i>
+            <span>Production Item List</span>
+            <small class="text-muted" style="font-size: 0.75rem;">Running Lots &amp; POs</small>
+        </a>
+
+        <a class="dash-card" href="/production/maker-billing-list">
+            <i class="fas fa-file-invoice-dollar text-success"></i>
+            <span>Maker Billing</span>
+            <small class="text-muted" style="font-size: 0.75rem;">Posted Bills &amp; Vouchers</small>
+        </a>
+
+        <a class="dash-card" href="/production/receiving-list">
+            <i class="fas fa-truck-loading text-warning"></i>
+            <span>Maker Receiving</span>
+            <small class="text-muted" style="font-size: 0.75rem;">Vendor Deliveries &amp; PTCs</small>
+        </a>
+
+        <a class="dash-card" href="/production/maker-po-list">
+            <i class="fas fa-list-alt text-danger"></i>
+            <span>Maker PO Tracking</span>
+            <small class="text-muted" style="font-size: 0.75rem;">Vendor Issuances &amp; Auth</small>
+        </a>
+    </div>
+</div>
+
+<style>
+    .dashboard-shell { padding: 2rem; max-width: 1150px; margin: 0 auto; font-family: 'Calibri', 'Segoe UI', sans-serif; }
+    .dashboard-hero { display: flex; align-items: center; gap: 1.25rem; margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e0e2ec; }
+    .dashboard-icon-wrap { width: 64px; height: 64px; border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 1.75rem; flex-shrink: 0; box-shadow: 0 4px 14px rgba(21, 101, 192, 0.25); }
+    .dashboard-title { font-size: 2rem; font-weight: 700; color: #1565C0; margin: 0; line-height: 1.2; }
+    .dashboard-subtitle { color: #5f6368; margin: 0.25rem 0 0; font-size: 0.95rem; }
+
+    .featured-dash-banner {
+        background: linear-gradient(135deg, rgba(21, 101, 192, 0.08), rgba(66, 165, 245, 0.15));
+        border: 1px solid rgba(21, 101, 192, 0.25);
+        border-radius: 20px;
+        padding: 2rem;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .featured-dash-content { max-width: 650px; position: relative; z-index: 2; }
+    .featured-dash-title { font-size: 1.65rem; font-weight: 700; color: #1565C0; margin-bottom: 0.6rem; }
+    .featured-dash-desc { color: #3c4043; font-size: 0.95rem; line-height: 1.5; margin-bottom: 1.25rem; }
+    .featured-dash-icon-bg {
+        position: absolute;
+        right: -20px;
+        bottom: -30px;
+        font-size: 11rem;
+        color: rgba(21, 101, 192, 0.08);
+        z-index: 1;
+        pointer-events: none;
+    }
+
+    .dashboard-modules { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.2rem; }
+    .dash-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 1.5rem 1rem;
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(10px);
+        border: 1px solid #dee2e6;
+        border-radius: 16px;
+        text-decoration: none;
+        color: #1b1b1f;
+        font-weight: 600;
+        font-size: 0.9rem;
+        text-align: center;
+        transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+        cursor: pointer;
+    }
+    .dash-card i { font-size: 1.85rem; }
+    .dash-card:hover {
+        background: #ffffff;
+        box-shadow: 0 8px 24px rgba(21, 101, 192, 0.18);
+        transform: translateY(-3px);
+        text-decoration: none;
+        border-color: #1565C0;
+    }
+    .dash-card.primary-featured {
+        border-color: #1565C0;
+        background: #ffffff;
+        box-shadow: 0 4px 12px rgba(21, 101, 192, 0.12);
+    }
+</style>

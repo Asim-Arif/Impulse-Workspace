@@ -1,0 +1,861 @@
+@page "/dashboards/production-planning"
+@page "/dashboard/production-planning"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Dashboard
+@using DataAccessLibrary.Models.ViewModels.Production
+@using Blazored.Typeahead
+@using BlazorContextMenu
+@using Radzen
+
+<PageTitle>Production Planning Dashboard | Impulse ERP</PageTitle>
+<meta name="description" content="Live demand-supply equation balancing active customer orders, minimum buffer stock, work-in-process lots, maker POs, and inventory." />
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.87); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-3">
+
+            <!-- ── Page Header & Top Action Toolbar ──────────────────────── -->
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <div style="width:38px;height:38px;background:linear-gradient(135deg,#1565C0,#42A5F5);border-radius:10px;display:flex;align-items:center;justify-content:center;">
+                        <i class="fas fa-bullseye text-white" style="font-size:1.05rem;"></i>
+                    </div>
+                    <div>
+                        <h1 class="mb-0 fw-bold" style="font-size:1.25rem;color:#1565C0;">Production Planning Dashboard</h1>
+                        <small class="text-muted" style="font-size:0.75rem;">Live Demand-Supply Balancing, Shop Floor WIP &amp; Inventory Analytics</small>
+                    </div>
+                </div>
+
+                <div class="ms-auto d-flex align-items-center gap-2 flex-wrap">
+                    @if (IsLoading)
+                    {
+                        <span class="text-muted" style="font-size:0.8rem;"><i class="fas fa-spinner fa-spin me-1"></i>Loading...</span>
+                    }
+
+                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="ShowItemPicture" disabled="@(string.IsNullOrEmpty(SelectedArticle?.Id))" title="View Item Picture">
+                        <i class="fas fa-image me-1"></i> Picture
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-info" @onclick="ShowTechnicalDrawing" disabled="@(string.IsNullOrEmpty(SelectedArticle?.Id))" title="Technical Drawing">
+                        <i class="fas fa-drafting-compass me-1"></i> Tech Draw
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="PrintSpecs" disabled="@(string.IsNullOrEmpty(SelectedArticle?.Id))">
+                        <i class="fas fa-file-lines me-1"></i> Specs
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="PrintDetailSpecs" disabled="@(string.IsNullOrEmpty(SelectedArticle?.Id))">
+                        <i class="fas fa-file-invoice me-1"></i> Detail Specs
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-dark" @onclick="OpenDurationModal" disabled="@(string.IsNullOrEmpty(SelectedArticle?.Id))">
+                        <i class="fas fa-clock me-1"></i> Avg Duration
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary fw-bold" @onclick="RefreshDashboardAsync" disabled="@IsLoading">
+                        <i class="fas fa-sync-alt me-1"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Filter & Article Selection Bar ────────────────────────── -->
+            <div class="card border-0 bg-light p-2 mb-3 rounded-3" style="position: relative !important; z-index: 9999 !important;">
+                <div class="row g-2 align-items-end">
+                    <!-- Customer Lookup -->
+                    <div class="col-md-3">
+                        <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Customer</label>
+                        <select class="form-select form-select-sm" @bind="SelectedCustCode" @bind:after="OnCustomerChanged">
+                            @foreach (var c in Customers)
+                            {
+                                <option value="@c.Id">@c.Name</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Country Lookup -->
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Country</label>
+                        <select class="form-select form-select-sm" @bind="SelectedCountry" @bind:after="OnCountryChanged" disabled="@(SelectedCustCode == "0")">
+                            @foreach (var country in Countries)
+                            {
+                                <option value="@country">@country</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Article / Item Typeahead -->
+                    <div class="col-md-5">
+                        <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
+                            Article / Item <span class="text-danger">*</span>
+                        </label>
+                        <BlazoredTypeahead SearchMethod="SearchArticles"
+                                           @bind-Value="SelectedArticle"
+                                           @bind-Value:after="OnArticleChanged"
+                                           Placeholder="Type Item ID or Name to search..."
+                                           EnableDropDown="true"
+                                           MaximumSuggestions="1000">
+                            <SelectedTemplate Context="art">
+                                @art.Name
+                            </SelectedTemplate>
+                            <ResultTemplate Context="art">
+                                @art.Name
+                            </ResultTemplate>
+                            <NotFoundTemplate Context="searchText">
+                                <span class="text-muted small">No articles matching "@searchText"</span>
+                            </NotFoundTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+
+                    <!-- Filter by Order Indicator Tag (if active) -->
+                    <div class="col-md-2 text-end">
+                        @if (!string.IsNullOrEmpty(FilterOrderNo))
+                        {
+                            <div class="d-flex align-items-center justify-content-end gap-1">
+                                <span class="badge bg-warning text-dark py-2 px-2 shadow-sm" style="font-size: 0.78rem;">
+                                    <i class="fas fa-filter me-1"></i> Order: @FilterOrderNo
+                                </span>
+                                <button type="button" class="btn btn-sm btn-outline-danger py-1 px-2" @onclick="ClearOrderFilter" title="Clear Order Filter">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Executive Demand-Supply Equation Ribbon ───────────────── -->
+            @if (DashboardData != null && !string.IsNullOrEmpty(DashboardData.ItemCode))
+            {
+                <div class="row g-2 mb-3">
+                    <!-- Demand: Cust Orders -->
+                    <div class="col-md-2">
+                        <div class="p-2 rounded-3 border bg-white shadow-sm text-center">
+                            <div class="text-muted small fw-bold text-uppercase" style="font-size: 0.72rem;">Customer Orders</div>
+                            <div class="fs-5 fw-bold text-dark">
+                                @DashboardData.Summary.TotalCustOrders.ToString("N0") <span class="text-muted small" style="font-size: 0.75rem;">Pcs</span>
+                            </div>
+                            <div class="small text-muted" style="font-size: 0.7rem;">+ Min Buffer: @DashboardData.Summary.MinStock</div>
+                        </div>
+                    </div>
+
+                    <!-- Supply: Running Lots -->
+                    <div class="col-md-2">
+                        <div class="p-2 rounded-3 border bg-white shadow-sm text-center">
+                            <div class="text-muted small fw-bold text-uppercase" style="font-size: 0.72rem;">Running Lots (WIP)</div>
+                            <div class="fs-5 fw-bold text-primary">
+                                @DashboardData.Summary.TotalRunningLots.ToString("N0") <span class="text-muted small" style="font-size: 0.75rem;">Pcs</span>
+                            </div>
+                            <div class="small text-muted" style="font-size: 0.7rem;">@DashboardData.RunningLots.Count Active Lots</div>
+                        </div>
+                    </div>
+
+                    <!-- Supply: Open Maker POs -->
+                    <div class="col-md-2">
+                        <div class="p-2 rounded-3 border bg-white shadow-sm text-center">
+                            <div class="text-muted small fw-bold text-uppercase" style="font-size: 0.72rem;">Open Maker POs</div>
+                            <div class="fs-5 fw-bold text-info">
+                                @DashboardData.Summary.TotalOpenPO.ToString("N0") <span class="text-muted small" style="font-size: 0.75rem;">Pcs</span>
+                            </div>
+                            <div class="small text-muted" style="font-size: 0.7rem;">@DashboardData.OpenPOs.Count Vendor Orders</div>
+                        </div>
+                    </div>
+
+                    <!-- Supply: Finished & Semi-Finished Inventory -->
+                    <div class="col-md-2">
+                        <div class="p-2 rounded-3 border bg-white shadow-sm text-center">
+                            <div class="text-muted small fw-bold text-uppercase" style="font-size: 0.72rem;">Available Stock</div>
+                            <div class="fs-5 fw-bold text-success">
+                                @((DashboardData.Summary.TotalSFStock + DashboardData.Summary.TotalRFStock).ToString("N0")) <span class="text-muted small" style="font-size: 0.75rem;">Pcs</span>
+                            </div>
+                            <div class="small text-muted" style="font-size: 0.7rem;">RF: @DashboardData.Summary.TotalRFStock | SF: @DashboardData.Summary.TotalSFStock</div>
+                        </div>
+                    </div>
+
+                    <!-- Net Required (Hero Card) -->
+                    <div class="col-md-2">
+                        <div class="p-2 rounded-3 border text-center shadow-sm @(DashboardData.Summary.HasDeficit ? "bg-danger bg-opacity-10 border-danger" : "bg-success bg-opacity-10 border-success")">
+                            <div class="fw-bold text-uppercase @(DashboardData.Summary.HasDeficit ? "text-danger" : "text-success")" style="font-size: 0.72rem;">
+                                @(DashboardData.Summary.HasDeficit ? "🚨 Net Production Required" : "✅ Demand Covered")
+                            </div>
+                            <div class="fs-5 fw-bold @(DashboardData.Summary.HasDeficit ? "text-danger" : "text-success")">
+                                @(DashboardData.Summary.HasDeficit ? $"+{DashboardData.Summary.QtyRequired:N0}" : $"{Math.Abs(DashboardData.Summary.QtyRequired):N0} Surplus")
+                            </div>
+                            <div class="small text-muted" style="font-size: 0.7rem;">Orders + Min - Supply</div>
+                        </div>
+                    </div>
+
+                    <!-- Weighted Milestone Completion Progress Gauge -->
+                    <div class="col-md-2">
+                        <div class="p-2 rounded-3 border bg-white shadow-sm text-center">
+                            <div class="text-muted small fw-bold text-uppercase" style="font-size: 0.72rem;">Completion Rate</div>
+                            <div class="fs-5 fw-bold text-primary">@DashboardData.Summary.CompletionPercentage%</div>
+                            <div class="progress mt-1" style="height: 6px;">
+                                <div class="progress-bar bg-primary progress-bar-striped progress-bar-animated"
+                                     role="progressbar"
+                                     style="width: @DashboardData.Summary.CompletionPercentage%"
+                                     aria-valuenow="@DashboardData.Summary.CompletionPercentage"
+                                     aria-valuemin="0"
+                                     aria-valuemax="100"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Coordinated Dashboard Multi-Card Grid ─────────────────── -->
+                <div class="row g-3">
+                    
+                    <!-- ═══ LEFT COLUMN: Orders, WIP & Open POs ════════════════ -->
+                    <div class="col-lg-6">
+                        
+                        <!-- CARD 1: Customer Orders (Demand Pipeline) -->
+                        <div class="card border mb-3 shadow-sm rounded-3">
+                            <div class="card-header bg-light py-2 d-flex align-items-center justify-content-between">
+                                <span class="fw-bold text-dark" style="font-size: 0.88rem;">
+                                    <i class="fas fa-file-lines text-primary me-1"></i> Customer Orders Demand
+                                </span>
+                                <span class="badge bg-primary rounded-pill">@DashboardData.CustomerOrders.Count Orders (@DashboardData.Summary.TotalCustOrders.ToString("N0") Pcs)</span>
+                            </div>
+                            <div class="card-body p-0 table-responsive" style="max-height: 240px; overflow-y: auto;">
+                                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.84rem;">
+                                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.75rem; text-transform: uppercase;">
+                                        <tr>
+                                            <th>Cust</th>
+                                            <th>Order #</th>
+                                            <th>Date</th>
+                                            <th class="text-end">Un-Shipped</th>
+                                            <th>Delivery</th>
+                                            <th>Remarks</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (!DashboardData.CustomerOrders.Any())
+                                        {
+                                            <tr>
+                                                <td colspan="6" class="text-center py-3 text-muted small">No active unshipped customer orders for this article.</td>
+                                            </tr>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var order in DashboardData.CustomerOrders)
+                                            {
+                                                <ContextMenuTrigger MenuId="orderContextMenu" Data="order" WrapperTag="tr"
+                                                                    class="@(order.IsUrgent ? "table-danger" : (FilterOrderNo == order.OrderNo ? "table-warning fw-bold" : ""))"
+                                                                    style="cursor: pointer;"
+                                                                    @onclick="@(() => OnOrderRowClicked(order.OrderNo))">
+                                                    <td><span class="badge bg-light text-dark border">@order.CustCode</span></td>
+                                                    <td class="fw-bold text-primary">@order.OrderNo</td>
+                                                    <td>@(order.DT?.ToString("dd-MMM-yy") ?? "-")</td>
+                                                    <td class="text-end fw-bold text-dark">@order.UnshippedQty.ToString("N0")</td>
+                                                    <td>@(order.DeliveryDT?.ToString("dd-MMM-yyyy") ?? "-")</td>
+                                                    <td>
+                                                        @if (order.IsUrgent)
+                                                        {
+                                                            <span class="badge bg-danger text-white me-1">URGENT</span>
+                                                        }
+                                                        @order.Remarks
+                                                    </td>
+                                                </ContextMenuTrigger>
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- CARD 2: Running Lots on Shop Floor -->
+                        <div class="card border mb-3 shadow-sm rounded-3">
+                            <div class="card-header bg-light py-2 d-flex align-items-center justify-content-between">
+                                <span class="fw-bold text-dark" style="font-size: 0.88rem;">
+                                    <i class="fas fa-dolly-flatbed text-success me-1"></i> Running Lots in Production
+                                </span>
+                                <span class="badge bg-success rounded-pill">@DashboardData.RunningLots.Count Lots (@DashboardData.Summary.TotalRunningLots.ToString("N0") Pcs)</span>
+                            </div>
+                            <div class="card-body p-0 table-responsive" style="max-height: 240px; overflow-y: auto;">
+                                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.84rem;">
+                                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.75rem; text-transform: uppercase;">
+                                        <tr>
+                                            <th>Lot #</th>
+                                            <th>Current Stage</th>
+                                            <th class="text-end">Qty</th>
+                                            <th>Order #</th>
+                                            <th>Cust</th>
+                                            <th>R2-In Date</th>
+                                            <th>Origin</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (!DashboardData.RunningLots.Any())
+                                        {
+                                            <tr>
+                                                <td colspan="7" class="text-center py-3 text-muted small">No running lots currently on shop floor.</td>
+                                            </tr>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var lot in DashboardData.RunningLots)
+                                            {
+                                                <ContextMenuTrigger MenuId="lotContextMenu" Data="lot" WrapperTag="tr">
+                                                    <td class="fw-bold text-primary">@lot.LotNo</td>
+                                                    <td><span class="badge bg-secondary">@lot.Description</span></td>
+                                                    <td class="text-end fw-bold">@lot.Qty.ToString("N0")</td>
+                                                    <td>@lot.OrderNo</td>
+                                                    <td>@lot.CustCode</td>
+                                                    <td>@(lot.R2InDT?.ToString("dd-MMM-yyyy") ?? "-")</td>
+                                                    <td>
+                                                        @if (lot.OriginType == "Semi")
+                                                        {
+                                                            <span class="badge bg-info text-dark">Semi</span>
+                                                        }
+                                                        else if (lot.OriginType == "Pack")
+                                                        {
+                                                            <span class="badge bg-secondary">Pack</span>
+                                                        }
+                                                    </td>
+                                                </ContextMenuTrigger>
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- CARD 3: Open Maker Purchase Orders -->
+                        <div class="card border mb-3 shadow-sm rounded-3">
+                            <div class="card-header bg-light py-2 d-flex align-items-center justify-content-between">
+                                <span class="fw-bold text-dark" style="font-size: 0.88rem;">
+                                    <i class="fas fa-file-signature text-info me-1"></i> Open Maker Purchase Orders
+                                </span>
+                                <span class="badge bg-info text-dark rounded-pill">@DashboardData.OpenPOs.Count POs (@DashboardData.Summary.TotalOpenPO.ToString("N0") Pcs)</span>
+                            </div>
+                            <div class="card-body p-0 table-responsive" style="max-height: 220px; overflow-y: auto;">
+                                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.84rem;">
+                                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.75rem; text-transform: uppercase;">
+                                        <tr>
+                                            <th>Receipt #</th>
+                                            <th>Maker / Vendor</th>
+                                            <th>Order #</th>
+                                            <th class="text-end">Qty</th>
+                                            <th>Return Date</th>
+                                            <th>Master PO</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (!DashboardData.OpenPOs.Any())
+                                        {
+                                            <tr>
+                                                <td colspan="6" class="text-center py-3 text-muted small">No open purchase orders with makers.</td>
+                                            </tr>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var po in DashboardData.OpenPOs)
+                                            {
+                                                <ContextMenuTrigger MenuId="poContextMenu" Data="po" WrapperTag="tr" class="@(po.IsOverdue ? "table-danger" : "")">
+                                                    <td class="fw-bold">@po.ReceiptID</td>
+                                                    <td>@po.MakerName</td>
+                                                    <td>@po.OrderNo</td>
+                                                    <td class="text-end fw-bold">@po.Qty.ToString("N0")</td>
+                                                    <td>
+                                                        @(po.ReturnDT?.ToString("dd-MMM-yyyy") ?? "-")
+                                                        @if (po.IsOverdue)
+                                                        {
+                                                            <span class="badge bg-danger text-white ms-1" style="font-size: 0.65rem;">OVERDUE</span>
+                                                        }
+                                                    </td>
+                                                    <td><small class="text-muted">@po.MasterPONo</small></td>
+                                                </ContextMenuTrigger>
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- ═══ RIGHT COLUMN: Inventory, Forgings, Routing & Complaints ════ -->
+                    <div class="col-lg-6">
+
+                        <!-- CARD 4: Inventory & Available Stocks Hub (Tabbed) -->
+                        <div class="card border mb-3 shadow-sm rounded-3">
+                            <div class="card-header bg-light py-2 d-flex align-items-center justify-content-between">
+                                <span class="fw-bold text-dark" style="font-size: 0.88rem;">
+                                    <i class="fas fa-boxes-stacked text-warning me-1"></i> Warehouse Inventory &amp; Available Stocks
+                                </span>
+                                <div class="d-flex align-items-center gap-1">
+                                    <button type="button" class="btn btn-xs btn-outline-dark" @onclick="PrintFinishStoreLots" title="Print Finish Store Report">
+                                        <i class="fas fa-print me-1"></i> Print Stock
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body p-2">
+                                <ul class="nav nav-pills nav-fill mb-2 bg-light p-1 rounded-3 border" style="font-size: 0.8rem;">
+                                    <li class="nav-item">
+                                        <button class="nav-link py-1 @(InventoryTab == 0 ? "active bg-primary text-white" : "text-secondary")" @onclick="() => InventoryTab = 0">
+                                            Ready Finish (@DashboardData.ReadyFinishStocks.Count)
+                                        </button>
+                                    </li>
+                                    <li class="nav-item">
+                                        <button class="nav-link py-1 @(InventoryTab == 1 ? "active bg-primary text-white" : "text-secondary")" @onclick="() => InventoryTab = 1">
+                                            RF Lookalikes (@DashboardData.ReadyFinishLookalikes.Count)
+                                        </button>
+                                    </li>
+                                    <li class="nav-item">
+                                        <button class="nav-link py-1 @(InventoryTab == 2 ? "active bg-primary text-white" : "text-secondary")" @onclick="() => InventoryTab = 2">
+                                            Semi-Finish (@DashboardData.SemiFinishStocks.Count)
+                                        </button>
+                                    </li>
+                                    <li class="nav-item">
+                                        <button class="nav-link py-1 @(InventoryTab == 3 ? "active bg-primary text-white" : "text-secondary")" @onclick="() => InventoryTab = 3">
+                                            SF Lookalikes (@DashboardData.SemiFinishLookalikes.Count)
+                                        </button>
+                                    </li>
+                                </ul>
+
+                                <div class="table-responsive" style="max-height: 190px; overflow-y: auto;">
+                                    @if (InventoryTab == 0)
+                                    {
+                                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.82rem;">
+                                            <thead class="table-light text-secondary sticky-top">
+                                                <tr>
+                                                    <th>Location (Store - Rack - Shelf)</th>
+                                                    <th class="text-end">Net Qty</th>
+                                                    <th>Remarks</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var rf in DashboardData.ReadyFinishStocks)
+                                                {
+                                                    <tr>
+                                                        <td>@rf.StoreName</td>
+                                                        <td class="text-end fw-bold text-success">@rf.NetQty.ToString("N0")</td>
+                                                        <td><small class="text-muted">@rf.Remarks</small></td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    }
+                                    else if (InventoryTab == 1)
+                                    {
+                                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.82rem;">
+                                            <thead class="table-light text-secondary sticky-top">
+                                                <tr>
+                                                    <th>Lookalike Item</th>
+                                                    <th>Location</th>
+                                                    <th class="text-end">Qty</th>
+                                                    <th>Remarks</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var rfla in DashboardData.ReadyFinishLookalikes)
+                                                {
+                                                    <tr>
+                                                        <td class="fw-bold">@rfla.ItemID</td>
+                                                        <td>@rfla.StoreName</td>
+                                                        <td class="text-end fw-bold text-success">@rfla.NetQty.ToString("N0")</td>
+                                                        <td><small class="text-muted">@rfla.Remarks</small></td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    }
+                                    else if (InventoryTab == 2)
+                                    {
+                                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.82rem;">
+                                            <thead class="table-light text-secondary sticky-top">
+                                                <tr>
+                                                    <th>Description</th>
+                                                    <th class="text-end">Qty</th>
+                                                    <th>Location</th>
+                                                    <th>Lot #</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var sf in DashboardData.SemiFinishStocks)
+                                                {
+                                                    <tr>
+                                                        <td>@sf.Description</td>
+                                                        <td class="text-end fw-bold text-info">@sf.Qty.ToString("N0")</td>
+                                                        <td>@sf.StoreName</td>
+                                                        <td><span class="badge bg-light text-dark border">@sf.LotNoManual</span></td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    }
+                                    else
+                                    {
+                                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.82rem;">
+                                            <thead class="table-light text-secondary sticky-top">
+                                                <tr>
+                                                    <th>Lookalike Item</th>
+                                                    <th>Description</th>
+                                                    <th class="text-end">Qty</th>
+                                                    <th>Location</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var sfla in DashboardData.SemiFinishLookalikes)
+                                                {
+                                                    <tr>
+                                                        <td class="fw-bold">@sfla.ItemID</td>
+                                                        <td>@sfla.Description</td>
+                                                        <td class="text-end fw-bold text-info">@sfla.Qty.ToString("N0")</td>
+                                                        <td>@sfla.StoreName</td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CARD 5: Forgings & Raw Materials -->
+                        <div class="card border mb-3 shadow-sm rounded-3">
+                            <div class="card-header bg-light py-2 d-flex align-items-center justify-content-between">
+                                <span class="fw-bold text-dark" style="font-size: 0.88rem;">
+                                    <i class="fas fa-gem text-danger me-1"></i> Raw Material / Forgings Availability
+                                </span>
+                                <span class="badge bg-danger rounded-pill">@DashboardData.Forgings.Count Materials (@DashboardData.Summary.TotalForging.ToString("N0") Pcs)</span>
+                            </div>
+                            <div class="card-body p-0 table-responsive" style="max-height: 190px; overflow-y: auto;">
+                                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.84rem;">
+                                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.75rem; text-transform: uppercase;">
+                                        <tr>
+                                            <th>Material Code</th>
+                                            <th class="text-end">Shelf Qty</th>
+                                            <th>Location</th>
+                                            <th>Status</th>
+                                            <th class="text-center">Cross Demand</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (!DashboardData.Forgings.Any())
+                                        {
+                                            <tr>
+                                                <td colspan="5" class="text-center py-3 text-muted small">No raw materials or forgings linked to this article.</td>
+                                            </tr>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var forg in DashboardData.Forgings)
+                                            {
+                                                <ContextMenuTrigger MenuId="forgContextMenu" Data="forg" WrapperTag="tr" class="@(forg.IsInactive ? "table-secondary text-muted" : "")">
+                                                    <td class="fw-bold">@forg.MaterialID</td>
+                                                    <td class="text-end fw-bold text-danger">@forg.ShelfQty.ToString("N0")</td>
+                                                    <td>@forg.LocationDisplay</td>
+                                                    <td>
+                                                        @if (forg.IsInactive)
+                                                        {
+                                                            <span class="badge bg-secondary">Inactive</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-success">Active</span>
+                                                        }
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <button type="button" class="btn btn-xs btn-outline-primary" @onclick="@(() => OpenCrossDemandModal(forg.RMID, forg.MaterialID))" title="View other items sharing this material">
+                                                            <i class="fas fa-list-tree me-1"></i> Breakdown
+                                                        </button>
+                                                    </td>
+                                                </ContextMenuTrigger>
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- CARD 6 & 7: Routing, Makers & Quality Logs (Tabbed) -->
+                        <div class="card border mb-3 shadow-sm rounded-3">
+                            <div class="card-header bg-light py-2">
+                                <ul class="nav nav-pills nav-fill bg-white p-1 rounded-3 border" style="font-size: 0.8rem;">
+                                    <li class="nav-item">
+                                        <button class="nav-link py-1 @(DetailsTab == 0 ? "active bg-primary text-white" : "text-secondary")" @onclick="() => DetailsTab = 0">
+                                            <i class="fas fa-sitemap me-1"></i> Process Routing (@DashboardData.ProcessRoutings.Count)
+                                        </button>
+                                    </li>
+                                    <li class="nav-item">
+                                        <button class="nav-link py-1 @(DetailsTab == 1 ? "active bg-primary text-white" : "text-secondary")" @onclick="() => DetailsTab = 1">
+                                            <i class="fas fa-users-cog me-1"></i> Assigned Makers (@DashboardData.MakerRates.Count)
+                                        </button>
+                                    </li>
+                                    <li class="nav-item">
+                                        <button class="nav-link py-1 @(DetailsTab == 2 ? "active bg-primary text-white" : "text-secondary")" @onclick="() => DetailsTab = 2">
+                                            <i class="fas fa-tag me-1"></i> Customer Catalog (@DashboardData.CustomerCatalogs.Count)
+                                        </button>
+                                    </li>
+                                    <li class="nav-item">
+                                        <button class="nav-link py-1 @(DetailsTab == 3 ? "active bg-primary text-white" : "text-secondary")" @onclick="() => DetailsTab = 3">
+                                            <i class="fas fa-triangle-exclamation me-1"></i> Complaints (@DashboardData.Complaints.Count)
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="card-body p-0 table-responsive" style="max-height: 200px; overflow-y: auto;">
+                                @if (DetailsTab == 0)
+                                {
+                                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.82rem;">
+                                        <thead class="table-light text-secondary sticky-top">
+                                            <tr>
+                                                <th>Seq #</th>
+                                                <th>Process Description</th>
+                                                <th class="text-end">Standard Rate</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var proc in DashboardData.ProcessRoutings)
+                                            {
+                                                <tr>
+                                                    <td><span class="badge bg-light text-dark border">@proc.SNo</span></td>
+                                                    <td class="fw-bold">@proc.Description</td>
+                                                    <td class="text-end">@proc.Rate.ToString("N2")</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                }
+                                else if (DetailsTab == 1)
+                                {
+                                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.82rem;">
+                                        <thead class="table-light text-secondary sticky-top">
+                                            <tr>
+                                                <th>Maker / Vendor</th>
+                                                <th>Process</th>
+                                                <th class="text-end">Rate</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var mkr in DashboardData.MakerRates)
+                                            {
+                                                <tr>
+                                                    <td class="fw-bold">@mkr.MakerName</td>
+                                                    <td>@mkr.ProcessDescription</td>
+                                                    <td class="text-end">@mkr.RateDisplay</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                }
+                                else if (DetailsTab == 2)
+                                {
+                                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.82rem;">
+                                        <thead class="table-light text-secondary sticky-top">
+                                            <tr>
+                                                <th>Customer</th>
+                                                <th>Item ID</th>
+                                                <th>OCR Code</th>
+                                                <th class="text-end">History Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var cat in DashboardData.CustomerCatalogs)
+                                            {
+                                                <tr>
+                                                    <td><span class="badge bg-light text-dark border">@cat.CustCode</span></td>
+                                                    <td class="fw-bold">@cat.ItemID</td>
+                                                    <td>@cat.OCR</td>
+                                                    <td class="text-end fw-bold">@cat.OrderedQty.ToString("N0")</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                }
+                                else
+                                {
+                                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.82rem;">
+                                        <thead class="table-light text-secondary sticky-top">
+                                            <tr>
+                                                <th>Complaint #</th>
+                                                <th>Description</th>
+                                                <th class="text-end">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @if (!DashboardData.Complaints.Any())
+                                            {
+                                                <tr>
+                                                    <td colspan="3" class="text-center py-3 text-muted small">No quality complaints recorded for this article.</td>
+                                                </tr>
+                                            }
+                                            else
+                                            {
+                                                @foreach (var comp in DashboardData.Complaints)
+                                                {
+                                                    <tr>
+                                                        <td class="fw-bold text-danger">@comp.ComplaintNo</td>
+                                                        <td>@comp.Description</td>
+                                                        <td class="text-end">
+                                                            <button type="button" class="btn btn-xs btn-outline-danger" @onclick="@(() => PrintComplaint(comp.EntryID))">
+                                                                <i class="fas fa-print me-1"></i> Print
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            }
+                                        </tbody>
+                                    </table>
+                                }
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            }
+            else if (!IsLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="mb-3 text-muted opacity-50" style="font-size: 3.5rem;">
+                        <i class="fas fa-bullseye"></i>
+                    </div>
+                    <h5 class="fw-bold text-secondary">Select an Article to View Production Planning Intelligence</h5>
+                    <p class="text-muted small">Choose a Customer &amp; Article above to calculate demand, shop floor pipeline, and available inventory.</p>
+                </div>
+            }
+
+        </div>
+    </div>
+</div>
+
+<!-- ── CONTEXT MENUS (Win11Style) ────────────────────────────────────── -->
+<ContextMenu Id="orderContextMenu" Template="Win11Style">
+    <Item OnClick="@((e) => FilterByOrderNoFromContext(e.Data as CustOrderDemandItem))">
+        <span class="win11-icon"><i class="fas fa-filter text-primary"></i></span>
+        <span class="win11-menu-item">Filter Dashboard by this Order</span>
+    </Item>
+    <Item OnClick="@((e) => ClearOrderFilter())">
+        <span class="win11-icon"><i class="fas fa-list text-secondary"></i></span>
+        <span class="win11-menu-item">Show All Orders</span>
+    </Item>
+    <div class="dropdown-divider"></div>
+    <Item OnClick="@((e) => PrintOrderBalance((e.Data as CustOrderDemandItem)?.OrderNo))">
+        <span class="win11-icon"><i class="fas fa-print text-dark"></i></span>
+        <span class="win11-menu-item">Print Order Balance</span>
+    </Item>
+    <Item OnClick="@((e) => PrintOrderPlanningReportR1((e.Data as CustOrderDemandItem)?.OrderNo, true))">
+        <span class="win11-icon"><i class="fas fa-file-invoice text-info"></i></span>
+        <span class="win11-menu-item">R1-Order Planning</span>
+    </Item>
+    <Item OnClick="@((e) => PrintOrderPlanningReportR1((e.Data as CustOrderDemandItem)?.OrderNo, false))">
+        <span class="win11-icon"><i class="fas fa-file-invoice text-info"></i></span>
+        <span class="win11-menu-item">R2-Order Planning</span>
+    </Item>
+    <Item OnClick="@((e) => PrintOrderStatus((e.Data as CustOrderDemandItem)?.OrderNo))">
+        <span class="win11-icon"><i class="fas fa-chart-bar text-success"></i></span>
+        <span class="win11-menu-item">Print Order Status</span>
+    </Item>
+</ContextMenu>
+
+<ContextMenu Id="lotContextMenu" Template="Win11Style">
+    <Item OnClick="@((e) => PrintPTC((e.Data as RunningLotItem)?.LotNo, false))">
+        <span class="win11-icon"><i class="fas fa-print text-primary"></i></span>
+        <span class="win11-menu-item">Print PTC</span>
+    </Item>
+    <Item OnClick="@((e) => PrintPTC((e.Data as RunningLotItem)?.LotNo, true))">
+        <span class="win11-icon"><i class="fas fa-receipt text-info"></i></span>
+        <span class="win11-menu-item">Print PTC Mini</span>
+    </Item>
+    <Item OnClick="@((e) => PrintRunningLotsReport())">
+        <span class="win11-icon"><i class="fas fa-file-lines text-secondary"></i></span>
+        <span class="win11-menu-item">Print Running Lots</span>
+    </Item>
+    <div class="dropdown-divider"></div>
+    <Item OnClick="@((e) => CloseLotPrompt((e.Data as RunningLotItem)?.LotNo))">
+        <span class="win11-icon"><i class="fas fa-ban text-danger"></i></span>
+        <span class="win11-menu-item">Close Lot</span>
+    </Item>
+</ContextMenu>
+
+<ContextMenu Id="poContextMenu" Template="Win11Style">
+    <Item OnClick="@((e) => PrintMakerPO((e.Data as OpenPOItem)?.MasterPONo))">
+        <span class="win11-icon"><i class="fas fa-print text-primary"></i></span>
+        <span class="win11-menu-item">Print PO</span>
+    </Item>
+    <Item OnClick="@((e) => PrintMasterPOStatus((e.Data as OpenPOItem)?.MasterPONo))">
+        <span class="win11-icon"><i class="fas fa-chart-pie text-info"></i></span>
+        <span class="win11-menu-item">Print Master PO Status</span>
+    </Item>
+    <div class="dropdown-divider"></div>
+    <Item OnClick="@((e) => CloseMakerPOPrompt((e.Data as OpenPOItem)?.EntryID ?? 0))">
+        <span class="win11-icon"><i class="fas fa-times-circle text-danger"></i></span>
+        <span class="win11-menu-item">Close PO</span>
+    </Item>
+</ContextMenu>
+
+<ContextMenu Id="forgContextMenu" Template="Win11Style">
+    <Item OnClick="@((e) => OpenCrossDemandModal((e.Data as ForgingRawMaterialItem)?.RMID ?? 0, (e.Data as ForgingRawMaterialItem)?.MaterialID ?? string.Empty))">
+        <span class="win11-icon"><i class="fas fa-list-tree text-primary"></i></span>
+        <span class="win11-menu-item">View Competing Demand</span>
+    </Item>
+    <Item OnClick="@((e) => PrintRMLinkedReport())">
+        <span class="win11-icon"><i class="fas fa-print text-dark"></i></span>
+        <span class="win11-menu-item">Print RM Linked Lots</span>
+    </Item>
+    <div class="dropdown-divider"></div>
+    <Item OnClick="@((e) => ToggleForgingStatus((e.Data as ForgingRawMaterialItem)))">
+        <span class="win11-icon"><i class="fas fa-toggle-on text-warning"></i></span>
+        <span class="win11-menu-item">Toggle Active/Inactive</span>
+    </Item>
+</ContextMenu>
+
+<!-- ── CROSS DEMAND BREAKDOWN MODAL ─────────────────────────────────── -->
+@if (ShowCrossDemandModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-light py-2">
+                    <h6 class="modal-title fw-bold text-primary">
+                        <i class="fas fa-list-tree me-1"></i> Competing Demand for Material: @ActiveForgingCode
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="() => ShowCrossDemandModal = false"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <p class="small text-muted mb-2">Other active customer order articles consuming this raw material batch:</p>
+                    <div class="table-responsive" style="max-height: 300px;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                            <thead class="table-light text-secondary">
+                                <tr>
+                                    <th>Item Code</th>
+                                    <th>Item Name</th>
+                                    <th class="text-end">Un-Shipped Demand</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (!CrossDemandItems.Any())
+                                {
+                                    <tr>
+                                        <td colspan="3" class="text-center py-3 text-muted small">No other articles are competing for this raw material.</td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    @foreach (var c in CrossDemandItems)
+                                    {
+                                        <tr>
+                                            <td class="fw-bold text-primary">@c.ItemID</td>
+                                            <td>@c.ItemName</td>
+                                            <td class="text-end fw-bold text-danger">@c.UnshippedQty.ToString("N0") Pcs</td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer py-2 bg-light">
+                    <button type="button" class="btn btn-sm btn-secondary" @onclick="() => ShowCrossDemandModal = false">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .btn-xs { padding: 0.15rem 0.45rem; font-size: 0.75rem; border-radius: 4px; }
+    .blazored-typeahead { height: 35px !important; font-size: 0.85rem !important; padding-top: 0 !important; padding-bottom: 0 !important; box-sizing: border-box !important; }
+    .blazored-typeahead__input, .blazored-typeahead__controls { height: 33px !important; padding-top: 0 !important; padding-bottom: 0 !important; box-sizing: border-box !important; font-size: 0.85rem !important; }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper { height: 33px !important; display: flex !important; align-items: center !important; box-sizing: border-box !important; max-width: 100% !important; font-size: 0.85rem !important; }
+    .blazored-typeahead__results { max-height: 250px !important; overflow-y: auto !important; z-index: 10000 !important; }
+    .win11-section-header { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: #6c757d; padding: 4px 12px; }
+    .win11-icon { width: 16px; text-align: center; }
+    .win11-context-menu-container, .blazor-context-menu { max-height: 40vh !important; overflow-y: auto !important; }
+</style>

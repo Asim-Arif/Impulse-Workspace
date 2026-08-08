@@ -1,0 +1,674 @@
+@page "/dashboards/command-center"
+@page "/dashboard/command-center"
+@page "/command-center"
+@attribute [Authorize]
+
+<PageTitle>Command Center — SIAL ERP</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+
+    <!-- ── TOP EXECUTIVE HEADER & ACTIONS ──────────────────────────────── -->
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.90); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <!-- Left Title & AsOf Pill -->
+                <div class="d-flex align-items-center gap-3">
+                    <div style="width: 42px; height: 42px; background: linear-gradient(135deg, #0d47a1 0%, #1976d2 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.3rem; box-shadow: 0 4px 12px rgba(13, 71, 161, 0.25);">
+                        <i class="fas fa-tower-control"></i>
+                    </div>
+                    <div>
+                        <div class="d-flex align-items-center gap-2">
+                            <h4 class="mb-0 fw-bold text-dark" style="letter-spacing: -0.3px;">Executive Command Center</h4>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2 py-1" style="font-size: 0.75rem;">
+                                <i class="fas fa-circle-dot me-1 text-success fa-beat-fade"></i> Live Enterprise Cockpit
+                            </span>
+                        </div>
+                        <div class="text-muted small" style="font-size: 0.8rem;">
+                            Real-time synchronization across HR, Inventory, Treasury, Global Demand &amp; Shop Floor Throughput
+                            <span class="ms-2 badge bg-light text-secondary border">As of @Data.AsOfDate.ToString("dd-MMM-yyyy hh:mm tt")</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Quick Action Bar -->
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <button type="button" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1 shadow-sm"
+                            @onclick="PrintCashBookReport" title="Print Cash Book Report for today">
+                        <i class="fas fa-book text-primary"></i> <span>Cash Book</span>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1 shadow-sm"
+                            @onclick="PrintUnshippedOrderList" title="Print Unshipped Customer Orders Report">
+                        <i class="fas fa-ship text-warning"></i> <span>Unshipped Orders</span>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1 shadow-sm"
+                            @onclick="PrintAbsentSheet" title="Print Employee Daily Absentee Sheet">
+                        <i class="fas fa-user-xmark text-danger"></i> <span>Absent Sheet</span>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1 shadow-sm"
+                            @onclick="PrintLoanBalance" title="Print Employee Loan & Advance Balances">
+                        <i class="fas fa-hand-holding-dollar text-success"></i> <span>Staff Loans</span>
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm d-flex align-items-center gap-1 shadow-sm"
+                            @onclick="RefreshDataAsync" disabled="@IsLoading">
+                        <i class="fas fa-rotate @(IsLoading ? "fa-spin" : "")"></i>
+                        <span>@(IsLoading ? "Syncing..." : "Refresh Live")</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (IsLoading && !IsDataLoaded)
+    {
+        <div class="card border-0 shadow-sm p-5 text-center my-4" style="border-radius: 12px; background: rgba(255, 255, 255, 0.9);">
+            <div class="spinner-border text-primary mx-auto mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+            <h5 class="fw-bold text-secondary mb-1">Loading Enterprise Command Center Data...</h5>
+            <p class="text-muted small mb-0">Aggregating live ledgers, inventories, shop floor WIP, and order pipelines.</p>
+        </div>
+    }
+    else
+    {
+        <!-- ── 5 STRATEGIC COMMAND PILLARS GRID ────────────────────────────── -->
+        <div class="row g-3">
+
+            <!-- ── PILLAR 1: HUMAN CAPITAL & ATTENDANCE ───────────────────── -->
+            <div class="col-12 col-xl-4 col-lg-6">
+                <div class="card border-0 shadow-sm h-100 pillar-card" style="border-radius: 12px; background: rgba(255, 255, 255, 0.95); border-top: 4px solid #16a34a !important;">
+                    <div class="card-body p-3">
+                        <div class="d-flex align-items-center justify-content-between pb-2 mb-2 border-bottom">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="pillar-icon bg-success-subtle text-success">
+                                    <i class="fas fa-users-gear"></i>
+                                </div>
+                                <div>
+                                    <h6 class="fw-bold text-dark mb-0">Human Capital &amp; Payroll</h6>
+                                    <span class="text-muted" style="font-size: 0.75rem;">Workforce &amp; Staff Commitments</span>
+                                </div>
+                            </div>
+                            <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                @Data.HR.TotalActiveEmployees Active
+                            </span>
+                        </div>
+
+                        <!-- Payroll Volume -->
+                        <div class="bg-light rounded p-2 mb-2 d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="text-muted small" style="font-size: 0.75rem;">Monthly Payroll Commitment</div>
+                                <div class="fw-bold text-dark" style="font-size: 1.15rem;">
+                                    PKR @Data.HR.TotalMonthlyPayroll.ToString("#,##0")
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="text-muted small" style="font-size: 0.72rem;">Avg / Emp</div>
+                                <div class="fw-semibold text-secondary" style="font-size: 0.85rem;">
+                                    PKR @(Data.HR.TotalActiveEmployees > 0 ? (Data.HR.TotalMonthlyPayroll / Data.HR.TotalActiveEmployees).ToString("#,##0") : "0")
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Attendance Rate Meter -->
+                        <div class="card border-0 bg-light p-2 mb-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-semibold text-secondary" style="font-size: 0.78rem;">Today's Attendance Rate</span>
+                                <span class="fw-bold text-success" style="font-size: 0.82rem;">@Data.HR.AttendancePercentage%</span>
+                            </div>
+                            <div class="progress" style="height: 7px;">
+                                <div class="progress-bar bg-success" role="progressbar" style="width: @Data.HR.AttendancePercentage%"></div>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mt-2 pt-1 border-top" style="font-size: 0.78rem;">
+                                <span class="text-success fw-bold">
+                                    <i class="fas fa-user-check me-1"></i> @Data.HR.TotalPresentEmployees Present
+                                </span>
+                                <a href="javascript:void(0)" class="text-danger fw-bold text-decoration-none" @onclick="PrintAbsentSheet" title="Click to view absentee list">
+                                    <i class="fas fa-user-xmark me-1"></i> @Data.HR.TotalAbsentEmployees Absent <i class="fas fa-arrow-up-right-from-square ms-1" style="font-size: 0.7rem;"></i>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Loans & Advances -->
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <div class="border rounded p-2 text-center h-100 bg-white" style="cursor: pointer;" @onclick="PrintLoanBalance" title="Click to print Loan details">
+                                    <div class="text-muted" style="font-size: 0.72rem;">Long-Term Loans</div>
+                                    <div class="fw-bold text-dark" style="font-size: 0.92rem;">PKR @Data.HR.LongTermLoansBalance.ToString("#,##0")</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="border rounded p-2 text-center h-100 bg-white" style="cursor: pointer;" @onclick="PrintLoanBalance" title="Click to print Advance details">
+                                    <div class="text-muted" style="font-size: 0.72rem;">Short-Term Advances</div>
+                                    <div class="fw-bold text-dark" style="font-size: 0.92rem;">PKR @Data.HR.ShortTermAdvancesBalance.ToString("#,##0")</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── PILLAR 2: TREASURY & LIQUIDITY ─────────────────────────── -->
+            <div class="col-12 col-xl-4 col-lg-6">
+                <div class="card border-0 shadow-sm h-100 pillar-card" style="border-radius: 12px; background: rgba(255, 255, 255, 0.95); border-top: 4px solid #2563eb !important;">
+                    <div class="card-body p-3">
+                        <div class="d-flex align-items-center justify-content-between pb-2 mb-2 border-bottom">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="pillar-icon bg-primary-subtle text-primary">
+                                    <i class="fas fa-vault"></i>
+                                </div>
+                                <div>
+                                    <h6 class="fw-bold text-dark mb-0">Treasury &amp; Liquidity</h6>
+                                    <span class="text-muted" style="font-size: 0.75rem;">Cash, Bank &amp; Balances</span>
+                                </div>
+                            </div>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                                Financial Health
+                            </span>
+                        </div>
+
+                        <!-- Liquid Cash & Bank Banner -->
+                        <div class="bg-primary-subtle rounded p-2 mb-2 d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="text-primary small fw-semibold" style="font-size: 0.75rem;">Total Net Liquid Treasury</div>
+                                <div class="fw-bold text-primary" style="font-size: 1.2rem;">
+                                    PKR @Data.Financial.NetLiquidCash.ToString("#,##0")
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-light border text-primary shadow-sm" @onclick="PrintCashBookReport" title="View Today's Cash Book">
+                                <i class="fas fa-file-invoice me-1"></i> Cash Book
+                            </button>
+                        </div>
+
+                        <!-- Cash in Hand & Bank Balances Details -->
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <div class="border rounded p-2 bg-white">
+                                    <div class="text-muted" style="font-size: 0.72rem;"><i class="fas fa-money-bill-wave text-success me-1"></i> Cash-in-Hand</div>
+                                    <div class="fw-bold text-dark" style="font-size: 0.95rem;">PKR @Data.Financial.CashInHand.ToString("#,##0")</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="border rounded p-2 bg-white">
+                                    <div class="text-muted" style="font-size: 0.72rem;"><i class="fas fa-building-columns text-primary me-1"></i> Bank Accounts</div>
+                                    <div class="fw-bold text-dark" style="font-size: 0.95rem;">PKR @Data.Financial.BankBalance.ToString("#,##0")</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Debtors vs Creditors vs Fixed Assets -->
+                        <div class="row g-2">
+                            <div class="col-4">
+                                <div class="border rounded p-1 text-center bg-white">
+                                    <div class="text-muted" style="font-size: 0.68rem;">Receivable (15-003)</div>
+                                    <div class="fw-bold text-success" style="font-size: 0.85rem;">PKR @Data.Financial.AccountsReceivable.ToString("#,##0")</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="border rounded p-1 text-center bg-white">
+                                    <div class="text-muted" style="font-size: 0.68rem;">Payable (24-004)</div>
+                                    <div class="fw-bold text-danger" style="font-size: 0.85rem;">PKR @Data.Financial.AccountsPayable.ToString("#,##0")</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="border rounded p-1 text-center bg-white">
+                                    <div class="text-muted" style="font-size: 0.68rem;">Fixed Assets</div>
+                                    <div class="fw-bold text-secondary" style="font-size: 0.85rem;">PKR @Data.Financial.FixedAssetsCost.ToString("#,##0")</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── PILLAR 3: GLOBAL DEMAND & EXPORT ────────────────────────── -->
+            <div class="col-12 col-xl-4 col-lg-6">
+                <div class="card border-0 shadow-sm h-100 pillar-card" style="border-radius: 12px; background: rgba(255, 255, 255, 0.95); border-top: 4px solid #ea580c !important;">
+                    <div class="card-body p-3">
+                        <div class="d-flex align-items-center justify-content-between pb-2 mb-2 border-bottom">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="pillar-icon bg-warning-subtle text-warning">
+                                    <i class="fas fa-ship"></i>
+                                </div>
+                                <div>
+                                    <h6 class="fw-bold text-dark mb-0">Global Demand &amp; Export</h6>
+                                    <span class="text-muted" style="font-size: 0.75rem;">Foreign Orders &amp; Turnover</span>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-warning btn-sm py-0 px-2" style="font-size: 0.75rem;" @onclick="PrintUnshippedOrderList">
+                                <i class="fas fa-print me-1"></i> Order List
+                            </button>
+                        </div>
+
+                        <!-- Active In-Hand Orders -->
+                        <div class="bg-warning-subtle rounded p-2 mb-2 d-flex justify-content-between align-items-center" style="cursor: pointer;" @onclick="PrintUnshippedOrderList">
+                            <div>
+                                <div class="text-dark small fw-semibold" style="font-size: 0.75rem;">Unshipped Foreign Demand (In-Hand)</div>
+                                <div class="fw-bold text-dark" style="font-size: 1.15rem;">
+                                    @Data.Export.InHandQty.ToString("#,##0") <span style="font-size: 0.8rem; font-weight: normal;">Pcs</span>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="text-muted small" style="font-size: 0.72rem;">Order Value (PKR)</div>
+                                <div class="fw-bold text-dark" style="font-size: 0.95rem;">
+                                    PKR @Data.Export.InHandValue.ToString("#,##0")
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Fiscal Year Realized Revenue -->
+                        <div class="border rounded p-2 mb-2 bg-white d-flex justify-content-between align-items-center" style="cursor: pointer;" @onclick="PrintTotalExportCurrentFY" title="Click to view Current FY Export Report">
+                            <div>
+                                <div class="text-muted small" style="font-size: 0.72rem;">
+                                    <i class="fas fa-calendar-check text-primary me-1"></i> Current Fiscal Year Export Turnover
+                                </div>
+                                <div class="fw-bold text-dark" style="font-size: 1.05rem;">
+                                    PKR @Data.Export.TotalSalesCurrentFY.ToString("#,##0")
+                                </div>
+                            </div>
+                            <span class="badge bg-light text-primary border">FY Export Report <i class="fas fa-arrow-right ms-1"></i></span>
+                        </div>
+
+                        <!-- Lifetime Realized Revenue -->
+                        <div class="border rounded p-2 bg-white d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="text-muted small" style="font-size: 0.72rem;">Lifetime Export Sales (31-001)</div>
+                                <div class="fw-semibold text-secondary" style="font-size: 0.92rem;">
+                                    PKR @Data.Export.LifetimeTotalSales.ToString("#,##0")
+                                </div>
+                            </div>
+                            <span class="badge bg-light text-secondary border">Realized Cumulative</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── PILLAR 4: MULTI-TIER INVENTORY & VALUATION ─────────────── -->
+            <div class="col-12 col-xl-6">
+                <div class="card border-0 shadow-sm h-100 pillar-card" style="border-radius: 12px; background: rgba(255, 255, 255, 0.95); border-top: 4px solid #9333ea !important;">
+                    <div class="card-body p-3">
+                        <div class="d-flex align-items-center justify-content-between pb-2 mb-2 border-bottom">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="pillar-icon bg-purple-subtle text-purple" style="background: #f3e8ff; color: #9333ea;">
+                                    <i class="fas fa-boxes-stacked"></i>
+                                </div>
+                                <div>
+                                    <h6 class="fw-bold text-dark mb-0">Multi-Tier Inventory &amp; Valuation</h6>
+                                    <span class="text-muted" style="font-size: 0.75rem;">Finished, Semi-Finished, Forgings &amp; Materials</span>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-purple-subtle text-purple border" style="background: #f3e8ff; color: #9333ea; font-size: 0.78rem;">
+                                    Total: PKR @Data.Stock.TotalInventoryValue.ToString("#,##0")
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- 4 Inventory Tiers Grid -->
+                        <div class="row g-2 mb-2">
+                            <!-- Finished Goods -->
+                            <div class="col-6 col-sm-3">
+                                <div class="border rounded p-2 text-center bg-white inv-tier-card"
+                                     style="cursor: pointer; transition: all 0.15s ease;"
+                                     @onclick='() => OpenStockGroupModal(0, "Finished Goods Inventory")'
+                                     title="Click to view Group breakdown">
+                                    <div class="text-primary fw-semibold" style="font-size: 0.75rem;">
+                                        <i class="fas fa-box-open me-1"></i> Finished Goods
+                                    </div>
+                                    <div class="fw-bold text-dark" style="font-size: 1.05rem;">
+                                        @Data.Stock.FinishedStockQty.ToString("#,##0") <span style="font-size: 0.7rem; font-weight: normal;">Pcs</span>
+                                    </div>
+                                    <div class="text-muted" style="font-size: 0.72rem;">PKR @Data.Stock.FinishedStockValue.ToString("#,##0")</div>
+                                </div>
+                            </div>
+
+                            <!-- Semi-Finished WIP -->
+                            <div class="col-6 col-sm-3">
+                                <div class="border rounded p-2 text-center bg-white inv-tier-card"
+                                     style="cursor: pointer; transition: all 0.15s ease;"
+                                     @onclick='() => OpenStockGroupModal(1, "Semi-Finished WIP Inventory")'
+                                     title="Click to view Group breakdown">
+                                    <div class="text-info fw-semibold" style="font-size: 0.75rem;">
+                                        <i class="fas fa-layer-group me-1"></i> Semi-Finished
+                                    </div>
+                                    <div class="fw-bold text-dark" style="font-size: 1.05rem;">
+                                        @Data.Stock.SFStockQty.ToString("#,##0") <span style="font-size: 0.7rem; font-weight: normal;">Pcs</span>
+                                    </div>
+                                    <div class="text-muted" style="font-size: 0.72rem;">PKR @Data.Stock.SFStockValue.ToString("#,##0")</div>
+                                </div>
+                            </div>
+
+                            <!-- Forgings / RM -->
+                            <div class="col-6 col-sm-3">
+                                <div class="border rounded p-2 text-center bg-white inv-tier-card"
+                                     style="cursor: pointer; transition: all 0.15s ease;"
+                                     @onclick='() => OpenStockGroupModal(2, "Forgings Stock Inventory")'
+                                     title="Click to view Group breakdown">
+                                    <div class="text-danger fw-semibold" style="font-size: 0.75rem;">
+                                        <i class="fas fa-hammer me-1"></i> Forgings Stock
+                                    </div>
+                                    <div class="fw-bold text-dark" style="font-size: 1.05rem;">
+                                        @Data.Stock.ForgingStockQty.ToString("#,##0") <span style="font-size: 0.7rem; font-weight: normal;">Pcs</span>
+                                    </div>
+                                    <div class="text-muted" style="font-size: 0.72rem;">PKR @Data.Stock.ForgingStockValue.ToString("#,##0")</div>
+                                </div>
+                            </div>
+
+                            <!-- Other Materials -->
+                            <div class="col-6 col-sm-3">
+                                <div class="border rounded p-2 text-center bg-white inv-tier-card"
+                                     style="cursor: pointer; transition: all 0.15s ease;"
+                                     @onclick='() => OpenStockGroupModal(3, "Other Consumables & Materials")'
+                                     title="Click to view Group breakdown">
+                                    <div class="text-secondary fw-semibold" style="font-size: 0.75rem;">
+                                        <i class="fas fa-cubes me-1"></i> Other Materials
+                                    </div>
+                                    <div class="fw-bold text-dark" style="font-size: 1.05rem;">
+                                        @Data.Stock.OtherStockQty.ToString("#,##0") <span style="font-size: 0.7rem; font-weight: normal;">Pcs</span>
+                                    </div>
+                                    <div class="text-muted" style="font-size: 0.72rem;">PKR @Data.Stock.OtherStockValue.ToString("#,##0")</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Active Rework Lots Alert & Report Trigger -->
+                        <div class="d-flex justify-content-between align-items-center border rounded p-2 bg-light">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fas fa-wrench @(Data.Stock.TotalReWorkLots > 0 ? "text-danger fa-bounce" : "text-secondary")"></i>
+                                <div>
+                                    <span class="fw-semibold text-dark" style="font-size: 0.8rem;">Active Factory Rework Lots:</span>
+                                    <span class="ms-1 fw-bold @(Data.Stock.TotalReWorkLots > 0 ? "text-danger" : "text-secondary")">
+                                        @Data.Stock.TotalReWorkLots Lots (@Data.Stock.TotalReWorkQty.ToString("#,##0") Pcs)
+                                    </span>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2" style="font-size: 0.75rem;" @onclick="PrintReWorkLots">
+                                <i class="fas fa-print me-1"></i> Rework Report
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── PILLAR 5: SHOP FLOOR THROUGHPUT & BOTTLENECKS ──────────── -->
+            <div class="col-12 col-xl-6">
+                <div class="card border-0 shadow-sm h-100 pillar-card" style="border-radius: 12px; background: rgba(255, 255, 255, 0.95); border-top: 4px solid #dc2626 !important;">
+                    <div class="card-body p-3">
+                        <div class="d-flex align-items-center justify-content-between pb-2 mb-2 border-bottom">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="pillar-icon bg-danger-subtle text-danger">
+                                    <i class="fas fa-industry"></i>
+                                </div>
+                                <div>
+                                    <h6 class="fw-bold text-dark mb-0">Shop Floor Throughput &amp; Stations</h6>
+                                    <span class="text-muted" style="font-size: 0.75rem;">Active Lots, Maker POs &amp; Critical Bottlenecks</span>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2" style="font-size: 0.75rem;" @onclick="() => PrintRunningLots(0)">
+                                <i class="fas fa-print me-1"></i> All Running Lots
+                            </button>
+                        </div>
+
+                        <!-- Top Macro Stats (Running Lots, Maker Orders, Forging Orders) -->
+                        <div class="row g-2 mb-2">
+                            <div class="col-4">
+                                <div class="border rounded p-2 text-center bg-white" style="cursor: pointer;" @onclick="() => PrintRunningLots(0)" title="Click to print Running Lots report">
+                                    <div class="text-muted" style="font-size: 0.7rem;"><i class="fas fa-tags text-primary me-1"></i> Running Lots</div>
+                                    <div class="fw-bold text-dark" style="font-size: 0.95rem;">@Data.Production.RunningLotsCount <span style="font-size: 0.7rem; font-weight: normal;">Lots</span></div>
+                                    <div class="text-primary fw-semibold" style="font-size: 0.75rem;">@Data.Production.RunningLotsQty.ToString("#,##0") Pcs</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="border rounded p-2 text-center bg-white" style="cursor: pointer;" @onclick="PrintOpenMakerOrders" title="Click to print Open Maker Orders">
+                                    <div class="text-muted" style="font-size: 0.7rem;"><i class="fas fa-user-gear text-info me-1"></i> Maker POs</div>
+                                    <div class="fw-bold text-dark" style="font-size: 0.95rem;">@Data.Production.MakerOrdersCount <span style="font-size: 0.7rem; font-weight: normal;">POs</span></div>
+                                    <div class="text-info fw-semibold" style="font-size: 0.75rem;">@Data.Production.MakerOrdersQty.ToString("#,##0") Pcs</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="border rounded p-2 text-center bg-white" style="cursor: pointer;" @onclick="PrintForgingOpenOrders" title="Click to print Forging Orders">
+                                    <div class="text-muted" style="font-size: 0.7rem;"><i class="fas fa-truck-ramp-box text-warning me-1"></i> Forging POs</div>
+                                    <div class="fw-bold text-dark" style="font-size: 0.95rem;">@Data.Production.ForgingOrdersCount <span style="font-size: 0.7rem; font-weight: normal;">Orders</span></div>
+                                    <div class="text-warning fw-semibold" style="font-size: 0.75rem;">@Data.Production.ForgingOrdersQty.ToString("#,##0") Pcs</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 4 Critical Bottleneck Stations -->
+                        <div class="text-muted fw-semibold mb-1" style="font-size: 0.72rem; text-transform: uppercase;">
+                            <i class="fas fa-stopwatch text-danger me-1"></i> 4 Critical Manufacturing Stages (Click any station to view lots)
+                        </div>
+                        <div class="row g-2">
+                            <!-- Heat Treatment -->
+                            <div class="col-6 col-sm-3">
+                                <div class="border rounded p-2 text-center bg-light station-card"
+                                     style="cursor: pointer;"
+                                     @onclick="() => PrintRunningLots(Data.Production.HeatTreatmentProcessID)"
+                                     title="Click to print Temper lots">
+                                    <div class="text-dark fw-semibold" style="font-size: 0.72rem;"><i class="fas fa-fire-flame-curved text-danger me-1"></i> Tempering</div>
+                                    <div class="fw-bold text-dark" style="font-size: 0.92rem;">@Data.Production.LotsAtTemperCount <span style="font-size: 0.68rem; font-weight: normal;">Lots</span></div>
+                                    <div class="text-danger fw-semibold" style="font-size: 0.72rem;">@Data.Production.LotsAtTemperQty.ToString("#,##0") Pcs</div>
+                                </div>
+                            </div>
+
+                            <!-- Polishing -->
+                            <div class="col-6 col-sm-3">
+                                <div class="border rounded p-2 text-center bg-light station-card"
+                                     style="cursor: pointer;"
+                                     @onclick="() => PrintRunningLots(Data.Production.PolishingProcessID)"
+                                     title="Click to print Polishing lots">
+                                    <div class="text-dark fw-semibold" style="font-size: 0.72rem;"><i class="fas fa-wand-magic-sparkles text-primary me-1"></i> Polishing</div>
+                                    <div class="fw-bold text-dark" style="font-size: 0.92rem;">@Data.Production.LotsAtPolishingCount <span style="font-size: 0.68rem; font-weight: normal;">Lots</span></div>
+                                    <div class="text-primary fw-semibold" style="font-size: 0.72rem;">@Data.Production.LotsAtPolishingQty.ToString("#,##0") Pcs</div>
+                                </div>
+                            </div>
+
+                            <!-- QC 100% -->
+                            <div class="col-6 col-sm-3">
+                                <div class="border rounded p-2 text-center bg-light station-card"
+                                     style="cursor: pointer;"
+                                     @onclick="() => PrintRunningLots(Data.Production.QCProcessID)"
+                                     title="Click to print QC lots">
+                                    <div class="text-dark fw-semibold" style="font-size: 0.72rem;"><i class="fas fa-clipboard-check text-success me-1"></i> QC 100%</div>
+                                    <div class="fw-bold text-dark" style="font-size: 0.92rem;">@Data.Production.LotsAtQCCount <span style="font-size: 0.68rem; font-weight: normal;">Lots</span></div>
+                                    <div class="text-success fw-semibold" style="font-size: 0.72rem;">@Data.Production.LotsAtQCQty.ToString("#,##0") Pcs</div>
+                                </div>
+                            </div>
+
+                            <!-- Packing -->
+                            <div class="col-6 col-sm-3">
+                                <div class="border rounded p-2 text-center bg-light station-card"
+                                     style="cursor: pointer;"
+                                     @onclick="() => PrintRunningLots(Data.Production.PackingProcessID)"
+                                     title="Click to print Packing lots">
+                                    <div class="text-dark fw-semibold" style="font-size: 0.72rem;"><i class="fas fa-box text-secondary me-1"></i> Packing</div>
+                                    <div class="fw-bold text-dark" style="font-size: 0.92rem;">@Data.Production.LotsAtPackedCount <span style="font-size: 0.68rem; font-weight: normal;">Lots</span></div>
+                                    <div class="text-secondary fw-semibold" style="font-size: 0.72rem;">@Data.Production.LotsAtPackedQty.ToString("#,##0") Pcs</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    }
+
+    <!-- ── 2-LEVEL STOCK DRILLDOWN MODAL ───────────────────────────────── -->
+    @if (IsStockModalOpen)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0, 0, 0, 0.55); z-index: 1050;" role="dialog">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 14px;">
+                    <!-- Modal Header -->
+                    <div class="modal-header py-2 px-3 bg-light border-bottom align-items-center">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fas fa-boxes-stacked text-primary fs-5"></i>
+                            <div>
+                                <h6 class="modal-title fw-bold text-dark mb-0">@ModalStockTitle</h6>
+                                <div class="text-muted" style="font-size: 0.75rem;">
+                                    @if (IsShowingItemDetail)
+                                    {
+                                        <span><a href="javascript:void(0)" @onclick="BackToGroupSummary" class="text-decoration-none text-primary">Group Summary</a> &gt; <strong>@SelectedGroupName</strong> Item Details</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Summary by Product / Material Groups</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close btn-sm" @onclick="CloseStockModal" aria-label="Close"></button>
+                    </div>
+
+                    <!-- Modal Search Bar -->
+                    <div class="p-2 border-bottom bg-white d-flex justify-content-between align-items-center gap-2">
+                        <div class="input-group input-group-sm" style="max-width: 320px;">
+                            <span class="input-group-text bg-light border-end-0"><i class="fas fa-search text-muted"></i></span>
+                            <input type="text" class="form-control border-start-0" placeholder="Filter list..." @bind="ModalSearchText" @bind:event="oninput" />
+                        </div>
+                        @if (IsShowingItemDetail)
+                        {
+                            <button type="button" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" @onclick="BackToGroupSummary">
+                                <i class="fas fa-arrow-left"></i> <span>Back to Groups</span>
+                            </button>
+                        }
+                    </div>
+
+                    <!-- Modal Body -->
+                    <div class="modal-body p-0" style="min-height: 280px; max-height: 55vh; overflow-y: auto;">
+                        @if (IsModalLoading)
+                        {
+                            <div class="text-center p-5">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <div class="text-muted small mt-2">Loading valuation breakdown...</div>
+                            </div>
+                        }
+                        else if (!IsShowingItemDetail)
+                        {
+                            <!-- LEVEL 1: GROUP BREAKDOWN -->
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.86rem;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                    <tr>
+                                        <th style="width: 40px;" class="text-center">#</th>
+                                        <th>Product / Material Group</th>
+                                        <th class="text-end" style="width: 130px;">Stock Units</th>
+                                        <th class="text-end" style="width: 150px;">Valuation (PKR)</th>
+                                        <th style="width: 70px;" class="text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @{ int gIdx = 1; }
+                                    @foreach (var g in FilteredGroupSummary)
+                                    {
+                                        <tr style="cursor: pointer;" @onclick="() => DrillDownIntoGroup(g)">
+                                            <td class="text-center text-muted">@(gIdx++)</td>
+                                            <td class="fw-semibold text-dark">@g.GroupName</td>
+                                            <td class="text-end fw-semibold">@g.TotalStock.ToString("#,##0")</td>
+                                            <td class="text-end fw-bold text-success">@g.TotalValue.ToString("#,##0")</td>
+                                            <td class="text-center">
+                                                <button class="btn btn-outline-primary btn-sm py-0 px-2" style="font-size: 0.72rem;">
+                                                    <i class="fas fa-chevron-right"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                    @if (!FilteredGroupSummary.Any())
+                                    {
+                                        <tr>
+                                            <td colspan="5" class="text-center text-muted py-4">No groups found matching filter.</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot class="table-light fw-bold sticky-bottom" style="box-shadow: 0 -1px 0 #dee2e6;">
+                                    <tr>
+                                        <td colspan="2" class="ps-3">Total Aggregate</td>
+                                        <td class="text-end">@FilteredGroupSummary.Sum(x => x.TotalStock).ToString("#,##0")</td>
+                                        <td class="text-end text-success">PKR @FilteredGroupSummary.Sum(x => x.TotalValue).ToString("#,##0")</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        }
+                        else
+                        {
+                            <!-- LEVEL 2: ITEM DETAIL BREAKDOWN -->
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.86rem;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                    <tr>
+                                        <th style="width: 40px;" class="text-center">#</th>
+                                        <th style="width: 140px;">Article Code</th>
+                                        <th>Description / Item Name</th>
+                                        <th class="text-end" style="width: 120px;">Stock Units</th>
+                                        <th class="text-end" style="width: 150px;">Valuation (PKR)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @{ int iIdx = 1; }
+                                    @foreach (var itm in FilteredItemDetails)
+                                    {
+                                        <tr>
+                                            <td class="text-center text-muted">@(iIdx++)</td>
+                                            <td class="fw-bold text-primary">@itm.ItemID</td>
+                                            <td class="text-dark">@itm.ItemName</td>
+                                            <td class="text-end fw-semibold">@itm.TotalStock.ToString("#,##0")</td>
+                                            <td class="text-end fw-bold text-success">@itm.TotalValue.ToString("#,##0")</td>
+                                        </tr>
+                                    }
+                                    @if (!FilteredItemDetails.Any())
+                                    {
+                                        <tr>
+                                            <td colspan="5" class="text-center text-muted py-4">No items found for this group.</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot class="table-light fw-bold sticky-bottom" style="box-shadow: 0 -1px 0 #dee2e6;">
+                                    <tr>
+                                        <td colspan="3" class="ps-3">Group Total</td>
+                                        <td class="text-end">@FilteredItemDetails.Sum(x => x.TotalStock).ToString("#,##0")</td>
+                                        <td class="text-end text-success">PKR @FilteredItemDetails.Sum(x => x.TotalValue).ToString("#,##0")</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        }
+                    </div>
+
+                    <!-- Modal Footer -->
+                    <div class="modal-footer py-2 px-3 bg-light border-top d-flex justify-content-between">
+                        <span class="text-muted small">
+                            @(IsShowingItemDetail ? $"{FilteredItemDetails.Count()} Items Loaded" : $"{FilteredGroupSummary.Count()} Groups Loaded")
+                        </span>
+                        <button type="button" class="btn btn-secondary btn-sm" @onclick="CloseStockModal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+</div>
+
+<style>
+    .pillar-card {
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+    .pillar-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.08) !important;
+    }
+    .pillar-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+    }
+    .inv-tier-card:hover {
+        border-color: #9333ea !important;
+        background: #faf5ff !important;
+        transform: scale(1.02);
+    }
+    .station-card:hover {
+        border-color: #dc2626 !important;
+        background: #fef2f2 !important;
+        transform: scale(1.02);
+    }
+</style>

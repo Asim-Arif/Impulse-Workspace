@@ -301,10 +301,10 @@ builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IWastageTypeDa
 builder.Services.AddScoped<Impulse.Services.Production.IWastageTypeService, Impulse.Services.Production.WastageTypeService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IProductionItemListDataAccess, DataAccessLibrary.DAC.Production.ProductionItemListDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Production.IProductionItemListService, Impulse.Services.Production.ProductionItemListService>();
-
-
-
-
+builder.Services.AddScoped<DataAccessLibrary.Interface.Dashboard.IProductionPlanningDashboardDataAccess, DataAccessLibrary.DAC.Dashboard.ProductionPlanningDashboardDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Dashboard.IProductionPlanningDashboardService, Impulse.Services.Dashboard.ProductionPlanningDashboardService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Dashboard.ICommandCenterDashboardDataAccess, DataAccessLibrary.DAC.Dashboard.CommandCenterDashboardDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Dashboard.ICommandCenterDashboardService, Impulse.Services.Dashboard.CommandCenterDashboardService>();
 
 
 builder.Services.AddScoped<DataAccessLibrary.Interface.Company.IItemDataAccess, DataAccessLibrary.DAC.Company.ItemDataAccess>();

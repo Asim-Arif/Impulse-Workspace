@@ -3,22 +3,25 @@
 @using Impulse.Services.Production
 @using Blazored.Typeahead
 
+<PageTitle>Re-Work Lot Issuance | Impulse ERP</PageTitle>
+<meta name="description" content="Issue rejected or defective items for corrective repair and re-work." />
+
 <div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
-    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.87); backdrop-filter: blur(10px); border-radius: 12px;">
         <div class="card-body p-3">
             
-            <!-- Page Header -->
-            <div class="d-flex align-items-end justify-content-between pb-2 mb-3 border-bottom">
+            <!-- ── Page Header & Top Actions ──────────────────────────── -->
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom flex-wrap gap-2">
                 <div class="d-flex align-items-center gap-2">
-                    <div class="p-2 bg-primary bg-opacity-10 text-primary rounded-3">
-                        <i class="fas fa-tools fs-4"></i>
+                    <div style="width:38px;height:38px;background:linear-gradient(135deg,#1565C0,#42A5F5);border-radius:10px;display:flex;align-items:center;justify-content:center;">
+                        <i class="fas fa-wrench text-white" style="font-size:1.05rem;"></i>
                     </div>
                     <div>
-                        <h4 class="fw-bold mb-0 text-dark" style="font-size: 1.35rem;">Re-Work Issuance</h4>
-                        <div class="text-muted small">Issue rework lots to makers and generate new sequential rework lot numbers</div>
+                        <h1 class="mb-0 fw-bold" style="font-size:1.25rem;color:#1565C0;">Re-Work Lot Issuance</h1>
+                        <small class="text-muted" style="font-size:0.75rem;">Issue rejected or defective items for corrective repair and re-work</small>
                     </div>
                 </div>
-                <div class="d-flex align-items-center gap-2">
+                <div class="ms-auto d-flex align-items-center gap-2">
                     <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="PrintPendingReport">
                         <i class="fas fa-print me-1"></i> Print Pending
                     </button>
