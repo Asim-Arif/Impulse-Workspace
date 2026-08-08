@@ -1,0 +1,74 @@
+@using DataAccessLibrary.Models.ViewModels.Production
+
+<div class="card border-0 shadow-none">
+    <!-- Action Bar / Input Row -->
+    <div class="p-3 bg-light rounded-3 border mb-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-6">
+                <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
+                    <i class="fas fa-file-alt text-primary me-1"></i> Deduction Description <span class="text-danger">*</span>
+                </label>
+                <input type="text" class="form-control form-control-sm" placeholder="e.g. Broken sample adjustment, freight recovery..." @bind="NewDescription" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
+                    <i class="fas fa-dollar-sign text-danger me-1"></i> Amount (PKR) <span class="text-danger">*</span>
+                </label>
+                <input type="number" class="form-control form-control-sm text-end fw-bold text-danger" placeholder="0.00" @bind="NewAmount" />
+            </div>
+            <div class="col-md-3">
+                <button type="button" class="btn btn-sm btn-primary w-100 fw-bold" @onclick="AddManualDeduction" disabled="@(string.IsNullOrWhiteSpace(NewDescription) || NewAmount <= 0)">
+                    <i class="fas fa-plus me-1"></i> Add Deduction Line
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual Deductions Grid -->
+    <div class="table-responsive border rounded-3" style="max-height: 44vh; overflow-y: auto;">
+        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                <tr>
+                    <th style="width: 50px;">#</th>
+                    <th>Description / Purpose</th>
+                    <th class="text-end" style="width: 180px;">Amount (PKR)</th>
+                    <th style="width: 80px;" class="text-center">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Items.Any())
+                {
+                    <tr>
+                        <td colspan="4" class="text-center py-4 text-muted">
+                            <i class="fas fa-info-circle me-1"></i> No manual deductions added. Enter a description and amount above to add adjustments.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    int idx = 1;
+                    @foreach (var item in Items)
+                    {
+                        <tr>
+                            <td>@(idx++)</td>
+                            <td class="fw-semibold text-dark">@item.Description</td>
+                            <td class="text-end fw-bold text-danger fs-6">@item.Amount.ToString("N2")</td>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" @onclick="() => RemoveItem(item)" title="Remove deduction">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+            <tfoot class="table-light fw-bold text-dark border-top">
+                <tr>
+                    <td colspan="2" class="text-end">Total Manual Deductions:</td>
+                    <td class="text-end text-danger fs-6">@TotalManualAmount.ToString("N2")</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>

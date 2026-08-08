@@ -288,6 +288,387 @@
                 </div>
             }
 
+            <!-- Split / Transfer Lot Modal Dialog -->
+            @if (ShowSplitTransferModal && SelectedItem != null)
+            {
+                <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 10500;">
+                    <div class="modal-dialog modal-lg modal-dialog-centered">
+                        <div class="modal-content border-0 shadow" style="background: rgba(255, 255, 255, 0.98); backdrop-filter: blur(12px); border-radius: 12px;">
+                            <div class="modal-header border-bottom py-2 px-3 bg-light rounded-top">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="fas fa-exchange-alt text-primary fs-5"></i>
+                                    <h5 class="modal-title fw-bold text-dark mb-0" style="font-size: 1.05rem;">
+                                        Change / Split / Transfer Lot — <span class="badge bg-info text-dark">Lot #@SelectedItem.LotNo</span>
+                                    </h5>
+                                </div>
+                                <button type="button" class="btn-close btn-sm" @onclick="CloseSplitTransferModal" disabled="@IsProcessingSplit"></button>
+                            </div>
+                            <div class="modal-body p-3">
+                                <!-- Mode Selector Pills -->
+                                <div class="d-flex gap-2 p-1 bg-light rounded-3 border mb-3">
+                                    <button type="button" class="btn btn-sm flex-fill fw-semibold @(SplitMode == 0 ? "btn-primary shadow-sm" : "btn-light text-secondary")" @onclick="@(() => OnSplitModeChanged(0))">
+                                        <i class="fas fa-edit me-1"></i> Change Customer Order No.
+                                    </button>
+                                    <button type="button" class="btn btn-sm flex-fill fw-semibold @(SplitMode == 1 ? "btn-primary shadow-sm" : "btn-light text-secondary")" @onclick="@(() => OnSplitModeChanged(1))">
+                                        <i class="fas fa-cut me-1"></i> Split Lot
+                                    </button>
+                                    <button type="button" class="btn btn-sm flex-fill fw-semibold @(SplitMode == 2 ? "btn-primary shadow-sm" : "btn-light text-secondary")" @onclick="@(() => OnSplitModeChanged(2))">
+                                        <i class="fas fa-warehouse me-1"></i> Transfer to S/F Stock
+                                    </button>
+                                </div>
+
+                                <!-- Current Lot Context Bar -->
+                                <div class="p-2 mb-3 bg-light rounded-3 border d-flex flex-wrap gap-3 align-items-center" style="font-size: 0.82rem;">
+                                    <div><span class="text-muted fw-bold">Current Order:</span> <span class="badge bg-secondary">@SelectedItem.OrderNo</span></div>
+                                    <div><span class="text-muted fw-bold">Current Article:</span> <span class="fw-semibold">@SelectedItem.FullArticle</span></div>
+                                    <div><span class="text-muted fw-bold">Rcvd Qty:</span> <span class="badge bg-success">@SelectedItem.RcvdQty.ToString("N0")</span></div>
+                                    @if (SelectedItem.IssQty > 0)
+                                    {
+                                        <div><span class="text-muted fw-bold">Already Issued:</span> <span class="badge bg-danger">@SelectedItem.IssQty.ToString("N0")</span></div>
+                                    }
+                                </div>
+
+                                <!-- MODE 0: Change Customer Order No -->
+                                @if (SplitMode == 0)
+                                {
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-12 mb-2">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="chkModalCOStockOrder" @bind="ChangeOrderModel.TransferToStockOrder" />
+                                                <label class="form-check-label fw-bold text-primary" for="chkModalCOStockOrder">
+                                                    Transfer to Stock Order (Order No: 'Stock-Order')
+                                                </label>
+                                            </div>
+                                        </div>
+                                        @if (!ChangeOrderModel.TransferToStockOrder)
+                                        {
+                                            <div class="col-md-4">
+                                                <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Customer</label>
+                                                <BlazoredTypeahead SearchMethod="SearchSplitCustomers" @bind-Value="SelectedSplitCustomer" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Customer...">
+                                                    <SelectedTemplate>@context.Name</SelectedTemplate>
+                                                    <ResultTemplate>@context.Name</ResultTemplate>
+                                                </BlazoredTypeahead>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Order No.</label>
+                                                <BlazoredTypeahead SearchMethod="SearchSplitOrders" @bind-Value="SelectedSplitOrder" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Order No...">
+                                                    <SelectedTemplate>@context.DisplayName</SelectedTemplate>
+                                                    <ResultTemplate>@context.DisplayName</ResultTemplate>
+                                                </BlazoredTypeahead>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Item / Article</label>
+                                                <BlazoredTypeahead SearchMethod="SearchSplitArticles" @bind-Value="SelectedSplitArticle" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Article...">
+                                                    <SelectedTemplate>@context.Name</SelectedTemplate>
+                                                    <ResultTemplate>@context.Name</ResultTemplate>
+                                                </BlazoredTypeahead>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="col-12">
+                                                <div class="alert alert-info py-2 px-3 mb-0 small">
+                                                    <i class="fas fa-info-circle me-1"></i> Order No. will be updated to <strong>'Stock-Order'</strong> and item will remain <strong>@SelectedItem.FullArticle</strong>.
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+
+                                <!-- MODE 1: Split Lot -->
+                                @if (SplitMode == 1)
+                                {
+                                    @if (SelectedItem.IssQty > 0)
+                                    {
+                                        <div class="alert alert-danger py-2 px-3 mb-2 small">
+                                            <i class="fas fa-exclamation-triangle me-1"></i> <strong>Cannot Split:</strong> This Lot has already been issued (@SelectedItem.IssQty.ToString("N0") issued).
+                                        </div>
+                                    }
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-md-4">
+                                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Customer</label>
+                                            <BlazoredTypeahead SearchMethod="SearchSplitCustomers" @bind-Value="SelectedSplitCustomer" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Customer...">
+                                                <SelectedTemplate>@context.Name</SelectedTemplate>
+                                                <ResultTemplate>@context.Name</ResultTemplate>
+                                            </BlazoredTypeahead>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Order No.</label>
+                                            <BlazoredTypeahead SearchMethod="SearchSplitOrders" @bind-Value="SelectedSplitOrder" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Order No...">
+                                                <SelectedTemplate>@context.DisplayName</SelectedTemplate>
+                                                <ResultTemplate>@context.DisplayName</ResultTemplate>
+                                            </BlazoredTypeahead>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Target Article</label>
+                                            <BlazoredTypeahead SearchMethod="SearchSplitArticles" @bind-Value="SelectedSplitArticle" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Article...">
+                                                <SelectedTemplate>@context.Name</SelectedTemplate>
+                                                <ResultTemplate>@context.Name</ResultTemplate>
+                                            </BlazoredTypeahead>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Split Qty (Max: @SelectedItem.RcvdQty.ToString("N0"))</label>
+                                            <input type="number" class="form-control form-control-sm text-center fw-bold" @bind="SplitLotModel.SplitQty" min="1" max="@SelectedItem.RcvdQty" />
+                                        </div>
+                                        <div class="col-md-8">
+                                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Remarks</label>
+                                            <input type="text" class="form-control form-control-sm" @bind="SplitLotModel.Remarks" placeholder="Enter transfer remarks..." />
+                                        </div>
+                                    </div>
+                                }
+
+                                <!-- MODE 2: Transfer to S/F Stock -->
+                                @if (SplitMode == 2)
+                                {
+                                    @if (SelectedItem.IssQty > 0)
+                                    {
+                                        <div class="alert alert-danger py-2 px-3 mb-2 small">
+                                            <i class="fas fa-exclamation-triangle me-1"></i> <strong>Cannot Transfer:</strong> This entry has already been issued.
+                                        </div>
+                                    }
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-md-6">
+                                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Store</label>
+                                            <BlazoredTypeahead SearchMethod="SearchStores" @bind-Value="SelectedStore" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Store...">
+                                                <SelectedTemplate>@context.StoreName</SelectedTemplate>
+                                                <ResultTemplate>@context.StoreName</ResultTemplate>
+                                            </BlazoredTypeahead>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Location / Shelf</label>
+                                            <BlazoredTypeahead SearchMethod="SearchShelves" @bind-Value="SelectedShelf" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Shelf Location...">
+                                                <SelectedTemplate>@context.DisplayName</SelectedTemplate>
+                                                <ResultTemplate>@context.DisplayName</ResultTemplate>
+                                            </BlazoredTypeahead>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Transfer Qty</label>
+                                            <input type="number" class="form-control form-control-sm text-center fw-bold" @bind="TransferSFModel.TransferQty" min="1" max="@(SelectedItem.RcvdQty - SelectedItem.Wastage - SelectedItem.ReWorkQty)" />
+                                        </div>
+                                        <div class="col-md-8">
+                                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Remarks</label>
+                                            <input type="text" class="form-control form-control-sm" @bind="TransferSFModel.Remarks" placeholder="Remarks for opening..." />
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                            <div class="modal-footer border-top py-2 px-3 bg-light rounded-bottom d-flex justify-content-between">
+                                <div class="text-muted small">
+                                    @if (SplitMode == 1)
+                                    {
+                                        <span><i class="fas fa-magic text-primary me-1"></i> A new Lot number will be automatically generated.</span>
+                                    }
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-secondary" @onclick="CloseSplitTransferModal" disabled="@IsProcessingSplit">
+                                        <i class="fas fa-times me-1"></i> Cancel
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-primary fw-bold px-3" @onclick="ExecuteSplitTransfer" disabled="@IsProcessingSplit">
+                                        @if (IsProcessingSplit)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                        }
+                                        else
+                                        {
+                                            <i class="fas fa-check-circle me-1"></i>
+                                        }
+                                        Post
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- Inspection Data Modal Dialog -->
+            @if (ShowInspectionModal && InspectionDto != null)
+            {
+                <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 10550;">
+                    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                        <div class="modal-content border-0 shadow-lg" style="background: rgba(255, 255, 255, 0.98); backdrop-filter: blur(12px); border-radius: 12px;">
+                            <div class="modal-header border-bottom py-2 px-3 bg-light rounded-top">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="fas fa-search-plus text-primary fs-5"></i>
+                                    <h5 class="modal-title fw-bold text-dark mb-0" style="font-size: 1.05rem;">
+                                        Lot Inspection Entry — <span class="badge bg-info text-dark">Lot #@InspectionDto.LotNo</span>
+                                    </h5>
+                                </div>
+                                <button type="button" class="btn-close btn-sm" @onclick="CloseInspectionModal" disabled="@IsSavingInspection"></button>
+                            </div>
+                            <div class="modal-body p-3">
+                                <!-- Lot Context Pill Bar -->
+                                <div class="p-2 mb-3 bg-light rounded-3 border d-flex flex-wrap gap-3 align-items-center" style="font-size: 0.82rem;">
+                                    <div><span class="text-muted fw-bold">Article:</span> <span class="fw-semibold">@InspectionDto.ItemCode @InspectionDto.ItemName @InspectionDto.TipSize @InspectionDto.ItemSize @InspectionDto.SizeUnit</span></div>
+                                    <div><span class="text-muted fw-bold">Order No:</span> <span class="badge bg-secondary">@InspectionDto.OrderNo</span></div>
+                                    <div><span class="text-muted fw-bold">Rcvd Qty:</span> <span class="badge bg-success">@InspectionDto.RcvdQty.ToString("N0")</span></div>
+                                    <div><span class="text-muted fw-bold">Process:</span> <span class="badge bg-primary text-white">@InspectionDto.ProcessDescription</span></div>
+                                    @if (InspectionDto.ReceivingDT.HasValue)
+                                    {
+                                        <div><span class="text-muted fw-bold">Rcv Date:</span> <span>@InspectionDto.ReceivingDT.Value.ToString("dd-MMM-yyyy")</span></div>
+                                    }
+                                </div>
+
+                                <!-- Top Toolbar: Process selector, Status, Date -->
+                                <div class="row g-2 mb-3 align-items-end">
+                                    @if (InspectionDto.Processes.Count > 1)
+                                    {
+                                        <div class="col-md-4">
+                                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Inspection Process</label>
+                                            <select class="form-select form-select-sm" @bind="InspectionDto.ProcessID" @bind:after="OnInspectionProcessChanged">
+                                                @foreach (var proc in InspectionDto.Processes)
+                                                {
+                                                    <option value="@proc.ProcessID">@proc.DisplayName</option>
+                                                }
+                                            </select>
+                                        </div>
+                                    }
+                                    <div class="col-md-3">
+                                        <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Lot Inspection Status</label>
+                                        <div class="btn-group btn-group-sm w-100" role="group">
+                                            <button type="button" class="btn @(!InspectionDto.LotStatus ? "btn-success fw-bold" : "btn-outline-success")" @onclick="@(() => InspectionDto.LotStatus = false)">
+                                                <i class="fas fa-check me-1"></i> PASS
+                                            </button>
+                                            <button type="button" class="btn @(InspectionDto.LotStatus ? "btn-danger fw-bold" : "btn-outline-danger")" @onclick="@(() => InspectionDto.LotStatus = true)">
+                                                <i class="fas fa-times me-1"></i> FAIL
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Inspection Date</label>
+                                        <input type="date" class="form-control form-control-sm" @bind="InspectionDto.InspectionDT" />
+                                    </div>
+                                </div>
+
+                                <!-- Disposition and Comments -->
+                                <div class="row g-2 mb-3">
+                                    <div class="col-md-5">
+                                        <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Disposition</label>
+                                        <input type="text" class="form-control form-control-sm" @bind="InspectionDto.Disposation" placeholder="e.g. Approved / Accepted on deviation..." />
+                                    </div>
+                                    <div class="col-md-7">
+                                        <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Comments / Remarks</label>
+                                        <input type="text" class="form-control form-control-sm" @bind="InspectionDto.Comments" placeholder="Enter comments or inspection notes..." />
+                                    </div>
+                                </div>
+
+                                <!-- Inspection Parameters Grid -->
+                                <div class="card border mb-3 rounded-3 shadow-none">
+                                    <div class="card-header py-1 px-3 bg-light border-bottom d-flex align-items-center justify-content-between">
+                                        <span class="fw-bold text-secondary small"><i class="fas fa-list-check me-1"></i> Inspection Parameters</span>
+                                        <span class="badge bg-secondary">Total: @InspectionDto.Parameters.Count</span>
+                                    </div>
+                                    <div class="table-responsive" style="max-height: 35vh; overflow-y: auto;">
+                                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.84rem;">
+                                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.76rem; text-transform: uppercase;">
+                                                <tr>
+                                                    <th style="width: 40px;">#</th>
+                                                    <th>Parameter Name</th>
+                                                    <th>AQL</th>
+                                                    <th>Sample Size</th>
+                                                    <th>Reject On</th>
+                                                    <th>Tech Spec No</th>
+                                                    <th class="text-center" style="width: 120px;">Actual Rejection</th>
+                                                    <th class="text-center" style="width: 120px;">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @if (!InspectionDto.Parameters.Any())
+                                                {
+                                                    <tr>
+                                                        <td colspan="8" class="text-center py-3 text-muted">
+                                                            <i class="fas fa-info-circle me-1"></i> No inspection parameters defined for this process.
+                                                        </td>
+                                                    </tr>
+                                                }
+                                                else
+                                                {
+                                                    int pIdx = 1;
+                                                    @foreach (var param in InspectionDto.Parameters)
+                                                    {
+                                                        <tr>
+                                                            <td>@(pIdx++)</td>
+                                                            <td class="fw-semibold">@param.ParameterName</td>
+                                                            <td>@param.AQL</td>
+                                                            <td>@param.SampleSize</td>
+                                                            <td>@param.RejectOn</td>
+                                                            <td>@param.TestSpecificationNo</td>
+                                                            <td class="text-center">
+                                                                <input type="text" class="form-control form-control-sm text-center py-0" @bind="param.ActualRejection" style="max-width: 90px; margin: 0 auto;" />
+                                                            </td>
+                                                            <td class="text-center">
+                                                                <select class="form-select form-select-sm py-0" @bind="param.Status" style="max-width: 110px; margin: 0 auto;">
+                                                                    <option value="OK">OK</option>
+                                                                    <option value="Reject">Reject</option>
+                                                                    <option value="Rework">Rework</option>
+                                                                    <option value="Scrap">Scrap</option>
+                                                                    <option value="Pending">Pending</option>
+                                                                </select>
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Temper / Hardness Values Panel -->
+                                <div class="card border rounded-3 p-2 bg-light">
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <span class="fw-bold text-secondary small"><i class="fas fa-thermometer-half me-1"></i> Temper / Hardness Values</span>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <input type="text" class="form-control form-control-sm" style="max-width: 130px;" @bind="NewTemperValue" @bind:event="oninput" @onkeydown="OnTemperValueKeyDown" placeholder="Enter value..." />
+                                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddTemperValue">
+                                                <i class="fas fa-plus me-1"></i> Add
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                                        @if (!InspectionDto.TemperValues.Any())
+                                        {
+                                            <span class="text-muted small fst-italic">No temper values entered yet. Type a value and press Enter or click Add.</span>
+                                        }
+                                        else
+                                        {
+                                            @for (int tIdx = 0; tIdx < InspectionDto.TemperValues.Count; tIdx++)
+                                            {
+                                                int curIdx = tIdx;
+                                                <span class="badge bg-white text-dark border px-2 py-1 shadow-sm d-inline-flex align-items-center gap-2" style="font-size: 0.82rem;">
+                                                    <span class="text-muted small">#@(curIdx + 1):</span> <strong>@InspectionDto.TemperValues[curIdx]</strong>
+                                                    <i class="fas fa-times text-danger" style="cursor: pointer;" @onclick="@(() => RemoveTemperValue(curIdx))" title="Remove value"></i>
+                                                </span>
+                                            }
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-top py-2 px-3 bg-light rounded-bottom d-flex justify-content-between">
+                                <button type="button" class="btn btn-sm btn-outline-dark" @onclick="PrintInspectionQCReport">
+                                    <i class="fas fa-print me-1"></i> Print QC Report
+                                </button>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-secondary" @onclick="CloseInspectionModal" disabled="@IsSavingInspection">
+                                        <i class="fas fa-times me-1"></i> Close
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-primary fw-bold px-3" @onclick="SaveInspectionData" disabled="@IsSavingInspection">
+                                        @if (IsSavingInspection)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                        }
+                                        else
+                                        {
+                                            <i class="fas fa-save me-1"></i>
+                                        }
+                                        Save Inspection
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
         </div>
     </div>
 </div>
@@ -298,11 +679,12 @@
     <Item OnClick="@DeleteReceiving"><i class="fas fa-trash text-danger me-2"></i> Delete Receiving</Item>
     <Item OnClick="@CloseLot"><i class="fas fa-lock text-warning me-2"></i> Close Lot</Item>
     <Item OnClick="@OpenManualPTCPanel"><i class="fas fa-edit text-secondary me-2"></i> Enter Manual PTC No.</Item>
-    <Item OnClick="@PlaceholderAction"><i class="fas fa-exchange-alt text-info me-2"></i> Split / Transfer Lot</Item>
-    <Item OnClick="@PlaceholderAction"><i class="fas fa-search-plus text-primary me-2"></i> Inspection Data</Item>
+    <Item OnClick="@OpenSplitTransferModal"><i class="fas fa-exchange-alt text-info me-2"></i> Split / Transfer Lot</Item>
+    <Item OnClick="@OpenInspectionModal"><i class="fas fa-search-plus text-primary me-2"></i> Inspection Data</Item>
 
     <div class="win11-section-header px-3 py-1 text-muted small fw-bold border-bottom border-top mt-1">SLIPS & PTC</div>
     <Item OnClick="@PrintSlip"><i class="fas fa-print text-dark me-2"></i> Print Slip</Item>
+
     <Item OnClick="@PrintSlipMini"><i class="fas fa-print text-dark me-2"></i> Print Slip (Mini)</Item>
     <Item OnClick="@PrintPTC"><i class="fas fa-file text-dark me-2"></i> Print PTC</Item>
     <Item OnClick="@PrintPTCMini"><i class="fas fa-file-alt text-dark me-2"></i> Print PTC (Mini)</Item>

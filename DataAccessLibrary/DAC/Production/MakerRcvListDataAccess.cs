@@ -369,5 +369,542 @@ namespace DataAccessLibrary.DAC.Production
                 new { RightName = rightName, UserName = userName });
             return count > 0;
         }
+
+        // ─────────────────────────────────────────────────────────────
+        // SPLIT / TRANSFER LOT LOOKUPS
+        // ─────────────────────────────────────────────────────────────
+        public async Task<List<LookupItemString>> GetDistinctCustomerCodesAsync()
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            const string sql = "SELECT DISTINCT CustCode AS Id, CustCode AS Name FROM FCustomerOrders WHERE CustCode IS NOT NULL AND CustCode <> '' ORDER BY CustCode";
+            return (await db.QueryAsync<LookupItemString>(sql)).ToList();
+        }
+
+        public async Task<List<OrderLookupItem>> GetOrdersForCustomerAsync(string custCode, string? itemCode = null)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            if (!string.IsNullOrEmpty(itemCode))
+            {
+                const string sql = @"
+                    SELECT DISTINCT FOrderItems.OrderNo, ISNULL(FCustomerOrders.InternalRefNo, '') AS InternalRefNo
+                    FROM FOrderItems
+                    INNER JOIN FCustomerOrders ON FCustomerOrders.OrderNo = FOrderItems.OrderNo
+                    WHERE FCustomerOrders.CustCode = @CustCode
+                      AND FOrderItems.CompItemCode = @ItemCode
+                      AND (FCustomerOrders.OrderNo IN (SELECT OrderNo FROM VUnshippedOrderList) OR FOrderItems.OrderNo = 'Stock-Order')
+                    ORDER BY FOrderItems.OrderNo";
+                return (await db.QueryAsync<OrderLookupItem>(sql, new { CustCode = custCode, ItemCode = itemCode })).ToList();
+            }
+            else
+            {
+                const string sql = @"
+                    SELECT DISTINCT FOrderItems.OrderNo, ISNULL(FCustomerOrders.InternalRefNo, '') AS InternalRefNo
+                    FROM FOrderItems
+                    INNER JOIN FCustomerOrders ON FCustomerOrders.OrderNo = FOrderItems.OrderNo
+                    WHERE FCustomerOrders.CustCode = @CustCode
+                      AND FCustomerOrders.OrderNo IN (SELECT OrderNo FROM VUnshippedOrderList)
+                    ORDER BY FOrderItems.OrderNo";
+                return (await db.QueryAsync<OrderLookupItem>(sql, new { CustCode = custCode })).ToList();
+            }
+        }
+
+        public async Task<List<LookupItemString>> GetArticlesForOrderAsync(string orderNo)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            const string sql = @"
+                SELECT Items.ItemID AS Id,
+                       '{' + VrptOrders_ForProduction.CompItemID + '} ' + VrptOrders_ForProduction.ItemName AS Name
+                FROM VrptOrders_ForProduction
+                INNER JOIN Items ON VrptOrders_ForProduction.CompItemID = Items.ItemID
+                WHERE VrptOrders_ForProduction.OrderNo = @OrderNo
+                ORDER BY VrptOrders_ForProduction.ItemName";
+            return (await db.QueryAsync<LookupItemString>(sql, new { OrderNo = orderNo })).ToList();
+        }
+
+        public async Task<List<StoreLookupItem>> GetStoresAsync()
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            const string sql = "SELECT EntryID, StoreName FROM Stores ORDER BY StoreName";
+            return (await db.QueryAsync<StoreLookupItem>(sql)).ToList();
+        }
+
+        public async Task<List<ShelfLookupItem>> GetShelvesByStoreAsync(int storeRefId)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            const string sql = @"
+                SELECT EntryID, RackNo, ShelfNo
+                FROM VStoreShelfs
+                WHERE Store_RefID = @StoreRefID
+                ORDER BY StoreName, RackNo, ShelfNo";
+            return (await db.QueryAsync<ShelfLookupItem>(sql, new { StoreRefID = storeRefId })).ToList();
+        }
+
+        public async Task<string> GetShelfRemarksAsync(string itemCode, int processId, int shelfRefId)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            const string sql = @"
+                SELECT TOP 1 Remarks
+                FROM StockOrderOpening
+                WHERE ItemID = @ItemCode AND ProcessID = @ProcessID AND Shelf_RefID = @ShelfRefID";
+            return await db.ExecuteScalarAsync<string>(sql, new { ItemCode = itemCode, ProcessID = processId, ShelfRefID = shelfRefId }) ?? string.Empty;
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // SPLIT / TRANSFER LOT TRANSACTIONS
+        // ─────────────────────────────────────────────────────────────
+        private async Task<string> GenerateNextLotNoAsync(IDbConnection db, IDbTransaction tx)
+        {
+            string yearPrefix = DateTime.Today.ToString("yy");
+            string sql = @"
+                SELECT MAX(SeqNo) FROM (
+                    SELECT CAST(SUBSTRING(LotNo, 3, CASE WHEN CHARINDEX('-', LotNo) > 0 THEN CHARINDEX('-', LotNo) - 3 ELSE LEN(LotNo) END) AS INT) AS SeqNo
+                    FROM Lots_List WHERE LEFT(LotNo, 2) = @YearPrefix AND LEN(LotNo) = 7 AND ISNUMERIC(SUBSTRING(LotNo, 3, 5)) = 1
+                    UNION ALL
+                    SELECT CAST(SUBSTRING(LotNo, 3, CASE WHEN CHARINDEX('-', LotNo) > 0 THEN CHARINDEX('-', LotNo) - 3 ELSE LEN(LotNo) END) AS INT) AS SeqNo
+                    FROM VendRcvdDetail WHERE LEFT(LotNo, 2) = @YearPrefix AND LEN(LotNo) = 7 AND ISNUMERIC(SUBSTRING(LotNo, 3, 5)) = 1
+                    UNION ALL
+                    SELECT CAST(SUBSTRING(LotNo, 3, CASE WHEN CHARINDEX('-', LotNo) > 0 THEN CHARINDEX('-', LotNo) - 3 ELSE LEN(LotNo) END) AS INT) AS SeqNo
+                    FROM VendIssdDetail WHERE LEFT(LotNo, 2) = @YearPrefix AND LEN(LotNo) = 7 AND ISNUMERIC(SUBSTRING(LotNo, 3, 5)) = 1
+                    UNION ALL
+                    SELECT CAST(SUBSTRING(LotNo_Manual, 3, CASE WHEN CHARINDEX('-', LotNo_Manual) > 0 THEN CHARINDEX('-', LotNo_Manual) - 3 ELSE LEN(LotNo_Manual) END) AS INT) AS SeqNo
+                    FROM StockOrderOpening WHERE LEFT(LotNo_Manual, 2) = @YearPrefix AND LEN(LotNo_Manual) = 7 AND ISNUMERIC(LotNo_Manual) = 1
+                ) T";
+
+            int maxSeq = await db.ExecuteScalarAsync<int?>(sql, new { YearPrefix = yearPrefix }, tx) ?? 0;
+            if (maxSeq == 0)
+            {
+                maxSeq = 53000;
+            }
+            else
+            {
+                maxSeq++;
+            }
+
+            return $"{yearPrefix}{maxSeq:D5}";
+        }
+
+        public async Task<bool> ChangeOrderNoAsync(ChangeOrderNoRequest request)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            db.Open();
+            using var tx = db.BeginTransaction();
+            try
+            {
+                string toOrderNo = request.ToOrderNo;
+                string toItemCode = request.ToItemCode;
+
+                if (request.TransferToStockOrder)
+                {
+                    toOrderNo = "Stock-Order";
+                    toItemCode = request.ToItemCode;
+
+                    int custCount = await db.ExecuteScalarAsync<int>(
+                        "SELECT COUNT(*) FROM FCustomerCatalog WHERE Custcode = 'Stock' AND Country = 'PK' AND CompItemID = @ItemCode",
+                        new { ItemCode = toItemCode }, tx);
+                    if (custCount == 0)
+                    {
+                        await db.ExecuteAsync(
+                            "INSERT INTO FCustomerCatalog (Custcode, Country, ItemID, CompItemID) VALUES ('Stock', 'PK', @ItemCode, @ItemCode)",
+                            new { ItemCode = toItemCode }, tx);
+                    }
+
+                    int orderItemCount = await db.ExecuteScalarAsync<int>(
+                        "SELECT COUNT(*) FROM FOrderItems WHERE OrderNo = 'Stock-Order' AND CompItemCode = @ItemCode",
+                        new { ItemCode = toItemCode }, tx);
+                    if (orderItemCount == 0)
+                    {
+                        await db.ExecuteAsync(
+                            @"INSERT INTO FOrderItems (OrderNo, ItemCode, CompItemCode, Qty, DeliveryDT, Stamps, Quality)
+                              VALUES ('Stock-Order', @ItemCode, @ItemCode, @Qty, @Date, '', '')",
+                            new { ItemCode = toItemCode, Qty = request.OriginalQty, Date = DateTime.Today }, tx);
+                    }
+                    else
+                    {
+                        await db.ExecuteAsync(
+                            "UPDATE FOrderItems SET Qty = Qty + @Qty WHERE OrderNo = 'Stock-Order' AND ItemCode = @ItemCode",
+                            new { ItemCode = toItemCode, Qty = request.OriginalQty }, tx);
+                    }
+                }
+
+                await db.ExecuteAsync(
+                    "UPDATE VendRcvdDetail SET OrderNo = @ToOrderNo, ItemCode = @ToItemCode WHERE LotNo = @LotNo",
+                    new { ToOrderNo = toOrderNo, ToItemCode = toItemCode, LotNo = request.LotNo }, tx);
+
+                await db.ExecuteAsync(
+                    "UPDATE VendIssdDetail SET OrderNo = @ToOrderNo, ItemCode = @ToItemCode WHERE LotNo = @LotNo",
+                    new { ToOrderNo = toOrderNo, ToItemCode = toItemCode, LotNo = request.LotNo }, tx);
+
+                await db.ExecuteAsync(@"
+                    INSERT INTO LotTransferDetails (VRD_From_RefID, VRD_To_RefID, FromOrderNo, ToOrderNo, Qty, SplitQty, Type, FromItemCode, ToItemCode)
+                    VALUES (@EntryID, @EntryID, @FromOrderNo, @ToOrderNo, @Qty, @Qty, 0, @ToItemCode, @ToItemCode)",
+                    new
+                    {
+                        EntryID = request.EntryID,
+                        FromOrderNo = request.FromOrderNo,
+                        ToOrderNo = toOrderNo,
+                        Qty = (int)request.OriginalQty,
+                        ToItemCode = toItemCode
+                    }, tx);
+
+                tx.Commit();
+                return true;
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
+        }
+
+        public async Task<string> SplitLotAsync(SplitLotRequest request)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            db.Open();
+            using var tx = db.BeginTransaction();
+            try
+            {
+                string newLotNo = await GenerateNextLotNoAsync(db, tx);
+
+                string forgeBatchNo = await db.ExecuteScalarAsync<string>(
+                    "SELECT RcvID FROM VLot_With_ForgeBatchNo WHERE LotNo = @LotNo",
+                    new { LotNo = request.OriginalLotNo }, tx) ?? string.Empty;
+
+                int billCount = await db.ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM MakerPostedBillsDetail_Receivings WHERE VRD_RefID = @EntryID",
+                    new { EntryID = request.EntryID }, tx);
+                int notAvailableForBilling = billCount > 0 ? 1 : 0;
+
+                await db.ExecuteAsync(
+                    "UPDATE VendRcvdDetail SET RcvdQty = RcvdQty - @SplitQty WHERE EntryID = @EntryID",
+                    new { SplitQty = request.SplitQty, EntryID = request.EntryID }, tx);
+
+                await db.ExecuteAsync(@"
+                    INSERT INTO VendReceived (VendID, DT, RecieptID, UserID, ProcessID, Issuance_RefID, EmpID)
+                    SELECT VendID, DT, '', UserID, ProcessID, Issuance_RefID, EmpID
+                    FROM VendReceived WHERE EntryID = @VR_EntryID",
+                    new { VR_EntryID = request.VR_EntryID }, tx);
+
+                long newVrRefId = await db.ExecuteScalarAsync<long>("SELECT MAX(EntryID) FROM VendReceived", transaction: tx);
+
+                await db.ExecuteAsync(@"
+                    INSERT INTO VendRcvdDetail (
+                        RefID, ItemCode, RecieptID, RcvdQty, Wastage, IssQty, Rate, LotNo, ReqAuth,
+                        NextProcessID, LostQty, OrderNo, CountedBy, Issue_RefID, ProcessID, RcvdWeight,
+                        Opening_RefID, ReworkLot, Repair_RefID, Not_Available_For_Billing
+                    )
+                    SELECT
+                        @NewVrRefId, @SplitItemCode, '', @SplitQty, 0, 0, Rate, @NewLotNo, ReqAuth,
+                        NextProcessID, 0, @SplitOrderNo, '', Issue_RefID, ProcessID, 0,
+                        Opening_RefID, ReWorkLot, Repair_RefID, @NotAvailableForBilling
+                    FROM VendRcvdDetail WHERE EntryID = @EntryID",
+                    new
+                    {
+                        NewVrRefId = newVrRefId,
+                        SplitItemCode = request.SplitItemCode,
+                        SplitQty = request.SplitQty,
+                        NewLotNo = newLotNo,
+                        SplitOrderNo = request.SplitOrderNo,
+                        NotAvailableForBilling = notAvailableForBilling,
+                        EntryID = request.EntryID
+                    }, tx);
+
+                long newVrdEntryId = await db.ExecuteScalarAsync<long>("SELECT MAX(EntryID) FROM VendRcvdDetail", transaction: tx);
+
+                await db.ExecuteAsync(@"
+                    INSERT INTO Lots_List (LotNo, ItemID, Lot_Type, Reference_LotNo, Batch_No, Mill_Certificate_No, Forge_Batch_No)
+                    SELECT @NewLotNo, @SplitItemCode, 4, @OriginalLotNo, Batch_No, Mill_Certificate_No, @ForgeBatchNo
+                    FROM Lots_List WHERE LotNo = @OriginalLotNo",
+                    new
+                    {
+                        NewLotNo = newLotNo,
+                        SplitItemCode = request.SplitItemCode,
+                        OriginalLotNo = request.OriginalLotNo,
+                        ForgeBatchNo = forgeBatchNo
+                    }, tx);
+
+                await db.ExecuteAsync(@"
+                    INSERT INTO LotTransferDetails (VRD_From_RefID, VRD_To_RefID, FromOrderNo, ToOrderNo, Qty, SplitQty, Type, LotTransferRemarks)
+                    VALUES (@FromEntryID, @NewEntryID, @FromOrderNo, @ToOrderNo, @Qty, @SplitQty, 1, @Remarks)",
+                    new
+                    {
+                        FromEntryID = request.EntryID,
+                        NewEntryID = newVrdEntryId,
+                        FromOrderNo = request.FromOrderNo,
+                        ToOrderNo = request.SplitOrderNo,
+                        Qty = (int)request.OriginalQty,
+                        SplitQty = (int)request.SplitQty,
+                        Remarks = request.Remarks
+                    }, tx);
+
+                tx.Commit();
+                return newLotNo;
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
+        }
+
+        public async Task<bool> TransferToSFStockAsync(TransferSFStockRequest request)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            db.Open();
+            using var tx = db.BeginTransaction();
+            try
+            {
+                await db.ExecuteAsync(@"
+                    INSERT INTO StockOrderOpening (ItemID, ProcessID, Qty, Location, UserName, MachineName, Shelf_RefID, Remarks, LotNo_Manual)
+                    VALUES (@ItemCode, @ProcessID, @Qty, @Location, @UserName, @MachineName, @ShelfRefID, @Remarks, @LotNo)",
+                    new
+                    {
+                        ItemCode = request.ItemCode,
+                        ProcessID = request.ProcessID,
+                        Qty = (int)request.TransferQty,
+                        Location = request.LocationText,
+                        UserName = request.UserName,
+                        MachineName = request.MachineName,
+                        ShelfRefID = request.ShelfRefID,
+                        Remarks = request.Remarks,
+                        LotNo = request.LotNo
+                    }, tx);
+
+                long sooEntryId = await db.ExecuteScalarAsync<long>("SELECT MAX(EntryID) FROM StockOrderOpening", transaction: tx);
+
+                int custCount = await db.ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM ForeignCustomers WHERE CustCode = 'Stock' AND Country = 'PK'", transaction: tx);
+                if (custCount == 0)
+                {
+                    await db.ExecuteAsync("INSERT INTO ForeignCustomers (Custcode, Country) VALUES ('Stock', 'PK')", transaction: tx);
+                }
+
+                int orderCount = await db.ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM FCustomerOrders WHERE OrderNo = 'Stock-Order'", transaction: tx);
+                if (orderCount == 0)
+                {
+                    await db.ExecuteAsync("INSERT INTO FCustomerOrders (CustCode, Country, OrderNo, DT) VALUES ('Stock', 'PK', 'Stock-Order', @Date)",
+                        new { Date = DateTime.Today }, tx);
+                }
+
+                int catalogCount = await db.ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM FCustomerCatalog WHERE Custcode = 'Stock' AND Country = 'PK' AND CompItemID = @ItemCode",
+                    new { ItemCode = request.ItemCode }, tx);
+                if (catalogCount == 0)
+                {
+                    await db.ExecuteAsync("INSERT INTO FCustomerCatalog (Custcode, Country, ItemID, CompItemID) VALUES ('Stock', 'PK', @ItemCode, @ItemCode)",
+                        new { ItemCode = request.ItemCode }, tx);
+                }
+
+                int orderItemCount = await db.ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM FOrderItems WHERE OrderNo = 'Stock-Order' AND CompItemCode = @ItemCode",
+                    new { ItemCode = request.ItemCode }, tx);
+                if (orderItemCount == 0)
+                {
+                    await db.ExecuteAsync(
+                        @"INSERT INTO FOrderItems (OrderNo, ItemCode, CompItemCode, Qty, DeliveryDT, Stamps, Quality)
+                          VALUES ('Stock-Order', @ItemCode, @ItemCode, @Qty, @Date, '', '')",
+                        new { ItemCode = request.ItemCode, Qty = (int)request.TransferQty, Date = DateTime.Today }, tx);
+                }
+                else
+                {
+                    await db.ExecuteAsync(
+                        "UPDATE FOrderItems SET Qty = Qty + @Qty WHERE OrderNo = 'Stock-Order' AND ItemCode = @ItemCode",
+                        new { ItemCode = request.ItemCode, Qty = (int)request.TransferQty }, tx);
+                }
+
+                await db.ExecuteAsync(@"
+                    INSERT INTO LotTransferDetails (VRD_From_RefID, VRD_To_RefID, FromOrderNo, ToOrderNo, Qty, SplitQty, Type, SOO_RefID)
+                    VALUES (@FromEntryID, 0, @FromOrderNo, 'Stock-Order', @Qty, @SplitQty, 2, @SOO_EntryID)",
+                    new
+                    {
+                        FromEntryID = request.EntryID,
+                        FromOrderNo = request.FromOrderNo,
+                        Qty = (int)request.OriginalQty,
+                        SplitQty = (int)request.TransferQty,
+                        SOO_EntryID = sooEntryId
+                    }, tx);
+
+                await db.ExecuteAsync(
+                    "UPDATE VendRcvdDetail SET IssQty = IssQty + @TransferQty WHERE EntryID = @EntryID",
+                    new { TransferQty = request.TransferQty, EntryID = request.EntryID }, tx);
+
+                tx.Commit();
+                return true;
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // INSPECTION DATA
+        // ─────────────────────────────────────────────────────────────
+        public async Task<InspectionDataDto> GetInspectionDataAsync(long vrdEntryId)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+
+            const string sqlHeader = @"
+                SELECT VRD.EntryID AS VRD_RefID, VRD.LotNo, VRD.ItemCode, VRD.OrderNo,
+                       VRD.ProcessID, VRD.RcvdQty, VR.DT AS ReceivingDT,
+                       I.ItemName, I.TipSize, I.ItemSize, I.SizeUnit,
+                       P.Description AS ProcessDescription
+                FROM VendRcvdDetail VRD
+                INNER JOIN VendReceived VR ON VR.EntryID = VRD.RefID
+                LEFT JOIN Items I ON I.ItemID = VRD.ItemCode
+                LEFT JOIN Processes P ON P.ProcessID = VRD.ProcessID
+                WHERE VRD.EntryID = @VRD_EntryID";
+
+            var dto = await db.QueryFirstOrDefaultAsync<InspectionDataDto>(sqlHeader, new { VRD_EntryID = vrdEntryId });
+            if (dto == null) return new InspectionDataDto();
+
+            const string sqlProcesses = @"
+                SELECT ProcessID, Code, Description
+                FROM VItemProcesses
+                WHERE IsExist = @ItemCode AND ProcessID = @ProcessID
+                ORDER BY Description";
+            dto.Processes = (await db.QueryAsync<ProcessOptionItem>(sqlProcesses, new { ItemCode = dto.ItemCode, ProcessID = dto.ProcessID })).ToList();
+
+            const string sqlExisting = @"
+                SELECT EntryID, Disposation, Comments, DT AS InspectionDT, LotStatus
+                FROM VendRcvdDetailInspection
+                WHERE VRD_RefID = @VRD_RefID";
+            var existing = await db.QueryFirstOrDefaultAsync<dynamic>(sqlExisting, new { VRD_RefID = vrdEntryId });
+
+            if (existing != null)
+            {
+                dto.EntryID = (long)existing.EntryID;
+                dto.Disposation = (string)(existing.Disposation ?? string.Empty);
+                dto.Comments = (string)(existing.Comments ?? string.Empty);
+                dto.InspectionDT = (DateTime)(existing.InspectionDT ?? DateTime.Today);
+                dto.LotStatus = (bool)(existing.LotStatus ?? false);
+
+                const string sqlDetails = @"
+                    SELECT PIP.EntryID, PIP.ParameterName, VRDID.AQL, VRDID.SampleSize,
+                           VRDID.RejectOn, VRDID.TestSpecificationNo, VRDID.ActualRejection, VRDID.Status
+                    FROM VendRcvdDetailInspectionDetail VRDID
+                    LEFT JOIN ProcessInspectionParameters PIP ON PIP.EntryID = VRDID.PIP_RefID
+                    WHERE VRDID.VRDI_RefID = @VRDI_RefID";
+                dto.Parameters = (await db.QueryAsync<InspectionParameterItem>(sqlDetails, new { VRDI_RefID = dto.EntryID })).ToList();
+            }
+
+            if (!dto.Parameters.Any())
+            {
+                const string sqlParams = @"
+                    SELECT EntryID, ParameterName, AQL, SampleSize, RejectOn,
+                           TechSpecNo AS TestSpecificationNo, '0' AS ActualRejection, 'OK' AS Status
+                    FROM ProcessInspectionParameters
+                    WHERE ProcessID = @ProcessID
+                    ORDER BY EntryID";
+                dto.Parameters = (await db.QueryAsync<InspectionParameterItem>(sqlParams, new { ProcessID = dto.ProcessID })).ToList();
+            }
+
+            const string sqlTemper = @"
+                SELECT TempValue
+                FROM VendRcvdDetailTemperValues
+                WHERE VRD_RefID = @VRD_RefID
+                ORDER BY SNo, EntryID";
+            dto.TemperValues = (await db.QueryAsync<string>(sqlTemper, new { VRD_RefID = vrdEntryId }))
+                .Where(v => !string.IsNullOrEmpty(v))
+                .ToList();
+
+            return dto;
+        }
+
+        public async Task<List<InspectionParameterItem>> GetProcessInspectionParametersAsync(int processId)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            const string sql = @"
+                SELECT EntryID, ParameterName, AQL, SampleSize, RejectOn,
+                       TechSpecNo AS TestSpecificationNo, '0' AS ActualRejection, 'OK' AS Status
+                FROM ProcessInspectionParameters
+                WHERE ProcessID = @ProcessID
+                ORDER BY EntryID";
+            return (await db.QueryAsync<InspectionParameterItem>(sql, new { ProcessID = processId })).ToList();
+        }
+
+        public async Task<bool> SaveInspectionDataAsync(SaveInspectionRequest request)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            db.Open();
+            using var tx = db.BeginTransaction();
+            try
+            {
+                await db.ExecuteAsync(@"
+                    DELETE FROM VendRcvdDetailInspectionDetail
+                    WHERE VRDI_RefID IN (SELECT EntryID FROM VendRcvdDetailInspection WHERE VRD_RefID = @VRD_RefID)",
+                    new { VRD_RefID = request.VRD_RefID }, tx);
+
+                await db.ExecuteAsync(@"
+                    DELETE FROM VendRcvdDetailInspection WHERE VRD_RefID = @VRD_RefID",
+                    new { VRD_RefID = request.VRD_RefID }, tx);
+
+                await db.ExecuteAsync(@"
+                    INSERT INTO VendRcvdDetailInspection (VRD_RefID, Disposation, Comments, DT, LotStatus, UserName, MachineName)
+                    VALUES (@VRD_RefID, @Disposation, @Comments, @DT, @LotStatus, @UserName, @MachineName)",
+                    new
+                    {
+                        VRD_RefID = request.VRD_RefID,
+                        Disposation = request.Disposation,
+                        Comments = request.Comments,
+                        DT = request.DT,
+                        LotStatus = request.LotStatus,
+                        UserName = request.UserName,
+                        MachineName = request.MachineName
+                    }, tx);
+
+                long vrdiEntryId = await db.ExecuteScalarAsync<long>("SELECT MAX(EntryID) FROM VendRcvdDetailInspection", transaction: tx);
+
+                if (request.Parameters != null && request.Parameters.Any())
+                {
+                    foreach (var p in request.Parameters)
+                    {
+                        await db.ExecuteAsync(@"
+                            INSERT INTO VendRcvdDetailInspectionDetail (VRDI_RefID, PIP_RefID, AQL, SampleSize, RejectOn, TestSpecificationNo, ActualRejection, Status)
+                            VALUES (@VRDI_RefID, @PIP_RefID, @AQL, @SampleSize, @RejectOn, @TestSpecificationNo, @ActualRejection, @Status)",
+                            new
+                            {
+                                VRDI_RefID = vrdiEntryId,
+                                PIP_RefID = p.EntryID,
+                                AQL = p.AQL,
+                                SampleSize = p.SampleSize,
+                                RejectOn = p.RejectOn,
+                                TestSpecificationNo = p.TestSpecificationNo,
+                                ActualRejection = p.ActualRejection,
+                                Status = p.Status
+                            }, tx);
+                    }
+                }
+
+                await db.ExecuteAsync("DELETE FROM VendRcvdDetailTemperValues WHERE VRD_RefID = @VRD_RefID",
+                    new { VRD_RefID = request.VRD_RefID }, tx);
+
+                if (request.TemperValues != null && request.TemperValues.Any())
+                {
+                    int sno = 1;
+                    foreach (var val in request.TemperValues)
+                    {
+                        if (!string.IsNullOrWhiteSpace(val))
+                        {
+                            await db.ExecuteAsync(@"
+                                INSERT INTO VendRcvdDetailTemperValues (VRD_RefID, SNo, TempValue)
+                                VALUES (@VRD_RefID, @SNo, @TempValue)",
+                                new { VRD_RefID = request.VRD_RefID, SNo = sno++, TempValue = val.Trim() }, tx);
+                        }
+                    }
+                }
+
+                tx.Commit();
+                return true;
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
+        }
     }
 }
+
+

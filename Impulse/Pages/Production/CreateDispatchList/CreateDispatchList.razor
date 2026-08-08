@@ -1,0 +1,666 @@
+@page "/production/create-dispatch-list"
+@using DataAccessLibrary.Models.ViewModels.Production
+@using Impulse.Services.Production
+@using Blazored.Typeahead
+@using BlazorContextMenu
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-3">
+
+            <!-- Page Header -->
+            <div class="d-flex align-items-end justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="p-2 bg-primary bg-opacity-10 text-primary rounded-3">
+                        <i class="fas fa-shipping-fast fs-4"></i>
+                    </div>
+                    <div>
+                        <h4 class="fw-bold mb-0 text-dark" style="font-size: 1.35rem;">Create Dispatch List</h4>
+                        <div class="text-muted small">Select finalized production lots, package into boxes, assign cartons, and generate export dispatch lists</div>
+                    </div>
+                </div>
+
+                <!-- Material Design 3 Tabs Navigation -->
+                <ul class="nav nav-pills gap-2 bg-light p-1 rounded-pill border" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link rounded-pill px-3 py-1 fw-bold @(ActiveTab == 0 ? "active bg-primary text-white shadow-sm" : "text-secondary")"
+                                @onclick="() => SetTab(0)">
+                            <i class="fas fa-list-check me-1"></i> Lots Finalyzed
+                            <span class="badge @(ActiveTab == 0 ? "bg-light text-primary" : "bg-secondary text-white") ms-1">
+                                @AvailableLots.Count
+                            </span>
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link rounded-pill px-3 py-1 fw-bold @(ActiveTab == 1 ? "active bg-primary text-white shadow-sm" : "text-secondary")"
+                                @onclick="() => SetTab(1)">
+                            <i class="fas fa-boxes me-1"></i> Dispatch List
+                            <span class="badge @(ActiveTab == 1 ? "bg-light text-primary" : "bg-secondary text-white") ms-1">
+                                @StagedItems.Count
+                            </span>
+                        </button>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- TAB 0: LOTS FINALYZED -->
+            @if (ActiveTab == 0)
+            {
+                <!-- Filter Controls Panel (2-row structured layout) -->
+                <div class="p-3 bg-light rounded-3 border mb-3">
+                    <!-- ROW 1: Customer, Country, Maker, Article (Wide) -->
+                    <div class="row g-2 align-items-end mb-2">
+                        <!-- Customer Selector -->
+                        <div class="col-md-3">
+                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
+                                <i class="fas fa-user-tie text-primary me-1"></i> Customer <span class="text-danger">*</span>
+                            </label>
+                            <div class="custom-typeahead-container">
+                                <BlazoredTypeahead SearchMethod="SearchCustomers"
+                                                   TValue="LookupItemString"
+                                                   TItem="LookupItemString"
+                                                   Value="SelectedCustomer"
+                                                   ValueChanged="OnCustomerChanged"
+                                                   ValueExpression="@(() => SelectedCustomer)"
+                                                   Placeholder="Select Customer..."
+                                                   EnableDropDown="true"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="cust">
+                                        @cust.Name
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="cust">
+                                        @cust.Name
+                                    </ResultTemplate>
+                                    <NotFoundTemplate Context="searchText">
+                                        <span class="text-muted small">No customers matching "@searchText"</span>
+                                    </NotFoundTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                        </div>
+
+                        <!-- Country Selector (Cascading) -->
+                        <div class="col-md-2">
+                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
+                                <i class="fas fa-globe text-primary me-1"></i> Country
+                            </label>
+                            <select class="form-select form-select-sm" @bind="Filter.Country" @bind:after="LoadLotsAsync" disabled="@(!Countries.Any())">
+                                <option value="">-- All Countries --</option>
+                                @foreach (var c in Countries)
+                                {
+                                    <option value="@c">@c</option>
+                                }
+                            </select>
+                        </div>
+
+                        <!-- Maker Selector -->
+                        <div class="col-md-3">
+                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
+                                <i class="fas fa-industry text-primary me-1"></i> Maker
+                            </label>
+                            <div class="custom-typeahead-container">
+                                <BlazoredTypeahead SearchMethod="SearchMakers"
+                                                   TValue="LookupItemInt"
+                                                   TItem="LookupItemInt"
+                                                   Value="SelectedMaker"
+                                                   ValueChanged="OnMakerChanged"
+                                                   ValueExpression="@(() => SelectedMaker)"
+                                                   Placeholder="Select Maker..."
+                                                   EnableDropDown="true"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="mkr">
+                                        @mkr.Name
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="mkr">
+                                        @mkr.Name
+                                    </ResultTemplate>
+                                    <NotFoundTemplate Context="searchText">
+                                        <span class="text-muted small">No makers found</span>
+                                    </NotFoundTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                        </div>
+
+                        <!-- Article Selector (Expanded Width) -->
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
+                                <i class="fas fa-box-open text-primary me-1"></i> Article / Item
+                            </label>
+                            <div class="custom-typeahead-container">
+                                <BlazoredTypeahead SearchMethod="SearchArticles"
+                                                   TValue="LookupItemString"
+                                                   TItem="LookupItemString"
+                                                   Value="SelectedArticle"
+                                                   ValueChanged="OnArticleChanged"
+                                                   ValueExpression="@(() => SelectedArticle)"
+                                                   Placeholder="Select Article..."
+                                                   EnableDropDown="true"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="art">
+                                        @art.Name
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="art">
+                                        @art.Name
+                                    </ResultTemplate>
+                                    <NotFoundTemplate Context="searchText">
+                                        <span class="text-muted small">No items matching</span>
+                                    </NotFoundTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ROW 2: Date Range, From Date (Always Visible), To Date (Always Visible), Order #, Lot # Search, Refresh -->
+                    <div class="row g-2 align-items-end">
+                        <!-- Date Range Preset -->
+                        <div class="col-md-2">
+                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
+                                <i class="fas fa-calendar-alt text-primary me-1"></i> Date Range
+                            </label>
+                            <select class="form-select form-select-sm" @bind="Filter.DateRangeIndex" @bind:after="OnDateRangeChanged">
+                                <option value="0">Today</option>
+                                <option value="1">Last 15 Days</option>
+                                <option value="2">Last 30 Days</option>
+                                <option value="3">Last 60 Days</option>
+                                <option value="4">Last 90 Days</option>
+                                <option value="5">Custom Range</option>
+                            </select>
+                        </div>
+
+                        <!-- From Date (Always Visible) -->
+                        <div class="col-md-2">
+                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">From Date</label>
+                            <input type="date" class="form-control form-control-sm" @bind="Filter.DtFrom" @bind:after="LoadLotsAsync" disabled="@(Filter.DateRangeIndex != 5)" />
+                        </div>
+
+                        <!-- To Date (Always Visible) -->
+                        <div class="col-md-2">
+                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">To Date</label>
+                            <input type="date" class="form-control form-control-sm" @bind="Filter.DtTo" @bind:after="LoadLotsAsync" disabled="@(Filter.DateRangeIndex != 5)" />
+                        </div>
+
+                        <!-- Order No Filter -->
+                        <div class="col-md-2">
+                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Order #</label>
+                            <input type="text" class="form-control form-control-sm text-center" @bind="Filter.OrderNo" @bind:after="LoadLotsAsync" placeholder="Filter Order #..." />
+                        </div>
+
+                        <!-- Lot No Search -->
+                        <div class="col-md-3">
+                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Lot # Search</label>
+                            <div class="input-group input-group-sm">
+                                <input type="text" class="form-control form-control-sm text-center" @bind="Filter.LotNo" @onkeydown="OnLotNoKeyDown" placeholder="Search Lot #..." />
+                                <button class="btn btn-outline-primary" type="button" @onclick="LoadLotsAsync">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Refresh Button -->
+                        <div class="col-md-1">
+                            <button type="button" class="btn btn-sm btn-primary w-100 fw-bold" @onclick="LoadLotsAsync" disabled="@IsLoading">
+                                @if (IsLoading)
+                                {
+                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                }
+                                else
+                                {
+                                    <i class="fas fa-sync-alt"></i>
+                                }
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MAIN FINALIZED LOTS GRID -->
+                <div class="card border mb-3 rounded-3 shadow-none">
+                    <div class="table-responsive" style="max-height: 48vh; overflow-y: auto;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                <tr>
+                                    <th style="width: 40px;" class="text-center">
+                                        <input class="form-check-input" type="checkbox" checked="@IsAllSelected" @onchange="ToggleSelectAll" />
+                                    </th>
+                                    <th style="width: 45px;">#</th>
+                                    <th>Maker</th>
+                                    <th style="width: 120px;">Order #</th>
+                                    <th style="width: 110px;">Date</th>
+                                    <th>Process</th>
+                                    <th>Article</th>
+                                    <th class="text-center" style="width: 100px;">Avail Qty</th>
+                                    <th class="text-center" style="width: 120px;">Dispatch Qty</th>
+                                    <th class="text-center" style="width: 100px;">Lot #</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (IsLoading)
+                                {
+                                    <tr>
+                                        <td colspan="10" class="text-center py-4 text-muted">
+                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span> Loading finalized production lots...
+                                        </td>
+                                    </tr>
+                                }
+                                else if (!AvailableLots.Any())
+                                {
+                                    <tr>
+                                        <td colspan="10" class="text-center py-4 text-muted">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            @(SelectedCustomer == null ? "Please select a Customer above to view finalized lots." : "No completed lots available for dispatch matching your filter.")
+                                        </td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    int idx = 1;
+                                    @foreach (var item in AvailableLots)
+                                    {
+                                        <tr class="@(item.IsSelected ? "table-primary table-active" : "")">
+                                            <td class="text-center" @onclick:stopPropagation="true">
+                                                <input class="form-check-input" type="checkbox" @bind="item.IsSelected" @bind:after="OnSelectionChanged" />
+                                            </td>
+                                            <td>@(idx++)</td>
+                                            <td class="fw-semibold text-dark">@item.DisplayMaker</td>
+                                            <td><span class="badge bg-secondary">@item.OrderNo</span></td>
+                                            <td>@item.DT.ToString("dd-MMM-yyyy")</td>
+                                            <td><span class="badge bg-info text-dark">@item.Description</span></td>
+                                            <td>@item.FullArticle</td>
+                                            <td class="text-center fw-bold text-success">@item.AvailQty.ToString("N0")</td>
+                                            <td class="text-center" @onclick:stopPropagation="true">
+                                                <input type="number" class="form-control form-control-sm text-center py-0"
+                                                       @bind="item.DispatchQty"
+                                                       @bind:after="OnSelectionChanged"
+                                                       max="@item.AvailQty"
+                                                       min="1"
+                                                       style="max-width: 95px; margin: 0 auto;" />
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge px-2 py-1" style="background-color: #2196F3; color: #ffffff; font-weight: 700; border-radius: 4px;">
+                                                    @item.LotNo
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                            <tfoot class="table-light fw-bold text-dark border-top">
+                                <tr>
+                                    <td colspan="7" class="text-end">Summary Totals:</td>
+                                    <td class="text-center text-success">@TotalAvailableQty.ToString("N0")</td>
+                                    <td class="text-center text-primary">@TotalSelectedQty.ToString("N0")</td>
+                                    <td class="text-muted small text-center">(@SelectedLots.Count selected)</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Action Strip -->
+                <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded-3 border">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="fw-bold text-secondary">
+                            Selected Lots: <span class="badge bg-primary fs-6">@SelectedLots.Count</span>
+                        </span>
+                        <span class="fw-bold text-secondary">
+                            Dispatch Pieces: <span class="badge bg-success fs-6">@TotalSelectedQty.ToString("N0")</span>
+                        </span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-sm btn-primary fw-bold px-4" @onclick="OpenStageModal" disabled="@(!SelectedLots.Any())">
+                            <i class="fas fa-arrow-right me-1"></i> Add / Stage to Dispatch
+                        </button>
+                    </div>
+                </div>
+            }
+
+            <!-- TAB 1: DISPATCH LIST -->
+            @if (ActiveTab == 1)
+            {
+                <!-- Dispatch Header Bar -->
+                <div class="row g-2 align-items-center mb-3 p-3 bg-light rounded-3 border">
+                    <div class="col-md-4 d-flex align-items-center gap-2">
+                        <label class="form-label form-label-sm mb-0 fw-bold text-secondary text-nowrap">
+                            <i class="fas fa-file-invoice text-primary me-1"></i> Dispatch List No. <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control form-control-sm fw-bold text-primary" @bind="DispatchListNo" placeholder="Enter Dispatch List #..." />
+                    </div>
+
+                    <div class="col-md-4 d-flex align-items-center gap-2">
+                        <span class="fw-bold text-secondary">Customer:</span>
+                        <span class="badge bg-primary fs-6">@(SelectedCustomer?.Name ?? Filter.CustCode)</span>
+                        @if (!string.IsNullOrEmpty(Filter.Country))
+                        {
+                            <span class="badge bg-info text-dark fs-6">@Filter.Country</span>
+                        }
+                    </div>
+
+                    <div class="col-md-4 d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" @onclick="() => SetTab(0)">
+                            <i class="fas fa-plus me-1"></i> Add More Lots
+                        </button>
+                    </div>
+                </div>
+
+                <!-- STAGED ITEMS TABLE -->
+                <div class="card border mb-3 rounded-3 shadow-none">
+                    <div class="table-responsive" style="max-height: 48vh; overflow-y: auto;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                <tr>
+                                    <th style="width: 40px;" class="text-center">
+                                        <input class="form-check-input" type="checkbox" checked="@IsAllStagedSelected" @onchange="ToggleSelectAllStaged" />
+                                    </th>
+                                    <th style="width: 45px;">#</th>
+                                    <th class="text-center" style="width: 100px;">Qty (Pcs)</th>
+                                    <th style="width: 120px;">Item ID</th>
+                                    <th>Item Name</th>
+                                    <th class="text-center" style="width: 130px;">Carton #</th>
+                                    <th class="text-center" style="width: 100px;">Lot #</th>
+                                    <th style="width: 120px;">Internal Ord.</th>
+                                    <th>Process</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (!StagedItems.Any())
+                                {
+                                    <tr>
+                                        <td colspan="9" class="text-center py-4 text-muted">
+                                            <i class="fas fa-box-open me-1"></i> No items staged in this dispatch list. Go to "Lots Finalyzed" tab to select lots.
+                                        </td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    int sIdx = 1;
+                                    @foreach (var s in StagedItems)
+                                    {
+                                        <ContextMenuTrigger MenuId="stagedContextMenu" Data="@s" WrapperTag="tr" class="@(s.IsSelected ? "table-primary table-active" : "")">
+                                            <td class="text-center" @onclick:stopPropagation="true">
+                                                <input class="form-check-input" type="checkbox" @bind="s.IsSelected" @bind:after="OnStagedSelectionChanged" />
+                                            </td>
+                                            <td>@(sIdx++)</td>
+                                            <td class="text-center fw-bold text-success">@s.Qty.ToString("N0")</td>
+                                            <td><span class="badge bg-secondary">@s.ItemCode</span></td>
+                                            <td class="fw-semibold text-dark">@s.ItemName</td>
+                                            <td class="text-center">
+                                                @if (s.CartonNo > 0)
+                                                {
+                                                    <span class="badge bg-warning text-dark px-2 py-1 fw-bold fs-6">
+                                                        @s.CartonNo
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-light text-muted border px-2 py-1">
+                                                        -
+                                                    </span>
+                                                }
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge px-2 py-1" style="background-color: #2196F3; color: #ffffff; font-weight: 700; border-radius: 4px;">
+                                                    @s.LotNo
+                                                </span>
+                                            </td>
+                                            <td>@s.OrderNo</td>
+                                            <td><span class="badge bg-info text-dark">@s.ProcessDescription</span></td>
+                                        </ContextMenuTrigger>
+                                    }
+                                }
+                            </tbody>
+                            <tfoot class="table-light fw-bold text-dark border-top">
+                                <tr>
+                                    <td colspan="2" class="text-end">Batch Totals:</td>
+                                    <td class="text-center text-success">@TotalStagedQty.ToString("N0") Pcs</td>
+                                    <td colspan="2"></td>
+                                    <td class="text-center text-primary">@TotalCartonsCount Cartons</td>
+                                    <td colspan="3" class="text-muted small">(@StagedItems.Count boxes staged)</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- BATCH ACTION & REPORT STRIP -->
+                <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded-3 border">
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary fw-bold" @onclick="OpenCartonModal" disabled="@(!SelectedStagedItems.Any())">
+                            <i class="fas fa-box-open me-1"></i> Add to Carton
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger fw-bold" @onclick="RemoveSelectedStaged" disabled="@(!SelectedStagedItems.Any())">
+                            <i class="fas fa-trash-alt me-1"></i> Remove Selected
+                        </button>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-sm btn-outline-dark fw-bold" @onclick="() => PrintInnerLabels(false, false)" disabled="@(!StagedItems.Any())">
+                                <i class="fas fa-tags me-1"></i> Print Inner Labels
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-dark dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false" disabled="@(!StagedItems.Any())">
+                                <span class="visually-hidden">Toggle Dropdown</span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="font-size: 0.85rem;">
+                                <li>
+                                    <button class="dropdown-item py-2" type="button" @onclick="() => PrintInnerLabels(false, false)">
+                                        <i class="fas fa-tag text-primary me-2"></i> Print Inner Labels
+                                    </button>
+                                </li>
+                                <li>
+                                    <button class="dropdown-item py-2" type="button" @onclick="() => PrintInnerLabels(true, false)">
+                                        <i class="fas fa-tags text-info me-2"></i> Print Inner Labels - II
+                                    </button>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <button class="dropdown-item py-2" type="button" @onclick="() => PrintInnerLabels(false, true)">
+                                        <i class="fas fa-edit text-warning me-2"></i> Print Inner Labels - Manual Qty
+                                    </button>
+                                </li>
+                                <li>
+                                    <button class="dropdown-item py-2" type="button" @onclick="() => PrintInnerLabels(true, true)">
+                                        <i class="fas fa-edit text-danger me-2"></i> Print Inner Labels - II Manual Qty
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" @onclick="PrintDispatchListReport" disabled="@(SavedEntryId == 0)">
+                            <i class="fas fa-print me-1"></i> Print Dispatch List
+                        </button>
+                        <button type="button" class="btn btn-sm btn-primary fw-bold px-4" @onclick="SaveDispatchList" disabled="@(!StagedItems.Any() || IsSaving)">
+                            @if (IsSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                <span>Saving...</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-save me-1"></i>
+                                <span>Save Dispatch List</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            }
+
+            <!-- MANUAL QTY PROMPT MODAL -->
+            @if (ShowManualQtyModal)
+            {
+                <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 10560;">
+                    <div class="modal-dialog modal-sm modal-dialog-centered">
+                        <div class="modal-content border-0 shadow-lg" style="background: rgba(255, 255, 255, 0.98); backdrop-filter: blur(12px); border-radius: 12px;">
+                            <div class="modal-header border-bottom py-2 px-3 bg-light rounded-top">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="fas fa-edit text-warning fs-5"></i>
+                                    <h6 class="modal-title fw-bold text-dark mb-0">
+                                        Manual Qty to Show
+                                    </h6>
+                                </div>
+                                <button type="button" class="btn-close btn-sm" @onclick="CloseManualQtyModal"></button>
+                            </div>
+                            <div class="modal-body p-3">
+                                <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
+                                    Qty to Show on Label
+                                </label>
+                                <input type="number" class="form-control form-control-sm text-center fw-bold fs-5 text-primary"
+                                       @bind="ManualQtyInput"
+                                       min="1" />
+                                <div class="text-muted small mt-2">
+                                    This quantity will be passed as the override label quantity.
+                                </div>
+                            </div>
+                            <div class="modal-footer border-top py-2 px-3 bg-light rounded-bottom d-flex justify-content-end gap-2">
+                                <button type="button" class="btn btn-sm btn-secondary" @onclick="CloseManualQtyModal">Cancel</button>
+                                <button type="button" class="btn btn-sm btn-primary fw-bold px-3" @onclick="ConfirmManualQtyPrint" disabled="@(ManualQtyInput <= 0)">
+                                    <i class="fas fa-print me-1"></i> Print Label
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- STAGING / BOX GENERATION MODAL (Tab 0 -> Tab 1) -->
+            @if (ShowStageModal)
+            {
+                <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 10550;">
+                    <div class="modal-dialog modal-md modal-dialog-centered">
+                        <div class="modal-content border-0 shadow-lg" style="background: rgba(255, 255, 255, 0.98); backdrop-filter: blur(12px); border-radius: 12px;">
+                            <div class="modal-header border-bottom py-2 px-3 bg-light rounded-top">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="fas fa-boxes text-primary fs-5"></i>
+                                    <h6 class="modal-title fw-bold text-dark mb-0">
+                                        Stage to Dispatch (Box Packaging)
+                                    </h6>
+                                </div>
+                                <button type="button" class="btn-close btn-sm" @onclick="CloseStageModal"></button>
+                            </div>
+                            <div class="modal-body p-3">
+                                <!-- Summary Info Box -->
+                                <div class="p-2 mb-3 bg-light rounded-3 border d-flex justify-content-between align-items-center" style="font-size: 0.88rem;">
+                                    <div><span class="text-muted fw-bold">Selected Lots:</span> <span class="badge bg-primary">@SelectedLots.Count</span></div>
+                                    <div><span class="text-muted fw-bold">Total Pieces:</span> <span class="badge bg-success fs-6">@TotalSelectedQty.ToString("N0")</span></div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
+                                        Qty / Box (Pcs per Box / Inner)
+                                    </label>
+                                    <input type="number" class="form-control form-control-sm text-center fw-bold fs-5 text-primary"
+                                           @bind="StageQtyPerBox"
+                                           min="1"
+                                           placeholder="e.g. 50, 100..." />
+                                    <div class="text-muted small mt-1">
+                                        Specifies the number of pieces packaged into each individual small box.
+                                    </div>
+                                </div>
+
+                                <!-- Box Calculation Preview -->
+                                @if (StageQtyPerBox > 0 && TotalSelectedQty > 0)
+                                {
+                                    int fullBoxes = (int)(TotalSelectedQty / StageQtyPerBox);
+                                    decimal remainder = TotalSelectedQty % StageQtyPerBox;
+                                    int totalLines = fullBoxes + (remainder > 0 ? 1 : 0);
+
+                                    <div class="p-2 bg-primary bg-opacity-10 rounded-3 border border-primary border-opacity-25" style="font-size: 0.84rem;">
+                                        <div class="fw-bold text-primary mb-1"><i class="fas fa-calculator me-1"></i> Box Packaging Breakdown:</div>
+                                        <div class="text-dark">
+                                            Will create <strong>@totalLines box line(s)</strong> on the dispatch list:
+                                            @if (fullBoxes > 0)
+                                            {
+                                                <span>@fullBoxes box(es) &times; @StageQtyPerBox.ToString("N0") pcs</span>
+                                            }
+                                            @if (remainder > 0)
+                                            {
+                                                <span> + 1 box &times; @remainder.ToString("N0") pcs (remainder)</span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                            <div class="modal-footer border-top py-2 px-3 bg-light rounded-bottom d-flex justify-content-end gap-2">
+                                <button type="button" class="btn btn-sm btn-secondary" @onclick="CloseStageModal">
+                                    Cancel
+                                </button>
+                                <button type="button" class="btn btn-sm btn-primary fw-bold px-4" @onclick="ConfirmStagingBoxes" disabled="@(StageQtyPerBox <= 0)">
+                                    <i class="fas fa-check-circle me-1"></i> Generate &amp; Stage Boxes
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- ADD TO CARTON MODAL (Tab 1) -->
+            @if (ShowCartonModal)
+            {
+                <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 10550;">
+                    <div class="modal-dialog modal-sm modal-dialog-centered">
+                        <div class="modal-content border-0 shadow-lg" style="background: rgba(255, 255, 255, 0.98); backdrop-filter: blur(12px); border-radius: 12px;">
+                            <div class="modal-header border-bottom py-2 px-3 bg-light rounded-top">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="fas fa-box-open text-primary fs-5"></i>
+                                    <h6 class="modal-title fw-bold text-dark mb-0">
+                                        Assign to Carton
+                                    </h6>
+                                </div>
+                                <button type="button" class="btn-close btn-sm" @onclick="CloseCartonModal"></button>
+                            </div>
+                            <div class="modal-body p-3">
+                                <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Carton Number</label>
+                                <input type="number" class="form-control form-control-sm text-center fw-bold fs-5 text-primary" @bind="AssignedCartonNo" min="1" />
+                                <div class="text-muted small mt-2">
+                                    Assigns Carton #@AssignedCartonNo to @((ContextRowItem != null ? 1 : SelectedStagedItems.Count)) selected box row(s).
+                                </div>
+                            </div>
+                            <div class="modal-footer border-top py-2 px-3 bg-light rounded-bottom d-flex justify-content-end gap-2">
+                                <button type="button" class="btn btn-sm btn-secondary" @onclick="CloseCartonModal">Cancel</button>
+                                <button type="button" class="btn btn-sm btn-primary fw-bold" @onclick="ApplyCartonNo">Apply</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+        </div>
+    </div>
+</div>
+
+<!-- Row-Specific Context Menu for Staged Rows (right-click) -->
+<ContextMenu Id="stagedContextMenu" Template="Win11Style">
+    <div class="win11-section-header px-3 py-1 text-muted small fw-bold border-bottom">CARTON ASSIGNMENT</div>
+    <Item OnClick="@ContextAddToCarton"><i class="fas fa-box-open text-primary me-2"></i> Add to Carton...</Item>
+    <div class="win11-section-header px-3 py-1 text-muted small fw-bold border-bottom border-top">PRINT LABELS</div>
+    <Item OnClick="@(() => PrintInnerLabels(false, false))"><i class="fas fa-tag text-primary me-2"></i> Print Inner Labels</Item>
+    <Item OnClick="@(() => PrintInnerLabels(true, false))"><i class="fas fa-tags text-info me-2"></i> Print Inner Labels - II</Item>
+    <Item OnClick="@(() => PrintInnerLabels(false, true))"><i class="fas fa-edit text-warning me-2"></i> Print Inner Labels - Manual Qty</Item>
+    <Item OnClick="@(() => PrintInnerLabels(true, true))"><i class="fas fa-edit text-danger me-2"></i> Print Inner Labels - II Manual Qty</Item>
+    <div class="win11-section-header px-3 py-1 text-muted small fw-bold border-bottom border-top">ROW ACTIONS</div>
+    <Item OnClick="@ContextRemoveRow"><i class="fas fa-trash-alt text-danger me-2"></i> Remove Box</Item>
+</ContextMenu>
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+        border-radius: 6px !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__results {
+        z-index: 10000 !important;
+    }
+</style>

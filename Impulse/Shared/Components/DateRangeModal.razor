@@ -1,4 +1,4 @@
-﻿@using DataAccessLibrary.Models.ReportModels
+@using DataAccessLibrary.Models.ReportModels
 @if (IsVisible)
 {
     <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5); z-index: 1050;">
@@ -6,7 +6,7 @@
             <div class="modal-content cip-rpt-modal-content">
                 <div class="modal-header cip-rpt-header d-flex align-items-center justify-content-between">
                     <h5 class="modal-title text-white">
-                        <i class="fa fa-calendar me-2"></i>Select Date Range
+                        <i class="fa fa-calendar me-2"></i>@Title
                     </h5>
                     <button type="button" class="btn btn-sm p-0 border-0" @onclick="Cancel">
                         <span class="cip-rpt-close-x">&times;</span>
@@ -58,13 +58,20 @@
 }
 
 @code {
+    [Parameter] public string Title { get; set; } = "Select Date Range";
+
     private bool IsVisible { get; set; }
     private DateTime DateFrom { get; set; } = DateTime.Today.AddDays(-30); // Default to last 30 days    
     private DateTime DateTo { get; set; } = DateTime.Today;
-    private TaskCompletionSource<DateRangeResult> _tcs;
+    private TaskCompletionSource<DateRangeResult> _tcs = null!;
 
-    public Task<DateRangeResult> Show()
+    public Task<DateRangeResult> Show(string? title = null)
     {
+        if (!string.IsNullOrEmpty(title))
+        {
+            Title = title;
+        }
+
         IsVisible = true;
         _tcs = new TaskCompletionSource<DateRangeResult>();
         StateHasChanged();
@@ -76,10 +83,10 @@
         IsVisible = false;
         _tcs.SetResult(new DateRangeResult(true, DateFrom, DateTo));
     }
+
     private void Cancel()
     {
         IsVisible = false;
         _tcs.SetResult(new DateRangeResult(false, DateTime.MinValue, DateTime.MinValue));
     }
-    
 }

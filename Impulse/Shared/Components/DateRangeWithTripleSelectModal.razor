@@ -1,0 +1,251 @@
+@using DataAccessLibrary.Models.ReportModels
+@using DataAccessLibrary.Models.ViewModels
+@using Blazored.Typeahead
+
+@if (IsVisible)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5); z-index: 1050; font-family: 'Calibri', 'Segoe UI', sans-serif;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content cip-rpt-modal-content">
+                <div class="modal-header cip-rpt-header d-flex align-items-center justify-content-between">
+                    <h5 class="modal-title text-white">
+                        <i class="fa fa-filter me-2"></i>@Title
+                    </h5>
+                    <button type="button" class="btn btn-sm p-0 border-0" @onclick="Cancel">
+                        <span class="cip-rpt-close-x">&times;</span>
+                    </button>
+                </div>
+
+                <div class="modal-body p-4">
+                    <!-- Dropdown 1 (e.g. Department) -->
+                    <div class="mb-3">
+                        <label class="mb-1 fw-bold" style="font-size: 0.85rem;">@LabelText1</label>
+                        <BlazoredTypeahead SearchMethod="SearchData1" EnableDropDown="true"
+                                           Data="LocalOptions1"
+                                           TValue="GenericDropDownModel"
+                                           TItem="GenericDropDownModel"
+                                           Value="SelectedOption1"
+                                           ValueChanged="OnOption1Changed"
+                                           ValueExpression="@(() => SelectedOption1)"
+                                           Placeholder="@PlaceholderText1"
+                                           MaximumSuggestions="1000">
+                            <SelectedTemplate Context="selectedcard">
+                                @SelectedOption1?.DropDownValue_Description
+                            </SelectedTemplate>
+                            <ResultTemplate Context="result">
+                                @result.DropDownValue_Description
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+
+                    <!-- Dropdown 2 (e.g. Employee) -->
+                    <div class="mb-3">
+                        <label class="mb-1 fw-bold" style="font-size: 0.85rem;">@LabelText2</label>
+                        <BlazoredTypeahead SearchMethod="SearchData2" EnableDropDown="true"
+                                           Data="FilteredOptions2"
+                                           TValue="GenericDropDownModel"
+                                           TItem="GenericDropDownModel"
+                                           Value="SelectedOption2"
+                                           ValueChanged="OnOption2Changed"
+                                           ValueExpression="@(() => SelectedOption2)"
+                                           Placeholder="@PlaceholderText2"
+                                           MaximumSuggestions="1000">
+                            <SelectedTemplate Context="selectedcard">
+                                @SelectedOption2?.DropDownValue_Description
+                            </SelectedTemplate>
+                            <ResultTemplate Context="result">
+                                @result.DropDownValue_Description
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+
+                    <!-- Dropdown 3 (e.g. Process) -->
+                    <div class="mb-3">
+                        <label class="mb-1 fw-bold" style="font-size: 0.85rem;">@LabelText3</label>
+                        <BlazoredTypeahead SearchMethod="SearchData3" EnableDropDown="true"
+                                           Data="LocalOptions3"
+                                           TValue="GenericDropDownModel"
+                                           TItem="GenericDropDownModel"
+                                           Value="SelectedOption3"
+                                           ValueChanged="OnOption3Changed"
+                                           ValueExpression="@(() => SelectedOption3)"
+                                           Placeholder="@PlaceholderText3"
+                                           MaximumSuggestions="1000">
+                            <SelectedTemplate Context="selectedcard">
+                                @SelectedOption3?.DropDownValue_Description
+                            </SelectedTemplate>
+                            <ResultTemplate Context="result">
+                                @result.DropDownValue_Description
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+
+                    <!-- Date Banner -->
+                    <div class="cip-rpt-date-display text-center mb-3">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <small class="text-uppercase text-muted fw-normal" style="font-size: 0.7rem; letter-spacing: 1px; opacity: 0.8;">From Date</small>
+                                <h5 class="text-primary mb-0">@DateFrom.ToString("dd-MMM-yyyy")</h5>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fa-solid fa-arrow-right text-muted" style="font-size: 0.8rem;"></i>
+                            </div>
+                            <div class="col">
+                                <small class="text-uppercase text-muted fw-normal" style="font-size: 0.7rem; letter-spacing: 1px; opacity: 0.8;">To Date</small>
+                                <h5 class="text-primary mb-0">@DateTo.ToString("dd-MMM-yyyy")</h5>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Date Pickers -->
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="mb-1 fw-bold" style="font-size: 0.85rem;">Start Date:</label>
+                            <input type="date" class="form-control cip-rpt-input-custom" @bind="DateFrom" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="mb-1 fw-bold" style="font-size: 0.85rem;">End Date:</label>
+                            <input type="date" class="form-control cip-rpt-input-custom" @bind="DateTo" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer border-0 bg-light">
+                    <button class="btn btn-outline-secondary border-0" @onclick="Cancel">Cancel</button>
+                    <button class="btn btn-primary px-4 fw-bold shadow-sm" style="border-radius: 8px;" @onclick="Submit">
+                        Generate Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Title { get; set; } = "Select Parameters";
+    [Parameter] public string LabelText1 { get; set; } = "Department:";
+    [Parameter] public string LabelText2 { get; set; } = "Employee:";
+    [Parameter] public string LabelText3 { get; set; } = "Process:";
+    [Parameter] public string PlaceholderText1 { get; set; } = "Select Department...";
+    [Parameter] public string PlaceholderText2 { get; set; } = "Select Employee...";
+    [Parameter] public string PlaceholderText3 { get; set; } = "Select Process...";
+
+    [Parameter] public Func<string, Task<List<GenericDropDownModel>>>? OnDepartmentChangedCallback { get; set; }
+
+    private bool IsVisible { get; set; }
+    private DateTime DateFrom { get; set; } = DateTime.Today.AddDays(-7);
+    private DateTime DateTo { get; set; } = DateTime.Today;
+
+    private List<GenericDropDownModel> LocalOptions1 { get; set; } = new();
+    private GenericDropDownModel? SelectedOption1 { get; set; }
+
+    private List<GenericDropDownModel> LocalOptions2 { get; set; } = new();
+    private List<GenericDropDownModel> FilteredOptions2 { get; set; } = new();
+    private GenericDropDownModel? SelectedOption2 { get; set; }
+
+    private List<GenericDropDownModel> LocalOptions3 { get; set; } = new();
+    private GenericDropDownModel? SelectedOption3 { get; set; }
+
+    private TaskCompletionSource<DateRangeTripleSelectionResult> _tcs = null!;
+
+    public Task<DateRangeTripleSelectionResult> Show(
+        List<GenericDropDownModel> options1,
+        List<GenericDropDownModel> options2,
+        List<GenericDropDownModel> options3,
+        string title = "Select Parameters")
+    {
+        LocalOptions1 = options1;
+        LocalOptions2 = options2;
+        FilteredOptions2 = options2;
+        LocalOptions3 = options3;
+        Title = title;
+
+        SelectedOption1 = LocalOptions1.FirstOrDefault();
+        SelectedOption2 = FilteredOptions2.FirstOrDefault();
+        SelectedOption3 = LocalOptions3.FirstOrDefault();
+
+        DateFrom = DateTime.Today.AddDays(-7);
+        DateTo = DateTime.Today;
+
+        IsVisible = true;
+        _tcs = new TaskCompletionSource<DateRangeTripleSelectionResult>();
+        StateHasChanged();
+        return _tcs.Task;
+    }
+
+    private async Task<IEnumerable<GenericDropDownModel>> SearchData1(string searchText)
+    {
+        return await Task.FromResult(LocalOptions1
+            .Where(x => x.DropDownValue_Description?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)
+            .ToList());
+    }
+
+    private async Task OnOption1Changed(GenericDropDownModel? selectedValue)
+    {
+        SelectedOption1 = selectedValue;
+
+        if (OnDepartmentChangedCallback != null && selectedValue != null)
+        {
+            var updatedEmps = await OnDepartmentChangedCallback(selectedValue.DropDownValue_ID);
+            FilteredOptions2 = updatedEmps;
+            SelectedOption2 = FilteredOptions2.FirstOrDefault();
+        }
+        else
+        {
+            FilteredOptions2 = LocalOptions2;
+            SelectedOption2 = FilteredOptions2.FirstOrDefault();
+        }
+    }
+
+    private async Task<IEnumerable<GenericDropDownModel>> SearchData2(string searchText)
+    {
+        return await Task.FromResult(FilteredOptions2
+            .Where(x => x.DropDownValue_Description?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)
+            .ToList());
+    }
+
+    private async Task OnOption2Changed(GenericDropDownModel? selectedValue)
+    {
+        SelectedOption2 = selectedValue;
+        await Task.CompletedTask;
+    }
+
+    private async Task<IEnumerable<GenericDropDownModel>> SearchData3(string searchText)
+    {
+        return await Task.FromResult(LocalOptions3
+            .Where(x => x.DropDownValue_Description?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)
+            .ToList());
+    }
+
+    private async Task OnOption3Changed(GenericDropDownModel? selectedValue)
+    {
+        SelectedOption3 = selectedValue;
+        await Task.CompletedTask;
+    }
+
+    private void Submit()
+    {
+        IsVisible = false;
+        _tcs.SetResult(new DateRangeTripleSelectionResult(
+            true,
+            DateFrom,
+            DateTo,
+            SelectedOption1?.DropDownValue_ID ?? "0",
+            SelectedOption2?.DropDownValue_ID ?? "0",
+            SelectedOption3?.DropDownValue_ID ?? "0"
+        ));
+    }
+
+    private void Cancel()
+    {
+        IsVisible = false;
+        _tcs.SetResult(new DateRangeTripleSelectionResult(
+            false,
+            DateTime.MinValue,
+            DateTime.MinValue,
+            null,
+            null,
+            null
+        ));
+    }
+}

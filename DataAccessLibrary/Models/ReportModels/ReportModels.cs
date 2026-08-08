@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace DataAccessLibrary.Models.ReportModels
 {
@@ -7,7 +7,9 @@ namespace DataAccessLibrary.Models.ReportModels
     public record DateSingleResult(bool Success, DateTime Date);
 
     public record DateRangeSingleSelectionResult(bool Success, DateTime DateFrom, DateTime DateTo, string SelectedValue);
+    public record DateSingleSelectionResult(bool Success, DateTime Date, string SelectedValue);
     public record DateRangeSingleSelectionResultSubHeads(bool Success, DateTime DateFrom, DateTime DateTo, string SelectedValue, string SelectedValue_sub);
+    public record DateRangeTripleSelectionResult(bool Success, DateTime DateFrom, DateTime DateTo, string? SelectedValue1, string? SelectedValue2, string? SelectedValue3);
 
     public class ReportOption
     {

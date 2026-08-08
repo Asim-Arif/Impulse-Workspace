@@ -1,0 +1,371 @@
+@page "/production/item-list"
+@using DataAccessLibrary.Models.ViewModels.Production
+@using BlazorContextMenu
+
+<PageTitle>Production Item List | Impulse ERP</PageTitle>
+<meta name="description" content="View and filter production running lots and order items with real-time status." />
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255,255,255,0.87); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-3">
+
+            <!-- ── Page Header ──────────────────────────────────────────── -->
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <div style="width:38px;height:38px;background:linear-gradient(135deg,#1565C0,#42A5F5);border-radius:10px;display:flex;align-items:center;justify-content:center;">
+                        <i class="fas fa-layer-group text-white" style="font-size:1.05rem;"></i>
+                    </div>
+                    <div>
+                        <h1 class="mb-0 fw-bold" style="font-size:1.25rem;color:#1565C0;">Production Item List</h1>
+                        <small class="text-muted" style="font-size:0.75rem;">Running Lots &amp; Production Orders</small>
+                    </div>
+                </div>
+                <div class="ms-auto d-flex gap-2 align-items-center">
+                    @if (IsLoading)
+                    {
+                        <span class="text-muted" style="font-size:0.8rem;"><i class="fas fa-spinner fa-spin me-1"></i>Loading...</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-light text-secondary border" style="font-size:0.75rem;">@Items.Count records</span>
+                    }
+                    <!-- Options button -->
+                    <ContextMenuTrigger MenuId="optionsBarMenu" MouseButtonTrigger="MouseButtonTrigger.Left" Data="@("options")" WrapperTag="span">
+                        <button class="btn btn-sm btn-outline-secondary d-flex align-items-center" id="btnOptions" @onclick="OpenOptionsMenu">
+                            <i class="fas fa-ellipsis-v me-1"></i> Options
+                        </button>
+                    </ContextMenuTrigger>
+                </div>
+            </div>
+
+            <!-- ── Filter Row 1 ─────────────────────────────────────────── -->
+            <div class="d-flex align-items-end flex-wrap gap-2 mb-2" style="position:relative !important; z-index:9999 !important;">
+                <div style="min-width:170px; max-width:200px;">
+                    <label class="form-label mb-1 filter-label">Customer</label>
+                    <BlazoredTypeahead SearchMethod="SearchCustomers"
+                                       @bind-Value="SelectedCustomer"
+                                       Placeholder="All Customers..."
+                                       MaximumSuggestions="1000"
+                                       EnableDropDown="true"
+                                       @bind-Value:after="OnCustomerChangedAsync">
+                        <SelectedTemplate Context="c"><text>@c.Name</text></SelectedTemplate>
+                        <ResultTemplate Context="c"><text>@c.Name</text></ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div style="min-width:130px; max-width:150px;">
+                    <label class="form-label mb-1 filter-label">Country</label>
+                    <select class="form-select form-select-sm" @bind="Filters.Country">
+                        <option value="0">&lt;All Countries&gt;</option>
+                        @foreach (var c in Countries)
+                        {
+                            <option value="@c.Id">@c.Name</option>
+                        }
+                    </select>
+                </div>
+                <div style="min-width:120px; max-width:130px;">
+                    <label class="form-label mb-1 filter-label">Date Range</label>
+                    <select class="form-select form-select-sm" @bind="Filters.DateRangeMode" @bind:after="OnDateRangeModeChanged">
+                        <option value="0">All</option>
+                        <option value="1">+15 Days</option>
+                        <option value="2">+30 Days</option>
+                        <option value="3">+45 Days</option>
+                        <option value="4">Custom</option>
+                    </select>
+                </div>
+                <div style="min-width:125px; max-width:140px;">
+                    <label class="form-label mb-1 filter-label">From</label>
+                    <input type="date" class="form-control form-control-sm" @bind="Filters.DtFrom" disabled="@IsDateRangeDisabled" />
+                </div>
+                <div style="min-width:125px; max-width:140px;">
+                    <label class="form-label mb-1 filter-label">To</label>
+                    <input type="date" class="form-control form-control-sm" @bind="Filters.DtTo" disabled="@IsDateRangeDisabled" />
+                </div>
+                <div style="min-width:145px; max-width:170px;">
+                    <label class="form-label mb-1 filter-label">Item Group</label>
+                    <select class="form-select form-select-sm" @bind="Filters.ItemGroupId">
+                        <option value="0">&lt;All Groups&gt;</option>
+                        @foreach (var g in Lookups.ItemGroups)
+                        {
+                            <option value="@g.Id">@g.Name</option>
+                        }
+                    </select>
+                </div>
+                <div style="min-width:200px; max-width:240px;">
+                    <label class="form-label mb-1 filter-label">Order No</label>
+                    <BlazoredTypeahead SearchMethod="SearchOrders"
+                                       @bind-Value="SelectedOrder"
+                                       Placeholder="All Orders..."
+                                       MaximumSuggestions="1000"
+                                       EnableDropDown="true">
+                        <SelectedTemplate Context="o"><text>@o.Name</text></SelectedTemplate>
+                        <ResultTemplate Context="o"><text>@o.Name</text></ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div style="min-width:130px; max-width:150px;">
+                    <label class="form-label mb-1 filter-label">Lot #</label>
+                    <input type="text" class="form-control form-control-sm" @bind="Filters.LotNo" placeholder="Direct Lot#..." />
+                </div>
+                <div>
+                    <button class="btn btn-primary btn-sm px-3" @onclick="LoadDataAsync" style="border-radius:6px;">
+                        <i class="fas fa-sync-alt me-1"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Filter Row 2 (Hub pushed to right edge, Item wide) ─────── -->
+            <div class="d-flex align-items-end flex-wrap gap-2 mb-2" style="position:relative !important; z-index:9998 !important;">
+                <div style="min-width:200px; max-width:240px;">
+                    <label class="form-label mb-1 filter-label">Process</label>
+                    <BlazoredTypeahead SearchMethod="SearchProcesses"
+                                       @bind-Value="SelectedProcess"
+                                       Placeholder="All Processes..."
+                                       MaximumSuggestions="1000"
+                                       EnableDropDown="true">
+                        <SelectedTemplate Context="p"><text>@p.Name</text></SelectedTemplate>
+                        <ResultTemplate Context="p"><text>@p.Name</text></ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div style="min-width:220px; max-width:260px;">
+                    <label class="form-label mb-1 filter-label">Maker</label>
+                    <BlazoredTypeahead SearchMethod="SearchMakers"
+                                       @bind-Value="SelectedMaker"
+                                       Placeholder="All Makers..."
+                                       MaximumSuggestions="1000"
+                                       EnableDropDown="true">
+                        <SelectedTemplate Context="m"><text>@m.Name</text></SelectedTemplate>
+                        <ResultTemplate Context="m"><text>@m.Name</text></ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="flex-grow-1" style="min-width:340px;">
+                    <label class="form-label mb-1 filter-label">Item</label>
+                    <BlazoredTypeahead SearchMethod="SearchItems"
+                                       @bind-Value="SelectedItem"
+                                       Placeholder="All Items..."
+                                       MaximumSuggestions="1000"
+                                       EnableDropDown="true">
+                        <SelectedTemplate Context="i"><text>@i.Name</text></SelectedTemplate>
+                        <ResultTemplate Context="i"><text>@i.Name</text></ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+                <div class="ms-auto" style="min-width:130px; max-width:160px;">
+                    <label class="form-label mb-1 filter-label">Hub</label>
+                    <select class="form-select form-select-sm" @bind="Filters.Hub">
+                        <option value="0">&lt;All&gt;</option>
+                        @foreach (var h in Lookups.Hubs)
+                        {
+                            <option value="@h">@h</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <!-- ── Filter Row 3: Checkboxes ─────────────────────────────── -->
+            <div class="d-flex flex-wrap align-items-center gap-3 mb-3 py-2 px-3 rounded" style="background:rgba(21,101,192,0.05);border:1px solid rgba(21,101,192,0.12);">
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkIssuance" @bind="Filters.ShowIssuance" />
+                    <label class="form-check-label" for="chkIssuance" style="font-size:0.83rem;">Issuance</label>
+                </div>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkReceiving" @bind="Filters.ShowReceiving" />
+                    <label class="form-check-label" for="chkReceiving" style="font-size:0.83rem;">Receiving</label>
+                </div>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkLotsOnly" @bind="Filters.ShowLotsOnly" />
+                    <label class="form-check-label" for="chkLotsOnly" style="font-size:0.83rem;">Lots Only</label>
+                </div>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkNotYetStarted" @bind="Filters.ShowNotYetStarted" />
+                    <label class="form-check-label" for="chkNotYetStarted" style="font-size:0.83rem;">Not Yet Started</label>
+                </div>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkRegular" @bind="Filters.ShowRegularLots" />
+                    <label class="form-check-label text-danger fw-semibold" for="chkRegular" style="font-size:0.83rem;">Regular Lots</label>
+                </div>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkRepair" @bind="Filters.ShowRepairLots" />
+                    <label class="form-check-label text-danger fw-semibold" for="chkRepair" style="font-size:0.83rem;">Repair Lots</label>
+                </div>
+            </div>
+
+            <!-- ── Data Table ───────────────────────────────────────────── -->
+            <div style="position:relative !important; z-index:1 !important; max-height:62vh; overflow-y:auto; border-radius:8px; border:1px solid #dee2e6;">
+                @if (IsLoading)
+                {
+                    <div class="text-center py-5 text-muted">
+                        <i class="fas fa-spinner fa-spin fa-2x mb-2"></i>
+                        <div>Loading data...</div>
+                    </div>
+                }
+                else
+                {
+                    <table class="table table-hover table-sm align-middle mb-0" style="font-size:0.88rem;">
+                        <thead class="table-light text-secondary sticky-top" style="font-size:0.78rem;text-transform:uppercase;z-index:2;box-shadow:0 1px 0 #dee2e6;">
+                            <tr>
+                                <th class="px-2">#</th>
+                                <th>Start</th>
+                                <th>Lot #</th>
+                                <th>Item Code</th>
+                                <th>Item Description</th>
+                                <th class="text-end">Qty</th>
+                                <th>Status</th>
+                                <th class="text-end">Last Days</th>
+                                <th>Remarks</th>
+                                <th class="text-end">TL Running/Orders</th>
+                                <th class="text-end">Semi</th>
+                                <th class="text-end">Pack</th>
+                                <th>Order #</th>
+                                <th>Ship. Status</th>
+                                <th class="text-end">Price</th>
+                                <th>Hub</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Items.Count == 0)
+                            {
+                                <tr>
+                                    <td colspan="16" class="text-center py-5 text-muted">
+                                        <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                                        No records found. Adjust filters and click Refresh.
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                <Virtualize Items="@Items" Context="item" ItemSize="38" SpacerElement="tr">
+                                    @{
+                                        var rowClass = item.EntryType == 1 ? "table-warning" : "";
+                                    }
+                                    <ContextMenuTrigger MenuId="rowContextMenu" WrapperTag="tr" CssClass="@rowClass" Data="@item">
+                                        <td class="px-2 text-muted" style="white-space:nowrap;">@item.SNo</td>
+                                        <td style="white-space:nowrap;">@(item.StartDT?.ToString("dd-MMM-yyyy") ?? "")</td>
+                                        <td style="white-space:nowrap;font-weight:600;color:#1565C0;">@item.LotNo</td>
+                                        <td style="white-space:nowrap;">@item.ItemCode</td>
+                                        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="@item.ItemName">@item.ItemName</td>
+                                        <td class="text-end fw-semibold">@item.Qty</td>
+                                        <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="@item.Description">@item.Description</td>
+                                        <td class="text-end @(item.LastProcessDays > 30 ? "text-danger fw-semibold" : "")">@item.LastProcessDays</td>
+                                        <!-- Inline editable remarks cell -->
+                                        <td style="min-width:160px;">
+                                            @if (item.IsEditingRemarks)
+                                            {
+                                                <input type="text"
+                                                       class="form-control form-control-sm"
+                                                       style="font-size:0.82rem;"
+                                                       @bind="item.EditingRemarksValue"
+                                                       @bind:event="onchange"
+                                                       @onkeydown="e => OnRemarksKeyDown(e, item)"
+                                                       @onblur="() => SaveRemarksOnBlur(item)"
+                                                       autofocus />
+                                            }
+                                            else
+                                            {
+                                                <span @ondblclick="() => StartRemarksEdit(item)"
+                                                      class="d-block"
+                                                      style="cursor:text;min-height:22px;"
+                                                      title="Double-click to edit">@item.DisplayRemarks</span>
+                                            }
+                                        </td>
+                                        <td class="text-end">@item.TLRunningDisplay</td>
+                                        <td class="text-end">@item.SemiQty</td>
+                                        <td class="text-end">@item.PackStock</td>
+                                        <td style="white-space:nowrap;">@item.OrderNo</td>
+                                        <td>
+                                            <span class="badge @(item.ShippingStatus == "Shipped" ? "bg-success" : "bg-warning text-dark")" style="font-size:0.72rem;">
+                                                @item.ShippingStatus
+                                            </span>
+                                            @if (item.OpenPOQty > 0)
+                                            {
+                                                <div class="text-danger fw-semibold" style="font-size:0.75rem;" title="Open Purchase Order Qty Pending with Maker">
+                                                    Open POs: @item.OpenPOQty
+                                                </div>
+                                            }
+                                        </td>
+                                        <td class="text-end">@(item.DisplayPrice?.ToString("N3") ?? "")</td>
+                                        <td class="text-muted">@item.Hub_Name</td>
+                                    </ContextMenuTrigger>
+                                </Virtualize>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ── Options Bar Context Menu ─────────────────────────────────────────── -->
+<ContextMenu Id="optionsBarMenu" Template="Win11Style">
+    <Item OnClick="@PrintListAsync"><i class="fas fa-print text-primary me-2 win11-icon"></i> Print</Item>
+    <Item OnClick="@PrintHubwiseAsync"><i class="fas fa-sitemap text-info me-2 win11-icon"></i> Hubwise</Item>
+    <Item OnClick="@PrintWithValueAsync"><i class="fas fa-file-invoice-dollar text-success me-2 win11-icon"></i> Print (Value)</Item>
+</ContextMenu>
+
+<!-- ── Row Right-Click Context Menu ──────────────────────────────────────── -->
+<ContextMenu Id="rowContextMenu" Template="Win11Style">
+    <Item OnClick="@PrintPTCFromRow"><i class="fas fa-file text-dark me-2 win11-icon"></i> Print PTC</Item>
+</ContextMenu>
+
+<style>
+    .filter-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: #6c757d;
+        display: block;
+    }
+
+    /* Consistent 35px height across all standard inputs and buttons */
+    .form-control-sm, .form-select-sm, .btn-sm {
+        height: 35px !important;
+        font-size: 0.85rem !important;
+    }
+
+    /* Fix Blazored Typeahead height to match .btn-sm (35px) */
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.85rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+
+    .disabled-typeahead-wrapper .blazored-typeahead {
+        background-color: #e9ecef !important;
+        overflow: hidden !important;
+        border-radius: 4px;
+    }
+
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+        font-size: 0.85rem !important;
+    }
+
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+        font-size: 0.85rem !important;
+    }
+
+    .blazored-typeahead__results {
+        max-height: 250px !important;
+        overflow-y: auto !important;
+        z-index: 10000 !important;
+    }
+
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    .win11-menu-item {
+        font-size: 0.85rem !important;
+    }
+</style>

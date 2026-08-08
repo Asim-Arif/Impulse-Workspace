@@ -1,0 +1,180 @@
+@using DataAccessLibrary.Models.ViewModels.Production
+@using Impulse.Services.Production
+
+@if (IsOpen && Model != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0, 0, 0, 0.5); z-index: 100050; font-family: 'Calibri', 'Segoe UI', sans-serif;">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-primary text-white py-2 px-3">
+                    <h6 class="modal-title fw-bold mb-0" style="font-size: 1.05rem;">
+                        <i class="fas @(Model.EntryID == 0 ? "fa-plus-circle" : "fa-pencil-alt") me-2"></i>
+                        @(Model.EntryID == 0 ? "Create New Repair Type" : $"Edit Repair Type: {Model.RepairType}")
+                    </h6>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body p-3">
+
+                    <!-- Header / Master Fields -->
+                    <div class="row g-2 mb-3">
+                        <!-- Repair Code -->
+                        <div class="col-md-3">
+                            <label class="form-label form-label-sm fw-bold text-secondary mb-1" style="font-size: 0.85rem;">
+                                Repair Code <span class="text-danger">*</span>
+                            </label>
+                            <input type="text"
+                                   class="form-control form-control-sm fw-bold"
+                                   style="height: 31px; font-size: 0.875rem;"
+                                   placeholder="e.g. REP-01, CUT-DEF"
+                                   @bind="Model.RepairCode" />
+                        </div>
+
+                        <!-- Repair Type Name -->
+                        <div class="col-md-5">
+                            <label class="form-label form-label-sm fw-bold text-secondary mb-1" style="font-size: 0.85rem;">
+                                Repair Type Description <span class="text-danger">*</span>
+                            </label>
+                            <input type="text"
+                                   class="form-control form-control-sm fw-bold"
+                                   style="height: 31px; font-size: 0.875rem;"
+                                   placeholder="e.g. Upper Stitching Rework"
+                                   @bind="Model.RepairType" />
+                        </div>
+
+                        <!-- Defect Type -->
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm fw-bold text-secondary mb-1" style="font-size: 0.85rem;">
+                                Defect Classification <span class="text-danger">*</span>
+                            </label>
+                            <input type="text"
+                                   class="form-control form-control-sm"
+                                   style="height: 31px; font-size: 0.875rem;"
+                                   placeholder="e.g. Loose Seam, Adhesion Failure"
+                                   @bind="Model.DefectType" />
+                        </div>
+
+                        <!-- Return to Originator Toggle -->
+                        <div class="col-md-12 mt-2">
+                            <div class="form-check form-switch p-2 bg-light rounded border d-flex align-items-center gap-2">
+                                <input class="form-check-input ms-0 mt-0"
+                                       type="checkbox"
+                                       role="switch"
+                                       id="chkReturnToOriginator"
+                                       style="cursor: pointer; width: 2.2em; height: 1.2em;"
+                                       @bind="Model.ReturnToOriginator" />
+                                <label class="form-check-label fw-bold text-dark mb-0 ms-1" for="chkReturnToOriginator" style="cursor: pointer; font-size: 0.88rem;">
+                                    <i class="fas fa-undo-alt text-primary me-1"></i> Return to Originator
+                                </label>
+                                <span class="text-muted small ms-2">
+                                    (When enabled, repaired lot items will automatically be routed back to the initial vendor/contractor who performed the original work)
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Process Checklist & Sequence Pipeline -->
+                    <div class="border rounded-3 p-2 bg-light">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <div class="fw-bold text-secondary small text-uppercase" style="font-size: 0.78rem;">
+                                <i class="fas fa-tasks text-primary me-1"></i> Select Applicable Processes &amp; Routing
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <input type="text"
+                                       class="form-control form-control-sm py-0"
+                                       style="height: 27px; font-size: 0.82rem; width: 180px;"
+                                       placeholder="Filter processes..."
+                                       @bind="ProcessSearchFilter"
+                                       @bind:event="oninput" />
+                                <button type="button" class="btn btn-link btn-sm p-0 text-primary small text-decoration-none fw-bold" @onclick="SelectAllProcesses">Select All</button>
+                                <span class="text-muted">|</span>
+                                <button type="button" class="btn btn-link btn-sm p-0 text-secondary small text-decoration-none" @onclick="ClearAllProcesses">Clear All</button>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive bg-white border rounded" style="max-height: 40vh; overflow-y: auto;">
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                    <tr>
+                                        <th style="width: 50px;" class="text-center">Select</th>
+                                        <th style="width: 100px;">Code</th>
+                                        <th>Process Name</th>
+                                        <th style="width: 100px;" class="text-center">Sequence #</th>
+                                        <th style="width: 110px;" class="text-center">Scanning</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (!FilteredProcesses.Any())
+                                    {
+                                        <tr>
+                                            <td colspan="5" class="text-center py-4 text-muted">
+                                                No processes found matching "@ProcessSearchFilter"
+                                            </td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var proc in FilteredProcesses)
+                                        {
+                                            <tr class="@(proc.IsSelected ? "table-light" : "")">
+                                                <td class="text-center">
+                                                    <input type="checkbox"
+                                                           class="form-check-input"
+                                                           style="cursor: pointer;"
+                                                           checked="@proc.IsSelected"
+                                                           @onchange="(e) => ToggleProcess(proc, (bool)(e.Value ?? false))" />
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-secondary">@proc.Code</span>
+                                                </td>
+                                                <td class="fw-semibold text-dark">
+                                                    @proc.Description
+                                                </td>
+                                                <td class="text-center">
+                                                    <input type="number"
+                                                           class="form-control form-control-sm text-center py-0"
+                                                           style="height: 27px; width: 70px; font-size: 0.85rem; margin: 0 auto;"
+                                                           disabled="@(!proc.IsSelected)"
+                                                           @bind="proc.SeqNo" />
+                                                </td>
+                                                <td class="text-center">
+                                                    <div class="form-check form-switch d-inline-block">
+                                                        <input class="form-check-input"
+                                                               type="checkbox"
+                                                               role="switch"
+                                                               disabled="@(!proc.IsSelected)"
+                                                               @bind="proc.Scanning" />
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="modal-footer bg-light py-2 px-3 d-flex justify-content-between">
+                    <div class="text-muted small">
+                        Selected Processes: <strong class="text-dark">@Model.Processes.Count(p => p.IsSelected)</strong> of @Model.Processes.Count
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-secondary fw-bold" @onclick="CloseModal" disabled="@IsSaving">Cancel</button>
+                        <button type="button" class="btn btn-sm btn-primary fw-bold px-4" @onclick="SaveRepairTypeAsync" disabled="@(IsSaving || string.IsNullOrWhiteSpace(Model.RepairCode) || string.IsNullOrWhiteSpace(Model.RepairType) || !Model.Processes.Any(p => p.IsSelected))">
+                            @if (IsSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                <span>Saving...</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-check-circle me-1"></i>
+                                <span>@(Model.EntryID == 0 ? "Save Repair Type" : "Update Repair Type")</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}

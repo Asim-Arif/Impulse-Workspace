@@ -1,0 +1,407 @@
+@page "/production/maker-billing-list"
+@using DataAccessLibrary.Models.ViewModels.Production
+@using Blazored.Typeahead
+@using BlazorContextMenu
+
+<PageTitle>Maker Posted Bills List | Impulse ERP</PageTitle>
+<meta name="description" content="Overview of posted maker bills, settlement vouchers, payments, and outstanding balances." />
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.87); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-3">
+
+            <!-- ── Page Header & Top Actions ──────────────────────────── -->
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <div style="width:38px;height:38px;background:linear-gradient(135deg,#1565C0,#42A5F5);border-radius:10px;display:flex;align-items:center;justify-content:center;">
+                        <i class="fas fa-list-check text-white" style="font-size:1.05rem;"></i>
+                    </div>
+                    <div>
+                        <h1 class="mb-0 fw-bold" style="font-size:1.25rem;color:#1565C0;">Maker Posted Bills List</h1>
+                        <small class="text-muted" style="font-size:0.75rem;">Overview of posted maker bills, settlement vouchers, payments, and outstanding balances</small>
+                    </div>
+                </div>
+
+                <div class="ms-auto d-flex align-items-center gap-2">
+                    @if (IsLoading)
+                    {
+                        <span class="text-muted" style="font-size:0.8rem;"><i class="fas fa-spinner fa-spin me-1"></i>Loading...</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-light text-secondary border" style="font-size:0.75rem;">@FilteredBills.Count records</span>
+                    }
+                    <button type="button" class="btn btn-sm btn-outline-dark fw-bold" @onclick="PrintBillsListReport" disabled="@(!FilteredBills.Any())">
+                        <i class="fas fa-print me-1"></i> Print Bills List
+                    </button>
+                    <a href="/production/maker-billing" class="btn btn-sm btn-success fw-bold px-3">
+                        <i class="fas fa-plus-circle me-1"></i> New Maker Bill
+                    </a>
+                </div>
+            </div>
+
+            <!-- KPI Metric Summary Tiles -->
+            <div class="row g-2 mb-3">
+                <div class="col-md-2">
+                    <div class="p-2 rounded-3 border bg-light text-center">
+                        <div class="text-muted small fw-bold text-uppercase" style="font-size: 0.75rem;">Total Bills</div>
+                        <div class="fs-5 fw-bold text-dark">@Summary.TotalBills</div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="p-2 rounded-3 border bg-light text-center">
+                        <div class="text-muted small fw-bold text-uppercase" style="font-size: 0.75rem;">Total Billed Qty</div>
+                        <div class="fs-5 fw-bold text-primary">@Summary.TotalQty.ToString("N0") <span class="small fs-6">Pcs</span></div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-2 rounded-3 border bg-light text-center">
+                        <div class="text-muted small fw-bold text-uppercase" style="font-size: 0.75rem;">Total Billed Value</div>
+                        <div class="fs-5 fw-bold text-dark">@Summary.TotalValue.ToString("N2")</div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="p-2 rounded-3 border bg-light text-center">
+                        <div class="text-muted small fw-bold text-uppercase" style="font-size: 0.75rem;">Total Paid</div>
+                        <div class="fs-5 fw-bold text-success">@Summary.TotalPaid.ToString("N2")</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-2 rounded-3 border bg-light text-center">
+                        <div class="text-muted small fw-bold text-uppercase" style="font-size: 0.75rem;">Outstanding Balance</div>
+                        <div class="fs-5 fw-bold @(Summary.TotalBalance > 0 ? "text-danger" : "text-success")">
+                            @Summary.TotalBalance.ToString("N2")
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter Controls Panel -->
+            <div class="p-3 bg-light rounded-3 border mb-3">
+                <div class="row g-2 align-items-end">
+                    <!-- Maker Selector -->
+                    <div class="col-md-4">
+                        <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
+                            <i class="fas fa-industry text-primary me-1"></i> Maker / Vendor
+                        </label>
+                        <div class="custom-typeahead-container">
+                            <BlazoredTypeahead SearchMethod="SearchMakers"
+                                               TValue="LookupItemInt"
+                                               TItem="LookupItemInt"
+                                               Value="SelectedMaker"
+                                               ValueChanged="OnMakerChanged"
+                                               ValueExpression="@(() => SelectedMaker)"
+                                               Placeholder="Search maker or select all..."
+                                               EnableDropDown="true"
+                                               MaximumSuggestions="1000">
+                                <SelectedTemplate Context="maker">
+                                    @maker.Name
+                                </SelectedTemplate>
+                                <ResultTemplate Context="maker">
+                                    @maker.Name
+                                </ResultTemplate>
+                                <NotFoundTemplate Context="searchText">
+                                    <span class="text-muted small">No makers matching "@searchText"</span>
+                                </NotFoundTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+                    </div>
+
+                    <!-- Date Range Preset -->
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
+                            <i class="fas fa-calendar-alt text-primary me-1"></i> Range Preset
+                        </label>
+                        <select class="form-select form-select-sm" @bind="Filter.DateRangeIndex" @bind:after="OnDateRangeChanged">
+                            <option value="0">Today</option>
+                            <option value="1">Last 15 Days</option>
+                            <option value="2">Last 30 Days</option>
+                            <option value="3">Last 60 Days</option>
+                            <option value="4">Last 90 Days</option>
+                            <option value="5">Custom Range</option>
+                        </select>
+                    </div>
+
+                    <!-- From Date -->
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm mb-1 fw-bold text-secondary">From Date</label>
+                        <input type="date" class="form-control form-control-sm" @bind="Filter.DtFrom" @bind:after="LoadBillsAsync" disabled="@(Filter.DateRangeIndex != 5)" />
+                    </div>
+
+                    <!-- To Date -->
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm mb-1 fw-bold text-secondary">To Date</label>
+                        <input type="date" class="form-control form-control-sm" @bind="Filter.DtTo" @bind:after="LoadBillsAsync" disabled="@(Filter.DateRangeIndex != 5)" />
+                    </div>
+
+                    <!-- Quick Refresh -->
+                    <div class="col-md-2 d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-primary flex-grow-1 fw-bold" @onclick="LoadBillsAsync" disabled="@IsLoading">
+                            @if (IsLoading)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                <span>Loading...</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-sync-alt me-1"></i>
+                                <span>Refresh</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Instant Search Filter Bar -->
+                <div class="row g-2 mt-2 pt-2 border-top">
+                    <div class="col-md-6">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                            <input type="text" class="form-control" placeholder="Search by Maker name, Voucher #, or Bill #..." @bind="Filter.SearchText" @bind:event="oninput" />
+                        </div>
+                    </div>
+                    <div class="col-md-6 text-end text-muted small d-flex align-items-center justify-content-end">
+                        <span>Showing <strong class="text-dark">@FilteredBills.Count</strong> of <strong class="text-dark">@Bills.Count</strong> bills</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bills Data Grid -->
+            <div class="table-responsive border rounded-3 mb-3" style="max-height: 52vh; overflow-y: auto;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem; white-space: nowrap;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th style="width: 45px;" class="text-center">S. #</th>
+                            <th style="min-width: 220px;">Maker</th>
+                            <th style="width: 140px;">Vchr #</th>
+                            <th style="width: 120px;">Date</th>
+                            <th class="text-center" style="width: 100px;">Total Qty</th>
+                            <th class="text-end" style="width: 140px;">Total Value</th>
+                            <th class="text-end" style="width: 140px;">Paid</th>
+                            <th class="text-end" style="width: 140px;">Balance</th>
+                            <th style="width: 100px;" class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="9" class="text-center py-5 text-muted">
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span> Loading posted bills...
+                                </td>
+                            </tr>
+                        }
+                        else if (!FilteredBills.Any())
+                        {
+                            <tr>
+                                <td colspan="9" class="text-center py-5 text-muted">
+                                    <i class="fas fa-inbox fa-2x d-block mb-2 text-secondary opacity-50"></i>
+                                    No posted maker bills found for the selected criteria.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            int idx = 1;
+                            @foreach (var bill in FilteredBills)
+                            {
+                                <ContextMenuTrigger MenuId="billContextMenu" Data="@bill" WrapperTag="tr" class="@(SelectedBill?.EntryID == bill.EntryID ? "table-primary" : "")" @onclick="() => SelectedBill = bill">
+                                    <td class="text-center fw-semibold text-muted">@(idx++)</td>
+                                    <td class="fw-bold text-dark">
+                                        @if (!string.IsNullOrWhiteSpace(bill.VendID1))
+                                        {
+                                            <span class="badge bg-secondary me-1">@bill.VendID1</span>
+                                        }
+                                        @bill.VenderName
+                                    </td>
+                                    <td>
+                                        <span class="badge px-2 py-1" style="background-color: #2196F3; color: #ffffff; font-weight: 700; border-radius: 4px;">
+                                            @bill.VchrNo
+                                        </span>
+                                    </td>
+                                    <td>@bill.DT.ToString("dd-MMM-yyyy")</td>
+                                    <td class="text-center fw-bold">@bill.TotalQty.ToString("N0")</td>
+                                    <td class="text-end fw-bold text-dark">@bill.NetPayable.ToString("N2")</td>
+                                    <td class="text-end fw-bold text-success">@bill.TotalPaidAmount.ToString("N2")</td>
+                                    <td class="text-end fw-bold @(bill.Balance > 0 ? "text-danger" : "text-muted")">
+                                        @bill.Balance.ToString("N2")
+                                    </td>
+                                    <td class="text-center" @onclick:stopPropagation="true">
+                                        <div class="d-flex align-items-center justify-content-center gap-2">
+                                            <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 fw-semibold" title="Print Bill" @onclick="() => PrintBill(bill)">
+                                                <i class="fas fa-print me-1"></i> Print
+                                            </button>
+                                        </div>
+                                    </td>
+                                </ContextMenuTrigger>
+                            }
+                        }
+                    </tbody>
+                    <tfoot class="table-light fw-bold text-dark border-top">
+                        <tr>
+                            <td colspan="4" class="text-end">Summary Totals:</td>
+                            <td class="text-center">@Summary.TotalQty.ToString("N0")</td>
+                            <td class="text-end text-dark">@Summary.TotalValue.ToString("N2")</td>
+                            <td class="text-end text-success">@Summary.TotalPaid.ToString("N2")</td>
+                            <td class="text-end text-danger">@Summary.TotalBalance.ToString("N2")</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Context Menu for Posted Bill Grid with Standard Win11Style Classes -->
+<ContextMenu Id="billContextMenu" Template="Win11Style">
+    <div class="win11-section-header">Bill Actions</div>
+    <Item class="win11-menu-item" OnClick="@ContextPrintBill">
+        <i class="fas fa-print fa-fw win11-icon text-primary"></i> Print Bill
+    </Item>
+    <div class="win11-divider"></div>
+    <Item class="win11-menu-item" OnClick="@ContextPaymentVoucher">
+        <i class="fas fa-money-bill-wave fa-fw win11-icon text-success"></i> Payment Voucher
+    </Item>
+</ContextMenu>
+
+<!-- Payment Voucher Modal Dialog -->
+@if (ShowPaymentModal && PaymentRequest != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0, 0, 0, 0.5); z-index: 100050;">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 14px;">
+                <div class="modal-header bg-success text-white py-2 px-3">
+                    <h6 class="modal-title fw-bold mb-0">
+                        <i class="fas fa-money-bill-wave me-2"></i> Post Payment Voucher
+                    </h6>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => ShowPaymentModal = false"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <!-- Bill Context Banner -->
+                    <div class="row g-2 p-2 bg-light rounded border mb-3">
+                        <div class="col-md-4">
+                            <span class="text-muted small fw-bold">Maker / Vendor:</span>
+                            <div class="fw-bold text-dark">@PaymentRequest.MakerName</div>
+                        </div>
+                        <div class="col-md-3">
+                            <span class="text-muted small fw-bold">Bill # / Vchr #:</span>
+                            <div class="fw-bold text-primary">#@PaymentRequest.BillNo (@PaymentRequest.BillVoucherNo)</div>
+                        </div>
+                        <div class="col-md-2 text-center">
+                            <span class="text-muted small fw-bold">Bill Date:</span>
+                            <div class="fw-bold text-secondary">@SelectedBill?.DT.ToString("dd-MMM-yyyy")</div>
+                        </div>
+                        <div class="col-md-3 text-end">
+                            <span class="text-muted small fw-bold">Outstanding Balance:</span>
+                            <div class="fs-6 fw-bold text-danger">Rs. @(SelectedBill?.Balance.ToString("N2") ?? "0.00")</div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- Payment Mode -->
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm fw-bold text-secondary">Payment Mode</label>
+                            <div class="d-flex gap-3 mt-1">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="payMode" id="modeCash" value="Cash" checked="@(PaymentRequest.PaymentMode == "Cash")" @onchange="@(() => PaymentRequest.PaymentMode = "Cash")" />
+                                    <label class="form-check-label fw-bold text-dark small" for="modeCash">
+                                        <i class="fas fa-money-bill text-success me-1"></i> Cash (CPV)
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="payMode" id="modeBank" value="Bank" checked="@(PaymentRequest.PaymentMode == "Bank")" @onchange="@(() => PaymentRequest.PaymentMode = "Bank")" />
+                                    <label class="form-check-label fw-bold text-dark small" for="modeBank">
+                                        <i class="fas fa-university text-primary me-1"></i> Bank (BPV)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Payment Date -->
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm fw-bold text-secondary">Payment Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control form-control-sm" @bind="PaymentRequest.PaymentDate" />
+                        </div>
+
+                        <!-- Amount to Pay -->
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm fw-bold text-secondary">Amount (Rs.) <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control form-control-sm fw-bold text-success text-end fs-6" @bind="PaymentRequest.Amount" />
+                        </div>
+
+                        <!-- Credit Account Selector -->
+                        <div class="col-md-12">
+                            <label class="form-label form-label-sm fw-bold text-secondary">
+                                <i class="fas fa-book text-primary me-1"></i> Credit Account (Paid From) <span class="text-danger">*</span>
+                            </label>
+                            <div class="custom-typeahead-container">
+                                <BlazoredTypeahead SearchMethod="SearchCreditAccounts"
+                                                   TValue="LookupItemString"
+                                                   TItem="LookupItemString"
+                                                   Value="SelectedCreditAccount"
+                                                   ValueChanged="OnCreditAccountChanged"
+                                                   ValueExpression="@(() => SelectedCreditAccount)"
+                                                   Placeholder="Select Cash in Hand or Bank Account..."
+                                                   EnableDropDown="true"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="acc">
+                                        @acc.Name
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="acc">
+                                        @acc.Name
+                                    </ResultTemplate>
+                                    <NotFoundTemplate Context="searchText">
+                                        <span class="text-muted small">No accounts matching "@searchText"</span>
+                                    </NotFoundTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                        </div>
+
+                        @if (PaymentRequest.PaymentMode == "Bank")
+                        {
+                            <!-- Cheque Details -->
+                            <div class="col-md-6">
+                                <label class="form-label form-label-sm fw-bold text-secondary">Cheque No.</label>
+                                <input type="text" class="form-control form-control-sm" placeholder="Cheque number..." @bind="PaymentRequest.ChequeNo" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label form-label-sm fw-bold text-secondary">Cheque Date</label>
+                                <input type="date" class="form-control form-control-sm" @bind="PaymentRequest.ChequeDate" />
+                            </div>
+                        }
+
+                        <!-- Narration / Remarks -->
+                        <div class="col-md-12">
+                            <label class="form-label form-label-sm fw-bold text-secondary">Narration / Description</label>
+                            <input type="text" class="form-control form-control-sm" placeholder="Optional voucher description..." @bind="PaymentRequest.Remarks" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2 px-3">
+                    <button type="button" class="btn btn-sm btn-secondary fw-bold" @onclick="() => ShowPaymentModal = false" disabled="@IsPostingPayment">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-success fw-bold px-4" @onclick="PostPaymentVoucher" disabled="@(IsPostingPayment || PaymentRequest.Amount <= 0)">
+                        @if (IsPostingPayment)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            <span>Posting Voucher...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-check-circle me-1"></i>
+                            <span>Post Payment Voucher</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .blazor-context-menu {
+        z-index: 100000 !important;
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+    }
+</style>

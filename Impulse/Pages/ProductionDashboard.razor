@@ -15,49 +15,93 @@
     </div>
 
     <div class="dashboard-modules">
-        <a class="dash-card text-decoration-none" href="/production/new-maker">
+        <a class="dash-card" href="/production/new-maker">
             <i class="fas fa-person-digging"></i>
             <span>New Maker</span>
         </a>
-        <a class="dash-card text-decoration-none" href="/production/maker-list">
+        <a class="dash-card" href="/production/maker-list">
             <i class="fas fa-users-gear"></i>
             <span>Maker List</span>
         </a>
-        <a class="dash-card text-decoration-none" href="/production/maker-item-assignment">
+        <a class="dash-card" href="/production/maker-item-assignment">
             <i class="fas fa-link"></i>
             <span>Maker Item Assignment</span>
         </a>
-        <a class="dash-card text-decoration-none" href="/production/maker-po">
+        <a class="dash-card" href="/production/maker-po">
             <i class="fas fa-file-invoice-dollar"></i>
             <span>Maker PO</span>
         </a>
-        <a class="dash-card text-decoration-none" href="/production/maker-issuance-from-sf">
+        <a class="dash-card" href="/production/maker-issuance-from-sf">
             <i class="fas fa-boxes-packing"></i>
             <span>Maker Issuance from SF</span>
         </a>
-        <a class="dash-card text-decoration-none" href="/production/receive-against-po">
+        <a class="dash-card" href="/production/receive-against-po">
             <i class="fas fa-truck-ramp-box"></i>
             <span>Receive against PO</span>
         </a>
-        <a class="dash-card text-decoration-none" href="/production/receive-lot">
+        <a class="dash-card" href="/production/receive-lot">
             <i class="fas fa-boxes-stacked"></i>
             <span>Receive Lot</span>
         </a>
-        <a class="dash-card text-decoration-none" href="/production/lot-issuance">
+        <a class="dash-card" href="/production/lot-issuance">
             <i class="fas fa-boxes-packing"></i>
             <span>Lot Issuance</span>
         </a>
-        <a class="dash-card text-decoration-none" href="/production/authorize-received">
+        <a class="dash-card" href="/production/authorize-received">
             <i class="fas fa-clipboard-check"></i>
             <span>Authorize Received</span>
         </a>
-        <a class="dash-card text-decoration-none" href="/production/maker-po-list">
+        <a class="dash-card" href="/production/maker-po-list">
             <i class="fas fa-list-alt"></i>
             <span>Maker PO List</span>
         </a>
-        <a class="dash-card text-decoration-none" href="/production/receiving-list">
+        <a class="dash-card" href="/production/receiving-list">
             <i class="fas fa-truck-loading"></i>
             <span>Receiving List</span>
+        </a>
+        <a class="dash-card" href="/production/rework-issuance">
+            <i class="fas fa-tools"></i>
+            <span>Rework Issuance</span>
+        </a>
+        <a class="dash-card" href="/production/transfer-to-ready-finish-stock">
+            <i class="fas fa-dolly-flatbed"></i>
+            <span>Transfer to Ready Finish</span>
+        </a>
+        <a class="dash-card" href="/production/create-dispatch-list">
+            <i class="fas fa-shipping-fast"></i>
+            <span>Create Dispatch List</span>
+        </a>
+        <a class="dash-card" href="/production/dispatch-list">
+            <i class="fas fa-clipboard-list"></i>
+            <span>Dispatch List</span>
+        </a>
+        <a class="dash-card" href="/production/maker-billing">
+            <i class="fas fa-file-invoice-dollar"></i>
+            <span>Maker Billing</span>
+        </a>
+        <a class="dash-card" href="/production/maker-billing-list">
+            <i class="fas fa-list-check"></i>
+            <span>Maker Billing List</span>
+        </a>
+        <a class="dash-card" href="/production/processes">
+            <i class="fas fa-network-wired"></i>
+            <span>Processes Setup</span>
+        </a>
+        <a class="dash-card" href="/production/process-groups">
+            <i class="fas fa-layer-group"></i>
+            <span>Process Groups</span>
+        </a>
+        <a class="dash-card" href="/production/repair-types">
+            <i class="fas fa-tools"></i>
+            <span>Repair Types</span>
+        </a>
+        <a class="dash-card" href="/production/wastage-types">
+            <i class="fas fa-trash-alt"></i>
+            <span>Wastage Types</span>
+        </a>
+        <a class="dash-card" href="/production/statistics">
+            <i class="fas fa-chart-line"></i>
+            <span>Statistics</span>
         </a>
     </div>
 </div>
@@ -69,7 +113,9 @@
     .dashboard-title { font-size: 2rem; font-weight: 700; color: #1b1b1f; margin: 0; line-height: 1.2; }
     .dashboard-subtitle { color: #44474f; margin: 0.25rem 0 0; font-size: 0.95rem; }
     .dashboard-modules { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 1rem; }
-    .dash-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; padding: 1.5rem 1rem; background: #ffffff; border: 1px solid #e0e2ec; border-radius: 16px; color: #1b1b1f; font-weight: 500; font-size: 0.875rem; text-align: center; }
+    .dash-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; padding: 1.5rem 1rem; background: #ffffff; border: 1px solid #e0e2ec; border-radius: 16px; text-decoration: none; color: #1b1b1f; font-weight: 500; font-size: 0.875rem; text-align: center; transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease; cursor: pointer; }
     .dash-card i { font-size: 1.75rem; color: #bf3a3a; }
+    .dash-card:hover { background: #fdf0f0; box-shadow: 0 4px 16px rgba(191, 58, 58, 0.15); transform: translateY(-2px); color: #7a0000; text-decoration: none; }
+    .dash-card:hover i { color: #7a0000; }
     .dash-card.coming-soon { opacity: 0.55; cursor: default; }
 </style>

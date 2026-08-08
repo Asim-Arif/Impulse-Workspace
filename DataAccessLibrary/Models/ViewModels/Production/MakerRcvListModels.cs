@@ -110,4 +110,131 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public bool NonBilledOnly { get; set; }
         public bool ShowLastOnly { get; set; }
     }
+
+    public class ChangeOrderNoRequest
+    {
+        public long EntryID { get; set; }
+        public string LotNo { get; set; } = string.Empty;
+        public string FromOrderNo { get; set; } = string.Empty;
+        public string ToOrderNo { get; set; } = string.Empty;
+        public string ToItemCode { get; set; } = string.Empty;
+        public decimal OriginalQty { get; set; }
+        public bool TransferToStockOrder { get; set; }
+    }
+
+    public class SplitLotRequest
+    {
+        public long EntryID { get; set; }
+        public long VR_EntryID { get; set; }
+        public string OriginalLotNo { get; set; } = string.Empty;
+        public string FromOrderNo { get; set; } = string.Empty;
+        public string SplitOrderNo { get; set; } = string.Empty;
+        public string SplitItemCode { get; set; } = string.Empty;
+        public decimal OriginalQty { get; set; }
+        public decimal SplitQty { get; set; }
+        public string Remarks { get; set; } = string.Empty;
+    }
+
+    public class TransferSFStockRequest
+    {
+        public long EntryID { get; set; }
+        public string LotNo { get; set; } = string.Empty;
+        public string FromOrderNo { get; set; } = string.Empty;
+        public string ItemCode { get; set; } = string.Empty;
+        public int ProcessID { get; set; }
+        public decimal OriginalQty { get; set; }
+        public decimal TransferQty { get; set; }
+        public int ShelfRefID { get; set; }
+        public string LocationText { get; set; } = string.Empty;
+        public string Remarks { get; set; } = string.Empty;
+        public string UserName { get; set; } = string.Empty;
+        public string MachineName { get; set; } = string.Empty;
+    }
+
+    public class OrderLookupItem
+    {
+        public string OrderNo { get; set; } = string.Empty;
+        public string InternalRefNo { get; set; } = string.Empty;
+        public string DisplayName => !string.IsNullOrEmpty(InternalRefNo)
+            ? $"{OrderNo} {{{InternalRefNo}}}"
+            : OrderNo;
+    }
+
+    public class StoreLookupItem
+    {
+        public int EntryID { get; set; }
+        public string StoreName { get; set; } = string.Empty;
+    }
+
+    public class ShelfLookupItem
+    {
+        public int EntryID { get; set; }
+        public string RackNo { get; set; } = string.Empty;
+        public string ShelfNo { get; set; } = string.Empty;
+        public string DisplayName => $"{RackNo} {{{ShelfNo}}}";
+    }
+
+    public class ProcessOptionItem
+    {
+        public int ProcessID { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string DisplayName => !string.IsNullOrEmpty(Code)
+            ? $"{Code} - {Description}"
+            : Description;
+    }
+
+    public class InspectionParameterItem
+    {
+        public int EntryID { get; set; }            // PIP_RefID
+        public string ParameterName { get; set; } = string.Empty;
+        public string AQL { get; set; } = string.Empty;
+        public string SampleSize { get; set; } = string.Empty;
+        public string RejectOn { get; set; } = string.Empty;
+        public string TestSpecificationNo { get; set; } = string.Empty;
+        public string ActualRejection { get; set; } = "0";
+        public string Status { get; set; } = "OK";
+    }
+
+    public class InspectionDataDto
+    {
+        public long EntryID { get; set; }          // VRDI EntryID (if already saved)
+        public long VRD_RefID { get; set; }
+        public string LotNo { get; set; } = string.Empty;
+        public string ItemCode { get; set; } = string.Empty;
+        public string ItemName { get; set; } = string.Empty;
+        public string ItemSize { get; set; } = string.Empty;
+        public string SizeUnit { get; set; } = string.Empty;
+        public string TipSize { get; set; } = string.Empty;
+        public decimal RcvdQty { get; set; }
+        public string OrderNo { get; set; } = string.Empty;
+        public string ProcessDescription { get; set; } = string.Empty;
+        public int ProcessID { get; set; }
+        public DateTime? ReceivingDT { get; set; }
+
+        public DateTime InspectionDT { get; set; } = DateTime.Today;
+        public bool LotStatus { get; set; } = false; // false = Pass, true = Fail
+        public string Disposation { get; set; } = string.Empty;
+        public string Comments { get; set; } = string.Empty;
+
+        public List<ProcessOptionItem> Processes { get; set; } = new List<ProcessOptionItem>();
+        public List<InspectionParameterItem> Parameters { get; set; } = new List<InspectionParameterItem>();
+        public List<string> TemperValues { get; set; } = new List<string>();
+    }
+
+    public class SaveInspectionRequest
+    {
+        public long VRD_RefID { get; set; }
+        public DateTime DT { get; set; } = DateTime.Today;
+        public bool LotStatus { get; set; } // false = Pass, true = Fail
+        public string Disposation { get; set; } = string.Empty;
+        public string Comments { get; set; } = string.Empty;
+        public string UserName { get; set; } = string.Empty;
+        public string MachineName { get; set; } = string.Empty;
+
+        public List<InspectionParameterItem> Parameters { get; set; } = new List<InspectionParameterItem>();
+        public List<string> TemperValues { get; set; } = new List<string>();
+    }
 }
+
+

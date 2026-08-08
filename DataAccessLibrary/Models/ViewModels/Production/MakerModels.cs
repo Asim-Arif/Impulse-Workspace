@@ -45,15 +45,6 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public bool Active { get; set; } = true;
     }
 
-    public class ProcessModel
-    {
-        public int ProcessID { get; set; }
-        public string Description { get; set; } = string.Empty;
-        public string Code { get; set; } = string.Empty;
-        public int SNo { get; set; }
-        public bool IsSelected { get; set; }
-    }
-
     public class MakerCategoryModel
     {
         public string AccNo { get; set; } = string.Empty;

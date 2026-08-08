@@ -458,6 +458,646 @@ namespace Impulse.Pages.Production.ReceivingList
         }
 
         // ─────────────────────────────────────────────────────────────
+        // SPLIT / TRANSFER LOT MODAL STATE & HANDLERS
+        // ─────────────────────────────────────────────────────────────
+        public bool ShowSplitTransferModal { get; set; } = false;
+        public int SplitMode { get; set; } = 0; // 0=Change Order No, 1=Split Lot, 2=Transfer to S/F Stock
+        public bool IsProcessingSplit { get; set; } = false;
+
+        public ChangeOrderNoRequest ChangeOrderModel { get; set; } = new ChangeOrderNoRequest();
+        public SplitLotRequest SplitLotModel { get; set; } = new SplitLotRequest();
+        public TransferSFStockRequest TransferSFModel { get; set; } = new TransferSFStockRequest();
+
+        // Modal lookup caches
+        public List<LookupItemString> SplitCustomers { get; set; } = new List<LookupItemString>();
+        public List<OrderLookupItem> SplitOrders { get; set; } = new List<OrderLookupItem>();
+        public List<LookupItemString> SplitArticles { get; set; } = new List<LookupItemString>();
+        public List<StoreLookupItem> StoresList { get; set; } = new List<StoreLookupItem>();
+        public List<ShelfLookupItem> ShelvesList { get; set; } = new List<ShelfLookupItem>();
+
+        private LookupItemString? _selectedSplitCustomer;
+        public LookupItemString? SelectedSplitCustomer
+        {
+            get => _selectedSplitCustomer;
+            set
+            {
+                _selectedSplitCustomer = value;
+                _selectedSplitOrder = null;
+                _selectedSplitArticle = null;
+                SplitOrders.Clear();
+                SplitArticles.Clear();
+                if (value != null)
+                {
+                    _ = LoadSplitOrdersAsync(value.Id);
+                }
+            }
+        }
+
+        private OrderLookupItem? _selectedSplitOrder;
+        public OrderLookupItem? SelectedSplitOrder
+        {
+            get => _selectedSplitOrder;
+            set
+            {
+                _selectedSplitOrder = value;
+                _selectedSplitArticle = null;
+                SplitArticles.Clear();
+                if (value != null)
+                {
+                    ChangeOrderModel.ToOrderNo = value.OrderNo;
+                    SplitLotModel.SplitOrderNo = value.OrderNo;
+                    _ = LoadSplitArticlesAsync(value.OrderNo);
+                }
+            }
+        }
+
+        private LookupItemString? _selectedSplitArticle;
+        public LookupItemString? SelectedSplitArticle
+        {
+            get => _selectedSplitArticle;
+            set
+            {
+                _selectedSplitArticle = value;
+                if (value != null)
+                {
+                    ChangeOrderModel.ToItemCode = value.Id;
+                    SplitLotModel.SplitItemCode = value.Id;
+                }
+            }
+        }
+
+        private StoreLookupItem? _selectedStore;
+        public StoreLookupItem? SelectedStore
+        {
+            get => _selectedStore;
+            set
+            {
+                _selectedStore = value;
+                _selectedShelf = null;
+                ShelvesList.Clear();
+                if (value != null)
+                {
+                    _ = LoadShelvesAsync(value.EntryID);
+                }
+            }
+        }
+
+        private ShelfLookupItem? _selectedShelf;
+        public ShelfLookupItem? SelectedShelf
+        {
+            get => _selectedShelf;
+            set
+            {
+                _selectedShelf = value;
+                if (value != null)
+                {
+                    TransferSFModel.ShelfRefID = value.EntryID;
+                    TransferSFModel.LocationText = value.DisplayName;
+                    if (SelectedItem != null)
+                    {
+                        _ = LoadShelfRemarksAsync(SelectedItem.ItemCode, SelectedItem.ProcessID, value.EntryID);
+                    }
+                }
+            }
+        }
+
+        public async Task OpenSplitTransferModal(ItemClickEventArgs args)
+        {
+            ResolveRowItem(args);
+            if (SelectedItem == null) return;
+
+            SplitMode = 0;
+            _selectedSplitCustomer = null;
+            _selectedSplitOrder = null;
+            _selectedSplitArticle = null;
+            _selectedStore = null;
+            _selectedShelf = null;
+            SplitOrders.Clear();
+            SplitArticles.Clear();
+            ShelvesList.Clear();
+
+            ChangeOrderModel = new ChangeOrderNoRequest
+            {
+                EntryID = SelectedItem.VRD_EntryID,
+                LotNo = SelectedItem.LotNo,
+                FromOrderNo = SelectedItem.OrderNo,
+                ToOrderNo = string.Empty,
+                ToItemCode = string.Empty,
+                OriginalQty = SelectedItem.RcvdQty,
+                TransferToStockOrder = false
+            };
+
+            SplitLotModel = new SplitLotRequest
+            {
+                EntryID = SelectedItem.VRD_EntryID,
+                VR_EntryID = SelectedItem.EntryID,
+                OriginalLotNo = SelectedItem.LotNo,
+                FromOrderNo = SelectedItem.OrderNo,
+                SplitOrderNo = string.Empty,
+                SplitItemCode = string.Empty,
+                OriginalQty = SelectedItem.RcvdQty,
+                SplitQty = 0,
+                Remarks = string.Empty
+            };
+
+            decimal netQty = SelectedItem.RcvdQty - SelectedItem.Wastage - SelectedItem.ReWorkQty;
+            TransferSFModel = new TransferSFStockRequest
+            {
+                EntryID = SelectedItem.VRD_EntryID,
+                LotNo = SelectedItem.LotNo,
+                FromOrderNo = SelectedItem.OrderNo,
+                ItemCode = SelectedItem.ItemCode,
+                ProcessID = SelectedItem.ProcessID,
+                OriginalQty = SelectedItem.RcvdQty,
+                TransferQty = netQty > 0 ? netQty : 0,
+                ShelfRefID = 0,
+                LocationText = string.Empty,
+                Remarks = string.Empty
+            };
+
+            ShowSplitTransferModal = true;
+            await LoadSplitLookupsAsync();
+        }
+
+        public void CloseSplitTransferModal()
+        {
+            ShowSplitTransferModal = false;
+        }
+
+        public async Task OnSplitModeChanged(int mode)
+        {
+            SplitMode = mode;
+            if (mode == 2 && !StoresList.Any())
+            {
+                StoresList = await RcvListService.GetStoresAsync();
+            }
+        }
+
+        private async Task LoadSplitLookupsAsync()
+        {
+            try
+            {
+                SplitCustomers = await RcvListService.GetDistinctCustomerCodesAsync();
+                StoresList = await RcvListService.GetStoresAsync();
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Lookup Error",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+            }
+        }
+
+        private async Task LoadSplitOrdersAsync(string custCode)
+        {
+            try
+            {
+                string? itemCode = SplitMode == 1 && SelectedItem != null ? SelectedItem.ItemCode : null;
+                SplitOrders = await RcvListService.GetOrdersForCustomerAsync(custCode, itemCode);
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Orders Error",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+            }
+        }
+
+        private async Task LoadSplitArticlesAsync(string orderNo)
+        {
+            try
+            {
+                SplitArticles = await RcvListService.GetArticlesForOrderAsync(orderNo);
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Articles Error",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+            }
+        }
+
+        private async Task LoadShelvesAsync(int storeRefId)
+        {
+            try
+            {
+                ShelvesList = await RcvListService.GetShelvesByStoreAsync(storeRefId);
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Shelves Error",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+            }
+        }
+
+        private async Task LoadShelfRemarksAsync(string itemCode, int processId, int shelfRefId)
+        {
+            try
+            {
+                string remarks = await RcvListService.GetShelfRemarksAsync(itemCode, processId, shelfRefId);
+                if (!string.IsNullOrEmpty(remarks))
+                {
+                    TransferSFModel.Remarks = remarks;
+                }
+            }
+            catch { /* optional */ }
+        }
+
+        // Modal Search methods for Typeaheads
+        public Task<IEnumerable<LookupItemString>> SearchSplitCustomers(string searchText)
+        {
+            if (string.IsNullOrWhiteSpace(searchText))
+                return Task.FromResult<IEnumerable<LookupItemString>>(SplitCustomers);
+            string q = searchText.Trim().ToLower();
+            return Task.FromResult<IEnumerable<LookupItemString>>(SplitCustomers.Where(c => c.Name.ToLower().Contains(q)).ToList());
+        }
+
+        public Task<IEnumerable<OrderLookupItem>> SearchSplitOrders(string searchText)
+        {
+            if (string.IsNullOrWhiteSpace(searchText))
+                return Task.FromResult<IEnumerable<OrderLookupItem>>(SplitOrders);
+            string q = searchText.Trim().ToLower();
+            return Task.FromResult<IEnumerable<OrderLookupItem>>(SplitOrders.Where(o => o.DisplayName.ToLower().Contains(q)).ToList());
+        }
+
+        public Task<IEnumerable<LookupItemString>> SearchSplitArticles(string searchText)
+        {
+            if (string.IsNullOrWhiteSpace(searchText))
+                return Task.FromResult<IEnumerable<LookupItemString>>(SplitArticles);
+            string q = searchText.Trim().ToLower();
+            return Task.FromResult<IEnumerable<LookupItemString>>(SplitArticles.Where(a => a.Name.ToLower().Contains(q)).ToList());
+        }
+
+        public Task<IEnumerable<StoreLookupItem>> SearchStores(string searchText)
+        {
+            if (string.IsNullOrWhiteSpace(searchText))
+                return Task.FromResult<IEnumerable<StoreLookupItem>>(StoresList);
+            string q = searchText.Trim().ToLower();
+            return Task.FromResult<IEnumerable<StoreLookupItem>>(StoresList.Where(s => s.StoreName.ToLower().Contains(q)).ToList());
+        }
+
+        public Task<IEnumerable<ShelfLookupItem>> SearchShelves(string searchText)
+        {
+            if (string.IsNullOrWhiteSpace(searchText))
+                return Task.FromResult<IEnumerable<ShelfLookupItem>>(ShelvesList);
+            string q = searchText.Trim().ToLower();
+            return Task.FromResult<IEnumerable<ShelfLookupItem>>(ShelvesList.Where(s => s.DisplayName.ToLower().Contains(q)).ToList());
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // EXECUTE SPLIT / TRANSFER OPERATION
+        // ─────────────────────────────────────────────────────────────
+        public async Task ExecuteSplitTransfer()
+        {
+            if (SelectedItem == null) return;
+            IsProcessingSplit = true;
+
+            try
+            {
+                if (SplitMode == 0) // Change Order No
+                {
+                    if (!ChangeOrderModel.TransferToStockOrder)
+                    {
+                        if (string.IsNullOrWhiteSpace(ChangeOrderModel.ToOrderNo))
+                        {
+                            NotificationService.Notify(new Radzen.NotificationMessage
+                            {
+                                Severity = Radzen.NotificationSeverity.Warning,
+                                Summary = "Validation",
+                                Detail = "Please select an Order No.",
+                                Duration = 3000
+                            });
+                            return;
+                        }
+                        if (string.IsNullOrWhiteSpace(ChangeOrderModel.ToItemCode))
+                        {
+                            NotificationService.Notify(new Radzen.NotificationMessage
+                            {
+                                Severity = Radzen.NotificationSeverity.Warning,
+                                Summary = "Validation",
+                                Detail = "Please select an Item / Article.",
+                                Duration = 3000
+                            });
+                            return;
+                        }
+                        if (SelectedItem.OrderNo == ChangeOrderModel.ToOrderNo && SelectedItem.ItemCode == ChangeOrderModel.ToItemCode)
+                        {
+                            NotificationService.Notify(new Radzen.NotificationMessage
+                            {
+                                Severity = Radzen.NotificationSeverity.Warning,
+                                Summary = "Validation",
+                                Detail = "Same Order No. and Item Code selected.",
+                                Duration = 3000
+                            });
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        ChangeOrderModel.ToItemCode = SelectedItem.ItemCode;
+                    }
+
+                    bool success = await RcvListService.ChangeOrderNoAsync(ChangeOrderModel);
+                    if (success)
+                    {
+                        NotificationService.Notify(new Radzen.NotificationMessage
+                        {
+                            Severity = Radzen.NotificationSeverity.Success,
+                            Summary = "Order Changed",
+                            Detail = $"Lot {SelectedItem.LotNo} order updated successfully.",
+                            Duration = 4000
+                        });
+                        ShowSplitTransferModal = false;
+                        await LoadDataAsync();
+                    }
+                }
+                else if (SplitMode == 1) // Split Lot
+                {
+                    if (SelectedItem.IssQty > 0)
+                    {
+                        NotificationService.Notify(new Radzen.NotificationMessage
+                        {
+                            Severity = Radzen.NotificationSeverity.Error,
+                            Summary = "Cannot Split",
+                            Detail = "Can't split this lot, it has already been issued.",
+                            Duration = 4000
+                        });
+                        return;
+                    }
+                    if (string.IsNullOrWhiteSpace(SplitLotModel.SplitOrderNo))
+                    {
+                        NotificationService.Notify(new Radzen.NotificationMessage
+                        {
+                            Severity = Radzen.NotificationSeverity.Warning,
+                            Summary = "Validation",
+                            Detail = "Please select target Order No.",
+                            Duration = 3000
+                        });
+                        return;
+                    }
+                    if (string.IsNullOrWhiteSpace(SplitLotModel.SplitItemCode))
+                    {
+                        NotificationService.Notify(new Radzen.NotificationMessage
+                        {
+                            Severity = Radzen.NotificationSeverity.Warning,
+                            Summary = "Validation",
+                            Detail = "Please select target Article.",
+                            Duration = 3000
+                        });
+                        return;
+                    }
+                    if (SplitLotModel.SplitQty <= 0 || SplitLotModel.SplitQty > SelectedItem.RcvdQty)
+                    {
+                        NotificationService.Notify(new Radzen.NotificationMessage
+                        {
+                            Severity = Radzen.NotificationSeverity.Warning,
+                            Summary = "Validation",
+                            Detail = $"Split Qty must be between 1 and {SelectedItem.RcvdQty}.",
+                            Duration = 4000
+                        });
+                        return;
+                    }
+
+                    string newLotNo = await RcvListService.SplitLotAsync(SplitLotModel);
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Success,
+                        Summary = "Lot Split Successfully",
+                        Detail = $"New Lot No. {newLotNo} generated. Please print PTC cards for both lots.",
+                        Duration = 6000
+                    });
+
+                    ShowSplitTransferModal = false;
+                    await LoadDataAsync();
+                }
+                else if (SplitMode == 2) // Transfer to S/F Stock
+                {
+                    if (SelectedItem.IssQty > 0)
+                    {
+                        NotificationService.Notify(new Radzen.NotificationMessage
+                        {
+                            Severity = Radzen.NotificationSeverity.Error,
+                            Summary = "Cannot Transfer",
+                            Detail = "Can't transfer this entry, it has already been issued.",
+                            Duration = 4000
+                        });
+                        return;
+                    }
+                    decimal availableQty = SelectedItem.RcvdQty - SelectedItem.Wastage - SelectedItem.ReWorkQty;
+                    if (TransferSFModel.TransferQty <= 0 || TransferSFModel.TransferQty > availableQty)
+                    {
+                        NotificationService.Notify(new Radzen.NotificationMessage
+                        {
+                            Severity = Radzen.NotificationSeverity.Warning,
+                            Summary = "Validation",
+                            Detail = $"Transfer Qty must be between 1 and {availableQty}.",
+                            Duration = 4000
+                        });
+                        return;
+                    }
+                    if (TransferSFModel.ShelfRefID <= 0)
+                    {
+                        NotificationService.Notify(new Radzen.NotificationMessage
+                        {
+                            Severity = Radzen.NotificationSeverity.Warning,
+                            Summary = "Validation",
+                            Detail = "Please select Store and Shelf location.",
+                            Duration = 3000
+                        });
+                        return;
+                    }
+
+                    TransferSFModel.UserName = await GetCurrentUserName();
+                    TransferSFModel.MachineName = Environment.MachineName;
+
+                    bool success = await RcvListService.TransferToSFStockAsync(TransferSFModel);
+                    if (success)
+                    {
+                        NotificationService.Notify(new Radzen.NotificationMessage
+                        {
+                            Severity = Radzen.NotificationSeverity.Success,
+                            Summary = "Transferred to S/F Stock",
+                            Detail = $"Transferred {TransferSFModel.TransferQty:N0} pcs to S/F Stock ({TransferSFModel.LocationText}).",
+                            Duration = 5000
+                        });
+                        ShowSplitTransferModal = false;
+                        await LoadDataAsync();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Operation Failed",
+                    Detail = ex.Message,
+                    Duration = 6000
+                });
+            }
+            finally
+            {
+                IsProcessingSplit = false;
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // INSPECTION DATA MODAL STATE & HANDLERS
+        // ─────────────────────────────────────────────────────────────
+        public bool ShowInspectionModal { get; set; } = false;
+        public bool IsSavingInspection { get; set; } = false;
+        public InspectionDataDto? InspectionDto { get; set; } = null;
+        public string NewTemperValue { get; set; } = string.Empty;
+
+        public async Task OpenInspectionModal(ItemClickEventArgs args)
+        {
+            ResolveRowItem(args);
+            if (SelectedItem == null) return;
+
+            try
+            {
+                InspectionDto = await RcvListService.GetInspectionDataAsync(SelectedItem.VRD_EntryID);
+                NewTemperValue = string.Empty;
+                ShowInspectionModal = true;
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Error Loading Inspection",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+            }
+        }
+
+        public void CloseInspectionModal()
+        {
+            ShowInspectionModal = false;
+        }
+
+        public async Task OnInspectionProcessChanged()
+        {
+            if (InspectionDto == null) return;
+            try
+            {
+                InspectionDto.Parameters = await RcvListService.GetProcessInspectionParametersAsync(InspectionDto.ProcessID);
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Process Parameters Error",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+            }
+        }
+
+        public void AddTemperValue()
+        {
+            if (InspectionDto == null || string.IsNullOrWhiteSpace(NewTemperValue)) return;
+            InspectionDto.TemperValues.Add(NewTemperValue.Trim());
+            NewTemperValue = string.Empty;
+        }
+
+        public void OnTemperValueKeyDown(KeyboardEventArgs e)
+        {
+            if (e.Key == "Enter")
+            {
+                AddTemperValue();
+            }
+        }
+
+        public void RemoveTemperValue(int index)
+        {
+            if (InspectionDto == null || index < 0 || index >= InspectionDto.TemperValues.Count) return;
+            InspectionDto.TemperValues.RemoveAt(index);
+        }
+
+        public async Task SaveInspectionData()
+        {
+            if (InspectionDto == null || SelectedItem == null) return;
+            IsSavingInspection = true;
+
+            try
+            {
+                string userName = await GetCurrentUserName();
+                string machineName = Environment.MachineName;
+
+                var req = new SaveInspectionRequest
+                {
+                    VRD_RefID = SelectedItem.VRD_EntryID,
+                    DT = InspectionDto.InspectionDT,
+                    LotStatus = InspectionDto.LotStatus,
+                    Disposation = InspectionDto.Disposation,
+                    Comments = InspectionDto.Comments,
+                    UserName = userName,
+                    MachineName = machineName,
+                    Parameters = InspectionDto.Parameters,
+                    TemperValues = InspectionDto.TemperValues
+                };
+
+                bool success = await RcvListService.SaveInspectionDataAsync(req);
+                if (success)
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Success,
+                        Summary = "Inspection Saved",
+                        Detail = $"Inspection data for Lot {InspectionDto.LotNo} saved successfully.",
+                        Duration = 4000
+                    });
+                    ShowInspectionModal = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Save Failed",
+                    Detail = ex.Message,
+                    Duration = 5000
+                });
+            }
+            finally
+            {
+                IsSavingInspection = false;
+            }
+        }
+
+        public async Task PrintInspectionQCReport()
+        {
+            if (SelectedItem == null) return;
+
+            await ReportNavigationService.PrintReportAsync(new ReportRequest
+            {
+                ReportName = "VRDInspection.rpt",
+                SelectionFormula = $"{{ProcessInspection.VRD_RefID}} = {SelectedItem.VRD_EntryID}"
+            });
+        }
+
+        // ─────────────────────────────────────────────────────────────
         // Row-Specific Reports
         // ─────────────────────────────────────────────────────────────
 

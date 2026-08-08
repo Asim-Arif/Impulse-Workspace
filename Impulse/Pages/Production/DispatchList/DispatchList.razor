@@ -1,0 +1,256 @@
+@page "/production/dispatch-list"
+@using DataAccessLibrary.Models.ViewModels.Production
+@using Impulse.Services.Production
+@using Blazored.Typeahead
+@using BlazorContextMenu
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-3">
+
+            <!-- Page Header -->
+            <div class="d-flex align-items-end justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="p-2 bg-primary bg-opacity-10 text-primary rounded-3">
+                        <i class="fas fa-clipboard-list fs-4"></i>
+                    </div>
+                    <div>
+                        <h4 class="fw-bold mb-0 text-dark" style="font-size: 1.35rem;">Dispatch List</h4>
+                        <div class="text-muted small">View, manage, finalize, and print foreign customer export dispatch lists</div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <a class="btn btn-sm btn-primary fw-bold px-3 text-decoration-none" href="/production/create-dispatch-list">
+                        <i class="fas fa-plus-circle me-1"></i> Add New Dispatch List
+                    </a>
+                </div>
+            </div>
+
+            <!-- Filter Controls Panel -->
+            <div class="p-3 bg-light rounded-3 border mb-3">
+                <div class="row g-2 align-items-end">
+                    <!-- Customer Selector -->
+                    <div class="col-md-3">
+                        <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
+                            <i class="fas fa-user-tie text-primary me-1"></i> Customer
+                        </label>
+                        <div class="custom-typeahead-container">
+                            <BlazoredTypeahead SearchMethod="SearchCustomers"
+                                               TValue="LookupItemString"
+                                               TItem="LookupItemString"
+                                               Value="SelectedCustomer"
+                                               ValueChanged="OnCustomerChanged"
+                                               ValueExpression="@(() => SelectedCustomer)"
+                                               Placeholder="Select Customer..."
+                                               EnableDropDown="true"
+                                               MaximumSuggestions="1000">
+                                <SelectedTemplate Context="cust">
+                                    @cust.Name
+                                </SelectedTemplate>
+                                <ResultTemplate Context="cust">
+                                    @cust.Name
+                                </ResultTemplate>
+                                <NotFoundTemplate Context="searchText">
+                                    <span class="text-muted small">No customers matching "@searchText"</span>
+                                </NotFoundTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+                    </div>
+
+                    <!-- Date Range Preset -->
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
+                            <i class="fas fa-calendar-alt text-primary me-1"></i> Date Range
+                        </label>
+                        <select class="form-select form-select-sm" @bind="Filter.DateRangeIndex" @bind:after="OnDateRangeChanged">
+                            <option value="0">Today</option>
+                            <option value="1">Last 7 Days</option>
+                            <option value="2">Last 15 Days</option>
+                            <option value="3">Last 30 Days</option>
+                            <option value="4">Last 60 Days</option>
+                            <option value="5">Last 90 Days</option>
+                            <option value="6">Last 1 Year</option>
+                            <option value="7">Last 5 Years</option>
+                            <option value="8">Custom Range</option>
+                        </select>
+                    </div>
+
+                    <!-- From Date (Always Visible) -->
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm mb-1 fw-bold text-secondary">From Date</label>
+                        <input type="date" class="form-control form-control-sm" @bind="Filter.DtFrom" @bind:after="LoadDispatchListsAsync" disabled="@(Filter.DateRangeIndex != 8)" />
+                    </div>
+
+                    <!-- To Date (Always Visible) -->
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm mb-1 fw-bold text-secondary">To Date</label>
+                        <input type="date" class="form-control form-control-sm" @bind="Filter.DtTo" @bind:after="LoadDispatchListsAsync" disabled="@(Filter.DateRangeIndex != 8)" />
+                    </div>
+
+                    <!-- Not Finalized Toggle -->
+                    <div class="col-md-2">
+                        <div class="form-check form-switch mb-1">
+                            <input class="form-check-input" type="checkbox" id="chkNotFinal" @bind="Filter.OnlyNotFinalized" @bind:after="LoadDispatchListsAsync" />
+                            <label class="form-check-label fw-bold text-secondary small" for="chkNotFinal">
+                                Not Finalized Only
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Refresh Button -->
+                    <div class="col-md-1">
+                        <button type="button" class="btn btn-sm btn-primary w-100 fw-bold" @onclick="LoadDispatchListsAsync" disabled="@IsLoading">
+                            @if (IsLoading)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-sync-alt"></i>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MAIN DISPATCH LISTS GRID -->
+            <div class="card border mb-3 rounded-3 shadow-none">
+                <div class="table-responsive" style="max-height: 58vh; overflow-y: auto;">
+                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                        <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                            <tr>
+                                <th style="width: 45px;">#</th>
+                                <th style="width: 140px;">Dispatch List #</th>
+                                <th style="width: 110px;">Date</th>
+                                <th class="text-center" style="width: 110px;">Total Cartons</th>
+                                <th style="width: 150px;">Status</th>
+                                <th>Customer</th>
+                                <th>Country</th>
+                                <th class="text-center" style="width: 110px;">Total Qty</th>
+                                <th>Created By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (IsLoading)
+                            {
+                                <tr>
+                                    <td colspan="9" class="text-center py-4 text-muted">
+                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span> Loading dispatch lists...
+                                    </td>
+                                </tr>
+                            }
+                            else if (!DispatchLists.Any())
+                            {
+                                <tr>
+                                    <td colspan="9" class="text-center py-4 text-muted">
+                                        <i class="fas fa-info-circle me-1"></i> No dispatch lists found matching your filter criteria.
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                int idx = 1;
+                                @foreach (var item in DispatchLists)
+                                {
+                                    <ContextMenuTrigger MenuId="dispatchContextMenu" Data="@item" WrapperTag="tr" @ondblclick="@(() => EditDispatch(item))" style="cursor: pointer;">
+                                        <td>@(idx++)</td>
+                                        <td>
+                                            <span class="badge px-2 py-1" style="background-color: #0d6efd; color: #ffffff; font-weight: 700; border-radius: 4px;">
+                                                @item.DispatchListNo
+                                            </span>
+                                        </td>
+                                        <td>@item.DT.ToString("dd-MMM-yyyy")</td>
+                                        <td class="text-center">
+                                            <span class="badge bg-warning text-dark px-2 py-1 fw-bold">
+                                                @item.TotalCartons
+                                            </span>
+                                        </td>
+                                        <td>
+                                            @if (item.Finalyzed)
+                                            {
+                                                <span class="badge bg-success px-2 py-1">
+                                                    <i class="fas fa-check-circle me-1"></i> Finalized (@item.FinalyzedDT?.ToString("dd-MMM-yy"))
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary px-2 py-1 text-white">
+                                                    <i class="fas fa-clock me-1"></i> Pending
+                                                </span>
+                                            }
+                                        </td>
+                                        <td class="fw-semibold text-dark">@item.CustCode</td>
+                                        <td>@item.Country</td>
+                                        <td class="text-center fw-bold text-success">@item.TotalQty.ToString("N0")</td>
+                                        <td class="text-muted small">@item.UserName</td>
+                                    </ContextMenuTrigger>
+                                }
+                            }
+                        </tbody>
+                        <tfoot class="table-light fw-bold text-dark border-top">
+                            <tr>
+                                <td colspan="3" class="text-end">Total Summary:</td>
+                                <td class="text-center text-primary">@TotalCartonsSum Cartons</td>
+                                <td></td>
+                                <td>@DispatchLists.Count Lists</td>
+                                <td></td>
+                                <td class="text-center text-success">@TotalPiecesSum.ToString("N0") Pcs</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Bottom Hint -->
+            <div class="d-flex align-items-center justify-content-between p-2 px-3 bg-light rounded-3 border text-muted small">
+                <div>
+                    <i class="fas fa-info-circle text-primary me-1"></i>
+                    <strong>Tip:</strong> Double-click or right-click any dispatch list to edit, finalize, or print documents.
+                </div>
+                <div>
+                    Total Records: <strong>@DispatchLists.Count</strong>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Row-Specific Context Menu (right-click) -->
+<ContextMenu Id="dispatchContextMenu" Template="Win11Style">
+    <div class="win11-section-header px-3 py-1 text-muted small fw-bold border-bottom">DISPATCH ACTIONS</div>
+    <Item OnClick="@ContextEdit"><i class="fas fa-pencil-alt text-primary me-2"></i> Edit Dispatch List</Item>
+    <Item OnClick="@ContextFinalize"><i class="fas fa-check-double text-success me-2"></i> Finalize Dispatch List</Item>
+    <div class="win11-section-header px-3 py-1 text-muted small fw-bold border-bottom border-top">REPORTS</div>
+    <Item OnClick="@PrintInnerwise"><i class="fas fa-print text-primary me-2"></i> Print Dispatch List</Item>
+    <Item OnClick="@PrintFinal"><i class="fas fa-file-invoice text-dark me-2"></i> Print Dispatch Final</Item>
+    <Item OnClick="@PrintWithValue"><i class="fas fa-dollar-sign text-success me-2"></i> Print Dispatch List (With Value)</Item>
+</ContextMenu>
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+        border-radius: 6px !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    .blazored-typeahead__results {
+        z-index: 10000 !important;
+    }
+</style>

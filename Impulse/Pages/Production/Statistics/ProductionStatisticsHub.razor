@@ -1,0 +1,109 @@
+@page "/production/statistics"
+@attribute [Authorize]
+
+<PageTitle>Production Statistics</PageTitle>
+
+<div class="dashboard-shell" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <!-- Back button & Hero Section -->
+    <div class="d-flex align-items-center mb-3">
+        <a href="/production" class="btn btn-sm btn-outline-secondary me-3" style="border-radius: 8px; font-weight: 600;">
+            <i class="fas fa-arrow-left me-1"></i> Dashboard
+        </a>
+    </div>
+
+    <div class="dashboard-hero">
+        <div class="dashboard-icon-wrap" style="background:#fdf0f0; color:#bf3a3a;">
+            <i class="fas fa-chart-pie"></i>
+        </div>
+        <div>
+            <h1 class="dashboard-title">Production Statistics</h1>
+            <p class="dashboard-subtitle">Operational metrics, open orders, processing pipelines, and manufacturing reports</p>
+        </div>
+    </div>
+
+    <!-- Statistics Cards Grid -->
+    <div class="dashboard-modules">
+        @foreach (var stat in statistics)
+        {
+            <div class="dash-card" @onclick="() => OnCardClick(stat.Name)">
+                <i class="@stat.Icon" style="color: #bf3a3a;"></i>
+                <span>@stat.Name</span>
+            </div>
+        }
+    </div>
+</div>
+
+@using Impulse.Shared.Components
+<DateRangeWithTripleSelectModal @ref="productivityModal"
+                               Title="Employee Productivity Report"
+                               LabelText1="Department:"
+                               LabelText2="Employee:"
+                               LabelText3="Process:"
+                               PlaceholderText1="Select Department..."
+                               PlaceholderText2="Select Employee..."
+                               PlaceholderText3="Select Process..."
+                               OnDepartmentChangedCallback="OnDepartmentChangedAsync" />
+
+<DateRangeWithSubHeadsSelectModal @ref="deptEmpDateRangeModal"
+                                  Title="Employee Monthly Productivity Report"
+                                  LabelText="Department:"
+                                  LabelTextSub="Employee:"
+                                  PlaceholderText="Select Department..."
+                                  PlaceholderTextSub="Select Employee..." />
+
+<DateSingleWithSelectModal @ref="singleDeptModal"
+                           Title="Department Productivity Report"
+                           LabelText="Select Department:"
+                           PlaceholderText="Search Department..." />
+
+<DateRangeModal @ref="rangeModal" />
+
+<style>
+    .dashboard-shell { padding: 2rem; max-width: 1200px; }
+    .dashboard-hero { display: flex; align-items: center; gap: 1.25rem; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e0e2ec; }
+    .dashboard-icon-wrap { width: 64px; height: 64px; border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 1.75rem; flex-shrink: 0; }
+    .dashboard-title { font-size: 2rem; font-weight: 700; color: #1b1b1f; margin: 0; line-height: 1.2; }
+    .dashboard-subtitle { color: #44474f; margin: 0.25rem 0 0; font-size: 0.95rem; }
+    
+    .dashboard-modules { 
+        display: grid; 
+        grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); 
+        gap: 1rem; 
+    }
+    
+    .dash-card { 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center; 
+        gap: 0.75rem; 
+        padding: 1.5rem 1rem; 
+        background: #ffffff; 
+        border: 1px solid #e0e2ec; 
+        border-radius: 16px; 
+        text-decoration: none; 
+        color: #1b1b1f; 
+        font-weight: 500; 
+        font-size: 0.875rem; 
+        text-align: center; 
+        transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease; 
+        cursor: pointer; 
+        height: 130px;
+    }
+    
+    .dash-card i { 
+        font-size: 1.75rem; 
+    }
+    
+    .dash-card:hover { 
+        background: #fdf0f0; 
+        box-shadow: 0 4px 16px rgba(191, 58, 58, 0.15); 
+        transform: translateY(-2px); 
+        color: #7a0000; 
+        text-decoration: none;
+    }
+    
+    .dash-card:hover i { 
+        color: #7a0000 !important; 
+    }
+</style>

@@ -279,6 +279,28 @@ builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IMakerPOListDa
 builder.Services.AddScoped<Impulse.Services.Production.IMakerPOListService, Impulse.Services.Production.MakerPOListService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IMakerRcvListDataAccess, DataAccessLibrary.DAC.Production.MakerRcvListDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Production.IMakerRcvListService, Impulse.Services.Production.MakerRcvListService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IReWorkIssuanceDataAccess, DataAccessLibrary.DAC.Production.ReWorkIssuanceDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IReWorkIssuanceService, Impulse.Services.Production.ReWorkIssuanceService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.ITransferToReadyFinishStockDataAccess, DataAccessLibrary.DAC.Production.TransferToReadyFinishStockDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.ITransferToReadyFinishStockService, Impulse.Services.Production.TransferToReadyFinishStockService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.ICreateDispatchListDataAccess, DataAccessLibrary.DAC.Production.CreateDispatchListDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.ICreateDispatchListService, Impulse.Services.Production.CreateDispatchListService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IDispatchListDataAccess, DataAccessLibrary.DAC.Production.DispatchListDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IDispatchListService, Impulse.Services.Production.DispatchListService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IMakerBillingDataAccess, DataAccessLibrary.DAC.Production.MakerBillingDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IMakerBillingService, Impulse.Services.Production.MakerBillingService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IMakerBillingListDataAccess, DataAccessLibrary.DAC.Production.MakerBillingListDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IMakerBillingListService, Impulse.Services.Production.MakerBillingListService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IProcessDataAccess, DataAccessLibrary.DAC.Production.ProcessDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IProcessService, Impulse.Services.Production.ProcessService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IProcessGroupDataAccess, DataAccessLibrary.DAC.Production.ProcessGroupDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IProcessGroupService, Impulse.Services.Production.ProcessGroupService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IRepairTypeDataAccess, DataAccessLibrary.DAC.Production.RepairTypeDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IRepairTypeService, Impulse.Services.Production.RepairTypeService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IWastageTypeDataAccess, DataAccessLibrary.DAC.Production.WastageTypeDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IWastageTypeService, Impulse.Services.Production.WastageTypeService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IProductionItemListDataAccess, DataAccessLibrary.DAC.Production.ProductionItemListDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IProductionItemListService, Impulse.Services.Production.ProductionItemListService>();
 
 
 

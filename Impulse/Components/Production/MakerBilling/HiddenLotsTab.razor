@@ -1,0 +1,78 @@
+@using DataAccessLibrary.Models.ViewModels.Production
+@using BlazorContextMenu
+
+<div class="card border-0 shadow-none">
+    <div class="table-responsive border rounded-3" style="max-height: 52vh; overflow-y: auto;">
+        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                <tr>
+                    <th style="width: 45px;">#</th>
+                    <th class="text-center" style="width: 100px;">Lot #</th>
+                    <th class="text-center" style="width: 90px;">Qty</th>
+                    <th style="width: 120px;">Item Code</th>
+                    <th>Item Name</th>
+                    <th style="width: 130px;">Order #</th>
+                    <th style="width: 120px;">Customer</th>
+                    <th>Process</th>
+                    <th style="width: 110px;" class="text-center">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (IsLoading)
+                {
+                    <tr>
+                        <td colspan="9" class="text-center py-4 text-muted">
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span> Loading hidden lots...
+                        </td>
+                    </tr>
+                }
+                else if (!Items.Any())
+                {
+                    <tr>
+                        <td colspan="9" class="text-center py-4 text-muted">
+                            <i class="fas fa-check-circle text-success me-1"></i> No hidden lots found for this maker.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    int idx = 1;
+                    @foreach (var item in Items)
+                    {
+                        <ContextMenuTrigger MenuId="hiddenLotMenu" Data="@item" WrapperTag="tr">
+                            <td>@(idx++)</td>
+                            <td class="text-center">
+                                <span class="badge px-2 py-1" style="background-color: #2196F3; color: #ffffff; font-weight: 700; border-radius: 4px;">
+                                    @item.LotNo
+                                </span>
+                            </td>
+                            <td class="text-center fw-bold">@item.Qty.ToString("N0")</td>
+                            <td><span class="badge bg-secondary">@item.ItemCode</span></td>
+                            <td class="fw-semibold text-dark">@item.ItemName</td>
+                            <td>@item.OrderNo</td>
+                            <td>@item.CustCode</td>
+                            <td><span class="badge bg-info text-dark">@item.Process</span></td>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-sm btn-outline-success py-0 px-2 fw-bold" @onclick="() => RestoreLot(item)" title="Restore to Billing">
+                                    <i class="fas fa-eye me-1"></i> Restore
+                                </button>
+                            </td>
+                        </ContextMenuTrigger>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Context Menu for Hidden Lot with Standard Win11Style Classes -->
+<ContextMenu Id="hiddenLotMenu" Template="Win11Style">
+    <div class="win11-section-header">Hidden Lot Actions</div>
+    <Item class="win11-menu-item" OnClick="@ContextRestoreLot">
+        <i class="fas fa-eye fa-fw win11-icon text-success"></i> Show in Billing
+    </Item>
+    <div class="win11-divider"></div>
+    <Item class="win11-menu-item" OnClick="@ContextPrintPTC">
+        <i class="fas fa-file-alt fa-fw win11-icon text-dark"></i> Print PTC
+    </Item>
+</ContextMenu>

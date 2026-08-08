@@ -1,0 +1,219 @@
+@using DataAccessLibrary.Models.ViewModels.Production
+@using Impulse.Services.Production
+@using Blazored.Typeahead
+
+@if (IsOpen && Group != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0, 0, 0, 0.5); z-index: 100050; font-family: 'Calibri', 'Segoe UI', sans-serif;">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-primary text-white py-2 px-3">
+                    <h6 class="modal-title fw-bold mb-0" style="font-size: 1.05rem;">
+                        <i class="fas @(IsCopy ? "fa-copy" : (Group.EntryID == 0 ? "fa-plus-circle" : "fa-pencil-alt")) me-2"></i>
+                        @(IsCopy ? $"Copy Process Group: {Group.GroupName}" : (Group.EntryID == 0 ? "Create New Process Group" : $"Edit Process Group: {Group.GroupName}"))
+                    </h6>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body p-3">
+
+                    <!-- Group Name / Header -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-12">
+                            <label class="form-label form-label-sm fw-bold text-secondary mb-1" style="font-size: 0.875rem;">
+                                Group Name / Description <span class="text-danger">*</span>
+                            </label>
+                            <input type="text"
+                                   class="form-control form-control-sm fw-bold"
+                                   style="font-size: 0.95rem; height: 33px;"
+                                   placeholder="e.g. UPPER FABRICATION PIPELINE, PACKING & DISPATCH..."
+                                   @bind="Group.GroupName" />
+                        </div>
+                    </div>
+
+                    <!-- Step Insertion Toolbar -->
+                    <div class="p-3 bg-light rounded-3 border mb-3">
+                        <div class="fw-bold text-secondary small text-uppercase mb-2" style="font-size: 0.78rem;">
+                            <i class="fas fa-plus-circle text-primary me-1"></i> Add Step into Sequence
+                        </div>
+
+                        <div class="row g-2 align-items-end">
+                            <!-- Process Lookup -->
+                            <div class="col-md-6">
+                                <label class="form-label form-label-sm mb-1 fw-bold text-secondary" style="font-size: 0.85rem;">
+                                    Process <span class="text-danger">*</span>
+                                </label>
+                                <div class="custom-typeahead-container modal-typeahead">
+                                    <BlazoredTypeahead SearchMethod="SearchProcesses"
+                                                       TValue="LookupItemInt"
+                                                       TItem="LookupItemInt"
+                                                       Value="SelectedProcess"
+                                                       ValueChanged="OnProcessSelected"
+                                                       ValueExpression="@(() => SelectedProcess)"
+                                                       Placeholder="Search manufacturing process..."
+                                                       EnableDropDown="true"
+                                                       MaximumSuggestions="1000">
+                                        <SelectedTemplate Context="proc">
+                                            @proc.Name
+                                        </SelectedTemplate>
+                                        <ResultTemplate Context="proc">
+                                            @proc.Name
+                                        </ResultTemplate>
+                                        <NotFoundTemplate Context="searchText">
+                                            <span class="text-muted small">No processes matching "@searchText"</span>
+                                        </NotFoundTemplate>
+                                    </BlazoredTypeahead>
+                                </div>
+                            </div>
+
+                            <!-- Scanning Required -->
+                            <div class="col-md-2">
+                                <label class="form-label form-label-sm mb-1 fw-bold text-secondary" style="font-size: 0.85rem;">Scanning</label>
+                                <select class="form-select form-select-sm" style="height: 31px; font-size: 0.875rem;" @bind="NewStepScanning">
+                                    <option value="false">No</option>
+                                    <option value="true">Yes</option>
+                                </select>
+                            </div>
+
+                            <!-- Hub Name / Station -->
+                            <div class="col-md-2">
+                                <label class="form-label form-label-sm mb-1 fw-bold text-secondary" style="font-size: 0.85rem;">Hub / Station</label>
+                                <input type="text" class="form-control form-control-sm" style="height: 31px; font-size: 0.875rem;" placeholder="e.g. Hub 1" @bind="NewStepHubName" />
+                            </div>
+
+                            <!-- Add Button -->
+                            <div class="col-md-2 d-grid">
+                                <button type="button" class="btn btn-sm btn-primary fw-bold" style="height: 31px; font-size: 0.875rem;" @onclick="AddStep" disabled="@(SelectedProcess == null)">
+                                    <i class="fas fa-plus me-1"></i> Add
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Process Sequence Ordered Grid -->
+                    <div class="table-responsive border rounded-3" style="max-height: 45vh; overflow-y: auto;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                <tr>
+                                    <th style="width: 60px;" class="text-center">Step #</th>
+                                    <th>Process Description</th>
+                                    <th style="width: 100px;" class="text-center">Scanning</th>
+                                    <th style="width: 130px;">Hub / Station</th>
+                                    <th style="width: 120px;" class="text-center">Order &amp; Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (!Group.Processes.Any())
+                                {
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4 text-muted">
+                                            <i class="fas fa-layer-group fa-2x d-block mb-2 text-secondary opacity-50"></i>
+                                            No processes added to this sequence yet. Add at least one step above.
+                                        </td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    @for (int i = 0; i < Group.Processes.Count; i++)
+                                    {
+                                        int index = i;
+                                        var step = Group.Processes[i];
+                                        <tr>
+                                            <td class="text-center fw-bold text-muted">@(index + 1)</td>
+                                            <td class="fw-bold text-dark">
+                                                @if (!string.IsNullOrWhiteSpace(step.ProcessCode))
+                                                {
+                                                    <span class="badge bg-secondary me-1">@step.ProcessCode</span>
+                                                }
+                                                @step.ProcessName
+                                            </td>
+                                            <td class="text-center">
+                                                @if (step.Scanning)
+                                                {
+                                                    <span class="badge bg-success px-2">Yes</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-light text-secondary border px-2">No</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <input type="text" class="form-control form-control-sm py-0" placeholder="Hub..." @bind="step.Hub_Name" style="max-width: 120px; height: 27px; font-size: 0.85rem;" />
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="d-flex align-items-center justify-content-center gap-1">
+                                                    <button type="button"
+                                                            class="btn btn-link btn-sm p-1 text-secondary"
+                                                            title="Move Up"
+                                                            disabled="@(index == 0)"
+                                                            @onclick="() => MoveStepUp(index)">
+                                                        <i class="fas fa-arrow-up"></i>
+                                                    </button>
+                                                    <button type="button"
+                                                            class="btn btn-link btn-sm p-1 text-secondary"
+                                                            title="Move Down"
+                                                            disabled="@(index == Group.Processes.Count - 1)"
+                                                            @onclick="() => MoveStepDown(index)">
+                                                        <i class="fas fa-arrow-down"></i>
+                                                    </button>
+                                                    <button type="button"
+                                                            class="btn btn-link btn-sm p-1 text-danger"
+                                                            title="Remove Step"
+                                                            @onclick="() => RemoveStep(index)">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+                <div class="modal-footer bg-light py-2 px-3 d-flex justify-content-between">
+                    <div class="text-muted small">
+                        Total Process Steps: <strong class="text-dark">@Group.Processes.Count</strong>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-secondary fw-bold" @onclick="CloseModal" disabled="@IsSaving">Cancel</button>
+                        <button type="button" class="btn btn-sm btn-primary fw-bold px-4" @onclick="SaveGroupAsync" disabled="@(IsSaving || string.IsNullOrWhiteSpace(Group.GroupName) || !Group.Processes.Any())">
+                            @if (IsSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                <span>Saving...</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-check-circle me-1"></i>
+                                <span>@(IsCopy ? "Save Duplicated Group" : (Group.EntryID == 0 ? "Save Process Group" : "Update Process Group"))</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .modal-typeahead .blazored-typeahead {
+        height: 31px !important;
+        min-height: 31px !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+        font-size: 0.875rem !important;
+        border-radius: 4px !important;
+    }
+    .modal-typeahead .blazored-typeahead__controls {
+        height: 31px !important;
+        min-height: 31px !important;
+    }
+    .modal-typeahead .blazored-typeahead__input-mask,
+    .modal-typeahead .blazored-typeahead__input {
+        height: 31px !important;
+        font-size: 0.875rem !important;
+        padding: 0.25rem 0.5rem !important;
+        line-height: 1.5 !important;
+    }
+</style>

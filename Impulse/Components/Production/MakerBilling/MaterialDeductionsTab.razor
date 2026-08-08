@@ -1,0 +1,116 @@
+@using DataAccessLibrary.Models.ViewModels.Production
+@using BlazorContextMenu
+
+<div class="card border-0 shadow-none">
+    <!-- Action Bar -->
+    <div class="d-flex align-items-center justify-content-between p-2 mb-2 bg-light rounded-3 border">
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-outline-primary fw-bold" @onclick="SelectAll">
+                <i class="fas fa-check-square me-1"></i> Select All
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" @onclick="UnselectAll">
+                <i class="fas fa-square me-1"></i> Unselect All
+            </button>
+            <div class="vr mx-1"></div>
+            <button type="button" class="btn btn-sm btn-outline-dark fw-bold" @onclick="() => OnPrintReport.InvokeAsync()" disabled="@(!Items.Any())">
+                <i class="fas fa-print me-1"></i> Print Material Deductions
+            </button>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small fw-bold">Total Material Deduction:</span>
+            <span class="badge bg-danger fs-6 px-3 py-1 fw-bold">@TotalSelectedMaterialAmount.ToString("N2")</span>
+        </div>
+    </div>
+
+    <!-- Material Deductions Grid -->
+    <div class="table-responsive border rounded-3" style="max-height: 48vh; overflow-y: auto;">
+        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                <tr>
+                    <th style="width: 40px;" class="text-center">
+                        <input class="form-check-input" type="checkbox" checked="@IsAllSelected" @onchange="ToggleSelectAll" />
+                    </th>
+                    <th style="width: 45px;">#</th>
+                    <th style="width: 100px;">Iss #</th>
+                    <th style="width: 110px;">Date</th>
+                    <th>Raw Material</th>
+                    <th style="width: 120px;">Item Code</th>
+                    <th class="text-end" style="width: 110px;">Rate</th>
+                    <th class="text-center" style="width: 90px;">Qty</th>
+                    <th class="text-end" style="width: 130px;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (IsLoading)
+                {
+                    <tr>
+                        <td colspan="9" class="text-center py-4 text-muted">
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span> Loading material deductions...
+                        </td>
+                    </tr>
+                }
+                else if (!Items.Any())
+                {
+                    <tr>
+                        <td colspan="9" class="text-center py-4 text-muted">
+                            <i class="fas fa-check-circle text-success me-1"></i> No unbilled raw material issuances found for this maker.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    int idx = 1;
+                    @foreach (var item in Items)
+                    {
+                        <ContextMenuTrigger MenuId="rmContextMenu" Data="@item" WrapperTag="tr" class="@(item.IsSelected ? "table-light" : "")">
+                            <td class="text-center" @onclick:stopPropagation="true">
+                                <input class="form-check-input" type="checkbox" @bind="item.IsSelected" @bind:after="OnSelectionChanged" />
+                            </td>
+                            <td>@(idx++)</td>
+                            <td><span class="badge bg-secondary">@item.IssNo</span></td>
+                            <td>@item.DT.ToString("dd-MMM-yyyy")</td>
+                            <td class="fw-semibold text-dark">@item.RawMaterialDisplay</td>
+                            <td><span class="badge bg-secondary">@item.ItemCode</span></td>
+                            <td class="text-end" @onclick:stopPropagation="true">
+                                @if (EditingItemId == item.EntryID)
+                                {
+                                    <div class="input-group input-group-sm">
+                                        <input type="number" class="form-control form-control-sm text-end fw-bold py-0" @bind="EditingPrice" @onkeydown="@(e => OnPriceKeyDown(e, item))" autofocus />
+                                        <button class="btn btn-sm btn-success py-0 px-2" @onclick="() => SavePrice(item)"><i class="fas fa-check"></i></button>
+                                        <button class="btn btn-sm btn-secondary py-0 px-2" @onclick="CancelPriceEdit"><i class="fas fa-times"></i></button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="text-primary fw-bold text-decoration-underline" style="cursor: pointer;" @onclick="() => StartPriceEdit(item)" title="Click to edit raw material rate">
+                                        @item.Price.ToString("N2")
+                                    </span>
+                                }
+                            </td>
+                            <td class="text-center fw-bold">@item.Qty.ToString("N0")</td>
+                            <td class="text-end fw-bold text-danger">@item.Amount.ToString("N2")</td>
+                        </ContextMenuTrigger>
+                    }
+                }
+            </tbody>
+            <tfoot class="table-light fw-bold text-dark border-top">
+                <tr>
+                    <td colspan="7" class="text-end">Total Material Deductions:</td>
+                    <td class="text-center">@Items.Where(x => x.IsSelected).Sum(x => x.Qty).ToString("N0")</td>
+                    <td class="text-end text-danger fs-6">@TotalSelectedMaterialAmount.ToString("N2")</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+<!-- Context Menu for Raw Material Item with Standard Win11Style Classes -->
+<ContextMenu Id="rmContextMenu" Template="Win11Style">
+    <div class="win11-section-header">Material Actions</div>
+    <Item class="win11-menu-item" OnClick="@ContextEditPrice">
+        <i class="fas fa-pencil-alt fa-fw win11-icon text-primary"></i> Edit Rate
+    </Item>
+    <Item class="win11-menu-item" OnClick="@ContextHideRM">
+        <i class="fas fa-eye-slash fa-fw win11-icon text-warning"></i> Hide from Billing
+    </Item>
+</ContextMenu>
