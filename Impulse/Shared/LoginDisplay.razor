@@ -4,20 +4,59 @@
             var name = context.User.Identity?.Name ?? "Administrator";
             var initial = !string.IsNullOrEmpty(name) ? name.Substring(0, 1).ToUpper() : "A";
         }
-        <div class="login-display-content">
+        <div class="login-display-content w-100 d-flex align-items-center justify-content-between px-3">
+            <!-- Left: User Avatar, Greeting, Role -->
             <div class="md3-user-profile">
-                <div class="md3-avatar">@initial</div>
-                <div class="md3-user-info">
-                    <div class="md3-greeting">@GetGreeting(), @name</div>
-                    <div class="md3-subtext">System Administrator &bull; Live Overview</div>
+                <div class="position-relative">
+                    <div class="md3-avatar">@initial</div>
+                    <span class="online-indicator-dot" title="Active Session"></span>
                 </div>
+                <div class="md3-user-info">
+                    <div class="md3-greeting">@GetGreeting(), <span class="fw-bold">@name</span></div>
+                    <div class="md3-subtext">System Administrator &bull; <span class="text-primary fw-semibold">Impulse ERP</span></div>
+                </div>
+            </div>
+
+            <!-- Right: System Telemetry, Status Pills & Sign Out -->
+            <div class="d-none d-md-flex align-items-center gap-2">
+                <!-- System & Version Badge -->
+                <div class="header-telemetry-pill">
+                    <i class="fas fa-server text-primary"></i>
+                    <div class="telemetry-text">
+                        <span class="telemetry-title">Impulse v3.5</span>
+                        <span class="telemetry-subtitle">Enterprise Host</span>
+                    </div>
+                </div>
+
+                <!-- Database Status Badge -->
+                <div class="header-telemetry-pill">
+                    <span class="db-status-pulse"></span>
+                    <div class="telemetry-text">
+                        <span class="telemetry-title">SQL Server</span>
+                        <span class="telemetry-subtitle text-success fw-semibold">Live Online</span>
+                    </div>
+                </div>
+
+                <!-- Date Badge -->
+                <div class="header-telemetry-pill">
+                    <i class="far fa-calendar-alt text-secondary"></i>
+                    <div class="telemetry-text">
+                        <span class="telemetry-title">@DateTime.Now.ToString("ddd, dd-MMM-yyyy")</span>
+                        <span class="telemetry-subtitle">Server Date</span>
+                    </div>
+                </div>
+
+                <!-- Quick Logout Button -->
+                <a href="/Identity/Account/Logout" class="btn btn-outline-danger btn-sm header-logout-btn ms-1 d-flex align-items-center gap-1 shadow-none" title="Sign out of Impulse">
+                    <i class="fas fa-arrow-right-from-bracket"></i>
+                    <span>Sign Out</span>
+                </a>
             </div>
         </div>
     </Authorized>
     <NotAuthorized>
-        <div class="d-flex align-items-center login-display-content">
-            <a href="/Identity/Account/Register" class="btn btn-outline-primary btn-sm me-2">Register</a>
-            <a href="/Identity/Account/Login" class="btn btn-outline-success btn-sm">Log in</a>
+        <div class="d-flex align-items-center login-display-content px-3">
+            <a href="/Identity/Account/Login" class="btn btn-outline-primary btn-sm">Log in</a>
         </div>
     </NotAuthorized>
 </AuthorizeView>

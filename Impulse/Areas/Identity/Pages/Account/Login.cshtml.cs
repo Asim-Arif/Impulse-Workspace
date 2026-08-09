@@ -33,6 +33,7 @@ using Microsoft.PowerBI.Api.Models;
 
 namespace Impulse.Areas.Identity.Pages.Account
 {
+    [IgnoreAntiforgeryToken]
     public class LoginModel : PageModel
     {
 
