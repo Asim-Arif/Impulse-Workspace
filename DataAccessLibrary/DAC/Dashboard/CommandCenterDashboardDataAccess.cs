@@ -138,6 +138,23 @@ namespace DataAccessLibrary.DAC.Dashboard
                     FROM Vouchers
                     WHERE LEFT(AccNo, 6) = '31-001' AND VDate BETWEEN @From AND @To",
                     new { From = fyFrom, To = fyTo });
+
+                var monthlyTrend = await db.QueryAsync<MonthlyExportSalesTrendItem>(@"
+                    SELECT TOP 12 
+                        FORMAT(CustomInvoice.DT, 'MMM yy') AS MonthLabel,
+                        YEAR(CustomInvoice.DT) AS [Year],
+                        MONTH(CustomInvoice.DT) AS [Month],
+                        COUNT(DISTINCT CustomInvoice.CustomInvoice) AS InvoiceCount,
+                        ISNULL(SUM(VCustomInvoiceTotalQty.TotalQty), 0) AS TotalShippedQty,
+                        ISNULL(SUM(VCustomInvoiceAmt.TotalAmt), 0) AS TotalAmountForeign,
+                        ISNULL(SUM(VCustomInvoiceAmt.TotalCustomAmt), 0) AS TotalAmountPKR
+                    FROM CustomInvoice
+                    INNER JOIN VCustomInvoiceTotalQty ON CustomInvoice.CustomInvoice = VCustomInvoiceTotalQty.CustomInvoice
+                    INNER JOIN VCustomInvoiceAmt ON CustomInvoice.CustomInvoice = VCustomInvoiceAmt.CustomInvoice
+                    GROUP BY FORMAT(CustomInvoice.DT, 'MMM yy'), YEAR(CustomInvoice.DT), MONTH(CustomInvoice.DT)
+                    ORDER BY YEAR(CustomInvoice.DT) ASC, MONTH(CustomInvoice.DT) ASC");
+
+                data.Export.MonthlyTrend = monthlyTrend.ToList();
             }
             catch { /* Handled with default zeros */ }
 

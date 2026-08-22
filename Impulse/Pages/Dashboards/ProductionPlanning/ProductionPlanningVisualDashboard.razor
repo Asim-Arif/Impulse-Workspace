@@ -1,0 +1,1579 @@
+@page "/dashboards/production-planning-analytics"
+@page "/dashboards/production-planning-visual"
+@page "/dashboard/production-planning-visual"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.ViewModels.Dashboard
+@using DataAccessLibrary.Models.ViewModels.Production
+@using Blazored.Typeahead
+@using BlazorContextMenu
+@using Radzen
+@using Radzen.Blazor
+
+<PageTitle>Production Planning Visual Analytics | Impulse ERP</PageTitle>
+<meta name="description" content="Power BI-style live interactive visual analytics and demand-supply intelligence for production planning." />
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="pbi-dashboard-container">
+
+        <!-- ── Power BI Master Navigation & Title Bar ──────────────────────── -->
+        <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 12px;">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    
+                    <!-- Left Brand / Title -->
+                    <div class="d-flex align-items-center gap-3">
+                        <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #118DFF 0%, #005A9E 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(17, 141, 255, 0.3);">
+                            <i class="fas fa-chart-pie text-white" style="font-size: 1.25rem;"></i>
+                        </div>
+                        <div>
+                            <div class="d-flex align-items-center gap-2">
+                                <h1 class="mb-0 fw-bold" style="font-size: 1.3rem; color: #118DFF; letter-spacing: -0.3px;">Production Planning Analytics</h1>
+                                <span class="badge rounded-pill px-2 py-1" style="background: rgba(17, 141, 255, 0.12); color: #005A9E; font-size: 0.72rem; font-weight: 700; border: 1px solid rgba(17, 141, 255, 0.25);">
+                                    <i class="fas fa-bolt me-1 text-warning"></i> POWER BI SUITE
+                                </span>
+                            </div>
+                            <small class="text-muted" style="font-size: 0.78rem;">Live Demand-Supply Balancing, Shop Floor WIP Stages &amp; Multi-Tier Stock Intelligence</small>
+                        </div>
+                    </div>
+
+                    <!-- Right Quick Actions & View Switcher -->
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        @if (IsLoading)
+                        {
+                            <span class="text-muted" style="font-size: 0.8rem;"><i class="fas fa-spinner fa-spin me-1"></i>Syncing...</span>
+                        }
+
+                        <!-- View Mode Pill Toggles -->
+                        <div class="btn-group btn-group-sm p-1 rounded-pill bg-light border shadow-sm me-2" role="group">
+                            <button type="button" class="btn btn-sm rounded-pill px-2 @(ActiveViewMode == 0 ? "btn-primary shadow-sm" : "btn-light text-secondary")" @onclick="() => ActiveViewMode = 0" title="Charts & Visuals Only">
+                                <i class="fas fa-chart-column me-1"></i> Visuals
+                            </button>
+                            <button type="button" class="btn btn-sm rounded-pill px-2 @(ActiveViewMode == 1 ? "btn-primary shadow-sm" : "btn-light text-secondary")" @onclick="() => ActiveViewMode = 1" title="Split Screen: Visuals + Data Matrix">
+                                <i class="fas fa-table-columns me-1"></i> Split View
+                            </button>
+                            <button type="button" class="btn btn-sm rounded-pill px-2 @(ActiveViewMode == 2 ? "btn-primary shadow-sm" : "btn-light text-secondary")" @onclick="() => ActiveViewMode = 2" title="Data Matrix & Tables Only">
+                                <i class="fas fa-table-list me-1"></i> Matrix
+                            </button>
+                        </div>
+
+                        <!-- Report Shortcuts -->
+                        <button type="button" class="btn btn-sm btn-outline-primary shadow-sm" @onclick="ShowItemPicture" disabled="@(string.IsNullOrEmpty(SelectedArticle?.Id))" title="View Item Picture">
+                            <i class="fas fa-image me-1"></i> Picture
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-info shadow-sm" @onclick="ShowTechnicalDrawing" disabled="@(string.IsNullOrEmpty(SelectedArticle?.Id))" title="Technical Drawing">
+                            <i class="fas fa-drafting-compass me-1"></i> Tech Draw
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary shadow-sm" @onclick="PrintSpecs" disabled="@(string.IsNullOrEmpty(SelectedArticle?.Id))" title="Print Item Specification">
+                            <i class="fas fa-file-lines me-1"></i> Specs
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-dark shadow-sm" @onclick="OpenDurationModal" disabled="@(string.IsNullOrEmpty(SelectedArticle?.Id))" title="Average Process Duration Analysis">
+                            <i class="fas fa-clock me-1"></i> Avg Duration
+                        </button>
+                        <button type="button" class="btn btn-sm btn-primary fw-bold shadow-sm" @onclick="RefreshDashboardAsync" disabled="@IsLoading">
+                            <i class="fas fa-sync-alt me-1 @(IsLoading ? "fa-spin" : "")"></i> Refresh
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Power BI Global Slicers & Filter Bar ────────────────────────── -->
+        <div class="card border-0 shadow-sm p-2 mb-3 rounded-3 pbi-slicer-card" style="background: rgba(255, 255, 255, 0.95); position: relative !important; z-index: 9999 !important;">
+            <div class="row g-2 align-items-end">
+                
+                <!-- Customer Slicer -->
+                <div class="col-md-3">
+                    <label class="form-label form-label-sm mb-1 fw-bold text-secondary" style="font-size: 0.76rem;">
+                        <i class="fas fa-user-tie text-primary me-1"></i> Customer Slicer
+                    </label>
+                    <select class="form-select form-select-sm shadow-sm" @bind="SelectedCustCode" @bind:after="OnCustomerChanged">
+                        @foreach (var c in Customers)
+                        {
+                            <option value="@c.Id">@c.Name</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Country Slicer -->
+                <div class="col-md-2">
+                    <label class="form-label form-label-sm mb-1 fw-bold text-secondary" style="font-size: 0.76rem;">
+                        <i class="fas fa-globe text-info me-1"></i> Destination Country
+                    </label>
+                    <select class="form-select form-select-sm shadow-sm" @bind="SelectedCountry" @bind:after="OnCountryChanged" disabled="@(SelectedCustCode == "0")">
+                        @foreach (var country in Countries)
+                        {
+                            <option value="@country">@country</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Searchable Article / Item Selector -->
+                <div class="col-md-5">
+                    <label class="form-label form-label-sm mb-1 fw-bold text-secondary" style="font-size: 0.76rem;">
+                        <i class="fas fa-cube text-danger me-1"></i> Article / Finished Product <span class="text-danger">*</span>
+                    </label>
+                    <div class="@(IsLoading ? "disabled-typeahead-wrapper" : "")">
+                        <BlazoredTypeahead SearchMethod="SearchArticles"
+                                           @bind-Value="SelectedArticle"
+                                           @bind-Value:after="OnArticleChanged"
+                                           Placeholder="Type Item ID or Description to analyze..."
+                                           EnableDropDown="true"
+                                           MaximumSuggestions="1000">
+                            <SelectedTemplate Context="art">
+                                @art.Name
+                            </SelectedTemplate>
+                            <ResultTemplate Context="art">
+                                @art.Name
+                            </ResultTemplate>
+                            <NotFoundTemplate Context="searchText">
+                                <span class="text-muted small">No articles found matching "@searchText"</span>
+                            </NotFoundTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                </div>
+
+                <!-- Active Filter Tags & Reset -->
+                <div class="col-md-2 text-end">
+                    <div class="d-flex align-items-center justify-content-end gap-1 flex-wrap">
+                        @if (!string.IsNullOrEmpty(FilterOrderNo))
+                        {
+                            <span class="badge bg-warning text-dark py-2 px-2 shadow-sm" style="font-size: 0.76rem;">
+                                <i class="fas fa-filter me-1"></i> Order: @FilterOrderNo
+                                <button type="button" class="btn-close btn-close-sm ms-1" style="font-size: 0.6rem;" @onclick="ClearOrderFilter" title="Clear Order Filter"></button>
+                            </span>
+                        }
+                        @if (!string.IsNullOrEmpty(SelectedStageFilter))
+                        {
+                            <span class="badge bg-info text-dark py-2 px-2 shadow-sm" style="font-size: 0.76rem;">
+                                <i class="fas fa-industry me-1"></i> Stage: @SelectedStageFilter
+                                <button type="button" class="btn-close btn-close-sm ms-1" style="font-size: 0.6rem;" @onclick="ClearStageFilter" title="Clear Stage Filter"></button>
+                            </span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (DashboardData == null || string.IsNullOrEmpty(DashboardData.ItemCode))
+        {
+            <!-- Empty State Prompt -->
+            <div class="card border-0 shadow-sm p-5 text-center my-4" style="background: rgba(255, 255, 255, 0.9); border-radius: 12px;">
+                <div style="width: 70px; height: 70px; background: rgba(17, 141, 255, 0.1); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem;">
+                    <i class="fas fa-magnifying-glass-chart text-primary" style="font-size: 2rem;"></i>
+                </div>
+                <h4 class="fw-bold text-dark mb-1">Select an Article to Launch Visual Analytics</h4>
+                <p class="text-muted small mb-3" style="max-width: 540px; margin: 0 auto;">
+                    Choose a customer and search for any manufactured article in the slicer above. The dashboard will instantly generate interactive Power BI coverage gauges, waterfall demand bridges, WIP stage flows, and drill-through matrices.
+                </p>
+                <div class="d-flex justify-content-center gap-2 flex-wrap">
+                    <span class="badge bg-light text-secondary border px-3 py-2"><i class="fas fa-gauge-high me-1 text-primary"></i> Arc Coverage Gauge</span>
+                    <span class="badge bg-light text-secondary border px-3 py-2"><i class="fas fa-diagram-project me-1 text-danger"></i> Demand-to-Supply Waterfall</span>
+                    <span class="badge bg-light text-secondary border px-3 py-2"><i class="fas fa-industry me-1 text-success"></i> WIP Bottleneck Stream</span>
+                    <span class="badge bg-light text-secondary border px-3 py-2"><i class="fas fa-chart-pie me-1 text-info"></i> Inventory Tier Donut</span>
+                </div>
+            </div>
+        }
+        else
+        {
+            <!-- ── Power BI Executive KPI Scorecard Ribbon ───────────────────── -->
+            <div class="row g-2 mb-3">
+                
+                <!-- 1. Hero KPI: Net Planning Equation Status -->
+                <div class="col-12 col-sm-6 col-xl-2">
+                    <div class="pbi-kpi-card shadow-sm p-3 h-100 @(DashboardData.Summary.HasDeficit ? "pbi-kpi-deficit" : "pbi-kpi-surplus")">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="pbi-kpi-label">@(DashboardData.Summary.HasDeficit ? "Net Required" : "Demand Covered")</span>
+                            <i class="fas @(DashboardData.Summary.HasDeficit ? "fa-triangle-exclamation text-danger" : "fa-circle-check text-success")"></i>
+                        </div>
+                        <div class="pbi-kpi-value @(DashboardData.Summary.HasDeficit ? "text-danger" : "text-success")">
+                            @(DashboardData.Summary.HasDeficit ? $"+{DashboardData.Summary.QtyRequired:N0}" : $"{Math.Abs(DashboardData.Summary.QtyRequired):N0} Surplus")
+                        </div>
+                        <div class="pbi-kpi-subtext">
+                            @(DashboardData.Summary.HasDeficit ? "🚨 Deficit (Orders + Min - Supply)" : "✅ Fully Covered by Pipeline")
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Demand: Customer Orders -->
+                <div class="col-12 col-sm-6 col-xl-2">
+                    <div class="pbi-kpi-card shadow-sm p-3 h-100" style="border-top: 4px solid #118DFF !important;">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="pbi-kpi-label">Customer Demand</span>
+                            <i class="fas fa-file-invoice text-primary"></i>
+                        </div>
+                        <div class="pbi-kpi-value text-dark">
+                            @DashboardData.Summary.TotalCustOrders.ToString("N0") <span class="pbi-kpi-unit">Pcs</span>
+                        </div>
+                        <div class="pbi-kpi-subtext">
+                            @DashboardData.CustomerOrders.Count Orders | + Buffer: @DashboardData.Summary.MinStock.ToString("N0")
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Supply: Shop Floor WIP -->
+                <div class="col-12 col-sm-6 col-xl-2">
+                    <div class="pbi-kpi-card shadow-sm p-3 h-100" style="border-top: 4px solid #00BFA5 !important;">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="pbi-kpi-label">Shop Floor WIP</span>
+                            <i class="fas fa-dolly-flatbed text-success"></i>
+                        </div>
+                        <div class="pbi-kpi-value text-success">
+                            @DashboardData.Summary.TotalRunningLots.ToString("N0") <span class="pbi-kpi-unit">Pcs</span>
+                        </div>
+                        <div class="pbi-kpi-subtext">
+                            @DashboardData.RunningLots.Count Active Running Lots
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Supply: Open Maker POs -->
+                <div class="col-12 col-sm-6 col-xl-2">
+                    <div class="pbi-kpi-card shadow-sm p-3 h-100" style="border-top: 4px solid #7B1FA2 !important;">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="pbi-kpi-label">Open Maker POs</span>
+                            <i class="fas fa-file-signature text-purple" style="color: #7B1FA2;"></i>
+                        </div>
+                        <div class="pbi-kpi-value" style="color: #7B1FA2;">
+                            @DashboardData.Summary.TotalOpenPO.ToString("N0") <span class="pbi-kpi-unit">Pcs</span>
+                        </div>
+                        <div class="pbi-kpi-subtext">
+                            @DashboardData.OpenPOs.Count Vendor Purchase Orders
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. Supply: Available Finished & Semi-Finished Stocks -->
+                <div class="col-12 col-sm-6 col-xl-2">
+                    <div class="pbi-kpi-card shadow-sm p-3 h-100" style="border-top: 4px solid #107C41 !important;">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="pbi-kpi-label">Warehouse Stock</span>
+                            <i class="fas fa-boxes-stacked text-success"></i>
+                        </div>
+                        <div class="pbi-kpi-value text-success">
+                            @((DashboardData.Summary.TotalSFStock + DashboardData.Summary.TotalRFStock).ToString("N0")) <span class="pbi-kpi-unit">Pcs</span>
+                        </div>
+                        <div class="pbi-kpi-subtext">
+                            RF: @DashboardData.Summary.TotalRFStock.ToString("N0") | SF: @DashboardData.Summary.TotalSFStock.ToString("N0")
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 6. Weighted Milestone Completion Progress -->
+                <div class="col-12 col-sm-6 col-xl-2">
+                    <div class="pbi-kpi-card shadow-sm p-3 h-100 text-center" style="border-top: 4px solid #EAA300 !important;">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="pbi-kpi-label">Milestone Progress</span>
+                            <i class="fas fa-gauge-high text-warning"></i>
+                        </div>
+                        <div class="pbi-kpi-value text-primary">
+                            @DashboardData.Summary.CompletionPercentage%
+                        </div>
+                        <div class="progress mt-1" style="height: 6px; border-radius: 3px;">
+                            <div class="progress-bar bg-primary progress-bar-striped progress-bar-animated"
+                                 role="progressbar"
+                                 style="width: @DashboardData.Summary.CompletionPercentage%"
+                                 aria-valuenow="@DashboardData.Summary.CompletionPercentage"
+                                 aria-valuemin="0"
+                                 aria-valuemax="100"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ── Power BI Visuals Suite (Visible in Mode 0 & 1) ─────────────── -->
+            @if (ActiveViewMode == 0 || ActiveViewMode == 1)
+            {
+                <div class="row g-3 mb-3">
+
+                    <!-- VISUAL 1: Demand & Supply Coverage Arc Gauge & Speedometer -->
+                    <div class="col-12 col-xl-4 col-lg-6">
+                        <div class="card border-0 shadow-sm h-100 pbi-visual-card">
+                            <div class="pbi-visual-header d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="pbi-visual-badge bg-primary-subtle text-primary"><i class="fas fa-gauge-high"></i></span>
+                                    <div>
+                                        <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.88rem;">Demand Coverage Ratio</h6>
+                                        <small class="text-muted" style="font-size: 0.72rem;">Supply Pipeline vs. Total Demand</small>
+                                    </div>
+                                </div>
+                                <span class="badge @(DemandCoveragePercent >= 100 ? "bg-success" : (DemandCoveragePercent >= 50 ? "bg-warning text-dark" : "bg-danger"))">
+                                    @DemandCoveragePercent% Covered
+                                </span>
+                            </div>
+                            <div class="card-body p-3 d-flex flex-column justify-content-between" style="min-height: 240px;">
+                                <div class="d-flex justify-content-center align-items-center my-auto">
+                                    <RadzenArcGauge Style="width: 200px; height: 140px;">
+                                        <RadzenArcGaugeScale Min="0" Max="100" StartAngle="-90" EndAngle="90" Step="25" Y="0.8" Radius="1.2">
+                                            <RadzenArcGaugeScaleValue Value="@(Math.Min(100, DemandCoveragePercent))"
+                                                                      Fill="@(DemandCoveragePercent >= 100 ? "#107C41" : (DemandCoveragePercent >= 50 ? "#EAA300" : "#E81123"))" />
+                                        </RadzenArcGaugeScale>
+                                    </RadzenArcGauge>
+                                </div>
+                                
+                                <div class="row g-2 pt-2 border-top text-center mt-2" style="font-size: 0.78rem;">
+                                    <div class="col-6 border-end">
+                                        <span class="text-muted d-block" style="font-size: 0.7rem;">TOTAL DEMAND</span>
+                                        <strong class="text-dark fs-6">@DashboardData.Summary.EffectiveDemand.ToString("N0")</strong> <span class="text-muted" style="font-size: 0.68rem;">Pcs</span>
+                                    </div>
+                                    <div class="col-6">
+                                        <span class="text-muted d-block" style="font-size: 0.7rem;">PIPELINE SUPPLY</span>
+                                        <strong class="text-success fs-6">@DashboardData.Summary.TotalSuppliesInPipeline.ToString("N0")</strong> <span class="text-muted" style="font-size: 0.68rem;">Pcs</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- VISUAL 2: Power BI Demand-to-Supply Waterfall / Bridge Stream -->
+                    <div class="col-12 col-xl-8 col-lg-6">
+                        <div class="card border-0 shadow-sm h-100 pbi-visual-card">
+                            <div class="pbi-visual-header d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="pbi-visual-badge bg-info-subtle text-info"><i class="fas fa-diagram-project"></i></span>
+                                    <div>
+                                        <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.88rem;">Demand-to-Supply Waterfall Bridge</h6>
+                                        <small class="text-muted" style="font-size: 0.72rem;">Step-by-step balance from Gross Demand to Net Required</small>
+                                    </div>
+                                </div>
+                                <span class="badge @(DashboardData.Summary.HasDeficit ? "bg-danger" : "bg-success")">
+                                    @(DashboardData.Summary.HasDeficit ? $"🚨 Net Required: +{DashboardData.Summary.QtyRequired:N0} Pcs" : "✅ Demand 100% Satisfied")
+                                </span>
+                            </div>
+                            <div class="card-body p-3 d-flex flex-column justify-content-center" style="min-height: 240px;">
+                                <!-- Waterfall Flow Steps Grid -->
+                                <div class="pbi-waterfall-stream">
+                                    
+                                    <!-- Step 1: Gross Demand -->
+                                    <div class="waterfall-node node-demand">
+                                        <div class="node-tag">Gross Demand</div>
+                                        <div class="node-val text-primary">@DashboardData.Summary.EffectiveDemand.ToString("N0")</div>
+                                        <div class="node-sub">Orders + Buffer</div>
+                                    </div>
+
+                                    <div class="waterfall-arrow"><i class="fas fa-minus"></i></div>
+
+                                    <!-- Step 2: Finished Stock (RF) -->
+                                    <div class="waterfall-node node-stock">
+                                        <div class="node-tag">RF Stock</div>
+                                        <div class="node-val text-success">@DashboardData.Summary.TotalRFStock.ToString("N0")</div>
+                                        <div class="node-sub">Ready Finished</div>
+                                    </div>
+
+                                    <div class="waterfall-arrow"><i class="fas fa-minus"></i></div>
+
+                                    <!-- Step 3: Semi-Finish (SF) -->
+                                    <div class="waterfall-node node-sf">
+                                        <div class="node-tag">SF Stock</div>
+                                        <div class="node-val" style="color: #008272;">@DashboardData.Summary.TotalSFStock.ToString("N0")</div>
+                                        <div class="node-sub">Semi-Finished</div>
+                                    </div>
+
+                                    <div class="waterfall-arrow"><i class="fas fa-minus"></i></div>
+
+                                    <!-- Step 4: Shop Floor WIP -->
+                                    <div class="waterfall-node node-wip">
+                                        <div class="node-tag">Running Lots</div>
+                                        <div class="node-val" style="color: #00BFA5;">@DashboardData.Summary.TotalRunningLots.ToString("N0")</div>
+                                        <div class="node-sub">Active in Factory</div>
+                                    </div>
+
+                                    <div class="waterfall-arrow"><i class="fas fa-minus"></i></div>
+
+                                    <!-- Step 5: Maker POs -->
+                                    <div class="waterfall-node node-maker">
+                                        <div class="node-tag">Maker POs</div>
+                                        <div class="node-val" style="color: #7B1FA2;">@DashboardData.Summary.TotalOpenPO.ToString("N0")</div>
+                                        <div class="node-sub">Vendor Orders</div>
+                                    </div>
+
+                                    <div class="waterfall-arrow"><i class="fas fa-equals"></i></div>
+
+                                    <!-- Step 6: Net Result -->
+                                    <div class="waterfall-node @(DashboardData.Summary.HasDeficit ? "node-deficit" : "node-surplus")">
+                                        <div class="node-tag">@(DashboardData.Summary.HasDeficit ? "Net Deficit" : "Net Surplus")</div>
+                                        <div class="node-val @(DashboardData.Summary.HasDeficit ? "text-danger" : "text-success")">
+                                            @(DashboardData.Summary.HasDeficit ? $"+{DashboardData.Summary.QtyRequired:N0}" : $"{Math.Abs(DashboardData.Summary.QtyRequired):N0}")
+                                        </div>
+                                        <div class="node-sub">@(DashboardData.Summary.HasDeficit ? "Must Produce" : "Safe Surplus")</div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- VISUAL 3: Shop Floor WIP by Stage (Bottlenecks Flow) -->
+                    <div class="col-12 col-xl-6">
+                        <div class="card border-0 shadow-sm h-100 pbi-visual-card">
+                            <div class="pbi-visual-header d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="pbi-visual-badge bg-success-subtle text-success"><i class="fas fa-industry"></i></span>
+                                    <div>
+                                        <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.88rem;">Shop Floor WIP Stages &amp; Bottlenecks</h6>
+                                        <small class="text-muted" style="font-size: 0.72rem;">Distribution of active lots across manufacturing operations</small>
+                                    </div>
+                                </div>
+                                <span class="badge bg-success text-white">@DashboardData.RunningLots.Count Lots Running</span>
+                            </div>
+                            <div class="card-body p-3" style="max-height: 280px; overflow-y: auto;">
+                                @if (!StageWipChartData.Any())
+                                {
+                                    <div class="text-center py-5 text-muted small">
+                                        <i class="fas fa-check-circle text-success fs-3 mb-2 d-block"></i>
+                                        No active running lots currently on the shop floor.
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="d-flex flex-column gap-2">
+                                        @foreach (var stage in StageWipChartData)
+                                        {
+                                            <div class="pbi-stage-row p-2 rounded border bg-light d-flex align-items-center justify-content-between"
+                                                 style="cursor: pointer;"
+                                                 @onclick="() => FilterByStage(stage.StageName)"
+                                                 title="Click to filter matrix table for @stage.StageName">
+                                                <div class="d-flex align-items-center gap-2" style="min-width: 180px;">
+                                                    <span class="badge bg-primary text-white rounded-pill px-2" style="font-size: 0.72rem;">@stage.LotCount Lots</span>
+                                                    <strong class="text-dark" style="font-size: 0.84rem;">@stage.StageName</strong>
+                                                </div>
+
+                                                <!-- Mini Progress Bar -->
+                                                <div class="flex-grow-1 mx-3 d-none d-sm-block">
+                                                    <div class="progress" style="height: 8px; border-radius: 4px;">
+                                                        <div class="progress-bar bg-success" role="progressbar" style="width: @stage.PercentageOfTotal%"></div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="text-end" style="min-width: 100px;">
+                                                    <strong class="text-success fs-6">@stage.Quantity.ToString("N0")</strong> <span class="text-muted" style="font-size: 0.72rem;">Pcs</span>
+                                                    <small class="text-muted d-block" style="font-size: 0.68rem;">@stage.PercentageOfTotal% of WIP</small>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- VISUAL 4: Multi-Tier Inventory Donut Composition -->
+                    <div class="col-12 col-xl-6">
+                        <div class="card border-0 shadow-sm h-100 pbi-visual-card">
+                            <div class="pbi-visual-header d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="pbi-visual-badge bg-warning-subtle text-warning"><i class="fas fa-boxes-stacked"></i></span>
+                                    <div>
+                                        <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.88rem;">Warehouse Stock &amp; Raw Material Tiers</h6>
+                                        <small class="text-muted" style="font-size: 0.72rem;">Available finished, semi-finished &amp; forgings balances</small>
+                                    </div>
+                                </div>
+                                <span class="badge bg-light text-secondary border">
+                                    Total Available: @((DashboardData.Summary.TotalRFStock + DashboardData.Summary.TotalSFStock + DashboardData.Summary.TotalForging).ToString("N0")) Units
+                                </span>
+                            </div>
+                            <div class="card-body p-3" style="min-height: 250px;">
+                                @if (!InventoryDonutData.Any())
+                                {
+                                    <div class="text-center py-4 text-muted small">
+                                        <div class="p-3 bg-light rounded-3 border d-inline-block text-center my-2">
+                                            <i class="fas fa-box-open text-warning fs-3 mb-1 d-block"></i>
+                                            <strong class="text-dark d-block">Zero Warehouse Stock On Hand</strong>
+                                            <span class="text-muted" style="font-size: 0.75rem;">100% of required demand must be manufactured on shop floor.</span>
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="row align-items-center g-2">
+                                        <div class="col-sm-6 text-center">
+                                            <RadzenChart Style="height: 180px; width: 100%;">
+                                                <RadzenDonutSeries Data="@InventoryDonutData" CategoryProperty="Category" ValueProperty="Value" Title="Units">
+                                                    <TitleTemplate>
+                                                        <div class="rz-donut-content text-center">
+                                                            <div class="fw-bold fs-6 text-dark">@InventoryDonutData.Sum(x => x.Value).ToString("N0")</div>
+                                                            <div class="text-muted" style="font-size: 0.65rem;">Total Units</div>
+                                                        </div>
+                                                    </TitleTemplate>
+                                                </RadzenDonutSeries>
+                                                <RadzenLegend Visible="false" />
+                                            </RadzenChart>
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <div class="d-flex flex-column gap-1" style="font-size: 0.78rem;">
+                                                @foreach (var tier in InventoryDonutData)
+                                                {
+                                                    <div class="d-flex align-items-center justify-content-between p-1 px-2 rounded bg-light border">
+                                                        <div class="d-flex align-items-center gap-1">
+                                                            <span class="d-inline-block rounded-circle me-1" style="width: 8px; height: 8px; background-color: @tier.Color;"></span>
+                                                            <span class="text-dark fw-semibold">@tier.Category</span>
+                                                        </div>
+                                                        <strong class="text-dark">@tier.Value.ToString("N0")</strong>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- VISUAL 5: Maker / Subcontractor Workload Allocation -->
+                    <div class="col-12 col-xl-6">
+                        <div class="card border-0 shadow-sm h-100 pbi-visual-card">
+                            <div class="pbi-visual-header d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="pbi-visual-badge" style="background: rgba(123, 31, 162, 0.12); color: #7B1FA2;"><i class="fas fa-users-gear"></i></span>
+                                    <div>
+                                        <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.88rem;">Maker Subcontractor Allocation &amp; Risk</h6>
+                                        <small class="text-muted" style="font-size: 0.72rem;">Open PO workload assigned to external vendors</small>
+                                    </div>
+                                </div>
+                                <span class="badge" style="background: #7B1FA2; color: #fff;">@DashboardData.Summary.TotalOpenPO.ToString("N0") Pcs Allocated</span>
+                            </div>
+                            <div class="card-body p-3" style="max-height: 250px; overflow-y: auto;">
+                                @if (!MakerLoadChartData.Any())
+                                {
+                                    <div class="text-center py-4 text-muted small">
+                                        <i class="fas fa-file-circle-check text-secondary fs-3 mb-2 d-block"></i>
+                                        No active purchase orders currently pending with outside makers.
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="d-flex flex-column gap-2">
+                                        @foreach (var mkr in MakerLoadChartData)
+                                        {
+                                            <div class="p-2 rounded border bg-light d-flex align-items-center justify-content-between">
+                                                <div>
+                                                    <strong class="text-dark" style="font-size: 0.84rem;">@mkr.MakerName</strong>
+                                                    <div class="text-muted small" style="font-size: 0.7rem;">
+                                                        @mkr.PoCount Open POs
+                                                        @if (mkr.HasOverdue)
+                                                        {
+                                                            <span class="badge bg-danger text-white ms-1" style="font-size: 0.65rem;">@mkr.OverdueCount OVERDUE</span>
+                                                        }
+                                                    </div>
+                                                </div>
+                                                <div class="text-end">
+                                                    <strong style="color: #7B1FA2; font-size: 1rem;">@mkr.Quantity.ToString("N0")</strong> <span class="text-muted" style="font-size: 0.72rem;">Pcs</span>
+                                                    <small class="text-muted d-block" style="font-size: 0.68rem;">@mkr.PercentageOfTotal% of Vendor Load</small>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- VISUAL 6: Customer Delivery Horizon & Urgency Cards -->
+                    <div class="col-12 col-xl-6">
+                        <div class="card border-0 shadow-sm h-100 pbi-visual-card">
+                            <div class="pbi-visual-header d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="pbi-visual-badge bg-danger-subtle text-danger"><i class="fas fa-calendar-check"></i></span>
+                                    <div>
+                                        <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.88rem;">Customer Delivery Schedule Urgency</h6>
+                                        <small class="text-muted" style="font-size: 0.72rem;">Unshipped demand grouped by commitment timeline</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body p-3" style="max-height: 250px; overflow-y: auto;">
+                                @if (!DeliveryTimelineChartData.Any())
+                                {
+                                    <div class="text-center py-4 text-muted small">
+                                        No pending unshipped customer delivery dates found.
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="row g-2">
+                                        @foreach (var bucket in DeliveryTimelineChartData)
+                                        {
+                                            <div class="col-6">
+                                                <div class="p-2 rounded border bg-light h-100 d-flex flex-column justify-content-between">
+                                                    <div class="d-flex align-items-center justify-content-between mb-1">
+                                                        <span class="badge @bucket.BadgeClass" style="font-size: 0.72rem;">@bucket.TimelineBucket</span>
+                                                        <small class="text-muted">@bucket.OrderCount Orders</small>
+                                                    </div>
+                                                    <div class="my-1">
+                                                        <strong class="fs-5 text-dark">@bucket.Quantity.ToString("N0")</strong> <span class="text-muted" style="font-size: 0.72rem;">Pcs</span>
+                                                    </div>
+                                                    <div class="progress" style="height: 5px;">
+                                                        <div class="progress-bar bg-danger" role="progressbar" style="width: @bucket.PercentageOfDemand%"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            }
+
+            <!-- ── Power BI Interactive Drill-Through Matrix Section (Mode 1 & 2) ─ -->
+            @if (ActiveViewMode == 1 || ActiveViewMode == 2)
+            {
+                <div class="card border-0 shadow-sm mb-3 pbi-matrix-card" style="position: relative !important; z-index: 1 !important;">
+                    
+                    <!-- Matrix Navigation Tabs Bar -->
+                    <div class="card-header bg-white p-2 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        <ul class="nav nav-pills pbi-nav-pills" role="tablist">
+                            <li class="nav-item">
+                                <button class="nav-link @(ActiveMatrixTab == 0 ? "active" : "")" @onclick="() => ActiveMatrixTab = 0">
+                                    <i class="fas fa-file-lines me-1 text-primary"></i> Customer Orders
+                                    <span class="badge bg-primary ms-1">@DashboardData.CustomerOrders.Count</span>
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link @(ActiveMatrixTab == 1 ? "active" : "")" @onclick="() => ActiveMatrixTab = 1">
+                                    <i class="fas fa-dolly-flatbed me-1 text-success"></i> Running Lots (WIP)
+                                    <span class="badge bg-success ms-1">@DashboardData.RunningLots.Count</span>
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link @(ActiveMatrixTab == 2 ? "active" : "")" @onclick="() => ActiveMatrixTab = 2">
+                                    <i class="fas fa-file-signature me-1 text-purple" style="color: #7B1FA2;"></i> Maker POs
+                                    <span class="badge ms-1" style="background: #7B1FA2; color: #fff;">@DashboardData.OpenPOs.Count</span>
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link @(ActiveMatrixTab == 3 ? "active" : "")" @onclick="() => ActiveMatrixTab = 3">
+                                    <i class="fas fa-boxes-stacked me-1 text-warning"></i> Warehouse Stock
+                                    <span class="badge bg-secondary ms-1">@(DashboardData.ReadyFinishStocks.Count + DashboardData.SemiFinishStocks.Count)</span>
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link @(ActiveMatrixTab == 4 ? "active" : "")" @onclick="() => ActiveMatrixTab = 4">
+                                    <i class="fas fa-gem me-1 text-danger"></i> Raw Materials / Forgings
+                                    <span class="badge bg-danger ms-1">@DashboardData.Forgings.Count</span>
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link @(ActiveMatrixTab == 5 ? "active" : "")" @onclick="() => ActiveMatrixTab = 5">
+                                    <i class="fas fa-sitemap me-1 text-info"></i> Routing &amp; Rates
+                                    <span class="badge bg-info text-dark ms-1">@DashboardData.ProcessRoutings.Count</span>
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link @(ActiveMatrixTab == 6 ? "active" : "")" @onclick="() => ActiveMatrixTab = 6">
+                                    <i class="fas fa-triangle-exclamation me-1 text-danger"></i> Quality Complaints
+                                    <span class="badge bg-danger ms-1">@DashboardData.Complaints.Count</span>
+                                </button>
+                            </li>
+                        </ul>
+
+                        <!-- Tab Action Shortcuts -->
+                        <div class="d-flex align-items-center gap-1">
+                            @if (ActiveMatrixTab == 1)
+                            {
+                                <button type="button" class="btn btn-xs btn-outline-success" @onclick="PrintRunningLotsReport">
+                                    <i class="fas fa-print me-1"></i> Print Running Lots
+                                </button>
+                            }
+                            else if (ActiveMatrixTab == 3)
+                            {
+                                <button type="button" class="btn btn-xs btn-outline-dark" @onclick="PrintFinishStoreLots">
+                                    <i class="fas fa-print me-1"></i> Print Stock
+                                </button>
+                            }
+                            else if (ActiveMatrixTab == 4)
+                            {
+                                <button type="button" class="btn btn-xs btn-outline-danger" @onclick="PrintRMLinkedReport">
+                                    <i class="fas fa-print me-1"></i> RM Linked Lots
+                                </button>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Matrix Body -->
+                    <div class="card-body p-0">
+                        
+                        <!-- TAB 0: Customer Orders Demand -->
+                        @if (ActiveMatrixTab == 0)
+                        {
+                            <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+                                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.86rem;">
+                                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                        <tr>
+                                            <th>Cust Code</th>
+                                            <th>Order #</th>
+                                            <th>Internal Ref</th>
+                                            <th>Order Date</th>
+                                            <th class="text-end">Ordered Qty</th>
+                                            <th class="text-end">Shipped Qty</th>
+                                            <th class="text-end">Un-Shipped</th>
+                                            <th>Delivery Date</th>
+                                            <th>Urgency / Status</th>
+                                            <th>Remarks</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (!DashboardData.CustomerOrders.Any())
+                                        {
+                                            <tr>
+                                                <td colspan="10" class="text-center py-4 text-muted small">No active unshipped customer orders found for this article.</td>
+                                            </tr>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var order in DashboardData.CustomerOrders)
+                                            {
+                                                <ContextMenuTrigger MenuId="orderContextMenu" Data="order" WrapperTag="tr"
+                                                                    class="@(order.IsUrgent ? "table-danger" : (FilterOrderNo == order.OrderNo ? "table-warning fw-bold" : ""))"
+                                                                    style="cursor: pointer;"
+                                                                    @onclick="@(() => OnOrderRowClicked(order.OrderNo))">
+                                                    <td><span class="badge bg-light text-dark border">@order.CustCode</span></td>
+                                                    <td class="fw-bold text-primary">@order.OrderNo</td>
+                                                    <td><small class="text-muted">@order.InternalRefNo</small></td>
+                                                    <td>@(order.DT?.ToString("dd-MMM-yy") ?? "-")</td>
+                                                    <td class="text-end">@order.Qty.ToString("N0")</td>
+                                                    <td class="text-end text-muted">@order.ShippedQty.ToString("N0")</td>
+                                                    <td class="text-end fw-bold text-dark">@order.UnshippedQty.ToString("N0")</td>
+                                                    <td>@(order.DeliveryDT?.ToString("dd-MMM-yyyy") ?? "-")</td>
+                                                    <td>
+                                                        @if (order.IsUrgent)
+                                                        {
+                                                            <span class="badge bg-danger text-white me-1"><i class="fas fa-fire me-1"></i>URGENT</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-light text-secondary border">Normal</span>
+                                                        }
+                                                    </td>
+                                                    <td><small class="text-muted">@order.Remarks</small></td>
+                                                </ContextMenuTrigger>
+                                            }
+                                        }
+                                    </tbody>
+                                    <tfoot class="table-light fw-bold sticky-bottom" style="box-shadow: 0 -1px 0 #dee2e6;">
+                                        <tr>
+                                            <td colspan="4" class="ps-3">Total Customer Demand</td>
+                                            <td class="text-end">@DashboardData.CustomerOrders.Sum(x => x.Qty).ToString("N0")</td>
+                                            <td class="text-end">@DashboardData.CustomerOrders.Sum(x => x.ShippedQty).ToString("N0")</td>
+                                            <td class="text-end text-primary">@DashboardData.Summary.TotalCustOrders.ToString("N0")</td>
+                                            <td colspan="3"></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        }
+
+                        <!-- TAB 1: Running Lots in Production (WIP) -->
+                        else if (ActiveMatrixTab == 1)
+                        {
+                            <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+                                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.86rem;">
+                                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                        <tr>
+                                            <th>Lot #</th>
+                                            <th>Current Operation / Stage</th>
+                                            <th class="text-end">Lot Qty</th>
+                                            <th>Order #</th>
+                                            <th>Customer</th>
+                                            <th>R2-In Date</th>
+                                            <th>Origin Type</th>
+                                            <th class="text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @{
+                                            var lots = GetFilteredRunningLots().ToList();
+                                        }
+                                        @if (!lots.Any())
+                                        {
+                                            <tr>
+                                                <td colspan="8" class="text-center py-4 text-muted small">No active running lots found matching the filter.</td>
+                                            </tr>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var lot in lots)
+                                            {
+                                                <ContextMenuTrigger MenuId="lotContextMenu" Data="lot" WrapperTag="tr">
+                                                    <td class="fw-bold text-primary">@lot.LotNo</td>
+                                                    <td><span class="badge bg-secondary">@lot.Description</span></td>
+                                                    <td class="text-end fw-bold">@lot.Qty.ToString("N0")</td>
+                                                    <td>@lot.OrderNo</td>
+                                                    <td><span class="badge bg-light text-dark border">@lot.CustCode</span></td>
+                                                    <td>@(lot.R2InDT?.ToString("dd-MMM-yyyy") ?? "-")</td>
+                                                    <td>
+                                                        @if (lot.OriginType == "Semi")
+                                                        {
+                                                            <span class="badge bg-info text-dark">Semi</span>
+                                                        }
+                                                        else if (lot.OriginType == "Pack")
+                                                        {
+                                                            <span class="badge bg-secondary">Pack</span>
+                                                        }
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <button type="button" class="btn btn-xs btn-outline-danger" @onclick="@(() => CloseLotPrompt(lot.LotNo))" title="Close this lot">
+                                                            <i class="fas fa-times"></i> Close
+                                                        </button>
+                                                    </td>
+                                                </ContextMenuTrigger>
+                                            }
+                                        }
+                                    </tbody>
+                                    <tfoot class="table-light fw-bold sticky-bottom" style="box-shadow: 0 -1px 0 #dee2e6;">
+                                        <tr>
+                                            <td colspan="2" class="ps-3">Total Active WIP</td>
+                                            <td class="text-end text-success">@lots.Sum(x => x.Qty).ToString("N0")</td>
+                                            <td colspan="5"></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        }
+
+                        <!-- TAB 2: Open Maker Purchase Orders -->
+                        else if (ActiveMatrixTab == 2)
+                        {
+                            <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+                                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.86rem;">
+                                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                        <tr>
+                                            <th>Receipt #</th>
+                                            <th>Maker / Subcontractor</th>
+                                            <th>Order #</th>
+                                            <th class="text-end">PO Qty</th>
+                                            <th>Return Date</th>
+                                            <th>Master PO #</th>
+                                            <th>Status</th>
+                                            <th class="text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (!DashboardData.OpenPOs.Any())
+                                        {
+                                            <tr>
+                                                <td colspan="8" class="text-center py-4 text-muted small">No open purchase orders with outside makers.</td>
+                                            </tr>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var po in DashboardData.OpenPOs)
+                                            {
+                                                <ContextMenuTrigger MenuId="poContextMenu" Data="po" WrapperTag="tr" class="@(po.IsOverdue ? "table-danger" : "")">
+                                                    <td class="fw-bold">@po.ReceiptID</td>
+                                                    <td class="fw-semibold text-dark">@po.MakerName</td>
+                                                    <td>@po.OrderNo</td>
+                                                    <td class="text-end fw-bold">@po.Qty.ToString("N0")</td>
+                                                    <td>@(po.ReturnDT?.ToString("dd-MMM-yyyy") ?? "-")</td>
+                                                    <td><small class="text-muted">@po.MasterPONo</small></td>
+                                                    <td>
+                                                        @if (po.IsOverdue)
+                                                        {
+                                                            <span class="badge bg-danger text-white"><i class="fas fa-clock me-1"></i>OVERDUE</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-success text-white">Active</span>
+                                                        }
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <button type="button" class="btn btn-xs btn-outline-danger" @onclick="@(() => CloseMakerPOPrompt(po.EntryID))" title="Close this PO">
+                                                            <i class="fas fa-times"></i> Close
+                                                        </button>
+                                                    </td>
+                                                </ContextMenuTrigger>
+                                            }
+                                        }
+                                    </tbody>
+                                    <tfoot class="table-light fw-bold sticky-bottom" style="box-shadow: 0 -1px 0 #dee2e6;">
+                                        <tr>
+                                            <td colspan="3" class="ps-3">Total Open Maker POs</td>
+                                            <td class="text-end" style="color: #7B1FA2;">@DashboardData.Summary.TotalOpenPO.ToString("N0")</td>
+                                            <td colspan="4"></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        }
+
+                        <!-- TAB 3: Warehouse Inventory (Sub-Tabbed) -->
+                        else if (ActiveMatrixTab == 3)
+                        {
+                            <div class="p-2 border-bottom bg-light">
+                                <ul class="nav nav-pills nav-fill bg-white p-1 rounded-3 border" style="font-size: 0.82rem;">
+                                    <li class="nav-item">
+                                        <button class="nav-link py-1 @(InventorySubTab == 0 ? "active bg-primary text-white" : "text-secondary")" @onclick="() => InventorySubTab = 0">
+                                            Ready Finish (@DashboardData.ReadyFinishStocks.Count)
+                                        </button>
+                                    </li>
+                                    <li class="nav-item">
+                                        <button class="nav-link py-1 @(InventorySubTab == 1 ? "active bg-primary text-white" : "text-secondary")" @onclick="() => InventorySubTab = 1">
+                                            RF Lookalikes (@DashboardData.ReadyFinishLookalikes.Count)
+                                        </button>
+                                    </li>
+                                    <li class="nav-item">
+                                        <button class="nav-link py-1 @(InventorySubTab == 2 ? "active bg-primary text-white" : "text-secondary")" @onclick="() => InventorySubTab = 2">
+                                            Semi-Finish (@DashboardData.SemiFinishStocks.Count)
+                                        </button>
+                                    </li>
+                                    <li class="nav-item">
+                                        <button class="nav-link py-1 @(InventorySubTab == 3 ? "active bg-primary text-white" : "text-secondary")" @onclick="() => InventorySubTab = 3">
+                                            SF Lookalikes (@DashboardData.SemiFinishLookalikes.Count)
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <div class="table-responsive" style="max-height: 320px; overflow-y: auto;">
+                                @if (InventorySubTab == 0)
+                                {
+                                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.86rem;">
+                                        <thead class="table-light text-secondary sticky-top">
+                                            <tr>
+                                                <th>Store - Rack - Shelf Location</th>
+                                                <th class="text-end">Available Net Qty</th>
+                                                <th>Remarks</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var rf in DashboardData.ReadyFinishStocks)
+                                            {
+                                                <tr>
+                                                    <td><i class="fas fa-warehouse text-primary me-2"></i>@rf.StoreName</td>
+                                                    <td class="text-end fw-bold text-success">@rf.NetQty.ToString("N0")</td>
+                                                    <td><small class="text-muted">@rf.Remarks</small></td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                        <tfoot class="table-light fw-bold">
+                                            <tr>
+                                                <td>Total Ready-Finish Stock</td>
+                                                <td class="text-end text-success">@DashboardData.Summary.TotalRFStock.ToString("N0")</td>
+                                                <td></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                }
+                                else if (InventorySubTab == 1)
+                                {
+                                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.86rem;">
+                                        <thead class="table-light text-secondary sticky-top">
+                                            <tr>
+                                                <th>Lookalike Article</th>
+                                                <th>Location</th>
+                                                <th class="text-end">Available Qty</th>
+                                                <th>Remarks</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var rfla in DashboardData.ReadyFinishLookalikes)
+                                            {
+                                                <tr>
+                                                    <td class="fw-bold text-primary">@rfla.ItemID</td>
+                                                    <td>@rfla.StoreName</td>
+                                                    <td class="text-end fw-bold text-success">@rfla.NetQty.ToString("N0")</td>
+                                                    <td><small class="text-muted">@rfla.Remarks</small></td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                }
+                                else if (InventorySubTab == 2)
+                                {
+                                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.86rem;">
+                                        <thead class="table-light text-secondary sticky-top">
+                                            <tr>
+                                                <th>Description</th>
+                                                <th class="text-end">Qty</th>
+                                                <th>Location</th>
+                                                <th>Lot #</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var sf in DashboardData.SemiFinishStocks)
+                                            {
+                                                <tr>
+                                                    <td>@sf.Description</td>
+                                                    <td class="text-end fw-bold text-info">@sf.Qty.ToString("N0")</td>
+                                                    <td>@sf.StoreName</td>
+                                                    <td><span class="badge bg-light text-dark border">@sf.LotNoManual</span></td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                        <tfoot class="table-light fw-bold">
+                                            <tr>
+                                                <td>Total Semi-Finish Stock</td>
+                                                <td class="text-end text-info">@DashboardData.Summary.TotalSFStock.ToString("N0")</td>
+                                                <td colspan="2"></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                }
+                                else
+                                {
+                                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.86rem;">
+                                        <thead class="table-light text-secondary sticky-top">
+                                            <tr>
+                                                <th>Lookalike Item</th>
+                                                <th>Description</th>
+                                                <th class="text-end">Qty</th>
+                                                <th>Location</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var sfla in DashboardData.SemiFinishLookalikes)
+                                            {
+                                                <tr>
+                                                    <td class="fw-bold">@sfla.ItemID</td>
+                                                    <td>@sfla.Description</td>
+                                                    <td class="text-end fw-bold text-info">@sfla.Qty.ToString("N0")</td>
+                                                    <td>@sfla.StoreName</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                }
+                            </div>
+                        }
+
+                        <!-- TAB 4: Raw Material / Forgings -->
+                        else if (ActiveMatrixTab == 4)
+                        {
+                            <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+                                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.86rem;">
+                                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                        <tr>
+                                            <th>Material / Forging Code</th>
+                                            <th class="text-end">Shelf Balance</th>
+                                            <th>Store Location</th>
+                                            <th>Functional Status</th>
+                                            <th class="text-center">Cross Demand</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (!DashboardData.Forgings.Any())
+                                        {
+                                            <tr>
+                                                <td colspan="5" class="text-center py-4 text-muted small">No raw materials or forgings linked to this article.</td>
+                                            </tr>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var forg in DashboardData.Forgings)
+                                            {
+                                                <ContextMenuTrigger MenuId="forgContextMenu" Data="forg" WrapperTag="tr" class="@(forg.IsInactive ? "table-secondary text-muted" : "")">
+                                                    <td class="fw-bold text-dark"><i class="fas fa-gem text-danger me-2"></i>@forg.MaterialID</td>
+                                                    <td class="text-end fw-bold text-danger">@forg.ShelfQty.ToString("N0")</td>
+                                                    <td>@forg.LocationDisplay</td>
+                                                    <td>
+                                                        @if (forg.IsInactive)
+                                                        {
+                                                            <span class="badge bg-secondary">Inactive</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-success">Active</span>
+                                                        }
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <button type="button" class="btn btn-xs btn-outline-primary" @onclick="@(() => OpenCrossDemandModal(forg.RMID, forg.MaterialID))" title="View other items sharing this material">
+                                                            <i class="fas fa-list-tree me-1"></i> Competing Demand
+                                                        </button>
+                                                    </td>
+                                                </ContextMenuTrigger>
+                                            }
+                                        }
+                                    </tbody>
+                                    <tfoot class="table-light fw-bold sticky-bottom" style="box-shadow: 0 -1px 0 #dee2e6;">
+                                        <tr>
+                                            <td class="ps-3">Total Raw Material / Forgings</td>
+                                            <td class="text-end text-danger">@DashboardData.Summary.TotalForging.ToString("N0")</td>
+                                            <td colspan="3"></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        }
+
+                        <!-- TAB 5: Process Routing & Maker Rates -->
+                        else if (ActiveMatrixTab == 5)
+                        {
+                            <div class="row g-0">
+                                <div class="col-md-6 border-end">
+                                    <div class="p-2 bg-light fw-bold text-secondary border-bottom" style="font-size: 0.8rem;">
+                                        <i class="fas fa-sitemap me-1 text-primary"></i> Process Routing Sequence
+                                    </div>
+                                    <div class="table-responsive" style="max-height: 320px; overflow-y: auto;">
+                                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.84rem;">
+                                            <thead class="table-light text-secondary sticky-top">
+                                                <tr>
+                                                    <th>Seq #</th>
+                                                    <th>Process Description</th>
+                                                    <th class="text-end">Standard Rate</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var proc in DashboardData.ProcessRoutings)
+                                                {
+                                                    <tr>
+                                                        <td><span class="badge bg-light text-dark border">@proc.SNo</span></td>
+                                                        <td class="fw-bold">@proc.Description</td>
+                                                        <td class="text-end">@proc.Rate.ToString("N2")</td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="p-2 bg-light fw-bold text-secondary border-bottom" style="font-size: 0.8rem;">
+                                        <i class="fas fa-users-cog me-1 text-info"></i> Assigned Makers &amp; Rates
+                                    </div>
+                                    <div class="table-responsive" style="max-height: 320px; overflow-y: auto;">
+                                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.84rem;">
+                                            <thead class="table-light text-secondary sticky-top">
+                                                <tr>
+                                                    <th>Maker / Vendor</th>
+                                                    <th>Process</th>
+                                                    <th class="text-end">Assigned Rate</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var mkr in DashboardData.MakerRates)
+                                                {
+                                                    <tr>
+                                                        <td class="fw-bold">@mkr.MakerName</td>
+                                                        <td>@mkr.ProcessDescription</td>
+                                                        <td class="text-end">@mkr.RateDisplay</td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        <!-- TAB 6: Quality Complaints -->
+                        else if (ActiveMatrixTab == 6)
+                        {
+                            <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+                                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.86rem;">
+                                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                        <tr>
+                                            <th>Complaint #</th>
+                                            <th>Defect / Complaint Description</th>
+                                            <th class="text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (!DashboardData.Complaints.Any())
+                                        {
+                                            <tr>
+                                                <td colspan="3" class="text-center py-4 text-muted small">No customer complaints logged for this article.</td>
+                                            </tr>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var comp in DashboardData.Complaints)
+                                            {
+                                                <tr>
+                                                    <td class="fw-bold text-danger"><i class="fas fa-triangle-exclamation me-2"></i>@comp.ComplaintNo</td>
+                                                    <td>@comp.Description</td>
+                                                    <td class="text-center">
+                                                        <button type="button" class="btn btn-xs btn-outline-danger" @onclick="@(() => PrintComplaint(comp.EntryID))">
+                                                            <i class="fas fa-print me-1"></i> Print Log
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+
+                    </div>
+                </div>
+            }
+
+        }
+
+    </div>
+</div>
+
+<!-- ── Win11 Context Menus ────────────────────────────────────────────────── -->
+<ContextMenu Id="orderContextMenu" Template="Win11Style">
+    <div class="win11-section-header">Order Actions</div>
+    <Item OnClick="@((ItemClickEventArgs e) => PrintOrderBalance((e.Data as CustOrderDemandItem)?.OrderNo))">
+        <div class="win11-menu-item"><i class="fas fa-print win11-icon text-primary"></i> Print Order Balance</div>
+    </Item>
+    <Item OnClick="@((ItemClickEventArgs e) => PrintOrderPlanningReportR1((e.Data as CustOrderDemandItem)?.OrderNo, true))">
+        <div class="win11-menu-item"><i class="fas fa-file-invoice win11-icon text-secondary"></i> Print Planning Report (R1)</div>
+    </Item>
+    <Item OnClick="@((ItemClickEventArgs e) => PrintOrderStatus((e.Data as CustOrderDemandItem)?.OrderNo))">
+        <div class="win11-menu-item"><i class="fas fa-list-check win11-icon text-info"></i> Print Order Status</div>
+    </Item>
+    <div class="win11-separator"></div>
+    <Item OnClick="@((ItemClickEventArgs e) => OnOrderRowClicked((e.Data as CustOrderDemandItem)?.OrderNo ?? ""))">
+        <div class="win11-menu-item"><i class="fas fa-filter win11-icon text-warning"></i> Toggle Dashboard Filter for Order</div>
+    </Item>
+</ContextMenu>
+
+<ContextMenu Id="lotContextMenu" Template="Win11Style">
+    <div class="win11-section-header">Lot Controls</div>
+    <Item OnClick="@((ItemClickEventArgs e) => PrintPTC((e.Data as RunningLotItem)?.LotNo, false))">
+        <div class="win11-menu-item"><i class="fas fa-print win11-icon text-primary"></i> Print PTC (Full)</div>
+    </Item>
+    <Item OnClick="@((ItemClickEventArgs e) => PrintPTC((e.Data as RunningLotItem)?.LotNo, true))">
+        <div class="win11-menu-item"><i class="fas fa-file win11-icon text-secondary"></i> Print PTC (Mini)</div>
+    </Item>
+    <div class="win11-separator"></div>
+    <Item OnClick="@((ItemClickEventArgs e) => CloseLotPrompt((e.Data as RunningLotItem)?.LotNo))">
+        <div class="win11-menu-item text-danger"><i class="fas fa-times-circle win11-icon text-danger"></i> Close Production Lot</div>
+    </Item>
+</ContextMenu>
+
+<ContextMenu Id="poContextMenu" Template="Win11Style">
+    <div class="win11-section-header">Maker PO Options</div>
+    <Item OnClick="@((ItemClickEventArgs e) => PrintMakerPO((e.Data as OpenPOItem)?.MasterPONo))">
+        <div class="win11-menu-item"><i class="fas fa-print win11-icon text-primary"></i> Print Maker PO</div>
+    </Item>
+    <Item OnClick="@((ItemClickEventArgs e) => PrintMasterPOStatus((e.Data as OpenPOItem)?.MasterPONo))">
+        <div class="win11-menu-item"><i class="fas fa-file-invoice win11-icon text-info"></i> Master PO Status</div>
+    </Item>
+    <div class="win11-separator"></div>
+    <Item OnClick="@((ItemClickEventArgs e) => CloseMakerPOPrompt((e.Data as OpenPOItem)?.EntryID ?? 0))">
+        <div class="win11-menu-item text-danger"><i class="fas fa-times-circle win11-icon text-danger"></i> Close Purchase Order</div>
+    </Item>
+</ContextMenu>
+
+<ContextMenu Id="forgContextMenu" Template="Win11Style">
+    <div class="win11-section-header">Forging Actions</div>
+    <Item OnClick="@((ItemClickEventArgs e) => ToggleForgingStatus(e.Data as ForgingRawMaterialItem))">
+        <div class="win11-menu-item"><i class="fas fa-toggle-on win11-icon text-primary"></i> Toggle Active / Inactive Status</div>
+    </Item>
+    <Item OnClick="@((ItemClickEventArgs e) => OpenCrossDemandModal((e.Data as ForgingRawMaterialItem)?.RMID ?? 0, (e.Data as ForgingRawMaterialItem)?.MaterialID ?? ""))">
+        <div class="win11-menu-item"><i class="fas fa-list-tree win11-icon text-info"></i> View Competing Articles</div>
+    </Item>
+</ContextMenu>
+
+<!-- ── Forging Cross-Demand Modal ─────────────────────────────────────────── -->
+@if (ShowCrossDemandModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0, 0, 0, 0.5); z-index: 10000;" role="dialog">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header py-2 px-3 bg-light border-bottom align-items-center">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fas fa-list-tree text-primary fs-5"></i>
+                        <div>
+                            <h6 class="modal-title fw-bold text-dark mb-0">Competing Demand for RM / Forging: @ActiveForgingCode</h6>
+                            <small class="text-muted">Other manufactured articles requiring this same raw material</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-sm" @onclick="() => ShowCrossDemandModal = false"></button>
+                </div>
+                <div class="modal-body p-0" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.86rem;">
+                        <thead class="table-light text-secondary sticky-top">
+                            <tr>
+                                <th>Article ID</th>
+                                <th>Article Description</th>
+                                <th class="text-end">Un-Shipped Demand (Pcs)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (!CrossDemandItems.Any())
+                            {
+                                <tr>
+                                    <td colspan="3" class="text-center py-4 text-muted small">No other articles currently competing for this forging code.</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var item in CrossDemandItems)
+                                {
+                                    <tr>
+                                        <td class="fw-bold text-primary">@item.ItemID</td>
+                                        <td>@item.ItemName</td>
+                                        <td class="text-end fw-bold text-danger">@item.UnshippedQty.ToString("N0")</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                        <tfoot class="table-light fw-bold">
+                            <tr>
+                                <td colspan="2">Total Competing External Demand</td>
+                                <td class="text-end text-danger">@CrossDemandItems.Sum(x => x.UnshippedQty).ToString("N0")</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <div class="modal-footer py-2 px-3 bg-light border-top">
+                    <button type="button" class="btn btn-sm btn-secondary" @onclick="() => ShowCrossDemandModal = false">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    /* Power BI Dashboard Canvas Styling */
+    .pbi-dashboard-container {
+        max-width: 100%;
+        margin: 0 auto;
+    }
+
+    /* KPI Cards */
+    .pbi-kpi-card {
+        background: #ffffff;
+        border: 1px solid #e0e6ed;
+        border-radius: 10px;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .pbi-kpi-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08) !important;
+    }
+    .pbi-kpi-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #64748b;
+        letter-spacing: 0.3px;
+    }
+    .pbi-kpi-value {
+        font-size: 1.35rem;
+        font-weight: 800;
+        line-height: 1.2;
+        margin: 0.2rem 0;
+    }
+    .pbi-kpi-unit {
+        font-size: 0.75rem;
+        font-weight: normal;
+        color: #94a3b8;
+    }
+    .pbi-kpi-subtext {
+        font-size: 0.7rem;
+        color: #64748b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .pbi-kpi-deficit {
+        border-top: 4px solid #E81123 !important;
+        background: rgba(232, 17, 35, 0.03);
+    }
+    .pbi-kpi-surplus {
+        border-top: 4px solid #107C41 !important;
+        background: rgba(16, 124, 65, 0.03);
+    }
+
+    /* Visual Containers */
+    .pbi-visual-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    .pbi-visual-header {
+        padding: 0.65rem 0.9rem;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .pbi-visual-badge {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+    }
+
+    /* Power BI Waterfall Stream */
+    .pbi-waterfall-stream {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.4rem;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding: 0.5rem 0;
+    }
+    .waterfall-node {
+        flex: 1;
+        min-width: 95px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.6rem 0.4rem;
+        text-align: center;
+        transition: transform 0.15s ease;
+    }
+    .waterfall-node:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+    }
+    .waterfall-node .node-tag {
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #64748b;
+        margin-bottom: 0.2rem;
+    }
+    .waterfall-node .node-val {
+        font-size: 1.05rem;
+        font-weight: 800;
+        line-height: 1.1;
+    }
+    .waterfall-node .node-sub {
+        font-size: 0.62rem;
+        color: #94a3b8;
+        margin-top: 0.2rem;
+        white-space: nowrap;
+    }
+    .waterfall-arrow {
+        color: #94a3b8;
+        font-size: 0.85rem;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .waterfall-node.node-deficit {
+        background: rgba(232, 17, 35, 0.05);
+        border: 1.5px solid #E81123;
+    }
+    .waterfall-node.node-surplus {
+        background: rgba(16, 124, 65, 0.05);
+        border: 1.5px solid #107C41;
+    }
+
+    /* Stage Row */
+    .pbi-stage-row {
+        transition: background-color 0.15s ease;
+    }
+    .pbi-stage-row:hover {
+        background-color: #e2e8f0 !important;
+    }
+
+    /* Matrix & Nav Pills */
+    .pbi-matrix-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    .pbi-nav-pills .nav-link {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #475569;
+        border-radius: 6px;
+        padding: 0.4rem 0.75rem;
+        margin-right: 0.25rem;
+    }
+    .pbi-nav-pills .nav-link.active {
+        background: #118DFF;
+        color: #ffffff;
+    }
+
+    /* ── Blazored Typeahead Sizing & Anti-Bleed Styles ─────────────────────── */
+    .blazored-typeahead {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+        border-radius: 6px !important;
+        border: 1px solid #ced4da !important;
+        background: #ffffff !important;
+        position: relative !important;
+    }
+    .blazored-typeahead__controls {
+        height: 33px !important;
+        min-height: 33px !important;
+        max-height: 33px !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        align-items: center !important;
+        border: none !important;
+        background: transparent !important;
+    }
+    .blazored-typeahead__input {
+        height: 31px !important;
+        min-height: 31px !important;
+        font-size: 0.875rem !important;
+        padding: 0 0.5rem !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+        border: none !important;
+        outline: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+    .blazored-typeahead__input-mask, 
+    .blazored-typeahead__input-mask-wrapper {
+        height: 31px !important;
+        min-height: 31px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+        padding: 0 0.5rem !important;
+        margin: 0 !important;
+        border: none !important;
+        background: transparent !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+        height: 100% !important;
+        color: #6c757d !important;
+    }
+    .blazored-typeahead__results {
+        z-index: 10050 !important;
+        max-height: 260px !important;
+        overflow-y: auto !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+        border-radius: 6px !important;
+        border: 1px solid #dee2e6 !important;
+    }
+    .disabled-typeahead-wrapper .blazored-typeahead {
+        background-color: #f1f5f9 !important;
+        overflow: hidden !important;
+        border-radius: 6px !important;
+        pointer-events: none !important;
+        opacity: 0.7 !important;
+    }
+
+    /* Context Menu Win11 Styling */
+    .win11-section-header {
+        padding: 4px 12px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #64748b;
+    }
+    .win11-menu-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        font-size: 0.84rem;
+    }
+    .win11-icon {
+        width: 16px;
+        font-size: 0.9rem;
+    }
+    .win11-separator {
+        height: 1px;
+        background: #e2e8f0;
+        margin: 4px 0;
+    }
+</style>

@@ -45,6 +45,17 @@ namespace DataAccessLibrary.Models.ViewModels.Dashboard
         public decimal NetLiquidCash => CashInHand + BankBalance;
     }
 
+    public class MonthlyExportSalesTrendItem
+    {
+        public string MonthLabel { get; set; } = string.Empty;
+        public int Year { get; set; }
+        public int Month { get; set; }
+        public int InvoiceCount { get; set; }
+        public long TotalShippedQty { get; set; }
+        public decimal TotalAmountPKR { get; set; }
+        public decimal TotalAmountForeign { get; set; }
+    }
+
     public class ExportPillarData
     {
         public long InHandQty { get; set; }
@@ -52,6 +63,7 @@ namespace DataAccessLibrary.Models.ViewModels.Dashboard
         public decimal TotalSalesCurrentFY { get; set; }
         public decimal LifetimeTotalSales { get; set; }
         public decimal RebateReceivable { get; set; }
+        public List<MonthlyExportSalesTrendItem> MonthlyTrend { get; set; } = new();
     }
 
     public class ProductionPillarData
