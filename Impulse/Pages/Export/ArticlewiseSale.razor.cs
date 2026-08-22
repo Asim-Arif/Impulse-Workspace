@@ -190,7 +190,7 @@ namespace Impulse.Pages.Export
 
                 if (useDateFilter)
                 {
-                    constraints.Add($"{{VArticlewiseSales.DT}}=#{dateFrom:yyyy-MM-dd}# TO #{dateTo:yyyy-MM-dd}#");
+                    constraints.Add($"{{VArticlewiseSales.DT}} in Date({dateFrom.Year}, {dateFrom.Month}, {dateFrom.Day}) to Date({dateTo.Year}, {dateTo.Month}, {dateTo.Day})");
                 }
 
                 string selectionFormula = constraints.Count > 0 ? string.Join(" AND ", constraints) : "1=1";

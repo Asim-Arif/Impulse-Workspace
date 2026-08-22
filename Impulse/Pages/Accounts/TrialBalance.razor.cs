@@ -1,4 +1,4 @@
-﻿using BlazorBootstrap;
+using BlazorBootstrap;
 using BlazorContextMenu;
 using Impulse.Services.Integrations;
 using DataAccessLibrary;
@@ -194,7 +194,7 @@ namespace Impulse.Pages.Accounts
                 SelectionFormula = $"1=1",
                 FormulaValues = new Dictionary<string, object>
                 {
-                    { "FromTo", $"\"{strFromTo}\"" }
+                    { "FromTo", $"'{strFromTo}'" }
                 },
                 Parameters = new Dictionary<string, object>
                 {

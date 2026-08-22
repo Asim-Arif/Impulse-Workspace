@@ -257,7 +257,7 @@ namespace Impulse.Pages.Payroll.BiometricLedger
                 await ReportNavigationService.PrintReportAsync(new ReportRequest
                 {
                     ReportName = ReportNames.Payroll.PresentEmpList,
-                    SelectionFormula = $"{{AttendanceSheet.DT}}=#{SelectedDate:dd-MMM-yyyy}# AND {{AttendanceSheet.Attendance}}=1",
+                    SelectionFormula = $"{{AttendanceSheet.DT}}=Date({SelectedDate.Year}, {SelectedDate.Month}, {SelectedDate.Day}) AND {{AttendanceSheet.Attendance}}=1",
                     Parameters = new Dictionary<string, object>
                     {
                         { "@ForDate", SelectedDate.ToString("dd-MMM-yyyy") }

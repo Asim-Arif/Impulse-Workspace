@@ -160,7 +160,7 @@ namespace Impulse.Pages.Export.Proformas
         // --- Context Menus ---
         private async Task OpenOptionsBarMenu(MouseEventArgs e)
         {
-            await BlazorContextMenuService.ShowMenu("optionsBarMenu", (int)e.ClientX, (int)e.ClientY);
+            await BlazorContextMenuService.ShowMenu("optionsBarMenu", (int)e.ClientX, (int)e.ClientY + 15);
         }
 
         private async Task ShowRowContextMenu(MouseEventArgs e, ProformaListModel item)
@@ -315,7 +315,7 @@ namespace Impulse.Pages.Export.Proformas
         // --- General Reports ---
         private async Task PrintList(ItemClickEventArgs e)
         {
-            string sel = $"{{VFProformaList.DT}}=#{fromDate:yyyy-MM-dd}# TO #{toDate:yyyy-MM-dd}#";
+            string sel = $"{{VFProformaList.DT}} in Date({fromDate.Year}, {fromDate.Month}, {fromDate.Day}) to Date({toDate.Year}, {toDate.Month}, {toDate.Day})";
             
             if (selectedCustomer != null && selectedCustomer.CustCode != "0")
             {
@@ -326,17 +326,19 @@ namespace Impulse.Pages.Export.Proformas
                 sel += $" AND {{VFProformaList.Country}}='{selectedCountry}'";
             }
 
+            string customersStr = $"{(selectedCustomer?.Name ?? "<All Customers>")} {(string.IsNullOrEmpty(selectedCountry) ? "" : selectedCountry)}";
+            string dateRangeStr = $"{fromDate:dd-MMM-yyyy} to {toDate:dd-MMM-yyyy}";
+
             var request = new ReportRequest
             {
                 ReportName = "ProformaList.rpt",
-                SelectionFormula = sel
+                SelectionFormula = sel,
+                FormulaValues = new Dictionary<string, object>
+                {
+                    { "Customers", $"'{customersStr}'" },
+                    { "DateRange", $"'{dateRangeStr}'" }
+                }
             };
-            
-            string customersStr = $"{(selectedCustomer?.Name ?? "<All Customers>")} {(string.IsNullOrEmpty(selectedCountry) ? "" : selectedCountry)}";
-            string dateRangeStr = $"{fromDate:dd-MMM-yyyy} to {toDate:dd-MMM-yyyy}";
-            
-            request.Parameters.Add("Customers", customersStr);
-            request.Parameters.Add("DateRange", dateRangeStr);
 
             await ReportNavigation.PrintReportAsync(request);
         }

@@ -212,8 +212,8 @@ namespace Impulse.Pages.Payroll.Reports
                 try
                 {
                     string strSelection = item.Id == "new-hired"
-                        ? $"{{Employees.JoinDate}}=#{res.DateFrom:yyyy-MM-dd}# TO #{res.DateTo:yyyy-MM-dd}#"
-                        : $"{{VEmpLastInActiveDate.InActiveDT}}=#{res.DateFrom:yyyy-MM-dd}# TO #{res.DateTo:yyyy-MM-dd}#";
+                        ? $"{{Employees.JoinDate}} in Date({res.DateFrom.Year}, {res.DateFrom.Month}, {res.DateFrom.Day}) to Date({res.DateTo.Year}, {res.DateTo.Month}, {res.DateTo.Day})"
+                        : $"{{VEmpLastInActiveDate.InActiveDT}} in Date({res.DateFrom.Year}, {res.DateFrom.Month}, {res.DateFrom.Day}) to Date({res.DateTo.Year}, {res.DateTo.Month}, {res.DateTo.Day})";
                     var request = new ReportRequest
                     {
                         ReportName = item.ReportName,
@@ -316,7 +316,7 @@ namespace Impulse.Pages.Payroll.Reports
                 }
                 else if (ActiveReportItem.Id == "employee-wise-leaves")
                 {
-                    string strSelection = $"{{Employees.TempDept}}=FALSE AND {{Leaves.DT}}=#{selection.DateFrom:yyyy-MM-dd}# to #{selection.DateTo:yyyy-MM-dd}#";
+                    string strSelection = $"{{Employees.TempDept}}=False AND {{Leaves.DT}} in Date({selection.DateFrom.Year}, {selection.DateFrom.Month}, {selection.DateFrom.Day}) to Date({selection.DateTo.Year}, {selection.DateTo.Month}, {selection.DateTo.Day})";
                     if (selection.EmpID != "0")
                     {
                         strSelection += $" AND {{Employees.EmpID}}='{selection.EmpID}'";
@@ -338,7 +338,7 @@ namespace Impulse.Pages.Payroll.Reports
                 }
                 else if (ActiveReportItem.Id == "missing-outtime")
                 {
-                    string strSelection = $"{{EmpTimes.DT}}=#{selection.DateFrom:yyyy-MM-dd}# TO #{selection.DateTo:yyyy-MM-dd}#";
+                    string strSelection = $"{{EmpTimes.DT}} in Date({selection.DateFrom.Year}, {selection.DateFrom.Month}, {selection.DateFrom.Day}) to Date({selection.DateTo.Year}, {selection.DateTo.Month}, {selection.DateTo.Day})";
                     if (selection.EmpID != "0")
                     {
                         strSelection += $" AND {{Employees.EmpID}}='{selection.EmpID}'";
@@ -352,7 +352,7 @@ namespace Impulse.Pages.Payroll.Reports
                     {
                         ReportName = ActiveReportItem.ReportName,
                         SelectionFormula = strSelection,
-                        GroupSelectionFormula = "ISNULL({EmpTimes.OutTime})=TRUE  OR COUNT({EmpTimes.EmpID},{Employees.empid})=1",
+                        GroupSelectionFormula = "IsNull({EmpTimes.OutTime})=True OR Count({EmpTimes.EmpID}, {Employees.empid})=1",
                         FormulaValues = new Dictionary<string, object>
                         {
                             { "MainHeading", $"'{selection.DateFrom:dd-MMM-yyyy} to {selection.DateTo:dd-MMM-yyyy}'" }
@@ -361,7 +361,7 @@ namespace Impulse.Pages.Payroll.Reports
                 }
                 else if (ActiveReportItem.Id == "late-attendance")
                 {
-                    string strSelection = $"{{AttendanceSheet.DT}}=#{selection.DateFrom:yyyy-MM-dd}# TO #{selection.DateTo:yyyy-MM-dd}#";
+                    string strSelection = $"{{AttendanceSheet.DT}} in Date({selection.DateFrom.Year}, {selection.DateFrom.Month}, {selection.DateFrom.Day}) to Date({selection.DateTo.Year}, {selection.DateTo.Month}, {selection.DateTo.Day})";
                     if (selection.EmpID != "0")
                     {
                         strSelection += $" AND {{Employees.EmpID}}='{selection.EmpID}'";
@@ -402,9 +402,7 @@ namespace Impulse.Pages.Payroll.Reports
                 }
                 else
                 {
-
-
-                    string strCondition = $"{{MonthlySalaries.DT}}=#{selection.DateFrom:yyyy-MM-dd}# TO #{selection.DateTo:yyyy-MM-dd}#";
+                    string strCondition = $"{{MonthlySalaries.DT}} in Date({selection.DateFrom.Year}, {selection.DateFrom.Month}, {selection.DateFrom.Day}) to Date({selection.DateTo.Year}, {selection.DateTo.Month}, {selection.DateTo.Day})";
                     if (selection.EmpID != "0")
                     {
                         strCondition += $" AND {{VEmp.EmpID}}='{selection.EmpID}'";

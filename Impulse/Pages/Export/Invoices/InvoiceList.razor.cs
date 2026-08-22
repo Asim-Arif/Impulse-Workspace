@@ -178,6 +178,44 @@ namespace Impulse.Pages.Export.Invoices
             }
         }
 
+        private async Task ShowOptionsMenu(MouseEventArgs e)
+        {
+            await BlazorContextMenuService.ShowMenu("optionsBarMenu", (int)e.ClientX, (int)e.ClientY + 15);
+        }
+
+        private async Task PrintInvoiceListReport()
+        {
+            var f = fromDate ?? DateTime.Today.AddDays(-180);
+            var t = toDate ?? DateTime.Today;
+            string sel = $"{{VCustomInvoiceList.DT}} in Date({f.Year}, {f.Month}, {f.Day}) to Date({t.Year}, {t.Month}, {t.Day})";
+            
+            if (selectedCustomer != null && selectedCustomer.CustCode != "0")
+            {
+                sel += $" AND {{VCustomInvoiceList.CustCode}}='{selectedCustomer.CustCode}'";
+            }
+            if (!string.IsNullOrEmpty(selectedCountry))
+            {
+                sel += $" AND {{VCustomInvoiceList.Country}}='{selectedCountry}'";
+            }
+
+            string customersStr = $"{(selectedCustomer?.Name ?? "<All Customers>")} {(string.IsNullOrEmpty(selectedCountry) ? "" : selectedCountry)}";
+            string dateRangeStr = $"{f:dd-MMM-yyyy} to {t:dd-MMM-yyyy}";
+
+            var request = new ReportRequest
+            {
+                ReportName = "CustomInvoiceList.rpt",
+                SelectionFormula = sel,
+                FormulaValues = new Dictionary<string, object>
+                {
+                    { "Customers", $"'{customersStr}'" },
+                    { "DateRange", $"'{dateRangeStr}'" },
+                    { "bCustom", true }
+                }
+            };
+
+            await ReportNavigation.PrintReportAsync(request);
+        }
+
         private async Task DeleteInvoice(ItemClickEventArgs e)
         {
             if (contextMenuRowItem == null) return;
@@ -200,17 +238,212 @@ namespace Impulse.Pages.Export.Invoices
             });
         }
 
-        private void PrintReport(string reportName)
+        private async Task PrintReport(string actionKey)
         {
             if (contextMenuRowItem == null) return;
-            
+
+            string invNo = contextMenuRowItem.CustomInvoice;
+            string reportName = "";
+            string selectionFormula = "";
+            var formulaValues = new Dictionary<string, object>();
+            bool isCustom = (invoiceType == 0);
+
+            switch (actionKey)
+            {
+                case "rptInvoice":
+                    if (invoiceType == 2)
+                    {
+                        reportName = "Bank_Invoice.rpt";
+                    }
+                    else if (invoiceType == 1)
+                    {
+                        reportName = "rptCommercialInvoice.rpt";
+                    }
+                    else
+                    {
+                        reportName = "rptCustomInvoice.rpt";
+                    }
+                    selectionFormula = $"{{VrptCustomInvoiceDetail.CustomInvoice}}='{invNo}'";
+                    formulaValues["Discount"] = 0;
+                    break;
+
+                case "rptCustomInvoice": // Actual Invoice
+                    reportName = "Print_Actual_Invoice.rpt";
+                    selectionFormula = $"{{VrptCustomInvoiceDetail.CustomInvoice}}='{invNo}'";
+                    formulaValues["Discount"] = 0;
+                    break;
+
+                case "rptCustomInvoice_USA":
+                    reportName = isCustom ? "Invoice_USA.rpt" : "Commercial_Invoice_USA.rpt";
+                    selectionFormula = $"{{VrptCustomInvoiceDetail.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptInvoiceasHandTools":
+                    reportName = "Invoice_Handtools.rpt";
+                    selectionFormula = $"{{VrptProformas.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptInvoiceWOCustomerAddress":
+                    reportName = isCustom ? "rptSampleInvoiceWOAddress.rpt" : "Commercial_Invoice_WO_Address.rpt";
+                    selectionFormula = $"{{VrptCustomInvoiceDetail.CustomInvoice}}='{invNo}'";
+                    formulaValues["Discount"] = 0;
+                    break;
+
+                case "rptInvoiceDiscount":
+                    reportName = isCustom ? "rptCustomInvoice.rpt" : "rptCommercialInvoice.rpt";
+                    selectionFormula = $"{{VrptCustomInvoiceDetail.CustomInvoice}}='{invNo}'";
+                    formulaValues["Discount"] = 0;
+                    break;
+
+                case "rptComInvoice_Pay":
+                    reportName = "Payment_Invoice.rpt";
+                    selectionFormula = $"{{VrptCustomInvoiceDetail.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptUSAPaymentInvoice":
+                    reportName = "Commercial_USA_Payment_Invoice.rpt";
+                    selectionFormula = $"{{VrptProformas.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptComInvoice_Docs":
+                    reportName = "Print_Payment_Docs.rpt";
+                    selectionFormula = $"{{VrptCustomInvoiceDetail.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptCustomPListDetailed": // Packing List
+                    if (invoiceType == 2)
+                    {
+                        reportName = "Bank_Packing_List.rpt";
+                    }
+                    else if (invoiceType == 1)
+                    {
+                        reportName = "rptCommercialPList.rpt";
+                    }
+                    else
+                    {
+                        reportName = "rptCustomPList.rpt";
+                    }
+                    selectionFormula = $"{{VCustomPList.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptGSP":
+                    reportName = "rpt_GSP_Invoice.rpt";
+                    selectionFormula = $"{{VrptProformas.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptCustomPListCombined":
+                    reportName = isCustom ? "rptCustomPListDetailed.rpt" : "Commercial_Packing_List_Detailed.rpt";
+                    selectionFormula = $"{{VCustomPList.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptCustomPListCombinedCustom":
+                    reportName = isCustom ? "rptCustomPListDetailedCustom.rpt" : "Commercial_Packing_List_Detailed_Custom.rpt";
+                    selectionFormula = $"{{VCustomPList.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptBillOfExchange":
+                    reportName = "rptBillOfExchange.rpt";
+                    selectionFormula = $"{{VRptProformas.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptInvPListComparison":
+                    reportName = "InvoicePackingListComparison.rpt";
+                    selectionFormula = $"{{CustomInvoice.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptLabLetter":
+                    reportName = "LaboratoryTestLetter.rpt";
+                    selectionFormula = $"{{CustomInvoice.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptBankSlipLabTest":
+                    reportName = "NationalBankSlip.rpt";
+                    selectionFormula = $"{{CustomInvoice.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptUnderTaking":
+                    reportName = "Undertaking.rpt";
+                    selectionFormula = $"{{VCustomInvoice.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptLetterToBank":
+                    reportName = "rptLetterToBank.rpt";
+                    selectionFormula = $"{{VrptProformas.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptLetterToBankSimple":
+                    reportName = "rptLetterToBankSimple.rpt";
+                    selectionFormula = $"{{VrptProformas.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptBankSalesContract":
+                    reportName = "Bank_Sales_Contract.rpt";
+                    selectionFormula = $"{{VrptProformas.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptReasonForDelay":
+                    reportName = "Bank_Reason_For_Delay.rpt";
+                    selectionFormula = $"{{VrptProformas.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptReasonForDelaySBP":
+                    reportName = "Bank_Reason_For_Delay_SBP.rpt";
+                    selectionFormula = $"{{VrptProformas.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptLabReport":
+                    reportName = "Bank_Lab_Report.rpt";
+                    selectionFormula = $"{{VrptProformas.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptBankUnderTaking1":
+                    reportName = "Bank_Undertaking1.rpt";
+                    selectionFormula = $"{{VrptProformas.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptBankUnderTaking2":
+                    reportName = "Bank_Undertaking2.rpt";
+                    selectionFormula = $"{{VrptProformas.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptBankUnderTaking3":
+                    reportName = "Bank_Undertaking3.rpt";
+                    selectionFormula = $"{{VrptProformas.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptInvoiceExport":
+                    reportName = "Commercial_Invoice_Export.rpt";
+                    selectionFormula = $"{{VCustomInvoice.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptDeclarationOfConformity":
+                    reportName = "Declartion_Of_Conformity.rpt";
+                    selectionFormula = $"{{VCustomInvoice.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptCertificateOfCompliance":
+                    reportName = "Certificate_Of_Compliance.rpt";
+                    selectionFormula = $"{{VCustomInvoice.CustomInvoice}}='{invNo}'";
+                    break;
+
+                case "rptList":
+                    await PrintInvoiceListReport();
+                    return;
+
+                default:
+                    reportName = actionKey.EndsWith(".rpt", StringComparison.OrdinalIgnoreCase) ? actionKey : $"{actionKey}.rpt";
+                    selectionFormula = $"{{VCustomInvoice.CustomInvoice}}='{invNo}'";
+                    break;
+            }
+
             var request = new ReportRequest
             {
                 ReportName = reportName,
-                SelectionFormula = $"{{VCustomInvoiceList.CustomInvoice}}='{contextMenuRowItem.CustomInvoice}'"
+                SelectionFormula = selectionFormula,
+                FormulaValues = formulaValues
             };
 
-            _ = ReportNavigation.PrintReportAsync(request);
+            await ReportNavigation.PrintReportAsync(request);
         }
 
         private void AddInvoice(ItemClickEventArgs e)

@@ -221,8 +221,12 @@ namespace Impulse.Pages.Export.Quotations
             {
                 var request = new ReportRequest
                 {
-                    ReportName = "CustomerQuotation.rpt", // VB6 rpt name equivalent
-                    SelectionFormula = $"{{CustomerQuotations.QuotationNo}}={quotationNo}"
+                    ReportName = "CustomerQuotation.rpt",
+                    SelectionFormula = $"{{VrptCustomInvoiceDetail.QuotationNo}}={quotationNo}",
+                    FormulaValues = new Dictionary<string, object>
+                    {
+                        { "Discount", 0 }
+                    }
                 };
                 await ReportNavigation.PrintReportAsync(request);
             }
@@ -238,8 +242,12 @@ namespace Impulse.Pages.Export.Quotations
             {
                 var request = new ReportRequest
                 {
-                    ReportName = "CustomerQuotationDiscount.rpt", // VB6 rpt name equivalent
-                    SelectionFormula = $"{{CustomerQuotations.QuotationNo}}={quotationNo}"
+                    ReportName = "CustomerQuotation.rpt",
+                    SelectionFormula = $"{{VrptCustomInvoiceDetail.QuotationNo}}={quotationNo}",
+                    FormulaValues = new Dictionary<string, object>
+                    {
+                        { "Discount", 0 }
+                    }
                 };
                 await ReportNavigation.PrintReportAsync(request);
             }
@@ -253,10 +261,28 @@ namespace Impulse.Pages.Export.Quotations
         {
             try
             {
+                string sel = $"{{VCustomerQuotationsList.DT}} in Date({dtFrom.Year}, {dtFrom.Month}, {dtFrom.Day}) to Date({dtTo.Year}, {dtTo.Month}, {dtTo.Day})";
+                if (selectedCustomerFilter != null && selectedCustomerFilter.CustCode != "0")
+                {
+                    sel += $" AND {{VCustomerQuotationsList.CustCode}}='{selectedCustomerFilter.CustCode}'";
+                }
+                if (!string.IsNullOrEmpty(selectedCountryFilter) && selectedCountryFilter != "<All Countries>")
+                {
+                    sel += $" AND {{VCustomerQuotationsList.Country}}='{selectedCountryFilter}'";
+                }
+
+                string customersStr = $"{(selectedCustomerFilter?.Name ?? "<All Customers>")} {(selectedCountryFilter == "<All Countries>" ? "" : selectedCountryFilter)}";
+                string dateRangeStr = $"{dtFrom:dd-MMM-yyyy} to {dtTo:dd-MMM-yyyy}";
+
                 var request = new ReportRequest
                 {
-                    ReportName = "CustomerQuotationList.rpt", // General List rpt
-                    SelectionFormula = string.Empty
+                    ReportName = "CustomerQuotationsList.rpt",
+                    SelectionFormula = sel,
+                    FormulaValues = new Dictionary<string, object>
+                    {
+                        { "Customers", $"'{customersStr}'" },
+                        { "DateRange", $"'{dateRangeStr}'" }
+                    }
                 };
                 await ReportNavigation.PrintReportAsync(request);
             }

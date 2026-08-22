@@ -276,8 +276,15 @@ namespace Impulse.Pages.Production.ProductionItemList
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
-                ReportName = "PTC.rpt",
-                SelectionFormula = $"{{VendRcvdDetail.LotNo}} = '{item.LotNo}'"
+                ReportName = "PTCQEL.rpt",
+                Parameters = new Dictionary<string, object>
+                {
+                    { "@LotNo", item.LotNo }
+                },
+                FormulaValues = new Dictionary<string, object>
+                {
+                    { "ComputerName", $"'IMPULSE-WEB'" }
+                }
             });
         }
 
@@ -303,7 +310,7 @@ namespace Impulse.Pages.Production.ProductionItemList
                 if (Filters.DateRangeMode == 1) { dtFrom = DateTime.Today; dtTo = DateTime.Today.AddDays(15); }
                 else if (Filters.DateRangeMode == 2) { dtFrom = DateTime.Today; dtTo = DateTime.Today.AddDays(30); }
                 else if (Filters.DateRangeMode == 3) { dtFrom = DateTime.Today; dtTo = DateTime.Today.AddDays(45); }
-                parts.Add($"{{VRunningLots_POI.DT}} >= #{dtFrom:MM/dd/yyyy}# AND {{VRunningLots_POI.DT}} <= #{dtTo:MM/dd/yyyy}#");
+                parts.Add($"{{VRunningLots_POI.DT}} in Date({dtFrom.Year}, {dtFrom.Month}, {dtFrom.Day}) to Date({dtTo.Year}, {dtTo.Month}, {dtTo.Day})");
             }
 
             if (!string.IsNullOrEmpty(Filters.CustCode) && Filters.CustCode != "0")

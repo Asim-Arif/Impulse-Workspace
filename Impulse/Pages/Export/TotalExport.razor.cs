@@ -163,8 +163,7 @@ namespace Impulse.Pages.Export
 
             try
             {
-                // Format dates in selection constraint string format yyyy-MM-dd
-                string selectionFormula = $"{{VTotalExport.DT}}=#{dateFrom:yyyy-MM-dd}# To #{dateTo:yyyy-MM-dd}# AND {{VTotalExport.GatePassNo}}<>'' AND ({{VTotalExport.CustCode}}<>'HMP')";
+                string selectionFormula = $"{{VTotalExport.DT}} in Date({dateFrom.Year}, {dateFrom.Month}, {dateFrom.Day}) to Date({dateTo.Year}, {dateTo.Month}, {dateTo.Day}) AND {{VTotalExport.GatePassNo}}<>'' AND {{VTotalExport.CustCode}}<>'HMP'";
 
                 if (selectedCustomer != null && selectedCustomer.CustCode != "<All Customers>")
                 {

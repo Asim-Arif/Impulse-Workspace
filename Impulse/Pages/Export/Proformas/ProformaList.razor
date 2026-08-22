@@ -200,40 +200,37 @@
 </style>
 
 <!-- Context Menu: Row Options -->
-<BlazorContextMenu.ContextMenu Id="rowContextMenu" UseDefaultEventHandlers="true" Template="Win11Style">
-    <div class="win11-section-header">Record Actions</div>
-    <BlazorContextMenu.Item class="win11-menu-item" OnClick="@EditProforma">
-        <i class="fas fa-edit fa-fw win11-icon text-primary"></i> Edit Proforma
-    </BlazorContextMenu.Item>
-    <BlazorContextMenu.Item class="win11-menu-item" OnClick="@DeleteProforma">
-        <i class="fas fa-trash fa-fw win11-icon text-danger"></i> Delete Proforma
-    </BlazorContextMenu.Item>
-    <div class="win11-divider"></div>
-    <div class="win11-section-header">Proforma Printing</div>
-    <BlazorContextMenu.Item class="win11-menu-item" OnClick="@(() => PrintProforma())">
-        <i class="fas fa-print fa-fw win11-icon text-primary"></i> Print Proforma
-    </BlazorContextMenu.Item>
-    <BlazorContextMenu.Item class="win11-menu-item" OnClick="@PrintUSAProforma">
-        <i class="fas fa-file-invoice-dollar fa-fw win11-icon text-primary"></i> Print USA Proforma
-    </BlazorContextMenu.Item>
-    <BlazorContextMenu.Item class="win11-menu-item" OnClick="@ShowCompanyOverrideModal">
-        <i class="fas fa-building fa-fw win11-icon text-primary"></i> Print Proforma (Company Selection)
-    </BlazorContextMenu.Item>
-    <BlazorContextMenu.Item class="win11-menu-item" OnClick="@ShowDiscountModal">
-        <i class="fas fa-tags fa-fw win11-icon text-primary"></i> Print Proforma (Discount)
-    </BlazorContextMenu.Item>
-    <BlazorContextMenu.Item class="win11-menu-item" OnClick="@PrintProformaWD">
-        <i class="fas fa-file-alt fa-fw win11-icon text-primary"></i> Print Proforma Without Details
-    </BlazorContextMenu.Item>
-</BlazorContextMenu.ContextMenu>
+<ContextMenu Id="rowContextMenu" Template="Win11Style">
+    <Item OnClick="@EditProforma">
+        <i class="fas fa-edit fa-fw win11-icon text-primary me-2"></i> Edit Proforma
+    </Item>
+    <Item OnClick="@DeleteProforma">
+        <i class="fas fa-trash fa-fw win11-icon text-danger me-2"></i> Delete Proforma
+    </Item>
+    <Seperator />
+    <Item OnClick="@(() => PrintProforma())">
+        <i class="fas fa-print fa-fw win11-icon text-primary me-2"></i> Print Proforma
+    </Item>
+    <Item OnClick="@PrintUSAProforma">
+        <i class="fas fa-file-invoice-dollar fa-fw win11-icon text-primary me-2"></i> Print USA Proforma
+    </Item>
+    <Item OnClick="@ShowCompanyOverrideModal">
+        <i class="fas fa-building fa-fw win11-icon text-primary me-2"></i> Print Proforma (Company Selection)
+    </Item>
+    <Item OnClick="@ShowDiscountModal">
+        <i class="fas fa-tags fa-fw win11-icon text-primary me-2"></i> Print Proforma (Discount)
+    </Item>
+    <Item OnClick="@PrintProformaWD">
+        <i class="fas fa-file-alt fa-fw win11-icon text-primary me-2"></i> Print Proforma Without Details
+    </Item>
+</ContextMenu>
 
 <!-- Context Menu: Options Bar Menu (Reports) -->
-<BlazorContextMenu.ContextMenu Id="optionsBarMenu" UseDefaultEventHandlers="true" Template="Win11Style">
-    <div class="win11-section-header">General Reports</div>
-    <BlazorContextMenu.Item class="win11-menu-item" OnClick="@PrintList">
-        <i class="fas fa-list fa-fw win11-icon"></i> Print List
-    </BlazorContextMenu.Item>
-</BlazorContextMenu.ContextMenu>
+<ContextMenu Id="optionsBarMenu" Template="Win11Style">
+    <Item OnClick="@PrintList">
+        <i class="fas fa-list fa-fw win11-icon text-secondary me-2"></i> Print List
+    </Item>
+</ContextMenu>
 
 <!-- Modals -->
 @if (showCompanyModal)

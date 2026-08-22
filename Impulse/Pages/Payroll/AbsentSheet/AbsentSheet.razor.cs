@@ -136,7 +136,7 @@ namespace Impulse.Pages.Payroll.AbsentSheet
                     ReportName = ReportNames.Payroll.AbsentLeaveSummary,
                     FormulaValues = new Dictionary<string, object>
                     {
-                        { "FromTo", $"From {Filter.FromDate:dd-MMM-yyyy} To {Filter.ToDate:dd-MMM-yyyy}" }
+                        { "FromTo", $"'From {Filter.FromDate:dd-MMM-yyyy} To {Filter.ToDate:dd-MMM-yyyy}'" }
                     }
                 };
                 await ReportNavigation.PrintReportAsync(request);
@@ -162,7 +162,7 @@ namespace Impulse.Pages.Payroll.AbsentSheet
                     ReportName = ReportNames.Payroll.DailyAttendance,
                     FormulaValues = new Dictionary<string, object>
                     {
-                        { "FromTo", $"From {Filter.FromDate:dd-MMM-yyyy} To {Filter.ToDate:dd-MMM-yyyy}" }
+                        { "FromTo", $"'From {Filter.FromDate:dd-MMM-yyyy} To {Filter.ToDate:dd-MMM-yyyy}'" }
                     }
                 };
                 await ReportNavigation.PrintReportAsync(request);

@@ -325,12 +325,12 @@ namespace Impulse.Pages.Payroll.AttendanceLedger
                     SelectionFormula = string.Empty,
                     FormulaValues = new Dictionary<string, object>
                     {
-                        { "Company", CompanyName },
-                        { "FromTo", $"For {MonthNames[SelectedMonth - 1]}, {SelectedYear}." },
-                        { "EmpName", empDisplay },
-                        { "TotalLateHrs", AttendanceLedgerFormatter.GetHrsMin(TotalLateHrs) },
-                        { "TotalOverTime", AttendanceLedgerFormatter.GetHrsMin(TotalOTHrs) },
-                        { "TotalPresents", AttendanceLedgerFormatter.GetHrsMin(TotalHrs) },
+                        { "Company", $"'{CompanyName}'" },
+                        { "FromTo", $"'For {MonthNames[SelectedMonth - 1]}, {SelectedYear}.'" },
+                        { "EmpName", $"'{empDisplay}'" },
+                        { "TotalLateHrs", $"'{AttendanceLedgerFormatter.GetHrsMin(TotalLateHrs)}'" },
+                        { "TotalOverTime", $"'{AttendanceLedgerFormatter.GetHrsMin(TotalOTHrs)}'" },
+                        { "TotalPresents", $"'{AttendanceLedgerFormatter.GetHrsMin(TotalHrs)}'" },
                         { "TotalPayableHrs", TotalPayableHrs },
                         { "TotalAbsents", (daysInMonth - OffDayCount - 1) * 8 },
                         { "ForSA", true }

@@ -19,6 +19,7 @@ namespace Impulse.Pages.Export.AdvancePayments
         [Inject] private ICustomerOrderService CustomerOrderService { get; set; } = default!;
         [Inject] private NavigationManager NavigationManager { get; set; } = default!;
         [Inject] private NotificationService NotificationService { get; set; } = default!;
+        [Inject] private Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthenticationStateProvider { get; set; } = default!;
 
         private AdvancePaymentViewModel Payment { get; set; } = new AdvancePaymentViewModel();
 
@@ -171,8 +172,19 @@ namespace Impulse.Pages.Export.AdvancePayments
 
             try
             {
-                Payment.UserName = "BlazorUser"; // Replace with actual logged-in user if available
-                Payment.MachineName = "BlazorClient";
+                string userName = "Admin";
+                try
+                {
+                    var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                    if (authState.User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(authState.User.Identity.Name))
+                    {
+                        userName = authState.User.Identity.Name;
+                    }
+                }
+                catch { }
+
+                Payment.UserName = userName;
+                Payment.MachineName = Environment.MachineName;
 
                 bool success = await AdvancePaymentService.SaveAdvancePaymentAsync(Payment);
                 if (success)

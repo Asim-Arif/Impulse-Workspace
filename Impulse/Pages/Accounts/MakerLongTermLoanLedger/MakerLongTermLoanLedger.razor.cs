@@ -120,7 +120,7 @@ namespace Impulse.Pages.Accounts.MakerLongTermLoanLedger
 
             try
             {
-                string selectionFormula = $"{{VMakerAdvancesLedger.AccNo}}='{SelectedMaker.AccNo}' AND {{VMakerAdvancesLedger.DT}}>=#{FromDate:yyyy-MM-dd}# AND {{VMakerAdvancesLedger.DT}}<=#{ToDate:yyyy-MM-dd}#";
+                string selectionFormula = $"{{VMakerAdvancesLedger.AccNo}}='{SelectedMaker.AccNo}' AND {{VMakerAdvancesLedger.DT}} in Date({FromDate.Year}, {FromDate.Month}, {FromDate.Day}) to Date({ToDate.Year}, {ToDate.Month}, {ToDate.Day})";
                 var req = new ReportRequest
                 {
                     ReportName = "MakerAdvancesLedger_Long.rpt",

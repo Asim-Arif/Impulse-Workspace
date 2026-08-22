@@ -47,6 +47,15 @@ builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = true)
     .AddEntityFrameworkStores<ApplicationDbContext>();
 
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    var pathBase = builder.Configuration.GetValue<string>("AppSettings:PathBase");
+    var prefix = !string.IsNullOrEmpty(pathBase) ? pathBase.TrimEnd('/') : "";
+    options.LoginPath = $"{prefix}/Identity/Account/Login";
+    options.LogoutPath = $"{prefix}/Identity/Account/Logout";
+    options.AccessDeniedPath = $"{prefix}/Identity/Account/AccessDenied";
+});
+
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddRazorPages();
@@ -433,6 +442,18 @@ builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("AppSet
 builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<AppSettings>>().Value);
 
 var app = builder.Build();
+
+// Enable PathBase for IIS sub-application hosting (ensures Identity Login redirects stay under /impulse)
+var configuredPathBase = builder.Configuration.GetValue<string>("AppSettings:PathBase");
+if (!string.IsNullOrEmpty(configuredPathBase))
+{
+    app.UsePathBase(configuredPathBase);
+}
+else
+{
+    app.UsePathBase("/impulse");
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -445,29 +466,22 @@ else
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+// In production without SSL certificate on IP binding, do not force HTTPS redirection
+if (app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseStaticFiles();
-app.MapFallbackToPage("/_Host");
 
 app.UseRouting();
 
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.UseEndpoints(endpoints =>
-{
-    endpoints.MapRazorPages(); // Additional endpoint mappings...
-});
-
+app.MapRazorPages();
 app.MapControllers();
 app.MapBlazorHub();
-app.MapControllers();
-
-app.Use(async (context, next) =>
-{
-    Console.WriteLine($"Incoming request: {context.Request.Path}");
-    await next.Invoke();
-});
+app.MapFallbackToPage("/_Host");
 
 app.Run();

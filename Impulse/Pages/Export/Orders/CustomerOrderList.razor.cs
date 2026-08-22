@@ -21,6 +21,7 @@ namespace Impulse.Pages.Export.Orders
         [Inject] private NavigationManager NavigationManager { get; set; } = null!;
         [Inject] private IDBHelperService DbHelper { get; set; } = null!;
         [Inject] private IBlazorContextMenuService BlazorContextMenuService { get; set; } = null!;
+        [Inject] private Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
 
         [Parameter]
         [SupplyParameterFromQuery(Name = "viewType")]
@@ -428,8 +429,8 @@ namespace Impulse.Pages.Export.Orders
         {
             try
             {
-                string user = "BlazorUser";
-                string machine = "BlazorWeb";
+                string user = await GetLoggedInUserNameAsync();
+                string machine = Environment.MachineName;
 
                 bool success = await CustomerOrderService.UpdateOrderFinalStatusAsync(orderNo, custCode, country, cancelledCode, remarks, user, machine);
                 if (success)
@@ -494,9 +495,10 @@ namespace Impulse.Pages.Export.Orders
                     { "@OrderNo", orderNo }
                 };
 
+                string currentUserName = await GetLoggedInUserNameAsync();
                 var formulaValues = new Dictionary<string, object>
                 {
-                    { "UserName", "BlazorUser" }
+                    { "UserName", $"'{currentUserName}'" }
                 };
 
                 var request = new ReportRequest
@@ -513,6 +515,21 @@ namespace Impulse.Pages.Export.Orders
             {
                 NotificationServiceManager.ShowError("Report Failed", ex.Message);
             }
+        }
+
+        private async Task<string> GetLoggedInUserNameAsync()
+        {
+            try
+            {
+                var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                var user = authState.User;
+                if (user.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(user.Identity.Name))
+                {
+                    return user.Identity.Name;
+                }
+            }
+            catch { }
+            return "Admin";
         }
 
         private async Task PrintMaterialConsumptionSheet(string orderNo, bool articleWise = false)
@@ -543,7 +560,7 @@ namespace Impulse.Pages.Export.Orders
                 ReportName = ReportNames.Export.OrderItemList,
                 FormulaValues = new Dictionary<string, object>
                 {
-                    { "Filters", $"Order No.:{orderNo}" }
+                    { "Filters", $"'Order No.:{orderNo}'" }
                 }
             };
             await ReportNavigation.PrintReportAsync(request);
@@ -567,7 +584,7 @@ namespace Impulse.Pages.Export.Orders
             var request = new ReportRequest
             {
                 ReportName = ReportNames.Export.BalanceOrdersCT,
-                SelectionFormula = $"{{VFOrderItemswithShippedQty.DT}} >= #{dtFrom:yyyy-MM-dd}# AND {{VFOrderItemswithShippedQty.DT}} <= #{dtTo:yyyy-MM-dd}# AND {{VFOrderItemswithShippedQty.OrderNo}}='{orderNo}'"
+                SelectionFormula = $"{{VFOrderItemswithShippedQty.DT}} in Date({dtFrom.Year}, {dtFrom.Month}, {dtFrom.Day}) to Date({dtTo.Year}, {dtTo.Month}, {dtTo.Day}) AND {{VFOrderItemswithShippedQty.OrderNo}}='{orderNo}'"
             };
             await ReportNavigation.PrintReportAsync(request);
         }
@@ -576,9 +593,9 @@ namespace Impulse.Pages.Export.Orders
         {
             var formulaValues = new Dictionary<string, object>
             {
-                { "ForCustomer", $"{selectedCustomerFilter?.Name ?? "<All Customers>"} {selectedCountryFilter}" },
-                { "ForFromTo", $"{dtFrom:dd-MMM-yyyy} to {dtTo:dd-MMM-yyyy}" },
-                { "OrderType", selectedOrderType }
+                { "ForCustomer", $"'{selectedCustomerFilter?.Name ?? "<All Customers>"} {selectedCountryFilter}'" },
+                { "ForFromTo", $"'{dtFrom:dd-MMM-yyyy} to {dtTo:dd-MMM-yyyy}'" },
+                { "OrderType", $"'{selectedOrderType}'" }
             };
 
             var request = new ReportRequest
@@ -596,7 +613,7 @@ namespace Impulse.Pages.Export.Orders
             if (mode == 1) rptName = ReportNames.Export.CombinedOrderItemwise;
             else if (mode == 2) rptName = ReportNames.Export.PartShippedOrders;
 
-            string cond = $"{{FCustomerOrders.DT}} >= #{dtFrom:yyyy-MM-dd}# AND {{FCustomerOrders.DT}} <= #{dtTo:yyyy-MM-dd}#";
+            string cond = $"{{FCustomerOrders.DT}} in Date({dtFrom.Year}, {dtFrom.Month}, {dtFrom.Day}) to Date({dtTo.Year}, {dtTo.Month}, {dtTo.Day})";
             if (selectedCustomerFilter != null && selectedCustomerFilter.CustCode != "0")
             {
                 cond += $" AND {{FCustomerOrders.CustCode}}='{selectedCustomerFilter.CustCode}'";
@@ -681,7 +698,7 @@ namespace Impulse.Pages.Export.Orders
 
         private async Task PrintUrgentRequestReport()
         {
-            string cond = $"{{VrptOrders.DT}} >= #{dtFrom:yyyy-MM-dd}# AND {{VrptOrders.DT}} <= #{dtTo:yyyy-MM-dd}# AND {{VrptOrders.DeliveryStatus}}=2";
+            string cond = $"{{VrptOrders.DT}} in Date({dtFrom.Year}, {dtFrom.Month}, {dtFrom.Day}) to Date({dtTo.Year}, {dtTo.Month}, {dtTo.Day}) AND {{VrptOrders.DeliveryStatus}}=2";
             if (selectedCustomerFilter != null && selectedCustomerFilter.CustCode != "0")
             {
                 cond += $" AND {{VrptOrders.CustCode}}='{selectedCustomerFilter.CustCode}'";

@@ -15,12 +15,15 @@ namespace Impulse.Services
         private readonly IJSRuntime _js;
         private readonly AppSettings _appSettings;
         private readonly LoadingService _loader; 
-        public ReportNavigationService(HttpClient httpClient, IJSRuntime js,AppSettings appSettings,LoadingService loader) 
+        private readonly INotificationService _notificationService;
+
+        public ReportNavigationService(HttpClient httpClient, IJSRuntime js, AppSettings appSettings, LoadingService loader, INotificationService notificationService) 
         { 
             _httpClient = httpClient;
             _js = js;
             _appSettings = appSettings;
             _loader = loader;
+            _notificationService = notificationService;
         }
         public async Task PrintReportAsync(ReportRequest reportRequest)
         {
@@ -32,73 +35,73 @@ namespace Impulse.Services
         }
         public async Task PrintVoucher(string strVchrNo) 
         {
-            await GenerateAndOpenReport_Old("PV.rpt", $"{{VLedger.VchrNo}}='{strVchrNo}'");
+            await GenerateAndOpenReport_Old("Voucher.rpt", $"{{VLedger.VchrNo}}='{strVchrNo}'");
         }
         public async Task PrintVoucherOld(string strVchrNo) 
         {
             var request = new
             {
-                ReportName = "PV.rpt",
+                ReportName = "Voucher.rpt",
                 SelectionFormula = "{VLedger.VchrNo}='" + strVchrNo + "'"
             };
 
             var json = JsonSerializer.Serialize(request);
-            var content=new StringContent(json,Encoding.UTF8, "application/json");
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             //Call the Report API
             var apiUrl = _appSettings.BaseAddressForReports + "/api/report";
-            //var response = await _httpClient.PostAsync("api/report", content);
-            var response = await _httpClient.PostAsync(apiUrl, content);
-
-            if (!response.IsSuccessStatusCode) 
+            try
             {
-                var errorMsg = await response.Content.ReadAsStringAsync();
-                Console.WriteLine("API Error: " + errorMsg);
-                return;
+                var response = await _httpClient.PostAsync(apiUrl, content);
+
+                if (!response.IsSuccessStatusCode) 
+                {
+                    var errorMsg = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine("API Error: " + errorMsg);
+                    _notificationService.ShowError("Report Error", $"Report API error: {errorMsg}");
+                    return;
+                }
+
+                var pdfBytes = await response.Content.ReadAsByteArrayAsync();
+                var base64 = Convert.ToBase64String(pdfBytes);
+                await _js.InvokeVoidAsync("openPdfFromBase64", base64);
             }
-
-            //response.EnsureSuccessStatusCode();
-
-
-            var pdfBytes= await response.Content.ReadAsByteArrayAsync();
-
-            var base64=Convert.ToBase64String(pdfBytes);
-
-            var jsCode = @$"
-                var byteCharacters = atob('{base64}');
-                var byteNumbers = new Array(byteCharacters.length);
-                for (var i = 0; i < byteCharacters.length; i++) {{
-                    byteNumbers[i] = byteCharacters.charCodeAt(i);
-                }}
-                var byteArray = new Uint8Array(byteNumbers);
-                var blob = new Blob([byteArray], {{ type: 'application/pdf' }});
-                var url = URL.createObjectURL(blob);
-                window.open(url, '_blank');";
-
-
-            /*var jsCode = $"var w = window.open('about:blank');" +
-                         $"w.document.write('<iframe width=\"100%\" height=\"100%\" src=\"data:application/pdf;base64,{base64}\"></iframe>');";
-            */
-            await _js.InvokeVoidAsync("eval", jsCode);
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Critical Error: {ex.Message}");
+                _notificationService.ShowError("Report Connection Error", $"Cannot connect to Reports API at {_appSettings.BaseAddressForReports}: {ex.Message}");
+            }
         }
         private async Task GenerateAndOpenReport(ReportRequest request)
         {
+            if (string.IsNullOrEmpty(request.ReportName))
+            {
+                _notificationService.ShowError("Report Error", "Report name cannot be empty.");
+                return;
+            }
+
+            if (!request.ReportName.EndsWith(".rpt", StringComparison.OrdinalIgnoreCase))
+            {
+                request.ReportName += ".rpt";
+            }
+
             _loader.Show($"Generating {request.ReportName}...");
-            //var request = new { ReportName = reportName, SelectionFormula = selectionFormula };
             var json = JsonSerializer.Serialize(request);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-
 
             try
             {
                 var apiUrl = $"{_appSettings.BaseAddressForReports}/api/report";
-                var response = await _httpClient.PostAsync(apiUrl, content);
+                using var client = new HttpClient();
+                client.Timeout = TimeSpan.FromMinutes(3);
+
+                var response = await client.PostAsync(apiUrl, content);
 
                 if (!response.IsSuccessStatusCode)
                 {
                     var errorMsg = await response.Content.ReadAsStringAsync();
-                    // You could inject a Toast service here to show the error to the user
                     Console.WriteLine($"API Error for {request.ReportName}: {errorMsg}");
+                    _notificationService.ShowError("Report Generation Error", $"Status {(int)response.StatusCode}: {errorMsg}");
                     return;
                 }
                 
@@ -119,6 +122,7 @@ namespace Impulse.Services
             catch (Exception ex)
             {
                 Console.WriteLine($"Critical Error printing {request.ReportName}: {ex.Message}");
+                _notificationService.ShowError("Report Service Error", $"Cannot reach Report API at {_appSettings.BaseAddressForReports}: {ex.Message}");
             }
             finally 
             {
@@ -127,6 +131,17 @@ namespace Impulse.Services
         }
         private async Task GenerateAndOpenReport_Old(string reportName, string selectionFormula)
         {
+            if (string.IsNullOrEmpty(reportName))
+            {
+                _notificationService.ShowError("Report Error", "Report name cannot be empty.");
+                return;
+            }
+
+            if (!reportName.EndsWith(".rpt", StringComparison.OrdinalIgnoreCase))
+            {
+                reportName += ".rpt";
+            }
+
             var request = new { ReportName = reportName, SelectionFormula = selectionFormula };
             var json = JsonSerializer.Serialize(request);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -134,13 +149,16 @@ namespace Impulse.Services
             try
             {
                 var apiUrl = $"{_appSettings.BaseAddressForReports}/api/report";
-                var response = await _httpClient.PostAsync(apiUrl, content);
+                using var client = new HttpClient();
+                client.Timeout = TimeSpan.FromMinutes(3);
+
+                var response = await client.PostAsync(apiUrl, content);
 
                 if (!response.IsSuccessStatusCode)
                 {
                     var errorMsg = await response.Content.ReadAsStringAsync();
-                    // You could inject a Toast service here to show the error to the user
                     Console.WriteLine($"API Error for {reportName}: {errorMsg}");
+                    _notificationService.ShowError("Report Generation Error", $"Status {(int)response.StatusCode}: {errorMsg}");
                     return;
                 }
 
@@ -150,6 +168,7 @@ namespace Impulse.Services
             catch (Exception ex)
             {
                 Console.WriteLine($"Critical Error printing {reportName}: {ex.Message}");
+                _notificationService.ShowError("Report Service Error", $"Cannot reach Report API at {_appSettings.BaseAddressForReports}: {ex.Message}");
             }
         }
         private async Task OpenPdfInNewTab(byte[] pdfBytes)

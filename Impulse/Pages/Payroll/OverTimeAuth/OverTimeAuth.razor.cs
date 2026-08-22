@@ -170,7 +170,7 @@ namespace Impulse.Pages.Payroll.OverTimeAuth
         {
             try
             {
-                string formula = $"Month({{EmpOTHrs.DT}})={AttendanceDate.Month} AND Year({{EmpOTHrs.DT}})={AttendanceDate.Year} AND Day({{EmpOTHrs.DT}})={AttendanceDate.Day}";
+                string formula = $"{{EmpOTHrs.DT}}=Date({AttendanceDate.Year}, {AttendanceDate.Month}, {AttendanceDate.Day})";
                 var request = new ReportRequest
                 {
                     ReportName = ReportNames.Payroll.DailyOverTime,

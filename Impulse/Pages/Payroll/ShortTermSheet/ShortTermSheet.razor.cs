@@ -431,7 +431,7 @@ namespace Impulse.Pages.Payroll.ShortTermSheet
                 var dt = SelectedDate;
                 var lastDayOfMonth = new DateTime(dt.Year, dt.Month, DateTime.DaysInMonth(dt.Year, dt.Month));
 
-                string strSelection = $"{{VEmp.DT}}=#{lastDayOfMonth:yyyy-MM-dd}#";
+                string strSelection = $"{{VEmp.DT}}=Date({lastDayOfMonth.Year}, {lastDayOfMonth.Month}, {lastDayOfMonth.Day})";
                 if (!bAllDepartments && SelectedDeptID != "0")
                 {
                     strSelection += $" AND {{VEmp.DeptID}}='{SelectedDeptID}'";
@@ -477,7 +477,7 @@ namespace Impulse.Pages.Payroll.ShortTermSheet
                 var dt = SelectedDate;
                 var lastDayOfMonth = new DateTime(dt.Year, dt.Month, DateTime.DaysInMonth(dt.Year, dt.Month));
 
-                string strSelection = $"{{VEmp.DT}}=#{lastDayOfMonth:yyyy-MM-dd}#";
+                string strSelection = $"{{VEmp.DT}}=Date({lastDayOfMonth.Year}, {lastDayOfMonth.Month}, {lastDayOfMonth.Day})";
                 if (SelectedDeptID != "0")
                 {
                     strSelection += $" AND {{VEmp.DeptID}}='{SelectedDeptID}'";

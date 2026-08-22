@@ -119,9 +119,12 @@
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">To Date</label>
                     <input type="date" class="form-control form-control-sm" @bind="CurrentAccount.DTTo" />
                 </div>
-                <div>
+                <div class="d-flex gap-2">
                     <button class="btn btn-primary btn-sm px-3" @onclick="RefreshLedger" disabled="@IsLoading">
                         <i class="fas fa-sync-alt @(IsLoading ? "fa-spin" : "") me-1"></i> Refresh
+                    </button>
+                    <button class="btn btn-outline-primary btn-sm px-3" @onclick="PrintTransactionRegisterReport" disabled="@IsLoading" title="Print Transaction Register">
+                        <i class="fas fa-print me-1"></i> Print Register
                     </button>
                 </div>
             </div>
@@ -261,14 +264,14 @@
 
         <div class="menu-divider"></div>
 
-        <Item class="menu-item">
-        <i class="fas fa-ticket fa-fw win11-icon"></i> Print This Voucher
+        <Item class="menu-item" OnClick="@(async e => await PrintVoucher(e))">
+            <i class="fas fa-ticket fa-fw win11-icon text-primary"></i> Print This Voucher
         </Item>
-        <Item class="menu-item">
-        <i class="fas fa-file-pdf fa-fw win11-icon"></i> Preview This Voucher
+        <Item class="menu-item" OnClick="@(async e => await PrintVoucher(e))">
+            <i class="fas fa-file-pdf fa-fw win11-icon text-info"></i> Preview This Voucher
         </Item>
-        <Item class="menu-item">
-        <i class="fas fa-money-check fa-fw win11-icon"></i> Print Cheque
+        <Item class="menu-item" OnClick="@(async e => await ShowPrintChequeModal(e))">
+            <i class="fas fa-money-check fa-fw win11-icon text-success"></i> Print Cheque
         </Item>
 
 </ContextMenu>
@@ -378,6 +381,52 @@
                     </div>
 
                 </div>
+        </div>
+    </div>
+}
+
+@if (bPrintCheque)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" style="z-index: 1050; font-family: Calibri, sans-serif; display: flex; align-items: center; justify-content: center; background-color: rgba(0,0,0,0.4);">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content shadow-lg border-0" style="border-radius: 12px; overflow: hidden;">
+                <!-- Header -->
+                <div class="modal-header text-white" style="background-color: rgb(7, 44, 96);">
+                    <h5 class="modal-title fw-bold d-flex align-items-center mb-0">
+                        <i class="fas fa-money-check me-2"></i>
+                        Cheque Printing
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="HidePrintCheque"></button>
+                </div>
+
+                <div class="modal-body p-3">
+                    <div class="row g-2">
+                        <div class="col-md-12">
+                            <label class="fw-semibold form-label small mb-1">Payee</label>
+                            <input class="form-control form-control-sm" @bind="SelectedCheque.chqpayee" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="fw-semibold form-label small mb-1">Designation</label>
+                            <input class="form-control form-control-sm" @bind="SelectedCheque.chqdesignation" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="fw-semibold form-label small mb-1">Company</label>
+                            <input class="form-control form-control-sm" @bind="SelectedCheque.chqcompany" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="fw-semibold form-label small mb-1">Cheque Date</label>
+                            <input class="form-control form-control-sm" type="date" @bind="SelectedCheque.chqprintdate" />
+                        </div>
+                    </div>
+
+                    <div class="mt-3 text-end d-flex justify-content-end gap-2">
+                        <button class="btn btn-sm btn-secondary px-3" @onclick="HidePrintCheque">Cancel</button>
+                        <button class="btn btn-sm text-white px-3" style="background-color: rgb(7, 44, 96);" @onclick="PrintChequeConfirm">
+                            <i class="fas fa-print me-1"></i> Print Cheque
+                        </button>
+                    </div>
+                </div>  
+            </div>
         </div>
     </div>
 }

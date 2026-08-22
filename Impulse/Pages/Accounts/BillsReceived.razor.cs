@@ -1,4 +1,4 @@
-﻿using BlazorBootstrap;
+using BlazorBootstrap;
 using BlazorContextMenu;
 using Impulse.Pages.SelectionModals;
 using Impulse.Services.Integrations;
@@ -243,9 +243,9 @@ namespace Impulse.Pages.Accounts
             string strFromTo = DTFrom.ToString("dd-MMM-yyyy") + " to " + DTTo.ToString("dd-MMM-yyyy");
             string strSelectionFormula = "";
             if (SerialFrom <= 0)
-                strSelectionFormula = $"{{ImportantTasks.DTIn_DateOnly}}=#" + DTFrom.ToString("dd-MMM-yyyy") + "# to #" + DTTo.ToString("dd-MMM-yyyy") + "#";
+                strSelectionFormula = $"{{ImportantTasks.DTIn_DateOnly}} in Date({DTFrom.Year}, {DTFrom.Month}, {DTFrom.Day}) to Date({DTTo.Year}, {DTTo.Month}, {DTTo.Day})";
             else
-                strSelectionFormula = $"{{ImportantTasks.EntryID}}={SerialFrom} To {SerialTo}";
+                strSelectionFormula = $"{{ImportantTasks.EntryID}} in {SerialFrom} to {SerialTo}";
 
             var reportRequest = new ReportRequest
             {
@@ -253,7 +253,7 @@ namespace Impulse.Pages.Accounts
                 SelectionFormula = strSelectionFormula,
                 FormulaValues = new Dictionary<string, object>
                 {
-                    { "DateRange", $"\"{strFromTo}\"" }
+                    { "DateRange", $"'{strFromTo}'" }
                 }
             };
 

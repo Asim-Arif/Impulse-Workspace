@@ -1136,8 +1136,15 @@ namespace Impulse.Pages.Production.ReceivingList
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
-                ReportName = "PTC.rpt",
-                SelectionFormula = $"{{VendRcvdDetail.EntryID}} = {SelectedItem!.VRD_EntryID}"
+                ReportName = "PTCQEL.rpt",
+                Parameters = new Dictionary<string, object>
+                {
+                    { "@LotNo", SelectedItem!.LotNo }
+                },
+                FormulaValues = new Dictionary<string, object>
+                {
+                    { "ComputerName", $"'IMPULSE-WEB'" }
+                }
             });
         }
 
@@ -1148,8 +1155,15 @@ namespace Impulse.Pages.Production.ReceivingList
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
-                ReportName = "PTC_Mini.rpt",
-                SelectionFormula = $"{{VendRcvdDetail.EntryID}} = {SelectedItem!.VRD_EntryID}"
+                ReportName = "PTCQEL_Mini.rpt",
+                Parameters = new Dictionary<string, object>
+                {
+                    { "@LotNo", SelectedItem!.LotNo }
+                },
+                FormulaValues = new Dictionary<string, object>
+                {
+                    { "ComputerName", $"'IMPULSE-WEB'" }
+                }
             });
         }
 
@@ -1160,9 +1174,15 @@ namespace Impulse.Pages.Production.ReceivingList
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
-                ReportName = "PTC.rpt",
-                SelectionFormula = $"{{VendRcvdDetail.EntryID}} = {SelectedItem!.VRD_EntryID}",
-                FormulaValues = new Dictionary<string, object> { { "ShowCost", true } }
+                ReportName = "PTCQELWithPrice.rpt",
+                Parameters = new Dictionary<string, object>
+                {
+                    { "@LotNo", SelectedItem!.LotNo }
+                },
+                FormulaValues = new Dictionary<string, object>
+                {
+                    { "ComputerName", $"'IMPULSE-WEB'" }
+                }
             });
         }
 
@@ -1201,7 +1221,7 @@ namespace Impulse.Pages.Production.ReceivingList
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "RepairRejectionProcessWiseSummary.rpt",
-                SelectionFormula = LastReportSql,
+                SelectionFormula = string.Empty,
                 FormulaValues = new Dictionary<string, object>
                 {
                     { "Filters", $"'{filtersStr}'" },
@@ -1221,7 +1241,7 @@ namespace Impulse.Pages.Production.ReceivingList
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "RepairRejectionGraphs.rpt",
-                SelectionFormula = LastReportSql,
+                SelectionFormula = string.Empty,
                 FormulaValues = new Dictionary<string, object>
                 {
                     { "Filters", $"'{filtersStr}'" },
@@ -1270,7 +1290,7 @@ namespace Impulse.Pages.Production.ReceivingList
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "ReceivingList.rpt",
-                SelectionFormula = LastReportSql,
+                SelectionFormula = string.Empty,
                 FormulaValues = new Dictionary<string, object>
                 {
                     { "Filters", $"'{filtersStr}'" },
@@ -1287,7 +1307,7 @@ namespace Impulse.Pages.Production.ReceivingList
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "ReceivingList_Process.rpt",
-                SelectionFormula = LastReportSql,
+                SelectionFormula = string.Empty,
                 FormulaValues = new Dictionary<string, object>
                 {
                     { "Filters", $"'{filtersStr}'" },
@@ -1304,7 +1324,7 @@ namespace Impulse.Pages.Production.ReceivingList
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "ReceivingListSummary.rpt",
-                SelectionFormula = LastReportSql,
+                SelectionFormula = string.Empty,
                 FormulaValues = new Dictionary<string, object>
                 {
                     { "Filters", $"'{filtersStr}'" },

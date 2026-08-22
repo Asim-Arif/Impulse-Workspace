@@ -324,7 +324,7 @@ namespace Impulse.Pages.Export.Invoices
                     SelectionFormula = $"{{VShippingInstructions.CustomInvoice}}='{selectedInvoice}'",
                     FormulaValues = new Dictionary<string, object>
                     {
-                        { "HideValue", hideValue ? "True" : "False" }
+                        { "HideValue", hideValue }
                     }
                 };
 

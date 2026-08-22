@@ -1,4 +1,4 @@
-﻿using DataAccessLibrary.Models.ViewModels;
+using DataAccessLibrary.Models.ViewModels;
 using DataAccessLibrary.Models.ViewModels.Accounts;
 using Impulse.Constants;
 using Impulse.Services;
@@ -474,7 +474,7 @@ namespace Impulse.Pages.Accounts
                     SelectionFormula = strSelectionFormula,
                     FormulaValues = new Dictionary<string, object>
                     {
-                        { "Test", "\"Value from Front end\"" }
+                        { "Test", "'Value from Front end'" }
                     }
                 };
                 await ReportNavigationService.PrintReportAsync(reportRequest);

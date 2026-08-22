@@ -249,9 +249,9 @@ namespace Impulse.Pages.Payroll.SalaryHistory
                     SelectionFormula = formula,
                     FormulaValues = new Dictionary<string, object>
                     {
-                        { "Company", CompanyName },
-                        { "From", FromDate.ToString("ddd dd-MMM-yyyy") },
-                        { "To", ToDate.ToString("ddd dd-MMM-yyyy") }
+                        { "Company", $"'{CompanyName}'" },
+                        { "From", $"'{FromDate:ddd dd-MMM-yyyy}'" },
+                        { "To", $"'{ToDate:ddd dd-MMM-yyyy}'" }
                     }
                 };
 

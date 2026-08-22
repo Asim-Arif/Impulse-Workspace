@@ -1,4 +1,4 @@
-﻿using BlazorBootstrap;
+using BlazorBootstrap;
 using BlazorContextMenu;
 using Impulse.Pages.SelectionModals;
 using Impulse.Services.Integrations;
@@ -234,10 +234,10 @@ namespace Impulse.Pages.Accounts
             var reportRequest = new ReportRequest
             {
                 ReportName = ReportNames.ChequeReceivingList,
-                SelectionFormula = $"{{VChequeReceivingReport.DT}}=#"+DTFrom.ToString("dd-MMM-yyyy")+"# to #"+DTTo.ToString("dd-MMM-yyyy")+"#",
+                SelectionFormula = $"{{VChequeReceivingReport.DT}} in Date({DTFrom.Year}, {DTFrom.Month}, {DTFrom.Day}) to Date({DTTo.Year}, {DTTo.Month}, {DTTo.Day})",
                 FormulaValues = new Dictionary<string, object>
                 {
-                    { "DateRange", $"\"{strFromTo}\"" }
+                    { "DateRange", $"'{strFromTo}'" }
                 }
             };
 

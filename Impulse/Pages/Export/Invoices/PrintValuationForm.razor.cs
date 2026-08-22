@@ -153,7 +153,7 @@ namespace Impulse.Pages.Export.Invoices
                     SelectionFormula = $"{{VrptValuationFormA.CustomInvoice}}='{selectedInvoice}'",
                     FormulaValues = new Dictionary<string, object>
                     {
-                        { "HideValue", printValue ? "False" : "True" } // Since company is "IAA", we always pass printValue formula state
+                        { "HideValue", !printValue } // Since company is "IAA", we always pass printValue formula state
                     }
                 };
 

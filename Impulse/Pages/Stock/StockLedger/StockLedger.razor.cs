@@ -107,11 +107,11 @@ namespace Impulse.Pages.Stock.StockLedger
             }
 
             // Crystal formulas match what VB6 passed
-            string selectionFormula = $"{{VSTockLedger.MaterialID}}='{SelectedMaterial.RMID1}' and ({{VStockLedger.TransactionDate}} = Date({FromDate:yyyy,MM,dd}) to Date({ToDate:yyyy,MM,dd}))";
+            string selectionFormula = $"{{VSTockLedger.MaterialID}}='{SelectedMaterial.RMID1}' and ({{VStockLedger.TransactionDate}} in Date({FromDate.Year},{FromDate.Month},{FromDate.Day}) to Date({ToDate.Year},{ToDate.Month},{ToDate.Day}))";
             
             var formulaValues = new Dictionary<string, object>
             {
-                { "FromTo", $"From   {FromDate:dd-MMM-yyyy}    to     {ToDate:dd-MMM-yyyy}" },
+                { "FromTo", $"'From   {FromDate:dd-MMM-yyyy}    to     {ToDate:dd-MMM-yyyy}'" },
                 { "OpeningBalance", OpeningBalance.ToString() }
             };
 

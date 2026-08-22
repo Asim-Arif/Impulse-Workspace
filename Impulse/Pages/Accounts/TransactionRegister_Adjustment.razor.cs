@@ -1,4 +1,4 @@
-﻿using Azure.Identity;
+using Azure.Identity;
 using BlazorBootstrap;
 using BlazorContextMenu;
 using DataAccessLibrary;
@@ -231,18 +231,24 @@ namespace Impulse.Pages.Accounts
             if (CurrentVoucher != null)
             {
                 string cond = "{Electricity_Invoices_Detail.VchrNo}='" + CurrentVoucher.VchrNo + "'";
-                //ReportNavigationService.PrintReportAsync("JV_Voucher_Adjustment.rpt", cond);
-                ReportNavigationService.PrintReportAsync_Old("JV_Voucher_Adjustment.rpt", cond);
+                await ReportNavigationService.PrintReportAsync(new ReportRequest
+                {
+                    ReportName = "JV_Voucher_Adjustment.rpt",
+                    SelectionFormula = cond
+                });
             }
         }
 
-        private void PrintTransaction()
+        private async Task PrintTransaction()
         {
             if (CurrentAccount != null)
             {
-                string cond = "{VLedger.DT}=#" + CurrentAccount.DTFrom + "# TO #" + CurrentAccount.DTTo + "#";
-                //ReportNavigationService.PrintReportAsync("VoucherList_Adjustment.rpt", cond);
-                ReportNavigationService.PrintReportAsync_Old("VoucherList_Adjustment.rpt", cond);
+                string cond = $"{{VLedger.DT}} in Date({CurrentAccount.DTFrom.Year}, {CurrentAccount.DTFrom.Month}, {CurrentAccount.DTFrom.Day}) to Date({CurrentAccount.DTTo.Year}, {CurrentAccount.DTTo.Month}, {CurrentAccount.DTTo.Day})";
+                await ReportNavigationService.PrintReportAsync(new ReportRequest
+                {
+                    ReportName = "VoucherList_Adjustment.rpt",
+                    SelectionFormula = cond
+                });
             }
         }
 

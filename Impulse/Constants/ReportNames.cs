@@ -3,7 +3,7 @@ namespace Impulse.Constants
     public static class ReportNames
     {
         // Root Reports
-        public const string Voucher = "PV.rpt";
+        public const string Voucher = "Voucher.rpt";
         public const string BOD_Meetings_Participants = "BOD_Meetings_Participants.rpt";
         public const string EditedVouchers = "EditedVouchers.rpt";
         public const string TrialBalance = "TrialBalance.rpt";
@@ -40,7 +40,7 @@ namespace Impulse.Constants
         // Accounts Subfolder
         public static class Accounts
         {
-            private const string Folder = "Reports_Accounts/";
+            private const string Folder = "";
             public const string TrialBalance = Folder + "TrialBalance.rpt";
             public const string Ledger = Folder + "GeneralLedger.rpt";
             public const string Cheques_M1 = Folder + "Cheques_M1.rpt";
@@ -55,7 +55,7 @@ namespace Impulse.Constants
         public static class Payroll
         {
             private const string Folder = "Payroll/";
-            public const string PaySlip = Folder + "PaySlip.rpt";
+            public const string PaySlip = Folder + "rptPayslip.rpt";
 
             // Employee List Reports
             public const string EmpList                = Folder + "rptEmpList.rpt";
@@ -70,7 +70,7 @@ namespace Impulse.Constants
             public const string EmpListPercentage      = Folder + "rptEmpListPercentage.rpt";
             public const string AppForm                = Folder + "rptAppForm.rpt";
             public const string EmpSalHistory          = Folder + "rptEmpSalHistory.rpt";
-            public const string EmpSalaryLedger        = Folder + "EmpSalaryLedger.rpt";
+            public const string EmpSalaryLedger        = Folder + "rptEmpSalLedger.rpt";
             public const string TerminatedEmployees        = Folder + "TerminatedEmployees.rpt";
             public const string NewHiredEmployees          = Folder + "NewHiredEmployees.rpt";
             public const string EmployeesTargetsPerformance = Folder + "Employees_Targets_Performance.rpt";
@@ -120,7 +120,7 @@ namespace Impulse.Constants
             public const string NonSocialSecurity       = Folder + "rptNonSocialSecurity.rpt";
 
             // EOBI Reports
-            public const string EOBISheet               = Folder + "rptEOBI.rpt";
+            public const string EOBISheet               = Folder + "rptOldAge.rpt";
             public const string NonEOBI                = Folder + "rptNonEOBI.rpt";
 
             // Designation Reports

@@ -219,36 +219,16 @@ namespace Impulse.Pages.Accounts
             var vchr = e.Data as AccountsReportingModel;
             CurrentAccount = vchr;
 
-            if (CurrentAccount != null)
+            if (CurrentAccount != null && !string.IsNullOrEmpty(CurrentAccount.VchrNo))
             {
                 var reportRequest = new ReportRequest
                 {
-                    ReportName = ReportNames.Voucher, //"PV.rpt",
-                    Format = "xlsx",
-                    SelectionFormula = $"{{VLedger.VchrNo}} = '{CurrentAccount.VchrNo}'",
-                    FormulaValues = new Dictionary<string, object>
-                    {
-                        { "Test", "\"From\"" }
-                    }
+                    ReportName = ReportNames.Voucher,
+                    SelectionFormula = $"{{VLedger.VchrNo}} = '{CurrentAccount.VchrNo}'"
                 };
                 
                 ReportNavigationService.PrintReportAsync(reportRequest);
-                
             }
-            //use below code example for Parameterized reports.
-            /*DateTime myDT = DateTime.Now;
-            var reportRequest = new ReportRequest
-            {
-                ReportName = "Yearly_PLS_Comparison.rpt",
-                //SelectionFormula = $"{{VLedger.VchrNo}} = '{CurrentAccount.VchrNo}'",
-                Parameters = new Dictionary<string, object>
-                    {
-                        { "@Year", 2024 }
-                    }
-            };
-
-            ReportNavigationService.PrintReportAsync(reportRequest);
-            */
         }
 
         private void PrintLedgerWithTitle(ItemClickEventArgs e)
@@ -281,11 +261,10 @@ namespace Impulse.Pages.Accounts
 
             if (CurrentAccount != null)
             {
-
                 var reportRequest = new ReportRequest
                 {
                     ReportName = ReportNames.Accounts.Transaction_Report,
-                    SelectionFormula = $"{{VLedger.AccNo}} = '{CurrentAccount.AccNo}' AND {{VLedger.VDate}}=#{CurrentAccount.DTFrom}# TO #{CurrentAccount.DTTo}#",
+                    SelectionFormula = $"{{VLedger.AccNo}} = '{CurrentAccount.AccNo}' AND {{VLedger.VDate}} in Date({CurrentAccount.DTFrom.Year}, {CurrentAccount.DTFrom.Month}, {CurrentAccount.DTFrom.Day}) to Date({CurrentAccount.DTTo.Year}, {CurrentAccount.DTTo.Month}, {CurrentAccount.DTTo.Day})",
                 };
 
                 ReportNavigationService.PrintReportAsync(reportRequest);
@@ -294,33 +273,23 @@ namespace Impulse.Pages.Accounts
 
         private void PrintLedger(ItemClickEventArgs e)
         {
-            var vchr = e.Data as AccountsReportingModel;
-
-            decimal openingBalance = CurrentAccount.OpeningBalance;
-            string dateRange = $"'From {(CurrentAccount.DTFrom.ToString("dd-MMM-yyyy") ?? "")} To {(CurrentAccount.DTTo.ToString("dd-MMM-yyyy") ?? "")}'";
-            if (CurrentAccount != null)
+            if (CurrentAccount != null && !string.IsNullOrEmpty(CurrentAccount.AccNo))
             {
+                decimal openingBalance = CurrentAccount.OpeningBalance;
+                string openCrDr = openingBalance >= 0 ? "Dr" : "Cr";
+                string dateRange = $"From {CurrentAccount.DTFrom:dd-MMM-yyyy} To {CurrentAccount.DTTo:dd-MMM-yyyy}";
+                string selectionFormula = $"{{VLedger.AccNo}}='{CurrentAccount.AccNo}' AND {{VLedger.VDate}} in Date({CurrentAccount.DTFrom.Year}, {CurrentAccount.DTFrom.Month}, {CurrentAccount.DTFrom.Day}) to Date({CurrentAccount.DTTo.Year}, {CurrentAccount.DTTo.Month}, {CurrentAccount.DTTo.Day})";
+
                 var reportRequest = new ReportRequest
                 {
-                    ReportName = ReportNames.Accounts.PrintLedgerReport,
-                    SelectionFormula = $"1=1",
-                    Parameters = new Dictionary<string, object>
-                    {
-                        { "@DTFrom", CurrentAccount.DTFrom },
-                        { "@DTTo", CurrentAccount.DTTo},
-                        { "@AccNo", CurrentAccount.AccNo},
-
-                        { "@SubAccOf", ""}
-                    }
-                    ,
+                    ReportName = "Ledger.rpt",
+                    SelectionFormula = selectionFormula,
                     FormulaValues = new Dictionary<string, object>
                     {
-                        //{ "AccNo",  CurrentAccount.AccNo },
-                        //{ "AccTitle",  CurrentAccount.AccTitle }
-                        //,
-                        { "OpeningBalance",  openingBalance },
-                        { "OpenCrDr",  openingBalance },
-                        { "FromTo",  dateRange }
+                        { "Company", "'IAA'" },
+                        { "OpeningBalance", openingBalance },
+                        { "OpenCrDr", $"'{openCrDr}'" },
+                        { "FromTo", $"'{dateRange}'" }
                     }
                 };
 

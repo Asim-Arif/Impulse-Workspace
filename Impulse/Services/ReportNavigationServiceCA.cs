@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components;
 using System;
 namespace Impulse.Services
 {
@@ -9,11 +9,11 @@ namespace Impulse.Services
         {
             _navigation = navigation;
         }
-        public void PrintVoucher(string voucherNo) 
+        public void PrintVoucher(string strVchrNo)
         {
-            string strSelectionFormula= "{VLedger.VchrNo}='"+voucherNo+"'";
+            string strSelectionFormula = $"{{VLedger.VchrNo}}='{strVchrNo}'";
             string strEncodedFormula = Uri.EscapeDataString(strSelectionFormula);
-            _navigation.NavigateTo($"/myreports/PV.rpt/{strEncodedFormula}");
+            _navigation.NavigateTo($"/myreports/Voucher.rpt/{strEncodedFormula}");
         }
     }
 }

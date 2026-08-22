@@ -204,13 +204,13 @@ namespace Impulse.Pages.Stock.RMPO
         private async Task OnPrintOrder(BlazorContextMenu.ItemClickEventArgs e)
         {
             if (e.Data is RMPOListViewModel item)
-                await ReportNavigation.PrintReportAsync(new ReportRequest { ReportName = "RMPO", SelectionFormula = $"{{VendOrders.OrderNo}}='{item.OrderNo}'" });
+                await ReportNavigation.PrintReportAsync(new ReportRequest { ReportName = "RMPO.rpt", SelectionFormula = $"{{VendOrders.OrderNo}}='{item.OrderNo}'" });
         }
 
         private async Task OnPrintOrderStatus(BlazorContextMenu.ItemClickEventArgs e)
         {
             if (e.Data is RMPOListViewModel item)
-                await ReportNavigation.PrintReportAsync(new ReportRequest { ReportName = "RMPOWithReceiving", SelectionFormula = $"{{VendOrders.OrderNo}}='{item.OrderNo}'" });
+                await ReportNavigation.PrintReportAsync(new ReportRequest { ReportName = "RMPOWithReceiving.rpt", SelectionFormula = $"{{VendOrders.OrderNo}}='{item.OrderNo}'" });
         }
 
         private async Task OnPrintOrderZeroRate(BlazorContextMenu.ItemClickEventArgs e)
@@ -218,7 +218,7 @@ namespace Impulse.Pages.Stock.RMPO
             if (e.Data is RMPOListViewModel item)
                 await ReportNavigation.PrintReportAsync(new ReportRequest 
                 { 
-                    ReportName = "RMPOWP", 
+                    ReportName = "RMPOWP.rpt", 
                     SelectionFormula = $"{{VendOrders.OrderNo}}='{item.OrderNo}'",
                     FormulaValues = new Dictionary<string, object> { { "ZeroRate", true } }
                 });
@@ -227,28 +227,26 @@ namespace Impulse.Pages.Stock.RMPO
         private async Task OnPrintOrderOfficeCopy(BlazorContextMenu.ItemClickEventArgs e)
         {
             if (e.Data is RMPOListViewModel item)
-                await ReportNavigation.PrintReportAsync(new ReportRequest { ReportName = "RMPOOfficeCopy", SelectionFormula = $"{{VendOrders.OrderNo}}='{item.OrderNo}'" });
+                await ReportNavigation.PrintReportAsync(new ReportRequest { ReportName = "RMPOOfficeCopy.rpt", SelectionFormula = $"{{VendOrders.OrderNo}}='{item.OrderNo}'" });
         }
 
         private async Task OnPrintOrderVendorCopy(BlazorContextMenu.ItemClickEventArgs e)
         {
             if (e.Data is RMPOListViewModel item)
-                await ReportNavigation.PrintReportAsync(new ReportRequest { ReportName = "RMPOVendorCopy", SelectionFormula = $"{{VendOrders.OrderNo}}='{item.OrderNo}'" });
+                await ReportNavigation.PrintReportAsync(new ReportRequest { ReportName = "RMPOVendorCopy.rpt", SelectionFormula = $"{{VendOrders.OrderNo}}='{item.OrderNo}'" });
         }
 
         private async Task OnPrintOrderAccountsCopy(BlazorContextMenu.ItemClickEventArgs e)
         {
             if (e.Data is RMPOListViewModel item)
-                await ReportNavigation.PrintReportAsync(new ReportRequest { ReportName = "RMPOAccountCopy", SelectionFormula = $"{{VendOrders.OrderNo}}='{item.OrderNo}'" });
+                await ReportNavigation.PrintReportAsync(new ReportRequest { ReportName = "RMPOAccountCopy.rpt", SelectionFormula = $"{{VendOrders.OrderNo}}='{item.OrderNo}'" });
         }
 
         private async Task OnPrintOrderListSimple(BlazorContextMenu.ItemClickEventArgs e)
         {
-            string dateFrom = Filter.DateFrom?.ToString("yyyy-MM-dd") ?? "";
-            string dateTo = Filter.DateTo?.ToString("yyyy-MM-dd") ?? "";
-            string selectionFormula = $"{{VVendOrders.DT}} >= Date({Filter.DateFrom?.Year ?? 1900}, {Filter.DateFrom?.Month ?? 1}, {Filter.DateFrom?.Day ?? 1}) AND {{VVendOrders.DT}} <= Date({Filter.DateTo?.Year ?? 2099}, {Filter.DateTo?.Month ?? 1}, {Filter.DateTo?.Day ?? 1})";
+            string selectionFormula = $"{{VVendOrders.DT}} in Date({Filter.DateFrom?.Year ?? 1900}, {Filter.DateFrom?.Month ?? 1}, {Filter.DateFrom?.Day ?? 1}) to Date({Filter.DateTo?.Year ?? 2099}, {Filter.DateTo?.Month ?? 1}, {Filter.DateTo?.Day ?? 1})";
             
-            await ReportNavigation.PrintReportAsync(new ReportRequest { ReportName = "rptVendPOListDateWise", SelectionFormula = selectionFormula });
+            await ReportNavigation.PrintReportAsync(new ReportRequest { ReportName = "rptVendPOListDateWise.rpt", SelectionFormula = selectionFormula });
         }
         
         // --- PDF Attachment ---

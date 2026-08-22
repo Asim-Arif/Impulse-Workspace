@@ -222,7 +222,7 @@ namespace Impulse.Pages.Production.MakerList
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "MakerList.rpt",
-                SelectionFormula = IncludeInactive ? "" : "{VMakers.Active}=True"
+                SelectionFormula = string.Empty
             });
         }
     }

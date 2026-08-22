@@ -253,7 +253,7 @@ namespace Impulse.Pages.Production.Statistics
             var strEmpID = res.SelectedValue2 ?? "0";
             var strProcesses = res.SelectedValue3 ?? "0";
 
-            string selection = $"{{VEmpProductivityReport.DTOnly}}=#{dtFrom:yyyy-MM-dd}# TO #{dtTo:yyyy-MM-dd}#";
+            string selection = $"{{VEmpProductivityReport.DTOnly}} in Date({dtFrom.Year}, {dtFrom.Month}, {dtFrom.Day}) to Date({dtTo.Year}, {dtTo.Month}, {dtTo.Day})";
 
             if (strEmpID != "0")
             {
@@ -278,9 +278,7 @@ namespace Impulse.Pages.Production.Statistics
                 FormulaValues = new Dictionary<string, object>
                 {
                     { "SubHeading", $"'{dtFrom:dd-MMM-yyyy} to {dtTo:dd-MMM-yyyy}'" },
-                    { "ReportType", "'Regular'" },
-                    { "DTFrom", $"#{dtFrom:yyyy-MM-dd}#" },
-                    { "DTTo", $"#{dtTo:yyyy-MM-dd}#" }
+                    { "ReportType", "'Regular'" }
                 }
             };
 
@@ -302,7 +300,7 @@ namespace Impulse.Pages.Production.Statistics
             var strDeptID = res.SelectedValue ?? "0";
             var strEmpID = res.SelectedValue_sub ?? "0";
 
-            string selection = $"{{VEmpProductivityReport_Production.DT}}=#{dtFrom:yyyy-MM-dd}# TO #{dtTo:yyyy-MM-dd}#";
+            string selection = $"{{VEmpProductivityReport_Production.DT}} in Date({dtFrom.Year}, {dtFrom.Month}, {dtFrom.Day}) to Date({dtTo.Year}, {dtTo.Month}, {dtTo.Day})";
 
             if (strEmpID != "0")
             {
@@ -339,7 +337,7 @@ namespace Impulse.Pages.Production.Statistics
             var dtFrom = res.Date;
             var strDeptID = res.SelectedValue ?? "0";
 
-            string selection = $"{{VEmpProductivityReport.DTOnly}}=#{dtFrom:yyyy-MM-dd}# AND {{VEmpProductivityReport.OverTime}}=FALSE";
+            string selection = $"{{VEmpProductivityReport.DTOnly}} = Date({dtFrom.Year}, {dtFrom.Month}, {dtFrom.Day}) AND {{VEmpProductivityReport.OverTime}}=FALSE";
 
             if (strDeptID != "0" && !string.IsNullOrEmpty(strDeptID) && strDeptID != "All")
             {
@@ -375,7 +373,7 @@ namespace Impulse.Pages.Production.Statistics
             var dtFrom = res.DateFrom;
             var dtTo = res.DateTo;
 
-            string selection = $"{{VEmpProductivityReport_Production.DTOnly}}=#{dtFrom:yyyy-MM-dd}# TO #{dtTo:yyyy-MM-dd}# AND {{VEmpProductivityReport_Production.OverTime}}=FALSE";
+            string selection = $"{{VEmpProductivityReport_Production.DTOnly}} in Date({dtFrom.Year}, {dtFrom.Month}, {dtFrom.Day}) to Date({dtTo.Year}, {dtTo.Month}, {dtTo.Day}) AND {{VEmpProductivityReport_Production.OverTime}}=FALSE";
 
             var req = new ReportRequest
             {

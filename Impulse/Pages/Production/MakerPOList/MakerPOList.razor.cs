@@ -705,7 +705,7 @@ namespace Impulse.Pages.Production.MakerPOList
             {
                 ReportName = "IssList.rpt",
                 SelectionFormula = $"{{VendIssued.MasterPONo}} = '{SelectedItem.MasterPONo}'",
-                FormulaValues = new Dictionary<string, object> { { "Copy", "OFFICE COPY" } }
+                FormulaValues = new Dictionary<string, object> { { "Copy", "'OFFICE COPY'" } }
             });
         }
 
@@ -717,7 +717,7 @@ namespace Impulse.Pages.Production.MakerPOList
             {
                 ReportName = "IssList.rpt",
                 SelectionFormula = $"{{VendIssued.MasterPONo}} = '{SelectedItem.MasterPONo}'",
-                FormulaValues = new Dictionary<string, object> { { "Copy", "MAKER COPY" } }
+                FormulaValues = new Dictionary<string, object> { { "Copy", "'MAKER COPY'" } }
             });
         }
 
@@ -729,7 +729,7 @@ namespace Impulse.Pages.Production.MakerPOList
             {
                 ReportName = "IssList.rpt",
                 SelectionFormula = $"{{VendIssued.MasterPONo}} = '{SelectedItem.MasterPONo}'",
-                FormulaValues = new Dictionary<string, object> { { "Copy", "ACCOUNTS COPY" } }
+                FormulaValues = new Dictionary<string, object> { { "Copy", "'ACCOUNTS COPY'" } }
             });
         }
 
@@ -773,8 +773,15 @@ namespace Impulse.Pages.Production.MakerPOList
             if (!HasValidLotNo) return;
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
-                ReportName = "IssSlipMin.rpt",
-                SelectionFormula = $"{{VendIssued.EntryID}} IN [{SelectedItem!.EntryID}]"
+                ReportName = "PTCQEL.rpt",
+                Parameters = new Dictionary<string, object>
+                {
+                    { "@LotNo", SelectedItem!.LotNo }
+                },
+                FormulaValues = new Dictionary<string, object>
+                {
+                    { "ComputerName", $"'IMPULSE-WEB'" }
+                }
             });
         }
 
@@ -784,8 +791,15 @@ namespace Impulse.Pages.Production.MakerPOList
             if (!HasValidLotNo) return;
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
-                ReportName = "IssSlipMin.rpt",
-                SelectionFormula = $"{{VendIssued.EntryID}} IN [{SelectedItem!.EntryID}]"
+                ReportName = "PTCQEL_Mini.rpt",
+                Parameters = new Dictionary<string, object>
+                {
+                    { "@LotNo", SelectedItem!.LotNo }
+                },
+                FormulaValues = new Dictionary<string, object>
+                {
+                    { "ComputerName", $"'IMPULSE-WEB'" }
+                }
             });
         }
 
@@ -795,9 +809,15 @@ namespace Impulse.Pages.Production.MakerPOList
             if (!HasValidLotNo) return;
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
-                ReportName = "IssSlipMin.rpt",
-                SelectionFormula = $"{{VendIssued.EntryID}} IN [{SelectedItem!.EntryID}]",
-                FormulaValues = new Dictionary<string, object> { { "WithPrice", true } }
+                ReportName = "PTCQELWithPrice.rpt",
+                Parameters = new Dictionary<string, object>
+                {
+                    { "@LotNo", SelectedItem!.LotNo }
+                },
+                FormulaValues = new Dictionary<string, object>
+                {
+                    { "ComputerName", $"'IMPULSE-WEB'" }
+                }
             });
         }
 
@@ -806,7 +826,7 @@ namespace Impulse.Pages.Production.MakerPOList
             ResolveRowItem(args);
             if (!HasPurchaserSelected) return;
 
-            string formula = $"{{VVendIssdDetail_Simple.VID_EmpID}} = '{Filter.PurchaserEmpId}' AND {{VVendIssdDetail_Simple.DT}} = #{Filter.DtFrom:yyyy-MM-dd}# TO #{Filter.DtTo:yyyy-MM-dd}#";
+            string formula = $"{{VVendIssdDetail_Simple.VID_EmpID}} = '{Filter.PurchaserEmpId}' AND {{VVendIssdDetail_Simple.DT}} in Date({Filter.DtFrom.Year}, {Filter.DtFrom.Month}, {Filter.DtFrom.Day}) to Date({Filter.DtTo.Year}, {Filter.DtTo.Month}, {Filter.DtTo.Day})";
             if (!string.IsNullOrWhiteSpace(Filter.OrderNo))
             {
                 formula += $" AND {{FCustomerOrders.OrderNo}} = '{Filter.OrderNo.Trim()}'";
@@ -822,7 +842,7 @@ namespace Impulse.Pages.Production.MakerPOList
         public async Task PrintPurchasePlan(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            string formula = $"{{VVendIssdDetail_Simple.DT}} = #{Filter.DtFrom:yyyy-MM-dd}# TO #{Filter.DtTo:yyyy-MM-dd}#";
+            string formula = $"{{VVendIssdDetail_Simple.DT}} in Date({Filter.DtFrom.Year}, {Filter.DtFrom.Month}, {Filter.DtFrom.Day}) to Date({Filter.DtTo.Year}, {Filter.DtTo.Month}, {Filter.DtTo.Day})";
             if (Filter.MakerIds != null && Filter.MakerIds.Any())
             {
                 formula += $" AND {{VVendIssdDetail_Simple.VendID}} IN [{string.Join(",", Filter.MakerIds)}]";
@@ -846,7 +866,7 @@ namespace Impulse.Pages.Production.MakerPOList
         public async Task PrintPurchaseCalendar(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            string formula = $"{{DateLookup.DateFull}} = #{Filter.DtFrom:yyyy-MM-dd}# TO #{Filter.DtTo:yyyy-MM-dd}#";
+            string formula = $"{{DateLookup.DateFull}} in Date({Filter.DtFrom.Year}, {Filter.DtFrom.Month}, {Filter.DtFrom.Day}) to Date({Filter.DtTo.Year}, {Filter.DtTo.Month}, {Filter.DtTo.Day})";
             string makerId = Filter.MakerIds != null && Filter.MakerIds.Any() ? string.Join(",", Filter.MakerIds) : "0";
             string groupIds = Filter.ItemGroupIds != null && Filter.ItemGroupIds.Any() ? string.Join(",", Filter.ItemGroupIds) : "0";
             string custCodes = Filter.CustomerCodes != null && Filter.CustomerCodes.Any() ? string.Join(",", Filter.CustomerCodes) : "0";
@@ -857,9 +877,9 @@ namespace Impulse.Pages.Production.MakerPOList
                 SelectionFormula = formula,
                 FormulaValues = new Dictionary<string, object>
                 {
-                    { "Maker", makerId },
-                    { "ItemGroup", groupIds },
-                    { "Customer", custCodes }
+                    { "Maker", $"'{makerId}'" },
+                    { "ItemGroup", $"'{groupIds}'" },
+                    { "Customer", $"'{custCodes}'" }
                 }
             });
         }
@@ -869,7 +889,7 @@ namespace Impulse.Pages.Production.MakerPOList
             ResolveRowItem(args);
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
-                ReportName = "FollowupReport.rpt",
+                ReportName = "Followup_Report.rpt",
                 SelectionFormula = SelectedItem != null ? $"{{VendIssued.EntryID}} = {SelectedItem.EntryID}" : string.Empty
             });
         }
@@ -910,7 +930,7 @@ namespace Impulse.Pages.Production.MakerPOList
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "IssuanceList.rpt",
-                SelectionFormula = LastReportSql,
+                SelectionFormula = string.Empty,
                 FormulaValues = new Dictionary<string, object>
                 {
                     { "Filters", $"'{filtersStr}'" },
@@ -927,7 +947,7 @@ namespace Impulse.Pages.Production.MakerPOList
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "IssuanceList_BatchNoWise.rpt",
-                SelectionFormula = LastReportSql,
+                SelectionFormula = string.Empty,
                 FormulaValues = new Dictionary<string, object>
                 {
                     { "Filters", $"'{filtersStr}'" },
@@ -945,7 +965,7 @@ namespace Impulse.Pages.Production.MakerPOList
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "MakerIssuanceReportValuewise.rpt",
-                SelectionFormula = LastReportSql,
+                SelectionFormula = string.Empty,
                 FormulaValues = new Dictionary<string, object>
                 {
                     { "Filters", $"'{filtersStr}'" },
@@ -962,7 +982,7 @@ namespace Impulse.Pages.Production.MakerPOList
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "MakerList_Issuance.rpt",
-                SelectionFormula = LastReportSql,
+                SelectionFormula = string.Empty,
                 FormulaValues = new Dictionary<string, object>
                 {
                     { "Filters", $"'{filtersStr}'" },

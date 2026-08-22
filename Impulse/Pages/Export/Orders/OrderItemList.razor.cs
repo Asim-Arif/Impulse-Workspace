@@ -314,11 +314,11 @@ namespace Impulse.Pages.Export.Orders
             if (filterUrgent)
                 sel = "({VFOrderItems.DeliveryStatus}=2 OR {VFOrderItems.Remarks}<>'')";
             else if (filterBoth)
-                sel = $"({{VFOrderItems.DeliveryStatus}}=0 OR ({{VFOrderItems.DeliveryDT}}=#{dtFrom:d/M/yyyy}# TO #{dtTo:d/M/yyyy}#))";
+                sel = $"({{VFOrderItems.DeliveryStatus}}=0 OR ({{VFOrderItems.DeliveryDT}} in Date({dtFrom.Year}, {dtFrom.Month}, {dtFrom.Day}) to Date({dtTo.Year}, {dtTo.Month}, {dtTo.Day})))";
             else if (filterNoDelivery)
                 sel = "{VFOrderItems.DeliveryStatus}=0";
             else
-                sel = $"{{VFOrderItems.DeliveryDT}}=#{dtFrom:d/M/yyyy}# TO #{dtTo:d/M/yyyy}#";
+                sel = $"{{VFOrderItems.DeliveryDT}} in Date({dtFrom.Year}, {dtFrom.Month}, {dtFrom.Day}) to Date({dtTo.Year}, {dtTo.Month}, {dtTo.Day})";
 
             if (!string.IsNullOrEmpty(selectedCustomer?.CustCode))
                 sel += $" AND {{VFOrderItems.CustCode}}='{selectedCustomer.CustCode}'";

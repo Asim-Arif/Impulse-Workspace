@@ -154,7 +154,7 @@ namespace Impulse.Pages.Stock.FinishItemLedger
                 var req = new ReportRequest
                 {
                     ReportName = ReportNames.Stock.FinishItemLedger,
-                    FormulaValues = new Dictionary<string, object>
+                    Parameters = new Dictionary<string, object>
                     {
                         { "@ItemID", SelectedArticle.ItemID },
                         { "@DTFrom", FromDate },
@@ -179,7 +179,7 @@ namespace Impulse.Pages.Stock.FinishItemLedger
                 var req = new ReportRequest
                 {
                     ReportName = ReportNames.Stock.FinishItemLedgerBinCard,
-                    FormulaValues = new Dictionary<string, object>
+                    Parameters = new Dictionary<string, object>
                     {
                         { "@ItemID", SelectedArticle.ItemID },
                         { "@DTFrom", FromDate },

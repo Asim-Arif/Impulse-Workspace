@@ -164,8 +164,16 @@ namespace Impulse.Pages.Dashboards.CommandCenter
             {
                 await ReportNavigationService.PrintReportAsync(new ReportRequest
                 {
-                    ReportName = "rptCashBook",
-                    SelectionFormula = $"{{VBankCashPaymentReceipt.VDate}} = #{DateTime.Today:yyyy-MM-dd}#"
+                    ReportName = "CashBookReport.rpt",
+                    Parameters = new Dictionary<string, object>
+                    {
+                        { "@DTFrom", DateTime.Today },
+                        { "@DTTo", DateTime.Today }
+                    },
+                    FormulaValues = new Dictionary<string, object>
+                    {
+                        { "FromTo", $"'{DateTime.Today:dd-MMM-yyyy} to {DateTime.Today:dd-MMM-yyyy}'" }
+                    }
                 });
             }
             catch (Exception ex)
@@ -174,8 +182,8 @@ namespace Impulse.Pages.Dashboards.CommandCenter
                 {
                     Severity = NotificationSeverity.Error,
                     Summary = "Report Error",
-                    Detail = ex.Message,
-                    Duration = 3500
+                    Detail = $"Could not open Cash Book: {ex.Message}",
+                    Duration = 4000
                 });
             }
         }
@@ -186,8 +194,13 @@ namespace Impulse.Pages.Dashboards.CommandCenter
             {
                 await ReportNavigationService.PrintReportAsync(new ReportRequest
                 {
-                    ReportName = "rptFOrderList",
-                    SelectionFormula = "{VFOrderList.TotalShippedQty} < {VFOrderList.TotalOrderQty} AND ISNULL({VFOrderList.Cancelled}, 0) = 0 AND {VFOrderList.CustCode} <> 'Stock'"
+                    ReportName = "rptFOrderList.rpt",
+                    SelectionFormula = "{VFOrderList.TotalShippedQty} < {VFOrderList.TotalOrderQty} AND (IsNull({VFOrderList.Cancelled}) OR {VFOrderList.Cancelled} = 0) AND {VFOrderList.CustCode} <> 'Stock'",
+                    FormulaValues = new Dictionary<string, object>
+                    {
+                        { "ForCustomer", "'<All Customers>'" },
+                        { "ForFromTo", "'All Pending'" }
+                    }
                 });
             }
             catch (Exception ex)
@@ -196,8 +209,8 @@ namespace Impulse.Pages.Dashboards.CommandCenter
                 {
                     Severity = NotificationSeverity.Error,
                     Summary = "Report Error",
-                    Detail = ex.Message,
-                    Duration = 3500
+                    Detail = $"Could not open Order List: {ex.Message}",
+                    Duration = 4000
                 });
             }
         }
@@ -208,7 +221,7 @@ namespace Impulse.Pages.Dashboards.CommandCenter
             {
                 await ReportNavigationService.PrintReportAsync(new ReportRequest
                 {
-                    ReportName = "rptEmpAbsentSheetSummary",
+                    ReportName = "Payroll/rptEmpAbsentSheetSummary.rpt",
                     Parameters = new Dictionary<string, object>
                     {
                         { "@DTFrom", DateTime.Today },
@@ -222,8 +235,8 @@ namespace Impulse.Pages.Dashboards.CommandCenter
                 {
                     Severity = NotificationSeverity.Error,
                     Summary = "Report Error",
-                    Detail = ex.Message,
-                    Duration = 3500
+                    Detail = $"Could not open Absent Sheet: {ex.Message}",
+                    Duration = 4000
                 });
             }
         }
@@ -234,7 +247,12 @@ namespace Impulse.Pages.Dashboards.CommandCenter
             {
                 await ReportNavigationService.PrintReportAsync(new ReportRequest
                 {
-                    ReportName = "rptEmpLoanBalance"
+                    ReportName = "Payroll/rptEmpLoanBalance.rpt",
+                    Parameters = new Dictionary<string, object>
+                    {
+                        { "@DT", DateTime.Today },
+                        { "@InActive", false }
+                    }
                 });
             }
             catch (Exception ex)
@@ -243,8 +261,8 @@ namespace Impulse.Pages.Dashboards.CommandCenter
                 {
                     Severity = NotificationSeverity.Error,
                     Summary = "Report Error",
-                    Detail = ex.Message,
-                    Duration = 3500
+                    Detail = $"Could not open Loan Balance: {ex.Message}",
+                    Duration = 4000
                 });
             }
         }
@@ -259,8 +277,13 @@ namespace Impulse.Pages.Dashboards.CommandCenter
 
                 await ReportNavigationService.PrintReportAsync(new ReportRequest
                 {
-                    ReportName = "TotalExport",
-                    SelectionFormula = $"{{VTotalExport.DT}} >= #{fyFrom:yyyy-MM-dd}# AND {{VTotalExport.DT}} <= #{fyTo:yyyy-MM-dd}#"
+                    ReportName = "TotalExport.rpt",
+                    SelectionFormula = $"{{VTotalExport.DT}} in Date({fyFrom.Year}, {fyFrom.Month}, {fyFrom.Day}) to Date({fyTo.Year}, {fyTo.Month}, {fyTo.Day})",
+                    FormulaValues = new Dictionary<string, object>
+                    {
+                        { "CustomAmt", "false" },
+                        { "SubHeading", $"'{fyFrom:dd-MMM-yyyy} to {fyTo:dd-MMM-yyyy}'" }
+                    }
                 });
             }
             catch (Exception ex)
@@ -269,8 +292,8 @@ namespace Impulse.Pages.Dashboards.CommandCenter
                 {
                     Severity = NotificationSeverity.Error,
                     Summary = "Report Error",
-                    Detail = ex.Message,
-                    Duration = 3500
+                    Detail = $"Could not open Total Export: {ex.Message}",
+                    Duration = 4000
                 });
             }
         }
@@ -282,7 +305,7 @@ namespace Impulse.Pages.Dashboards.CommandCenter
                 string formula = processId > 0 ? $"{{VRunningLots.ProcessID}} = {processId}" : string.Empty;
                 await ReportNavigationService.PrintReportAsync(new ReportRequest
                 {
-                    ReportName = "RunningLots",
+                    ReportName = "RunningLots.rpt",
                     SelectionFormula = formula
                 });
             }
@@ -292,8 +315,8 @@ namespace Impulse.Pages.Dashboards.CommandCenter
                 {
                     Severity = NotificationSeverity.Error,
                     Summary = "Report Error",
-                    Detail = ex.Message,
-                    Duration = 3500
+                    Detail = $"Could not open Running Lots: {ex.Message}",
+                    Duration = 4000
                 });
             }
         }
@@ -304,7 +327,7 @@ namespace Impulse.Pages.Dashboards.CommandCenter
             {
                 await ReportNavigationService.PrintReportAsync(new ReportRequest
                 {
-                    ReportName = "ReWorkLots",
+                    ReportName = "ReWorkLots.rpt",
                     SelectionFormula = "{VVendRcvdDetailReWorkDetail.Qty} > {VVendRcvdDetailReWorkDetail.IssQty}"
                 });
             }
@@ -314,8 +337,8 @@ namespace Impulse.Pages.Dashboards.CommandCenter
                 {
                     Severity = NotificationSeverity.Error,
                     Summary = "Report Error",
-                    Detail = ex.Message,
-                    Duration = 3500
+                    Detail = $"Could not open Re-Work Lots: {ex.Message}",
+                    Duration = 4000
                 });
             }
         }
@@ -326,7 +349,7 @@ namespace Impulse.Pages.Dashboards.CommandCenter
             {
                 await ReportNavigationService.PrintReportAsync(new ReportRequest
                 {
-                    ReportName = "PendingPurchaseOrdersList"
+                    ReportName = "Maker_Open_POs.rpt"
                 });
             }
             catch (Exception ex)
@@ -335,8 +358,8 @@ namespace Impulse.Pages.Dashboards.CommandCenter
                 {
                     Severity = NotificationSeverity.Error,
                     Summary = "Report Error",
-                    Detail = ex.Message,
-                    Duration = 3500
+                    Detail = $"Could not open Maker Orders: {ex.Message}",
+                    Duration = 4000
                 });
             }
         }
@@ -347,10 +370,11 @@ namespace Impulse.Pages.Dashboards.CommandCenter
             {
                 await ReportNavigationService.PrintReportAsync(new ReportRequest
                 {
-                    ReportName = "RM_PO_List",
-                    Parameters = new Dictionary<string, object>
+                    ReportName = "RM_PO_List.rpt",
+                    SelectionFormula = "{VVendOrdersToRcv.OrderNo} = {VVendOrders.OrderNo} AND {@BalanceQty} > 0 AND {Material.ForgingGroupID} <> 0",
+                    FormulaValues = new Dictionary<string, object>
                     {
-                        { "Heading", "Forging Open Orders" }
+                        { "Heading", "'Forging Open Orders'" }
                     }
                 });
             }
@@ -360,8 +384,8 @@ namespace Impulse.Pages.Dashboards.CommandCenter
                 {
                     Severity = NotificationSeverity.Error,
                     Summary = "Report Error",
-                    Detail = ex.Message,
-                    Duration = 3500
+                    Detail = $"Could not open Forging Orders: {ex.Message}",
+                    Duration = 4000
                 });
             }
         }

@@ -210,7 +210,7 @@ namespace Impulse.Pages.Stock.VendGateRcvdList
 
         private async Task OnPrintDailyReceiving(ItemClickEventArgs e)
         {
-            string selection = $"{{VVendRcvd.RcvDate}}>='{Filter.DateFrom:yyyy-MM-dd}' AND {{VVendRcvd.RcvDate}}<='{Filter.DateTo:yyyy-MM-dd}'";
+            string selection = $"{{VVendRcvd.RcvDate}} in Date({Filter.DateFrom.Year}, {Filter.DateFrom.Month}, {Filter.DateFrom.Day}) to Date({Filter.DateTo.Year}, {Filter.DateTo.Month}, {Filter.DateTo.Day})";
             selection += $" AND {{VVendRcvd.SampleOrder}}={(IsSampleList ? "True" : "False")}";
             
             if (SelectedVendor != null)

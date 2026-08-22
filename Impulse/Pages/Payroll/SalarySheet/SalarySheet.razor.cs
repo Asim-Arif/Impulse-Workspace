@@ -434,25 +434,12 @@ namespace Impulse.Pages.Payroll.SalarySheet
         {
             var conditions = new List<string>();
 
-            // Filter by selected period
-            conditions.Add($"{{VSalarySheet.Month}}={Filter.Month} AND {{VSalarySheet.Year}}={Filter.Year}");
-
-            if (SelectedDepartment != null && !string.IsNullOrEmpty(SelectedDepartment.DeptID))
-            {
-                conditions.Add($"{{VSalarySheet.DeptID}}='{SelectedDepartment.DeptID}'");
-            }
-
-            if (SelectedEmployee != null && !string.IsNullOrEmpty(SelectedEmployee.EmpID))
-            {
-                conditions.Add($"{{VSalarySheet.EmpID}}='{SelectedEmployee.EmpID}'");
-            }
-
             if (isNegative)
             {
                 conditions.Add("{@Balance}<0");
             }
 
-            return string.Join(" AND ", conditions);
+            return conditions.Count > 0 ? string.Join(" AND ", conditions) : string.Empty;
         }
 
         private Dictionary<string, object> GetSalaryReportFormulaValues(bool isSummary = false)
@@ -473,7 +460,7 @@ namespace Impulse.Pages.Payroll.SalarySheet
 
             return new Dictionary<string, object>
             {
-                { "Company", companyName },
+                { "Company", $"'{companyName}'" },
                 { "FromTo", $"'{fromTo}'" },
                 { "MonthDays", totalDays },
                 { "TotalMonthDays", totalDays },
@@ -519,11 +506,11 @@ namespace Impulse.Pages.Payroll.SalarySheet
         {
             string period = $"{new DateTime(Filter.Year, Filter.Month, 1):MMMM} - {Filter.Year}";
             DateTime myDT = new DateTime(Filter.Year, Filter.Month, 1).AddMonths(1);
-            string selectionFormula = $"{{Advances.Description}}='Negative Salary Adjustment Entry' AND {{Advances.DT}}=#{myDT:yyyy-MM-dd}#";
+            string selectionFormula = $"{{Advances.Description}}='Negative Salary Adjustment Entry' AND {{Advances.DT}}=Date({myDT.Year}, {myDT.Month}, {myDT.Day})";
 
             var formulaValues = new Dictionary<string, object>
             {
-                { "Company", companyName },
+                { "Company", $"'{companyName}'" },
                 { "Period", $"'{period}'" }
             };
 

@@ -110,7 +110,7 @@ namespace Impulse.Pages.Stock.RMIssuanceList
         private void PrintIssuanceReport()
         {
             string dateRange = $"'{DateFrom:dd-MMM-yyyy} to {DateTo:dd-MMM-yyyy}'";
-            string strSelection = $"{{IssItemsSimple.DT}}=#{DateFrom:yyyy-MM-dd}# TO #{DateTo:yyyy-MM-dd}#";
+            string strSelection = $"{{IssItemsSimple.DT}} in Date({DateFrom.Year}, {DateFrom.Month}, {DateFrom.Day}) to Date({DateTo.Year}, {DateTo.Month}, {DateTo.Day})";
             
             if (SelectedMaterial != null)
                 strSelection += $" AND {{IssItemsSimpleDetail.RMID1}}='{SelectedMaterial.RMID1}'";

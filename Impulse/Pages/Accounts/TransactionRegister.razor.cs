@@ -7,6 +7,7 @@ using DataAccessLibrary.Interface.Accounts;
 using DataAccessLibrary.Models;
 using DataAccessLibrary.Models.ViewModels.Accounts;
 using DataAccessLibrary.Models.ViewModels;
+using Impulse.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
@@ -33,6 +34,10 @@ namespace Impulse.Pages.Accounts
         private IDBHelper IDBHelper { get; set; }
         [Inject]
         protected IAccountReportingAccess AccountReportingAccess { get; set; }
+        [Inject]
+        private Impulse.Services.IReportNavigationService ReportNavigationService { get; set; } = null!;
+        [Inject]
+        private Impulse.Services.INotificationService NotificationService { get; set; } = null!;
         private List<GenericDropDownModel> Accounts = new List<GenericDropDownModel>();
         private List<AccountsReportingModel> AccountsList = new List<AccountsReportingModel>();
         private AccountsReportingModel CurrentAccount = new AccountsReportingModel();
@@ -258,5 +263,144 @@ namespace Impulse.Pages.Accounts
             IsEdit = false;
         }
 
+        private bool bPrintCheque = false;
+        private ChqListModel SelectedCheque = new ChqListModel();
+
+        private async Task PrintVoucher(ItemClickEventArgs e)
+        {
+            var account = e.Data as AccountsReportingModel;
+            if (account != null && !string.IsNullOrEmpty(account.VchrNo))
+            {
+                try
+                {
+                    await ReportNavigationService.PrintReportAsync(new ReportRequest
+                    {
+                        ReportName = "Voucher.rpt",
+                        SelectionFormula = $"{{VLedger.VchrNo}}='{account.VchrNo}'"
+                    });
+                }
+                catch (Exception ex)
+                {
+                    NotificationService.ShowError("Report Error", $"Failed to print voucher: {ex.Message}");
+                }
+            }
+        }
+
+        private async Task ShowPrintChequeModal(ItemClickEventArgs e)
+        {
+            var account = e.Data as AccountsReportingModel;
+            if (account == null || string.IsNullOrEmpty(account.VchrNo)) return;
+
+            SelectedCheque = new ChqListModel
+            {
+                AccNo = account.AccNo,
+                AccTitle = account.AccTitle,
+                ChqNo = account.ChqNo,
+                Amount = account.Debit > 0 ? account.Debit : account.Credit,
+                chqpayee = !string.IsNullOrEmpty(account.Handed_Over_To) ? account.Handed_Over_To : account.AccTitle,
+                chqdesignation = string.Empty,
+                chqcompany = "IAA",
+                chqprintdate = account.ChqDate != DateTime.MinValue ? account.ChqDate : (account.VDate != DateTime.MinValue ? account.VDate : DateTime.Today),
+                DeleteDescription = account.VchrNo
+            };
+
+            try
+            {
+                string csnoStr = await IDBHelper.getSingleStringValue("SNo", "VChqLedger", $"WHERE VchrNo='{account.VchrNo}'");
+                if (double.TryParse(csnoStr, out double csno))
+                {
+                    SelectedCheque.CSNo = csno;
+                }
+            }
+            catch { }
+
+            bPrintCheque = true;
+            StateHasChanged();
+        }
+
+        private void HidePrintCheque()
+        {
+            bPrintCheque = false;
+            StateHasChanged();
+        }
+
+        private async Task PrintChequeConfirm()
+        {
+            try
+            {
+                string rptName = "";
+                if (SelectedCheque.CSNo > 0)
+                {
+                    rptName = await IDBHelper.getSingleStringValue("ChqFormat", "VChqLedger", $"WHERE SNo={SelectedCheque.CSNo}");
+                }
+
+                if (string.IsNullOrWhiteSpace(rptName))
+                {
+                    rptName = "rptChq.rpt";
+                }
+                else
+                {
+                    rptName = rptName.Replace(".rpt", "", StringComparison.OrdinalIgnoreCase) + ".rpt";
+                }
+
+                string selectionFormula;
+                if (SelectedCheque.CSNo > 0)
+                {
+                    selectionFormula = $"{{VChqLedger.SNo}}={SelectedCheque.CSNo}";
+                }
+                else
+                {
+                    selectionFormula = $"{{VLedger.VchrNo}}='{SelectedCheque.DeleteDescription}'";
+                }
+
+                await ReportNavigationService.PrintReportAsync(new ReportRequest
+                {
+                    ReportName = rptName,
+                    SelectionFormula = selectionFormula
+                });
+
+                bPrintCheque = false;
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                NotificationService.ShowError("Report Error", $"Failed to print cheque: {ex.Message}");
+            }
+        }
+
+        private async Task PrintTransactionRegisterReport()
+        {
+            try
+            {
+                var types = new List<string>();
+                if (IsJournal) { types.Add("'JV'"); }
+                if (IsBPV) { types.Add("'BP'"); types.Add("'BPV'"); }
+                if (IsCPV) { types.Add("'CP'"); types.Add("'CPV'"); }
+                if (IsCRV) { types.Add("'CR'"); types.Add("'CRV'"); }
+                if (IsBRV) { types.Add("'BR'"); types.Add("'BRV'"); }
+
+                string typeFilter = types.Any()
+                    ? $" AND (left({{VLedger.VchrNo}}, 2) in [{string.Join(", ", types)}] or left({{VLedger.VchrNo}}, 3) in [{string.Join(", ", types)}])"
+                    : "";
+                string sel = $"{{VLedger.VDate}} in Date({CurrentAccount.DTFrom.Year}, {CurrentAccount.DTFrom.Month}, {CurrentAccount.DTFrom.Day}) to Date({CurrentAccount.DTTo.Year}, {CurrentAccount.DTTo.Month}, {CurrentAccount.DTTo.Day}){typeFilter}";
+
+                var request = new ReportRequest
+                {
+                    ReportName = "TransRpt1.rpt",
+                    SelectionFormula = sel,
+                    FormulaValues = new Dictionary<string, object>
+                    {
+                        { "Company", $"'IAA'" },
+                        { "FromTo", $"'From {CurrentAccount.DTFrom:dd-MMM-yyyy} To {CurrentAccount.DTTo:dd-MMM-yyyy}'" }
+                    }
+                };
+
+                await ReportNavigationService.PrintReportAsync(request);
+            }
+            catch (Exception ex)
+            {
+                NotificationService.ShowError("Report Error", $"Failed to print register: {ex.Message}");
+            }
+        }
     }
 }

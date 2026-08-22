@@ -419,7 +419,7 @@ namespace Impulse.Pages.Payroll
             
             if (transport)
             {
-                cond = string.IsNullOrEmpty(cond) ? " {VEmp.Transport}=true " : cond + " AND {VEmp.Transport}=true ";
+                cond = string.IsNullOrEmpty(cond) ? " {VEmp.Transport}=True " : cond + " AND {VEmp.Transport}=True ";
             }
 
             if (ContractorsOnly)
@@ -448,7 +448,7 @@ namespace Impulse.Pages.Payroll
 
             var formulaValues = new Dictionary<string, object>
             {
-                { "Company", companyName }
+                { "Company", $"'{companyName}'" }
             };
 
             var request = new ReportRequest
@@ -467,9 +467,9 @@ namespace Impulse.Pages.Payroll
 
             var formulaValues = new Dictionary<string, object>
             {
-                { "Company", companyName },
+                { "Company", $"'{companyName}'" },
                 { "BirthDate", withDOB ? "True" : "False" },
-                { "RptCaption", reportCaption }
+                { "RptCaption", $"'{reportCaption}'" }
             };
 
             var request = new ReportRequest
@@ -558,14 +558,13 @@ namespace Impulse.Pages.Payroll
 
         private async Task PrintEmpListSalaryPercentage()
         {
-            // Prompt for percentage could be a simple 75% default or dialog. Let's default to 75% or use a simple modal.
             int iPercentage = 75; 
             string selectionFormula = "{VEmp.Active}=True AND {VEmp.TempDept}=False";
 
             var formulaValues = new Dictionary<string, object>
             {
-                { "Company", companyName },
-                { "SalaryPercentageHead", $"Salary @ {iPercentage}%" },
+                { "Company", $"'{companyName}'" },
+                { "SalaryPercentageHead", $"'Salary @ {iPercentage}%'" },
                 { "iPercentage", iPercentage }
             };
 
@@ -581,7 +580,6 @@ namespace Impulse.Pages.Payroll
 
         private async Task PrintBloodGroupReport(string bloodGroup)
         {
-            // Helper to print blood group report
             string selectionFormula = $"{GetSelectionFormula()} AND {{VEmp.BloodGroup}}='{bloodGroup}'";
             var request = new ReportRequest
             {
@@ -593,8 +591,7 @@ namespace Impulse.Pages.Payroll
 
         private async Task PrintEmpListDeptSelection()
         {
-            // Normally prompts for departments, let's print for the current selected department
-            string selectionFormula = "{VEmp.Active}=TRUE";
+            string selectionFormula = "{VEmp.Active}=True";
             if (selectedDepartment != null)
             {
                 selectionFormula += $" AND {{VEmp.DeptID}}='{selectedDepartment.DeptID}'";

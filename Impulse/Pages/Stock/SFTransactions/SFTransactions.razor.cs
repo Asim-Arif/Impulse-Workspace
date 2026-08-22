@@ -160,8 +160,8 @@ namespace Impulse.Pages.Stock.SFTransactions
                     SelectionFormula = formula,
                     FormulaValues = new Dictionary<string, object>
                     {
-                        { "Heading", heading },
-                        { "DateRange", $"{FromDate:dd-MMM-yyyy} to {ToDate:dd-MMM-yyyy}" }
+                        { "Heading", $"'{heading}'" },
+                        { "DateRange", $"'{FromDate:dd-MMM-yyyy} to {ToDate:dd-MMM-yyyy}'" }
                     }
                 };
 
