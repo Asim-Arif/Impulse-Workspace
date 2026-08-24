@@ -1,6 +1,8 @@
 @page "/"
 @attribute [Authorize]
 @inject Impulse.Services.IDBHelperService DbHelper
+@inject Impulse.Services.IntraOffice.IIntraOfficeService IntraOfficeService
+@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Master Dashboard — Impulse ERP</PageTitle>
 
@@ -61,6 +63,100 @@
             <div class="pulse-data">
                 <div class="pulse-number">@openExportOrders</div>
                 <div class="pulse-label">Open Foreign Orders</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Standout IntraOffice Enterprise Workspace Tile ────────────────── -->
+    <div class="intraoffice-feature-tile mb-4">
+        <div class="intraoffice-tile-header">
+            <div class="d-flex align-items-center gap-3">
+                <div class="intraoffice-tile-icon">
+                    <i class="fas fa-comments-dollar"></i>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <h2 class="intraoffice-tile-title mb-0">IntraOffice Workspace &amp; Communication</h2>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 rounded-pill" style="font-size: 0.72rem;">
+                            <i class="fas fa-circle fa-2xs me-1 text-success"></i> LIVE
+                        </span>
+                    </div>
+                    <p class="intraoffice-tile-subtitle mb-0">Direct chat, workflow minute approvals, task assignments &amp; notices for <strong>@(currentUserName ?? currentUserId)</strong></p>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2 mt-2 mt-md-0">
+                <a href="/intraoffice" class="btn btn-sm btn-primary d-flex align-items-center gap-1 shadow-sm px-3">
+                    <span>Open IntraOffice Hub</span>
+                    <i class="fas fa-arrow-right fa-xs"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- 4 Live Metric Pills for Logged-In User -->
+        <div class="intraoffice-user-metrics mt-3">
+            <a href="/intraoffice/tasks" class="user-metric-box @(myPendingTasksCount > 0 ? "highlight-warning" : "")">
+                <div class="user-metric-icon text-warning">
+                    <i class="fas fa-list-check"></i>
+                </div>
+                <div class="user-metric-info">
+                    <div class="user-metric-num">@myPendingTasksCount</div>
+                    <div class="user-metric-label">My Pending Tasks</div>
+                </div>
+            </a>
+
+            <a href="/intraoffice/minutes" class="user-metric-box @(myPendingMinutesCount > 0 ? "highlight-info" : "")">
+                <div class="user-metric-icon text-info">
+                    <i class="fas fa-file-signature"></i>
+                </div>
+                <div class="user-metric-info">
+                    <div class="user-metric-num">@myPendingMinutesCount</div>
+                    <div class="user-metric-label">Minutes for Approval</div>
+                </div>
+            </a>
+
+            <a href="/intraoffice/chat" class="user-metric-box @(myUnreadMessagesCount > 0 ? "highlight-success" : "")">
+                <div class="user-metric-icon text-success">
+                    <i class="fas fa-comments"></i>
+                </div>
+                <div class="user-metric-info">
+                    <div class="user-metric-num">@myUnreadMessagesCount</div>
+                    <div class="user-metric-label">Unread Chats</div>
+                </div>
+            </a>
+
+            <a href="/intraoffice/announcements" class="user-metric-box">
+                <div class="user-metric-icon text-primary">
+                    <i class="fas fa-bullhorn"></i>
+                </div>
+                <div class="user-metric-info">
+                    <div class="user-metric-num">@activeAnnouncementsCount</div>
+                    <div class="user-metric-label">Active Notices</div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Quick Items Stream / Shortcuts Row -->
+        <div class="intraoffice-actions-bar mt-3 pt-3 border-top d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="text-secondary small fw-bold text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.5px;">Quick Actions:</span>
+                <a href="/intraoffice/chat" class="btn btn-xs btn-outline-secondary d-inline-flex align-items-center gap-1 py-1 px-2">
+                    <i class="fas fa-paper-plane text-primary"></i> Direct Chat
+                </a>
+                <a href="/intraoffice/minutes/new" class="btn btn-xs btn-outline-secondary d-inline-flex align-items-center gap-1 py-1 px-2">
+                    <i class="fas fa-plus text-success"></i> New Minute Memo
+                </a>
+                <a href="/intraoffice/tasks" class="btn btn-xs btn-outline-secondary d-inline-flex align-items-center gap-1 py-1 px-2">
+                    <i class="fas fa-table-columns text-warning"></i> Task Kanban
+                </a>
+                <a href="/intraoffice/meetings" class="btn btn-xs btn-outline-secondary d-inline-flex align-items-center gap-1 py-1 px-2">
+                    <i class="fas fa-video text-danger"></i> Video Meetings
+                </a>
+                <a href="/intraoffice/stickynotes" class="btn btn-xs btn-outline-secondary d-inline-flex align-items-center gap-1 py-1 px-2">
+                    <i class="fas fa-note-sticky text-warning"></i> Sticky Notes
+                </a>
+            </div>
+            <div class="text-muted small">
+                <i class="fas fa-shield-halved text-success me-1"></i>Secure IntraOffice Network
             </div>
         </div>
     </div>
@@ -233,17 +329,46 @@
     private int openExportOrders = 0;
     private int totalForeignCustomers = 0;
 
+    // Logged-in user IntraOffice metrics
+    private string currentUserId = string.Empty;
+    private string? currentUserName;
+    private int myPendingTasksCount = 0;
+    private int myPendingMinutesCount = 0;
+    private int myUnreadMessagesCount = 0;
+    private int activeAnnouncementsCount = 0;
+
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            // Retrieve dynamic live metrics from database
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            currentUserId = user.Identity?.Name ?? user.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? "Guest";
+            currentUserName = user.Identity?.Name;
+
+            // Retrieve dynamic live metrics from ERP database
             totalActiveItems = await DbHelper.getSingleIntValueasync("COUNT(*)", "VItems", "WHERE InActive = 0");
             lowStockAlerts = await DbHelper.getSingleIntValueasync("COUNT(*)", "VItems", "WHERE InHand < ReorderPoint AND InActive = 0");
             activeEmployees = await DbHelper.getSingleIntValueasync("COUNT(*)", "Employees", "WHERE Active = 1");
             runningLotsCount = await DbHelper.getSingleIntValueasync("COUNT(DISTINCT LotNo)", "VRunningLots_Simple", "");
             openExportOrders = await DbHelper.getSingleIntValueasync("COUNT(*)", "VUnshippedOrderList", "");
             totalForeignCustomers = await DbHelper.getSingleIntValueasync("COUNT(*)", "ForeignCustomers", "WHERE Active = 1");
+
+            // Retrieve logged-in user specific IntraOffice metrics
+            if (!string.IsNullOrEmpty(currentUserId) && currentUserId != "Guest")
+            {
+                var tasks = await IntraOfficeService.GetTasksAsync(assignedTo: currentUserId);
+                myPendingTasksCount = tasks.Count(t => t.Status == DataAccessLibrary.Models.IntraOffice.TaskItemStatus.Pending || t.Status == DataAccessLibrary.Models.IntraOffice.TaskItemStatus.InProgress);
+
+                var minutes = await IntraOfficeService.GetMinutesAsync(new DataAccessLibrary.Models.IntraOffice.MinuteFilter { AssignedToUserId = currentUserId, Status = "Pending" });
+                myPendingMinutesCount = minutes.Count;
+
+                var chatSummaries = await IntraOfficeService.GetDirectChatSummariesAsync(currentUserId);
+                myUnreadMessagesCount = chatSummaries.Sum(c => c.UnreadCount);
+
+                var announcements = await IntraOfficeService.GetAnnouncementsAsync(currentUserId);
+                activeAnnouncementsCount = announcements.Count;
+            }
         }
         catch
         {
@@ -368,6 +493,130 @@
         color: #64748b;
         font-weight: 500;
         margin-top: 2px;
+    }
+
+    /* ── Standout IntraOffice Feature Tile ─────────────────────── */
+    .intraoffice-feature-tile {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 249, 255, 0.9) 100%);
+        border: 1.5px solid #bae6fd;
+        border-radius: 18px;
+        padding: 1.4rem 1.6rem;
+        box-shadow: 0 10px 30px rgba(14, 165, 233, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+        position: relative;
+        overflow: hidden;
+        backdrop-filter: blur(10px);
+    }
+
+    .intraoffice-feature-tile::after {
+        content: '';
+        position: absolute;
+        top: 0; right: 0; width: 220px; height: 100%;
+        background: radial-gradient(circle at 100% 50%, rgba(56, 189, 248, 0.12) 0%, transparent 70%);
+        pointer-events: none;
+    }
+
+    .intraoffice-tile-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .intraoffice-tile-icon {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        box-shadow: 0 6px 16px rgba(2, 132, 199, 0.28);
+        flex-shrink: 0;
+    }
+
+    .intraoffice-tile-title {
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: #0c4a6e;
+        letter-spacing: -0.3px;
+    }
+
+    .intraoffice-tile-subtitle {
+        font-size: 0.84rem;
+        color: #0369a1;
+        margin-top: 2px;
+    }
+
+    .intraoffice-user-metrics {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.85rem;
+    }
+
+    .user-metric-box {
+        background: #ffffff;
+        border: 1px solid #e0f2fe;
+        border-radius: 12px;
+        padding: 0.85rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.9rem;
+        text-decoration: none;
+        color: #0f172a;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
+        transition: all 0.18s ease;
+    }
+
+    .user-metric-box:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(2, 132, 199, 0.12);
+        border-color: #7dd3fc;
+        color: #0284c7;
+    }
+
+    .user-metric-box.highlight-warning {
+        border-color: #fde68a;
+        background: #fffbeb;
+    }
+
+    .user-metric-box.highlight-info {
+        border-color: #bae6fd;
+        background: #f0f9ff;
+    }
+
+    .user-metric-box.highlight-success {
+        border-color: #bbf7d0;
+        background: #f0fdf4;
+    }
+
+    .user-metric-icon {
+        font-size: 1.4rem;
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.85);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+
+    .user-metric-num {
+        font-size: 1.28rem;
+        font-weight: 800;
+        line-height: 1.1;
+        color: #0f172a;
+    }
+
+    .user-metric-label {
+        font-size: 0.74rem;
+        color: #64748b;
+        font-weight: 600;
+        margin-top: 1px;
     }
 
     /* ── Symmetrical 4-Column Module Cards Grid (2 x 4) ────────── */
@@ -508,6 +757,9 @@
         .enterprise-pulse-grid {
             grid-template-columns: repeat(2, 1fr);
         }
+        .intraoffice-user-metrics {
+            grid-template-columns: repeat(2, 1fr);
+        }
         .module-grid {
             grid-template-columns: repeat(2, 1fr);
         }
@@ -521,6 +773,9 @@
             font-size: 1.6rem;
         }
         .enterprise-pulse-grid {
+            grid-template-columns: 1fr;
+        }
+        .intraoffice-user-metrics {
             grid-template-columns: 1fr;
         }
         .module-grid {
