@@ -14,7 +14,7 @@
                     </div>
                     <div>
                         <h4 class="mb-0 fw-bold text-dark" style="font-size: 1.25rem;">Announcements Board</h4>
-                        <small class="text-secondary">Company-wide &amp; departmental updates, policies, and notices</small>
+                        <small class="text-secondary">Company-wide &amp; departmental updates, policies, voice notes, and notices</small>
                     </div>
                 </div>
                 <div class="d-flex align-items-center gap-2">
@@ -80,7 +80,8 @@
                 <div class="d-flex flex-column gap-3">
                     @foreach (var item in FilteredAnnouncements)
                     {
-                        <div class="card border @GetCardBorderClass(item.Priority) shadow-sm" style="border-radius: 10px; background: @(item.IsAcknowledgedByCurrentUser ? "#f9fffb" : "#ffffff");">
+                        var isMine = string.Equals(item.CreatedBy, CurrentUserId, StringComparison.OrdinalIgnoreCase);
+                        <div class="card border @(item.IsPinned ? "border-warning border-2" : GetCardBorderClass(item.Priority)) shadow-sm" style="border-radius: 10px; background: @(item.IsAcknowledgedByCurrentUser ? "#f9fffb" : "#ffffff");">
                             <div class="card-body p-3">
                                 <div class="d-flex align-items-start justify-content-between mb-2">
                                     <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -95,7 +96,15 @@
                                             <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="fas fa-check-circle me-1"></i>Acknowledged</span>
                                         }
                                     </div>
-                                    <small class="text-muted"><i class="fas fa-clock me-1"></i>@item.CreatedAt.ToString("MMM dd, yyyy hh:mm tt")</small>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <small class="text-muted"><i class="fas fa-clock me-1"></i>@item.CreatedAt.ToString("MMM dd, yyyy hh:mm tt")</small>
+                                        @if (isMine)
+                                        {
+                                            <button class="btn btn-xs btn-outline-warning" title="@(item.IsPinned ? "Unpin notice" : "Pin notice")" @onclick="() => TogglePinAsync(item.Id)">
+                                                <i class="fas fa-thumbtack"></i>
+                                            </button>
+                                        }
+                                    </div>
                                 </div>
 
                                 <div class="d-flex align-items-center gap-3 text-secondary small mb-2">
@@ -107,14 +116,42 @@
 
                                 @if (item.Attachments.Any())
                                 {
-                                    <div class="d-flex flex-wrap gap-2 mb-3">
+                                    <div class="d-flex flex-column gap-2 mb-3">
                                         @foreach (var att in item.Attachments)
                                         {
-                                            <a href="@att.FilePath" target="_blank" class="btn btn-xs btn-outline-secondary d-flex align-items-center gap-1 text-decoration-none py-1 px-2" style="font-size: 0.8rem;">
-                                                <i class="fas fa-paperclip text-primary"></i>
-                                                <span>@att.FileName</span>
-                                            </a>
+                                            @if (att.ContentType?.StartsWith("audio/") == true || att.FileName.EndsWith(".webm") || att.FileName.EndsWith(".mp3"))
+                                            {
+                                                <div class="p-2 rounded-2 bg-light border d-flex align-items-center gap-3" style="max-width: 480px;">
+                                                    <div class="d-flex align-items-center text-danger">
+                                                        <i class="fas fa-microphone-lines fa-lg me-2"></i>
+                                                        <span class="small fw-semibold">Voice Note</span>
+                                                    </div>
+                                                    <audio controls src="@att.FilePath" style="height: 32px; flex-grow: 1;"></audio>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <a href="@att.FilePath" target="_blank" class="btn btn-xs btn-outline-secondary d-inline-flex align-items-center gap-1 text-decoration-none py-1 px-2" style="font-size: 0.8rem; width: fit-content;">
+                                                    <i class="fas fa-paperclip text-primary"></i>
+                                                    <span>@att.FileName</span>
+                                                </a>
+                                            }
                                         }
+                                    </div>
+                                }
+
+                                @if (item.Acknowledgments.Any())
+                                {
+                                    <div class="p-2 rounded-2 bg-light border mb-2 small">
+                                        <div class="text-secondary fw-semibold mb-1"><i class="fas fa-users-check text-success me-1"></i>Acknowledged by:</div>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            @foreach (var ak in item.Acknowledgments)
+                                            {
+                                                <span class="badge bg-white text-dark border">
+                                                    <i class="fas fa-check text-success me-1"></i>@(ak.UserName ?? ak.UserId) · @ak.AcknowledgedAt.ToLocalTime().ToString("MMM dd, hh:mm tt")
+                                                </span>
+                                            }
+                                        </div>
                                     </div>
                                 }
 
@@ -148,19 +185,19 @@
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content border-0 shadow" style="border-radius: 12px;">
                 <div class="modal-header bg-light border-bottom py-2">
-                    <h5 class="modal-title fw-bold text-dark" style="font-size: 1.1rem;"><i class="fas fa-bullhorn text-primary me-2"></i>Create New Announcement</h5>
+                    <h5 class="modal-title fw-bold text-dark" style="font-size: 1.1rem;"><i class="fas fa-bullhorn text-primary me-2"></i>Publish New Announcement</h5>
                     <button type="button" class="btn-close" @onclick="CloseCreateModal"></button>
                 </div>
                 <div class="modal-body p-3">
-                    <div class="row g-3">
-                        <div class="col-md-12">
-                            <label class="form-label fw-semibold small text-secondary">Title *</label>
-                            <input type="text" class="form-control form-control-sm" placeholder="Enter announcement subject/title..." @bind="NewTitle" />
-                        </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">Title *</label>
+                        <input type="text" class="form-control form-control-sm" placeholder="Notice title..." @bind="NewTitle" />
+                    </div>
+                    <div class="row g-2 mb-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold small text-secondary">Target Department</label>
+                            <label class="form-label small fw-semibold text-secondary">Target Department</label>
                             <select class="form-select form-select-sm" @bind="NewDepartmentId">
-                                <option value="">Company-wide (All Departments)</option>
+                                <option value="">Company-wide (All Staff)</option>
                                 @foreach (var dept in Departments)
                                 {
                                     <option value="@dept.DeptId">@dept.DeptName</option>
@@ -168,38 +205,85 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold small text-secondary">Priority Level</label>
+                            <label class="form-label small fw-semibold text-secondary">Priority Level</label>
                             <select class="form-select form-select-sm" @bind="NewPriority">
                                 <option value="0">Normal</option>
                                 <option value="1">Important</option>
-                                <option value="2">Critical / Urgent</option>
+                                <option value="2">Critical</option>
                             </select>
                         </div>
-                        <div class="col-md-12">
-                            <label class="form-label fw-semibold small text-secondary">Notice Details *</label>
-                            <textarea class="form-control form-control-sm" rows="5" placeholder="Type the full announcement message here..." @bind="NewContent"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">Announcement Message *</label>
+                        <textarea class="form-control form-control-sm" rows="4" placeholder="Write full details of the notice..." @bind="NewContent"></textarea>
+                    </div>
+
+                    <!-- Voice Note & File Attachments -->
+                    <div class="p-3 border rounded-2 bg-light mb-3">
+                        <label class="form-label small fw-semibold text-dark mb-2">
+                            <i class="fas fa-microphone text-danger me-1"></i>Voice Note &amp; File Attachments
+                        </label>
+                        <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+                            <!-- Mic recording button -->
+                            <button type="button" class="btn btn-sm @(IsRecordingVoice ? "btn-danger recording-pulse" : "btn-outline-danger") d-flex align-items-center gap-1 shadow-sm" @onclick="ToggleVoiceRecordingAsync">
+                                <i class="fas @(IsRecordingVoice ? "fa-stop" : "fa-microphone")"></i>
+                                <span>@(IsRecordingVoice ? "Stop Recording Voice" : "Record Voice Note")</span>
+                            </button>
+
+                            <!-- Add regular files -->
+                            <label for="announcement-file-upload" class="btn btn-sm btn-outline-secondary mb-0 cursor-pointer d-flex align-items-center gap-1">
+                                <i class="fas fa-paperclip"></i>
+                                <span>Attach Documents</span>
+                            </label>
+                            <InputFile id="announcement-file-upload" OnChange="HandleFilesSelected" multiple style="display: none;" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webm,.mp3" />
                         </div>
-                        <div class="col-md-12">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="pinnedCheck" @bind="NewIsPinned" />
-                                <label class="form-check-label small text-dark fw-semibold" for="pinnedCheck">Pin this notice to top</label>
+
+                        <!-- Attachments Preview List -->
+                        @if (PendingVoiceNotes.Any() || PendingFiles.Any())
+                        {
+                            <div class="d-flex flex-wrap gap-2 mt-2 pt-2 border-top">
+                                @foreach (var vn in PendingVoiceNotes)
+                                {
+                                    <div class="p-1 px-2 rounded-2 bg-danger-subtle text-danger border border-danger-subtle d-flex align-items-center gap-2 small">
+                                        <i class="fas fa-microphone"></i>
+                                        <span>@vn.FileName</span>
+                                        <button type="button" class="btn btn-xs btn-link text-danger p-0" @onclick="() => PendingVoiceNotes.Remove(vn)">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                }
+                                @foreach (var f in PendingFiles)
+                                {
+                                    <div class="p-1 px-2 rounded-2 bg-white border d-flex align-items-center gap-2 small">
+                                        <i class="fas fa-file text-primary"></i>
+                                        <span>@f.Name</span>
+                                        <button type="button" class="btn btn-xs btn-link text-danger p-0" @onclick="() => PendingFiles.Remove(f)">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                }
                             </div>
-                        </div>
+                        }
+                    </div>
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="pinNoticeCheck" @bind="NewIsPinned" />
+                        <label class="form-check-label small text-dark fw-semibold" for="pinNoticeCheck">
+                            <i class="fas fa-thumbtack text-warning me-1"></i>Pin to top of Announcements Board
+                        </label>
                     </div>
                 </div>
                 <div class="modal-footer bg-light border-top py-2">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CloseCreateModal">
-                        <i class="fas fa-times me-1"></i>Cancel
-                    </button>
-                    <button type="button" class="btn btn-sm btn-primary shadow-sm" @onclick="SaveAnnouncementAsync" disabled="@IsSaving">
-                        @if (IsSaving)
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CloseCreateModal">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-primary shadow-sm" @onclick="CreateAnnouncementAsync" disabled="@IsPublishing">
+                        @if (IsPublishing)
                         {
                             <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                            <span>Saving...</span>
+                            <span>Publishing Notice...</span>
                         }
                         else
                         {
-                            <i class="fas fa-check me-1"></i>
+                            <i class="fas fa-paper-plane me-1"></i>
                             <span>Publish Notice</span>
                         }
                     </button>
@@ -208,3 +292,14 @@
         </div>
     </div>
 }
+
+<style>
+    .recording-pulse {
+        animation: pulseAnimation 1.2s infinite;
+    }
+    @@keyframes pulseAnimation {
+        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+        70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+    }
+</style>
