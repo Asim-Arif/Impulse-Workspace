@@ -27,25 +27,33 @@ namespace Impulse.Pages.IntraOffice.Minutes
 
         protected bool IsLoading { get; set; } = true;
         protected bool IsSaving { get; set; } = false;
-        protected bool IsReadOnly => Id.HasValue && (MinuteModel.Status == "Approved" || MinuteModel.Status == "Rejected");
+        protected bool IsEditMode { get; set; } = false;
 
         protected string CurrentUserId { get; set; } = string.Empty;
         protected MinuteApproval MinuteModel { get; set; } = new();
-        protected List<MinuteType> MinuteTypes { get; set; } = new();
         protected List<IntraUserProfile> UsersList { get; set; } = new();
 
         protected List<string> PointsList { get; set; } = new();
         protected string NewPointText { get; set; } = string.Empty;
-        protected string DecisionRemarks { get; set; } = string.Empty;
 
-        // Attachments dictionary mapped by slot index (0 to 7 -> I to VIII)
-        protected Dictionary<int, IBrowserFile> PendingAttachments { get; set; } = new();
+        // Attachments
+        protected Dictionary<int, IBrowserFile> AttachmentFiles { get; set; } = new();
+        protected string[] AttachmentNames { get; set; } = new string[8];
+
+        // Workflow Action fields
+        protected string NextForwardToUserId { get; set; } = string.Empty;
+        protected string DecisionRemarks { get; set; } = string.Empty;
 
         protected override async Task OnInitializedAsync()
         {
             var authState = await AuthStateProvider.GetAuthenticationStateAsync();
             var user = authState.User;
             CurrentUserId = user.Identity?.Name ?? user.FindFirst(ClaimTypes.Name)?.Value ?? "Guest";
+
+            for (int i = 0; i < 8; i++)
+            {
+                AttachmentNames[i] = string.Empty;
+            }
 
             await LoadDataAsync();
         }
@@ -55,7 +63,6 @@ namespace Impulse.Pages.IntraOffice.Minutes
             IsLoading = true;
             try
             {
-                MinuteTypes = await IntraOfficeService.GetMinuteTypesAsync();
                 UsersList = await IntraOfficeService.GetActiveUsersAsync();
 
                 if (Id.HasValue && Id.Value > 0)
@@ -75,7 +82,7 @@ namespace Impulse.Pages.IntraOffice.Minutes
                         {
                             Severity = NotificationSeverity.Error,
                             Summary = "Not Found",
-                            Detail = "The requested minute memo does not exist.",
+                            Detail = "The requested minute memo was not found.",
                             Duration = 4000
                         });
                         NavigationManager.NavigateTo("/intraoffice/minutes");
@@ -86,10 +93,10 @@ namespace Impulse.Pages.IntraOffice.Minutes
                     MinuteModel = new MinuteApproval
                     {
                         Date = DateTime.Today,
-                        No = $"MIN-{DateTime.UtcNow:yyyyMMdd}-{new Random().Next(100, 999)}",
+                        No = $"{DateTime.Today.Month}/{new Random().Next(100, 9999):D4}",
                         CreatedByUserId = CurrentUserId,
                         Status = "Pending",
-                        Currency = "PKR"
+                        Type = "General"
                     };
                 }
             }
@@ -98,7 +105,7 @@ namespace Impulse.Pages.IntraOffice.Minutes
                 NotificationService.Notify(new NotificationMessage
                 {
                     Severity = NotificationSeverity.Error,
-                    Summary = "Load Error",
+                    Summary = "Error",
                     Detail = ex.Message,
                     Duration = 4000
                 });
@@ -106,6 +113,14 @@ namespace Impulse.Pages.IntraOffice.Minutes
             finally
             {
                 IsLoading = false;
+            }
+        }
+
+        protected void HandlePointKeyPress(KeyboardEventArgs e)
+        {
+            if (e.Key == "Enter")
+            {
+                AddPoint();
             }
         }
 
@@ -118,28 +133,22 @@ namespace Impulse.Pages.IntraOffice.Minutes
             }
         }
 
-        protected void HandlePointKeyUp(KeyboardEventArgs e)
-        {
-            if (e.Key == "Enter")
-            {
-                AddPoint();
-            }
-        }
-
-        protected void CalculateAdvance()
-        {
-            if (MinuteModel.TotalAmount.HasValue && MinuteModel.AdvancePercentage.HasValue && MinuteModel.AdvancePercentage.Value > 0)
-            {
-                MinuteModel.AdvanceAmount = Math.Round((MinuteModel.TotalAmount.Value * MinuteModel.AdvancePercentage.Value) / 100m, 2);
-            }
-        }
-
-        protected void HandleFileSelected(InputFileChangeEventArgs e, int slotIndex)
+        protected void HandleFileSelected(InputFileChangeEventArgs e, int index)
         {
             if (e.File != null)
             {
-                PendingAttachments[slotIndex] = e.File;
+                AttachmentFiles[index] = e.File;
+                if (string.IsNullOrWhiteSpace(AttachmentNames[index]))
+                {
+                    AttachmentNames[index] = e.File.Name;
+                }
             }
+        }
+
+        protected void RemoveAttachmentSlot(int index)
+        {
+            AttachmentFiles.Remove(index);
+            AttachmentNames[index] = string.Empty;
         }
 
         protected string GetRomanNumeral(int number)
@@ -149,7 +158,7 @@ namespace Impulse.Pages.IntraOffice.Minutes
             return number.ToString();
         }
 
-        protected async Task SaveMinuteAsync()
+        protected async Task SaveMinuteWithAction(string action)
         {
             if (string.IsNullOrWhiteSpace(MinuteModel.No))
             {
@@ -179,27 +188,30 @@ namespace Impulse.Pages.IntraOffice.Minutes
             try
             {
                 MinuteModel.Points = string.Join("\n", PointsList);
+                MinuteModel.CreatedByUserId = CurrentUserId;
 
                 // Handle file uploads to wwwroot/uploads/minutes
-                if (PendingAttachments.Any())
+                if (AttachmentFiles.Any())
                 {
                     var uploadFolder = System.IO.Path.Combine(WebHostEnvironment.WebRootPath ?? "wwwroot", "uploads", "minutes");
                     System.IO.Directory.CreateDirectory(uploadFolder);
 
-                    foreach (var pair in PendingAttachments)
+                    foreach (var pair in AttachmentFiles)
                     {
+                        var slotIndex = pair.Key;
                         var file = pair.Value;
+                        var customTitle = !string.IsNullOrWhiteSpace(AttachmentNames[slotIndex]) ? AttachmentNames[slotIndex].Trim() : file.Name;
                         var uniqueName = $"{Guid.NewGuid():N}_{file.Name}";
                         var fullPath = System.IO.Path.Combine(uploadFolder, uniqueName);
 
                         await using (var fileStream = new System.IO.FileStream(fullPath, System.IO.FileMode.Create))
                         {
-                            await file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024).CopyToAsync(fileStream);
+                            await file.OpenReadStream(maxAllowedSize: 25 * 1024 * 1024).CopyToAsync(fileStream);
                         }
 
                         MinuteModel.Attachments.Add(new MinuteAttachment
                         {
-                            FileName = file.Name,
+                            FileName = customTitle,
                             FilePath = $"/uploads/minutes/{uniqueName}",
                             FileSize = file.Size,
                             ContentType = file.ContentType
@@ -207,30 +219,40 @@ namespace Impulse.Pages.IntraOffice.Minutes
                     }
                 }
 
-                if (!Id.HasValue)
-                {
-                    var newId = await IntraOfficeService.CreateMinuteApprovalAsync(MinuteModel);
-                    if (newId > 0)
-                    {
-                        NotificationService.Notify(new NotificationMessage
-                        {
-                            Severity = NotificationSeverity.Success,
-                            Summary = "Created",
-                            Detail = "Minute memo created and submitted successfully.",
-                            Duration = 3000
-                        });
-                        NavigationManager.NavigateTo($"/intraoffice/minutes/{newId}");
-                    }
-                }
-                else
+                var newId = await IntraOfficeService.CreateMinuteApprovalAsync(MinuteModel);
+                if (newId > 0)
                 {
                     NotificationService.Notify(new NotificationMessage
                     {
                         Severity = NotificationSeverity.Success,
-                        Summary = "Saved",
-                        Detail = "Minute memo updated successfully.",
+                        Summary = "Success",
+                        Detail = "Minute created successfully.",
                         Duration = 3000
                     });
+
+                    if (action == "new")
+                    {
+                        MinuteModel = new MinuteApproval
+                        {
+                            Date = DateTime.Today,
+                            No = $"{DateTime.Today.Month}/{new Random().Next(100, 9999):D4}",
+                            CreatedByUserId = CurrentUserId,
+                            Status = "Pending",
+                            Type = "General"
+                        };
+                        PointsList.Clear();
+                        AttachmentFiles.Clear();
+                        for (int i = 0; i < 8; i++) AttachmentNames[i] = string.Empty;
+                    }
+                    else if (action == "close")
+                    {
+                        NavigationManager.NavigateTo("/intraoffice/minutes");
+                    }
+                    else // stay
+                    {
+                        Id = newId;
+                        await LoadDataAsync();
+                    }
                 }
             }
             catch (Exception ex)
@@ -249,17 +271,27 @@ namespace Impulse.Pages.IntraOffice.Minutes
             }
         }
 
-        protected async Task ProcessDecisionAsync(string decision)
+        protected async Task ProcessAction(string action)
         {
             if (!Id.HasValue) return;
 
+            IsSaving = true;
             try
             {
+                var targetStatus = action switch
+                {
+                    "Approve" => "Approved",
+                    "Reject" => "Rejected",
+                    "Case Close" => "Closed",
+                    "Refer" => "Referred",
+                    _ => "Pending"
+                };
+
                 var success = await IntraOfficeService.UpdateMinuteStatusAsync(
                     Id.Value,
-                    decision,
+                    targetStatus,
                     CurrentUserId,
-                    decision,
+                    action,
                     DecisionRemarks
                 );
 
@@ -267,12 +299,13 @@ namespace Impulse.Pages.IntraOffice.Minutes
                 {
                     NotificationService.Notify(new NotificationMessage
                     {
-                        Severity = decision == "Approved" ? NotificationSeverity.Success : NotificationSeverity.Warning,
-                        Summary = decision,
-                        Detail = $"Minute memo marked as {decision}.",
+                        Severity = targetStatus == "Approved" ? NotificationSeverity.Success : NotificationSeverity.Info,
+                        Summary = action,
+                        Detail = $"Minute has been {targetStatus}.",
                         Duration = 3000
                     });
 
+                    DecisionRemarks = string.Empty;
                     await LoadDataAsync();
                 }
             }
@@ -286,6 +319,15 @@ namespace Impulse.Pages.IntraOffice.Minutes
                     Duration = 4000
                 });
             }
+            finally
+            {
+                IsSaving = false;
+            }
+        }
+
+        protected void Cancel()
+        {
+            NavigationManager.NavigateTo("/intraoffice/minutes");
         }
 
         protected string GetStatusBadgeClass(string status)
@@ -295,7 +337,8 @@ namespace Impulse.Pages.IntraOffice.Minutes
                 "Approved" => "bg-success",
                 "Rejected" => "bg-danger",
                 "Closed" => "bg-secondary",
-                _ => "bg-warning text-dark"
+                "Referred" => "bg-warning text-dark",
+                _ => "bg-primary"
             };
         }
     }
