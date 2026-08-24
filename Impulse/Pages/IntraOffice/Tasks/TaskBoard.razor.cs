@@ -449,8 +449,7 @@ namespace Impulse.Pages.IntraOffice.Tasks
                         var assignee = UsersList.FirstOrDefault(u => u.UserName == task.AssignedTo);
                         if (!string.IsNullOrEmpty(assignee?.CellNo))
                         {
-                            var msg = $"*New Task Assigned: {task.Title}*\nPriority: {task.Priority}\nDue: {task.DueDate:MMM dd, yyyy}\nBy: {CurrentUserId}";
-                            _ = WhatsAppService.SendNotificationAsync(assignee.CellNo, msg);
+                            _ = WhatsAppService.SendTaskNotificationAsync(assignee.CellNo, task.Title, assignee.FullUserName ?? task.AssignedTo, task.Priority.ToString(), task.Description);
                         }
                     }
 
