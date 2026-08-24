@@ -360,7 +360,7 @@
                 var tasks = await IntraOfficeService.GetTasksAsync(assignedTo: currentUserId);
                 myPendingTasksCount = tasks.Count(t => t.Status == DataAccessLibrary.Models.IntraOffice.TaskItemStatus.Pending || t.Status == DataAccessLibrary.Models.IntraOffice.TaskItemStatus.InProgress);
 
-                var minutes = await IntraOfficeService.GetMinutesAsync(new DataAccessLibrary.Models.IntraOffice.MinuteFilter { AssignedToUserId = currentUserId, Status = "Pending" });
+                var minutes = await IntraOfficeService.GetMinutesAsync(new DataAccessLibrary.Models.IntraOffice.MinuteFilter { UserId = currentUserId, Status = "Pending" });
                 myPendingMinutesCount = minutes.Count;
 
                 var chatSummaries = await IntraOfficeService.GetDirectChatSummariesAsync(currentUserId);
