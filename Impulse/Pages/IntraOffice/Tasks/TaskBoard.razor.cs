@@ -283,6 +283,18 @@ namespace Impulse.Pages.IntraOffice.Tasks
                             Duration = 3000
                         });
                     }
+                    else
+                    {
+                        NotificationService.Notify(new NotificationMessage
+                        {
+                            Severity = NotificationSeverity.Warning,
+                            Summary = "No Audio Received",
+                            Detail = "No audio data was captured. Please speak into your microphone and try again.",
+                            Duration = 4000
+                        });
+                    }
+
+                    await InvokeAsync(StateHasChanged);
                 }
             }
             catch (Exception ex)
