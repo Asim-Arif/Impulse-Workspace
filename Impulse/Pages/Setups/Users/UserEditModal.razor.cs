@@ -88,8 +88,9 @@ namespace Impulse.Pages.Setups.Users
             return _allEmployees.Where(e =>
                 (!string.IsNullOrEmpty(e.EmpID) && e.EmpID.ToLowerInvariant().Contains(query)) ||
                 (!string.IsNullOrEmpty(e.Name) && e.Name.ToLowerInvariant().Contains(query)) ||
+                (!string.IsNullOrEmpty(e.FName) && e.FName.ToLowerInvariant().Contains(query)) ||
                 (!string.IsNullOrEmpty(e.Designation) && e.Designation.ToLowerInvariant().Contains(query)) ||
-                (!string.IsNullOrEmpty(e.Department) && e.Department.ToLowerInvariant().Contains(query))
+                (!string.IsNullOrEmpty(e.DeptName) && e.DeptName.ToLowerInvariant().Contains(query))
             ).ToList();
         }
 
