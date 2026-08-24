@@ -16,9 +16,27 @@
     </div>
     <nav class="nav flex-column">
         <div class="nav-item">
-            <NavLink class="nav-link" href="setup">
-                <i class="fas fa-cog"></i><span class="nav-label"> Setups</span>
-            </NavLink>
+            <div class="nav-section-header" @onclick="NavigateSetups">
+                <i class="fas fa-sliders-h me-2"></i>
+                <span>Setups</span>
+                <i class="fas fa-chevron-down ms-auto @(isSetupsExpanded ? "rotated" : "")"></i>
+            </div>
+            @if (isSetupsExpanded)
+            {
+                <div class="nav-sub-section">
+                    <div class="nav-sub-links">
+                        <NavLink class="nav-link" href="/setup" Match="NavLinkMatch.All">
+                            <i class="fas fa-sliders-h me-2"></i> Setups Hub
+                        </NavLink>
+                        <NavLink class="nav-link" href="/setup/users">
+                            <i class="fas fa-users-cog me-2"></i> User Management
+                        </NavLink>
+                        <NavLink class="nav-link" href="/intraoffice/health">
+                            <i class="fas fa-heartbeat me-2"></i> Diagnostics
+                        </NavLink>
+                    </div>
+                </div>
+            }
         </div>
         <div class="nav-item">
             <div class="nav-section-header" @onclick="NavigateDashboards">
@@ -709,10 +727,17 @@
     private bool isCompanyExpanded = false;
     private bool isDashboardsExpanded = false;
     private bool isIntraOfficeExpanded = false;
+    private bool isSetupsExpanded = false;
 
     private async Task ToggleNavMenu()
     {
         await OnToggleSidebar.InvokeAsync();
+    }
+
+    private void NavigateSetups()
+    {
+        isSetupsExpanded = !isSetupsExpanded;
+        NavigationManager.NavigateTo("/setup");
     }
 
     private void NavigateDashboards()

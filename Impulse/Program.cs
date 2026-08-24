@@ -468,6 +468,10 @@ builder.Services.AddScoped<Impulse.Services.IntraOffice.IIntraOfficeService, Imp
 builder.Services.AddHttpClient<Impulse.Services.IntraOffice.IWhatsAppNotificationService, Impulse.Services.IntraOffice.WhatsAppNotificationService>();
 builder.Services.AddScoped<Impulse.Services.IntraOffice.IAiAssistantService, Impulse.Services.IntraOffice.AiAssistantService>();
 
+// Setup & User Management Registrations
+builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IUserDataAccess, DataAccessLibrary.DAC.Setup.UserDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Setup.IUserService, Impulse.Services.Setup.UserService>();
+
 var app = builder.Build();
 
 // Enable PathBase for IIS sub-application hosting (ensures Identity Login redirects stay under /impulse)
