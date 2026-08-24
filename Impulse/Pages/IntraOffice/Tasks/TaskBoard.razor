@@ -1,5 +1,4 @@
 @page "/intraoffice/tasks"
-@using DataAccessLibrary.Models.IntraOffice
 @attribute [Authorize]
 
 <PageTitle>Task Board - IntraOffice</PageTitle>
@@ -10,12 +9,12 @@
             <!-- Header -->
             <div class="d-flex align-items-end justify-content-between pb-2 mb-3 border-bottom">
                 <div class="d-flex align-items-center gap-2">
-                    <div class="d-flex align-items-center justify-content-center bg-success-subtle text-success rounded-3 p-2" style="width: 42px; height: 42px;">
+                    <div class="d-flex align-items-center justify-content-center bg-warning-subtle text-warning-emphasis rounded-3 p-2" style="width: 42px; height: 42px;">
                         <i class="fas fa-list-check fa-lg"></i>
                     </div>
                     <div>
-                        <h4 class="mb-0 fw-bold text-dark" style="font-size: 1.25rem;">Task Board</h4>
-                        <small class="text-secondary">Collaborative task assignments, tracking &amp; status workflow</small>
+                        <h4 class="mb-0 fw-bold text-dark" style="font-size: 1.25rem;">Enterprise Task Board</h4>
+                        <small class="text-secondary">Kanban workflow, assignments, voice notes, attachments &amp; WhatsApp alerts</small>
                     </div>
                 </div>
                 <div class="d-flex align-items-center gap-2">
@@ -30,7 +29,7 @@
                 </div>
             </div>
 
-            <!-- Filters -->
+            <!-- Filters & Views Row -->
             <div class="row g-2 mb-3 align-items-center">
                 <div class="col-md-3">
                     <div class="input-group input-group-sm">
@@ -41,35 +40,43 @@
                 <div class="col-md-3">
                     <select class="form-select form-select-sm" @bind="SelectedAssigneeFilter">
                         <option value="">All Assignees</option>
-                        <option value="@CurrentUserId">Assigned to Me</option>
-                        @foreach (var user in UsersList)
+                        @foreach (var u in UsersList)
                         {
-                            <option value="@user.UserName">@(user.FullUserName ?? user.UserName)</option>
+                            <option value="@u.UserName">@(u.FullUserName ?? u.UserName)</option>
                         }
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
+                    <select class="form-select form-select-sm" @bind="SelectedPriorityFilter">
+                        <option value="-1">All Priorities</option>
+                        <option value="0">Low</option>
+                        <option value="1">Normal</option>
+                        <option value="2">High</option>
+                        <option value="3">Urgent</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <select class="form-select form-select-sm" @bind="SelectedDepartmentFilter">
                         <option value="">All Departments</option>
-                        @foreach (var dept in Departments)
+                        @foreach (var d in Departments)
                         {
-                            <option value="@dept.DeptId">@dept.DeptName</option>
+                            <option value="@d.DeptId">@d.DeptName</option>
                         }
                     </select>
                 </div>
-                <div class="col-md-3 text-end">
+                <div class="col-md-2 text-end">
                     <div class="btn-group btn-group-sm" role="group">
-                        <button type="button" class="btn @(ViewMode == "kanban" ? "btn-secondary" : "btn-outline-secondary")" @onclick='() => ViewMode = "kanban"'>
-                            <i class="fas fa-table-columns me-1"></i>Kanban
+                        <button type="button" class="btn @(ViewMode == "kanban" ? "btn-primary" : "btn-outline-secondary")" @onclick='() => ViewMode = "kanban"'>
+                            <i class="fas fa-table-columns me-1"></i>Board
                         </button>
-                        <button type="button" class="btn @(ViewMode == "list" ? "btn-secondary" : "btn-outline-secondary")" @onclick='() => ViewMode = "list"'>
+                        <button type="button" class="btn @(ViewMode == "list" ? "btn-primary" : "btn-outline-secondary")" @onclick='() => ViewMode = "list"'>
                             <i class="fas fa-list me-1"></i>List
                         </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Board Content -->
+            <!-- Content Area -->
             @if (IsLoading)
             {
                 <div class="d-flex justify-content-center align-items-center py-5">
@@ -79,13 +86,14 @@
             }
             else if (ViewMode == "kanban")
             {
+                <!-- Kanban 4 Columns -->
                 <div class="row g-3">
                     <!-- Column 1: Pending -->
                     <div class="col-lg-3 col-md-6">
                         <div class="card border-0 bg-light shadow-sm h-100" style="border-radius: 10px;">
-                            <div class="card-header bg-warning-subtle text-dark border-0 py-2 d-flex align-items-center justify-content-between">
-                                <span class="fw-bold small"><i class="fas fa-hourglass-start text-warning me-1"></i>Pending</span>
-                                <span class="badge bg-warning text-dark">@GetTasksByStatus(TaskItemStatus.Pending).Count</span>
+                            <div class="card-header bg-secondary-subtle text-dark border-0 py-2 d-flex align-items-center justify-content-between">
+                                <span class="fw-bold small"><i class="fas fa-hourglass-start text-secondary me-1"></i>Pending</span>
+                                <span class="badge bg-secondary">@GetTasksByStatus(TaskItemStatus.Pending).Count</span>
                             </div>
                             <div class="card-body p-2 d-flex flex-column gap-2" style="min-height: 400px; max-height: 65vh; overflow-y: auto;">
                                 @foreach (var task in GetTasksByStatus(TaskItemStatus.Pending))
@@ -182,35 +190,44 @@
                         <tbody>
                             @foreach (var task in FilteredTasks)
                             {
-                                <tr>
+                                <tr @onclick="() => OpenTaskDetail(task)" style="cursor: pointer;">
                                     <td class="text-muted small">@task.Id</td>
                                     <td>
-                                        <a href="javascript:void(0)" class="fw-bold text-dark text-decoration-none" @onclick="() => OpenTaskDetail(task)">
-                                            @task.Title
-                                        </a>
+                                        <div class="fw-semibold text-dark">@task.Title</div>
+                                        @if (task.WhatsAppMessageSent)
+                                        {
+                                            <small class="text-success"><i class="fab fa-whatsapp me-1"></i>WhatsApp Sent</small>
+                                        }
                                     </td>
-                                    <td><span class="badge bg-light text-dark border"><i class="fas fa-user-tie text-primary me-1"></i>@(task.AssigneeName ?? task.AssignedTo ?? "Unassigned")</span></td>
-                                    <td><small class="text-secondary">@(task.AssignerName ?? task.AssignedBy)</small></td>
-                                    <td><small class="text-muted">@(task.DepartmentName ?? "-")</small></td>
-                                    <td><span class="badge @GetPriorityBadgeClass(task.Priority)">@task.Priority</span></td>
-                                    <td><span class="badge @GetStatusBadgeClass(task.Status)">@task.Status</span></td>
                                     <td>
-                                        @if (task.DueDate.HasValue)
-                                        {
-                                            <span class="small @(task.DueDate < DateTime.UtcNow && task.Status != TaskItemStatus.Completed ? "text-danger fw-bold" : "text-secondary")">
-                                                @task.DueDate.Value.ToString("MMM dd, yyyy")
-                                            </span>
-                                        }
-                                        else
-                                        {
-                                            <span class="text-muted small">-</span>
-                                        }
+                                        <span class="small text-dark"><i class="fas fa-user-tie text-primary me-1"></i>@(task.AssigneeName ?? task.AssignedTo ?? "Unassigned")</span>
                                     </td>
-                                    <td class="text-end">
+                                    <td>
+                                        <span class="small text-secondary">@(task.AssignerName ?? task.AssignedBy)</span>
+                                    </td>
+                                    <td>
+                                        <span class="small text-secondary">@(task.DepartmentName ?? "All")</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge @GetPriorityBadgeClass(task.Priority)">@task.Priority</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge @GetStatusBadgeClass(task.Status)">@task.Status</span>
+                                    </td>
+                                    <td class="small">
+                                        @(task.DueDate.HasValue ? task.DueDate.Value.ToString("MMM dd, yyyy") : "No date")
+                                    </td>
+                                    <td class="text-end" @onclick:stopPropagation>
                                         <button class="btn btn-xs btn-outline-primary" @onclick="() => OpenTaskDetail(task)">
-                                            <i class="fas fa-eye"></i>
+                                            <i class="fas fa-eye me-1"></i>Details
                                         </button>
                                     </td>
+                                </tr>
+                            }
+                            @if (!FilteredTasks.Any())
+                            {
+                                <tr>
+                                    <td colspan="9" class="text-center py-4 text-muted">No tasks found matching criteria.</td>
                                 </tr>
                             }
                         </tbody>
@@ -228,23 +245,69 @@
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content border-0 shadow" style="border-radius: 12px;">
                 <div class="modal-header bg-light border-bottom py-2">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="badge @GetStatusBadgeClass(SelectedTask.Status)">@SelectedTask.Status</span>
-                        <h5 class="modal-title fw-bold text-dark mb-0" style="font-size: 1.1rem;">@SelectedTask.Title</h5>
-                    </div>
+                    <h5 class="modal-title fw-bold text-dark" style="font-size: 1.1rem;">
+                        <i class="fas fa-tasks text-primary me-2"></i>@SelectedTask.Title
+                    </h5>
                     <button type="button" class="btn-close" @onclick="CloseTaskDetail"></button>
                 </div>
                 <div class="modal-body p-3">
-                    <div class="row g-3 mb-3">
+                    <div class="row g-3">
                         <div class="col-md-8">
-                            <h6 class="fw-semibold text-secondary small mb-1">Description</h6>
-                            <div class="p-3 bg-light rounded-3 text-dark mb-3" style="min-height: 80px; white-space: pre-wrap; font-size: 0.92rem;">
-                                @(string.IsNullOrWhiteSpace(SelectedTask.Description) ? "No description provided." : SelectedTask.Description)
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold text-secondary mb-1">Description</label>
+                                <div class="p-2 border rounded-2 bg-light small" style="white-space: pre-wrap; min-height: 60px;">
+                                    @(string.IsNullOrWhiteSpace(SelectedTask.Description) ? "No detailed instructions provided." : SelectedTask.Description)
+                                </div>
                             </div>
 
-                            <!-- Comments Section -->
-                            <h6 class="fw-semibold text-secondary small mb-2"><i class="fas fa-comments text-primary me-1"></i>Discussion &amp; Notes (@SelectedTask.Comments.Count)</h6>
-                            <div class="d-flex flex-column gap-2 mb-3" style="max-height: 200px; overflow-y: auto;">
+                            <!-- Attachments in Details Modal -->
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold text-secondary mb-1">
+                                    <i class="fas fa-paperclip text-primary me-1"></i>Task Attachments &amp; Voice Notes
+                                </label>
+                                @if (SelectedTask.Attachments.Any())
+                                {
+                                    <div class="d-flex flex-column gap-2 mb-2">
+                                        @foreach (var att in SelectedTask.Attachments)
+                                        {
+                                            @if (att.ContentType?.StartsWith("audio/") == true || att.FileName.EndsWith(".webm") || att.FileName.EndsWith(".mp3"))
+                                            {
+                                                <div class="p-2 rounded-2 bg-light border d-flex align-items-center gap-3">
+                                                    <div class="d-flex align-items-center text-danger">
+                                                        <i class="fas fa-microphone-lines fa-lg me-2"></i>
+                                                        <span class="small fw-semibold">Voice Note</span>
+                                                    </div>
+                                                    <audio controls src="@att.FilePath" style="height: 32px; flex-grow: 1;"></audio>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <a href="@att.FilePath" target="_blank" class="btn btn-xs btn-outline-secondary d-inline-flex align-items-center gap-1 text-decoration-none py-1 px-2" style="font-size: 0.8rem; width: fit-content;">
+                                                    <i class="fas fa-paperclip text-primary"></i>
+                                                    <span>@att.FileName</span>
+                                                </a>
+                                            }
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="text-muted small fst-italic mb-2">No attachments on this task.</div>
+                                }
+
+                                <!-- Upload new file to existing task -->
+                                <div class="d-flex align-items-center gap-2">
+                                    <label for="task-detail-file-upload" class="btn btn-xs btn-outline-primary mb-0 cursor-pointer d-flex align-items-center gap-1">
+                                        <i class="fas fa-upload"></i>
+                                        <span>Attach Document</span>
+                                    </label>
+                                    <InputFile id="task-detail-file-upload" OnChange="HandleDetailFileUpload" style="display: none;" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" />
+                                </div>
+                            </div>
+
+                            <!-- Comments Thread -->
+                            <h6 class="fw-bold text-dark mb-2"><i class="fas fa-comments text-primary me-2"></i>Discussion &amp; Updates</h6>
+                            <div class="p-2 border rounded-2 bg-light d-flex flex-column gap-2 mb-3" style="max-height: 200px; overflow-y: auto;">
                                 @foreach (var comment in SelectedTask.Comments)
                                 {
                                     <div class="p-2 border rounded-2 bg-white">
@@ -387,8 +450,59 @@
                         </div>
                         <div class="col-md-12">
                             <label class="form-label fw-semibold small text-secondary">Description</label>
-                            <textarea class="form-control form-control-sm" rows="4" placeholder="Detailed instructions for the task..." @bind="NewTaskDescription"></textarea>
+                            <textarea class="form-control form-control-sm" rows="3" placeholder="Detailed instructions for the task..." @bind="NewTaskDescription"></textarea>
                         </div>
+
+                        <!-- Voice Note & Attachments in Create Task Modal -->
+                        <div class="col-md-12">
+                            <div class="p-3 border rounded-2 bg-light">
+                                <label class="form-label small fw-semibold text-dark mb-2">
+                                    <i class="fas fa-microphone text-danger me-1"></i>Voice Note &amp; Document Attachments
+                                </label>
+                                <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+                                    <!-- Mic recording button -->
+                                    <button type="button" class="btn btn-sm @(IsRecordingVoice ? "btn-danger recording-pulse" : "btn-outline-danger") d-flex align-items-center gap-1 shadow-sm" @onclick="ToggleVoiceRecordingAsync">
+                                        <i class="fas @(IsRecordingVoice ? "fa-stop" : "fa-microphone")"></i>
+                                        <span>@(IsRecordingVoice ? "Stop Recording Voice" : "Record Voice Note")</span>
+                                    </button>
+
+                                    <!-- Add regular files -->
+                                    <label for="task-file-upload" class="btn btn-sm btn-outline-secondary mb-0 cursor-pointer d-flex align-items-center gap-1">
+                                        <i class="fas fa-paperclip"></i>
+                                        <span>Add Files</span>
+                                    </label>
+                                    <InputFile id="task-file-upload" OnChange="HandleNewAttachments" multiple style="display: none;" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webm,.mp3" />
+                                </div>
+
+                                <!-- Attachments Preview List -->
+                                @if (PendingVoiceNotes.Any() || PendingFiles.Any())
+                                {
+                                    <div class="d-flex flex-wrap gap-2 mt-2 pt-2 border-top">
+                                        @foreach (var vn in PendingVoiceNotes)
+                                        {
+                                            <div class="p-1 px-2 rounded-2 bg-danger-subtle text-danger border border-danger-subtle d-flex align-items-center gap-2 small">
+                                                <i class="fas fa-microphone"></i>
+                                                <span>@vn.FileName</span>
+                                                <button type="button" class="btn btn-xs btn-link text-danger p-0" @onclick="() => PendingVoiceNotes.Remove(vn)">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                        }
+                                        @foreach (var f in PendingFiles)
+                                        {
+                                            <div class="p-1 px-2 rounded-2 bg-white border d-flex align-items-center gap-2 small">
+                                                <i class="fas fa-file text-primary"></i>
+                                                <span>@f.Name</span>
+                                                <button type="button" class="btn btn-xs btn-link text-danger p-0" @onclick="() => PendingFiles.Remove(f)">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
                         <div class="col-md-12">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="whatsappCheck" @bind="NewTaskSendWhatsApp" />
@@ -420,6 +534,17 @@
         </div>
     </div>
 }
+
+<style>
+    .recording-pulse {
+        animation: pulseAnimation 1.2s infinite;
+    }
+    @@keyframes pulseAnimation {
+        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+        70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+    }
+</style>
 
 @code {
     private RenderFragment RenderTaskCard(TaskItem task) => __builder =>
