@@ -441,6 +441,12 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("AppSettings"));
 builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<AppSettings>>().Value);
 
+// IntraOffice Module Registrations
+builder.Services.AddScoped<DataAccessLibrary.Interface.IntraOffice.IIntraOfficeDataAccess, DataAccessLibrary.DAC.IntraOffice.IntraOfficeDataAccess>();
+builder.Services.AddScoped<Impulse.Services.IntraOffice.IIntraOfficeService, Impulse.Services.IntraOffice.IntraOfficeService>();
+builder.Services.AddHttpClient<Impulse.Services.IntraOffice.IWhatsAppNotificationService, Impulse.Services.IntraOffice.WhatsAppNotificationService>();
+builder.Services.AddScoped<Impulse.Services.IntraOffice.IAiAssistantService, Impulse.Services.IntraOffice.AiAssistantService>();
+
 var app = builder.Build();
 
 // Enable PathBase for IIS sub-application hosting (ensures Identity Login redirects stay under /impulse)
@@ -482,6 +488,7 @@ app.UseAuthorization();
 app.MapRazorPages();
 app.MapControllers();
 app.MapBlazorHub();
+app.MapHub<Impulse.Hubs.ChatHub>("/chathub");
 app.MapFallbackToPage("/_Host");
 
 app.Run();

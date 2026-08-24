@@ -632,11 +632,51 @@
                     </div>
                 </div>
             }
-
-
-
-
         </div>
+
+        <!-- IntraOffice Module -->
+        <div class="nav-item">
+            <div class="nav-section-header" @onclick="NavigateIntraOffice">
+                <i class="fas fa-comments me-2"></i>
+                <span>IntraOffice</span>
+                <i class="fas fa-chevron-down ms-auto @(isIntraOfficeExpanded ? "rotated" : "")"></i>
+            </div>
+            @if (isIntraOfficeExpanded)
+            {
+                <div class="nav-sub-section">
+                    <div class="nav-sub-links">
+                        <NavLink class="nav-link" href="/intraoffice" Match="NavLinkMatch.All">
+                            <i class="fas fa-gauge-high me-2"></i> IntraOffice Hub
+                        </NavLink>
+                        <NavLink class="nav-link" href="/intraoffice/chat">
+                            <i class="fas fa-comment-dots me-2"></i> Direct Chat &amp; AI
+                        </NavLink>
+                        <NavLink class="nav-link" href="/intraoffice/channels">
+                            <i class="fas fa-hashtag me-2"></i> Channels
+                        </NavLink>
+                        <NavLink class="nav-link" href="/intraoffice/announcements">
+                            <i class="fas fa-bullhorn me-2"></i> Announcements
+                        </NavLink>
+                        <NavLink class="nav-link" href="/intraoffice/tasks">
+                            <i class="fas fa-list-check me-2"></i> Task Board
+                        </NavLink>
+                        <NavLink class="nav-link" href="/intraoffice/minutes">
+                            <i class="fas fa-file-signature me-2"></i> Minutes Approvals
+                        </NavLink>
+                        <NavLink class="nav-link" href="/intraoffice/meetings">
+                            <i class="fas fa-video me-2"></i> Meetings
+                        </NavLink>
+                        <NavLink class="nav-link" href="/intraoffice/directory">
+                            <i class="fas fa-address-book me-2"></i> Employee Directory
+                        </NavLink>
+                        <NavLink class="nav-link" href="/intraoffice/stickynotes">
+                            <i class="fas fa-note-sticky me-2"></i> Sticky Notes
+                        </NavLink>
+                    </div>
+                </div>
+            }
+        </div>
+
         <div class="nav-item mt-auto">
             <form method="post" action="/Identity/Account/Logout">
                 <button type="submit" class="nav-link text-danger w-100 text-start sign-out-button">
@@ -668,6 +708,7 @@
     private bool isProductionExpanded = false;
     private bool isCompanyExpanded = false;
     private bool isDashboardsExpanded = false;
+    private bool isIntraOfficeExpanded = false;
 
     private async Task ToggleNavMenu()
     {
@@ -678,6 +719,12 @@
     {
         isDashboardsExpanded = !isDashboardsExpanded;
         NavigationManager.NavigateTo("/dashboards");
+    }
+
+    private void NavigateIntraOffice()
+    {
+        isIntraOfficeExpanded = !isIntraOfficeExpanded;
+        NavigationManager.NavigateTo("/intraoffice");
     }
 
     // Dual-action: navigate to module dashboard AND expand its sub-menu

@@ -1,0 +1,210 @@
+@page "/intraoffice/announcements"
+@attribute [Authorize]
+
+<PageTitle>Announcements - IntraOffice</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-3">
+            <!-- Header -->
+            <div class="d-flex align-items-end justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="d-flex align-items-center justify-content-center bg-primary-subtle text-primary rounded-3 p-2" style="width: 42px; height: 42px;">
+                        <i class="fas fa-bullhorn fa-lg"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-0 fw-bold text-dark" style="font-size: 1.25rem;">Announcements Board</h4>
+                        <small class="text-secondary">Company-wide &amp; departmental updates, policies, and notices</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-primary d-flex align-items-center gap-1 shadow-sm" @onclick="OpenCreateModal">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>New Announcement</span>
+                    </button>
+                    <a href="/intraoffice" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1">
+                        <i class="fas fa-arrow-left"></i>
+                        <span>Back</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Filter Row -->
+            <div class="row g-2 mb-3 align-items-center">
+                <div class="col-md-4">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light text-secondary border-end-0"><i class="fas fa-search"></i></span>
+                        <input type="text" class="form-control form-control-sm border-start-0" placeholder="Search announcements..." @bind="SearchTerm" @bind:event="oninput" />
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select form-select-sm" @bind="SelectedDepartmentId">
+                        <option value="">All Departments (Company-wide)</option>
+                        @foreach (var dept in Departments)
+                        {
+                            <option value="@dept.DeptId">@dept.DeptName</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select form-select-sm" @bind="SelectedPriorityFilter">
+                        <option value="-1">All Priorities</option>
+                        <option value="0">Normal</option>
+                        <option value="1">Important</option>
+                        <option value="2">Critical</option>
+                    </select>
+                </div>
+                <div class="col-md-2 text-end">
+                    <span class="badge bg-light text-dark border p-2">Total: @FilteredAnnouncements.Count</span>
+                </div>
+            </div>
+
+            <!-- Announcements Feed -->
+            @if (IsLoading)
+            {
+                <div class="d-flex justify-content-center align-items-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <span class="ms-2 text-secondary">Loading announcements...</span>
+                </div>
+            }
+            else if (!FilteredAnnouncements.Any())
+            {
+                <div class="text-center py-5 border rounded-3 bg-light">
+                    <i class="fas fa-bullhorn fa-3x text-muted mb-2"></i>
+                    <h6 class="text-secondary fw-semibold">No announcements found</h6>
+                    <p class="text-muted small mb-0">No company or departmental updates matching your filter criteria.</p>
+                </div>
+            }
+            else
+            {
+                <div class="d-flex flex-column gap-3">
+                    @foreach (var item in FilteredAnnouncements)
+                    {
+                        <div class="card border @GetCardBorderClass(item.Priority) shadow-sm" style="border-radius: 10px; background: @(item.IsAcknowledgedByCurrentUser ? "#f9fffb" : "#ffffff");">
+                            <div class="card-body p-3">
+                                <div class="d-flex align-items-start justify-content-between mb-2">
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        @if (item.IsPinned)
+                                        {
+                                            <span class="badge bg-warning text-dark"><i class="fas fa-thumbtack me-1"></i>Pinned</span>
+                                        }
+                                        <h5 class="mb-0 fw-bold text-dark" style="font-size: 1.05rem;">@item.Title</h5>
+                                        <span class="badge @GetPriorityBadgeClass(item.Priority)">@item.Priority</span>
+                                        @if (item.IsAcknowledgedByCurrentUser)
+                                        {
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="fas fa-check-circle me-1"></i>Acknowledged</span>
+                                        }
+                                    </div>
+                                    <small class="text-muted"><i class="fas fa-clock me-1"></i>@item.CreatedAt.ToString("MMM dd, yyyy hh:mm tt")</small>
+                                </div>
+
+                                <div class="d-flex align-items-center gap-3 text-secondary small mb-2">
+                                    <span><i class="fas fa-user-tie text-primary me-1"></i>@(item.CreatorName ?? item.CreatedBy) @(!string.IsNullOrEmpty(item.CreatorDesignation) ? $"({item.CreatorDesignation})" : "")</span>
+                                    <span><i class="fas fa-building text-info me-1"></i>@(item.DepartmentName ?? "Company-wide")</span>
+                                </div>
+
+                                <div class="text-dark mb-3" style="white-space: pre-wrap; font-size: 0.92rem; line-height: 1.5;">@item.Content</div>
+
+                                @if (item.Attachments.Any())
+                                {
+                                    <div class="d-flex flex-wrap gap-2 mb-3">
+                                        @foreach (var att in item.Attachments)
+                                        {
+                                            <a href="@att.FilePath" target="_blank" class="btn btn-xs btn-outline-secondary d-flex align-items-center gap-1 text-decoration-none py-1 px-2" style="font-size: 0.8rem;">
+                                                <i class="fas fa-paperclip text-primary"></i>
+                                                <span>@att.FileName</span>
+                                            </a>
+                                        }
+                                    </div>
+                                }
+
+                                <div class="d-flex align-items-center justify-content-between pt-2 border-top">
+                                    <div class="small text-muted">
+                                        <i class="fas fa-users-check me-1"></i>@item.AcknowledgmentCount @(item.AcknowledgmentCount == 1 ? "person has" : "people have") acknowledged
+                                    </div>
+                                    <div>
+                                        @if (!item.IsAcknowledgedByCurrentUser)
+                                        {
+                                            <button class="btn btn-sm btn-success d-flex align-items-center gap-1 shadow-sm" @onclick="() => AcknowledgeAsync(item.Id)">
+                                                <i class="fas fa-check"></i>
+                                                <span>Acknowledge Notice</span>
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Create Modal -->
+@if (ShowCreateModalState)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow" style="border-radius: 12px;">
+                <div class="modal-header bg-light border-bottom py-2">
+                    <h5 class="modal-title fw-bold text-dark" style="font-size: 1.1rem;"><i class="fas fa-bullhorn text-primary me-2"></i>Create New Announcement</h5>
+                    <button type="button" class="btn-close" @onclick="CloseCreateModal"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label fw-semibold small text-secondary">Title *</label>
+                            <input type="text" class="form-control form-control-sm" placeholder="Enter announcement subject/title..." @bind="NewTitle" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">Target Department</label>
+                            <select class="form-select form-select-sm" @bind="NewDepartmentId">
+                                <option value="">Company-wide (All Departments)</option>
+                                @foreach (var dept in Departments)
+                                {
+                                    <option value="@dept.DeptId">@dept.DeptName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">Priority Level</label>
+                            <select class="form-select form-select-sm" @bind="NewPriority">
+                                <option value="0">Normal</option>
+                                <option value="1">Important</option>
+                                <option value="2">Critical / Urgent</option>
+                            </select>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label fw-semibold small text-secondary">Notice Details *</label>
+                            <textarea class="form-control form-control-sm" rows="5" placeholder="Type the full announcement message here..." @bind="NewContent"></textarea>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="pinnedCheck" @bind="NewIsPinned" />
+                                <label class="form-check-label small text-dark fw-semibold" for="pinnedCheck">Pin this notice to top</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top py-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CloseCreateModal">
+                        <i class="fas fa-times me-1"></i>Cancel
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary shadow-sm" @onclick="SaveAnnouncementAsync" disabled="@IsSaving">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-check me-1"></i>
+                            <span>Publish Notice</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

@@ -1,0 +1,292 @@
+@page "/intraoffice/minutes/new"
+@page "/intraoffice/minutes/{Id:int}"
+@attribute [Authorize]
+
+<PageTitle>@(Id.HasValue ? $"Minute Memo #{MinuteModel.No}" : "New Minute Memo") - IntraOffice</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-3">
+            <!-- Header -->
+            <div class="d-flex align-items-end justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="d-flex align-items-center justify-content-center bg-primary-subtle text-primary rounded-3 p-2" style="width: 42px; height: 42px;">
+                        <i class="fas fa-file-invoice-dollar fa-lg"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-0 fw-bold text-dark" style="font-size: 1.25rem;">@(Id.HasValue ? $"Minute Memo: {MinuteModel.No}" : "Create Executive Minute Memo")</h4>
+                        <small class="text-secondary">Official executive authorization &amp; financial approval workflow</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    @if (Id.HasValue)
+                    {
+                        <span class="badge @GetStatusBadgeClass(MinuteModel.Status) p-2">@MinuteModel.Status</span>
+                    }
+                    <a href="/intraoffice/minutes" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1">
+                        <i class="fas fa-arrow-left"></i>
+                        <span>Back to List</span>
+                    </a>
+                </div>
+            </div>
+
+            @if (IsLoading)
+            {
+                <div class="d-flex justify-content-center align-items-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <span class="ms-2 text-secondary">Loading minute details...</span>
+                </div>
+            }
+            else
+            {
+                <div class="row g-3">
+                    <!-- Left: Form Information -->
+                    <div class="col-lg-8">
+                        <div class="card border border-light-subtle shadow-sm p-3 bg-white mb-3" style="border-radius: 10px;">
+                            <h6 class="fw-bold text-primary mb-3"><i class="fas fa-circle-info me-2"></i>Memo Information</h6>
+                            <div class="row g-2 mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label small text-secondary fw-semibold mb-1">Date *</label>
+                                    <input type="date" class="form-control form-control-sm" @bind="MinuteModel.Date" disabled="@IsReadOnly" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small text-secondary fw-semibold mb-1">Minute No. *</label>
+                                    <input type="text" class="form-control form-control-sm" placeholder="e.g. MIN-2026-001" @bind="MinuteModel.No" disabled="@IsReadOnly" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small text-secondary fw-semibold mb-1">Type *</label>
+                                    <select class="form-select form-select-sm" @bind="MinuteModel.Type" disabled="@IsReadOnly">
+                                        <option value="">-- Select Type --</option>
+                                        @foreach (var t in MinuteTypes)
+                                        {
+                                            <option value="@t.Name">@t.Name</option>
+                                        }
+                                        <option value="General">General</option>
+                                        <option value="Financial">Financial</option>
+                                        <option value="HR">HR / Leave</option>
+                                        <option value="Purchase">Purchase &amp; Inventory</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small text-secondary fw-semibold mb-1">Subject / Summary *</label>
+                                <input type="text" class="form-control form-control-sm" placeholder="Subject of the executive minute memo..." @bind="MinuteModel.Subject" disabled="@IsReadOnly" />
+                            </div>
+
+                            <!-- Bullet Points -->
+                            <div class="mb-3">
+                                <label class="form-label small text-secondary fw-semibold mb-1">Discussion Points &amp; Terms</label>
+                                @if (!IsReadOnly)
+                                {
+                                    <div class="input-group input-group-sm mb-2">
+                                        <input type="text" class="form-control" placeholder="Add a key point or term..." @bind="NewPointText" @onkeyup="HandlePointKeyUp" />
+                                        <button class="btn btn-outline-primary" type="button" @onclick="AddPoint">
+                                            <i class="fas fa-plus me-1"></i>Add Point
+                                        </button>
+                                    </div>
+                                }
+
+                                <div class="p-2 border rounded-2 bg-light" style="min-height: 80px;">
+                                    @if (PointsList.Any())
+                                    {
+                                        <ul class="list-group list-group-flush mb-0">
+                                            @foreach (var pt in PointsList)
+                                            {
+                                                <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center py-1 px-2 small">
+                                                    <span class="text-dark"><i class="fas fa-circle-check text-success me-2"></i>@pt</span>
+                                                    @if (!IsReadOnly)
+                                                    {
+                                                        <button class="btn btn-xs btn-link text-danger p-0" @onclick="() => PointsList.Remove(pt)">
+                                                            <i class="fas fa-times"></i>
+                                                        </button>
+                                                    }
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+                                    else
+                                    {
+                                        <div class="text-muted small text-center py-3">No points added.</div>
+                                    }
+                                </div>
+                            </div>
+
+                            <!-- Financial Details -->
+                            <div class="row g-2 mb-3">
+                                <div class="col-md-3">
+                                    <label class="form-label small text-secondary fw-semibold mb-1">Currency</label>
+                                    <select class="form-select form-select-sm" @bind="MinuteModel.Currency" disabled="@IsReadOnly">
+                                        <option value="PKR">PKR</option>
+                                        <option value="USD">USD</option>
+                                        <option value="EUR">EUR</option>
+                                        <option value="GBP">GBP</option>
+                                        <option value="AED">AED</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small text-secondary fw-semibold mb-1">Total Amount</label>
+                                    <input type="number" step="0.01" class="form-control form-control-sm" placeholder="0.00" @bind="MinuteModel.TotalAmount" @bind:after="CalculateAdvance" disabled="@IsReadOnly" />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small text-secondary fw-semibold mb-1">Advance %</label>
+                                    <input type="number" step="0.1" class="form-control form-control-sm" placeholder="0%" @bind="MinuteModel.AdvancePercentage" @bind:after="CalculateAdvance" disabled="@IsReadOnly" />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small text-secondary fw-semibold mb-1">Advance Amount</label>
+                                    <input type="number" step="0.01" class="form-control form-control-sm" placeholder="0.00" @bind="MinuteModel.AdvanceAmount" disabled="@IsReadOnly" />
+                                </div>
+                            </div>
+
+                            <!-- 8 Attachment Slots (Roman Numerals I - VIII) -->
+                            <div class="mb-3">
+                                <label class="form-label small text-secondary fw-semibold mb-2">
+                                    <i class="fas fa-paperclip text-primary me-1"></i>Supporting Documents &amp; Attachments (I - VIII)
+                                </label>
+                                <div class="row g-2">
+                                    @for (int i = 0; i < 8; i++)
+                                    {
+                                        var slotIndex = i;
+                                        var roman = GetRomanNumeral(slotIndex + 1);
+                                        var hasPendingFile = PendingAttachments.ContainsKey(slotIndex);
+                                        var existingAttachment = MinuteModel.Attachments.ElementAtOrDefault(slotIndex);
+
+                                        <div class="col-md-6">
+                                            <div class="p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between gap-2">
+                                                <div class="d-flex align-items-center gap-2 overflow-hidden">
+                                                    <span class="badge bg-secondary-subtle text-dark border fw-bold" style="min-width: 32px;">@roman</span>
+                                                    @if (existingAttachment != null)
+                                                    {
+                                                        <a href="@existingAttachment.FilePath" target="_blank" class="small text-primary text-decoration-none text-truncate fw-semibold" title="@existingAttachment.FileName">
+                                                            <i class="fas fa-file me-1"></i>@existingAttachment.FileName
+                                                        </a>
+                                                    }
+                                                    else if (hasPendingFile)
+                                                    {
+                                                        <span class="small text-success text-truncate fw-semibold" title="@PendingAttachments[slotIndex].Name">
+                                                            <i class="fas fa-file-arrow-up me-1"></i>@PendingAttachments[slotIndex].Name
+                                                        </span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="small text-muted fst-italic">No attachment</span>
+                                                    }
+                                                </div>
+
+                                                @if (!IsReadOnly)
+                                                {
+                                                    <div class="d-flex align-items-center gap-1">
+                                                        <label for="@($"file-slot-{slotIndex}")" class="btn btn-xs btn-outline-primary mb-0 cursor-pointer" title="Select File">
+                                                            <i class="fas fa-upload"></i>
+                                                        </label>
+                                                        <InputFile id="@($"file-slot-{slotIndex}")" OnChange="@((e) => HandleFileSelected(e, slotIndex))" style="display: none;" />
+
+                                                        @if (hasPendingFile)
+                                                        {
+                                                            <button type="button" class="btn btn-xs btn-link text-danger p-0" @onclick="() => PendingAttachments.Remove(slotIndex)" title="Remove">
+                                                                <i class="fas fa-times"></i>
+                                                            </button>
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="row g-2 align-items-center">
+                                <div class="col-md-6">
+                                    <label class="form-label small text-secondary fw-semibold mb-1">Forward To Signing Authority</label>
+                                    <select class="form-select form-select-sm" @bind="MinuteModel.ForwardToUserId" disabled="@IsReadOnly">
+                                        <option value="">-- Select Authority --</option>
+                                        @foreach (var u in UsersList)
+                                        {
+                                            <option value="@u.UserName">@(u.FullUserName ?? u.UserName) @(!string.IsNullOrEmpty(u.Designation) ? $"({u.Designation})" : "")</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-6 d-flex align-items-center gap-3 pt-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="urgentCheck" @bind="MinuteModel.IsUrgent" disabled="@IsReadOnly" />
+                                        <label class="form-check-label small fw-semibold text-danger" for="urgentCheck">Mark Urgent</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="closeInitiatorCheck" @bind="MinuteModel.CloseByInitiator" disabled="@IsReadOnly" />
+                                        <label class="form-check-label small text-dark" for="closeInitiatorCheck">Close by Initiator</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action buttons for creating / editing -->
+                        @if (!IsReadOnly)
+                        {
+                            <div class="d-flex justify-content-end gap-2">
+                                <button type="button" class="btn btn-sm btn-primary shadow-sm" @onclick="SaveMinuteAsync" disabled="@IsSaving">
+                                    @if (IsSaving)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                        <span>Saving with Attachments...</span>
+                                    }
+                                    else
+                                    {
+                                        <i class="fas fa-save me-1"></i>
+                                        <span>@(Id.HasValue ? "Update Minute" : "Submit Minute Memo")</span>
+                                    }
+                                </button>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Right: Workflow History & Decision Panel -->
+                    <div class="col-lg-4">
+                        <!-- Decision Box for Approver -->
+                        @if (Id.HasValue && MinuteModel.Status != "Approved" && MinuteModel.Status != "Rejected")
+                        {
+                            <div class="card border border-primary-subtle shadow-sm p-3 bg-white mb-3" style="border-radius: 10px;">
+                                <h6 class="fw-bold text-primary mb-2"><i class="fas fa-stamp me-1"></i>Approval Decision</h6>
+                                <div class="mb-2">
+                                    <label class="form-label small text-secondary fw-semibold mb-1">Remarks / Note</label>
+                                    <textarea class="form-control form-control-sm" rows="3" placeholder="Enter remarks or approval notes..." @bind="DecisionRemarks"></textarea>
+                                </div>
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-sm btn-success d-flex align-items-center justify-content-center gap-1 shadow-sm" @onclick='() => ProcessDecisionAsync("Approved")'>
+                                        <i class="fas fa-check-circle"></i>
+                                        <span>Approve Memo</span>
+                                    </button>
+                                    <button class="btn btn-sm btn-danger d-flex align-items-center justify-content-center gap-1 shadow-sm" @onclick='() => ProcessDecisionAsync("Rejected")'>
+                                        <i class="fas fa-times-circle"></i>
+                                        <span>Reject Memo</span>
+                                    </button>
+                                </div>
+                            </div>
+                        }
+
+                        <!-- Audit History Timeline -->
+                        <div class="card border border-light-subtle shadow-sm p-3 bg-white" style="border-radius: 10px;">
+                            <h6 class="fw-bold text-secondary mb-3"><i class="fas fa-history me-1"></i>Workflow History</h6>
+                            <div class="d-flex flex-column gap-2" style="max-height: 400px; overflow-y: auto;">
+                                @foreach (var hist in MinuteModel.WorkflowHistory)
+                                {
+                                    <div class="p-2 border rounded-2 bg-light small">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <strong class="text-dark">@(hist.FullName ?? hist.UserName ?? hist.UserId)</strong>
+                                            <span class="badge @GetStatusBadgeClass(hist.ActionTaken)">@hist.ActionTaken</span>
+                                        </div>
+                                        <div class="text-secondary mb-1">@hist.Remarks</div>
+                                        <small class="text-muted"><i class="fas fa-clock me-1"></i>@hist.CreatedAt.ToString("MMM dd, yyyy hh:mm tt")</small>
+                                    </div>
+                                }
+                                @if (!MinuteModel.WorkflowHistory.Any())
+                                {
+                                    <div class="text-muted small text-center py-3">No history recorded yet.</div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
