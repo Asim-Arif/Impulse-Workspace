@@ -1,0 +1,573 @@
+@page "/dashboards/finance-executive"
+@page "/dashboard/finance-executive"
+@attribute [Authorize]
+@namespace Impulse.Pages.Dashboards.Executive
+
+<PageTitle>Financial &amp; Treasury Executive Dashboard | Impulse ERP</PageTitle>
+
+<div class="container-fluid py-2 px-3 finance-dashboard-root" style="font-family: 'Calibri', 'Segoe UI', -apple-system, sans-serif; background-color: #f7f9fb; min-height: 100vh;">
+
+    <!-- ── Navigation Header ────────────────────────────────────────────── -->
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+        <div class="d-flex align-items-center gap-2">
+            <a href="/dashboards/executive" class="btn btn-sm btn-light border text-secondary shadow-sm rounded-pill px-3" style="font-size: 0.78rem;">
+                <i class="fas fa-arrow-left me-1"></i> Executive Dashboards
+            </a>
+            <span class="text-muted" style="font-size: 0.8rem;">/ Financial &amp; Treasury Intelligence</span>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge px-2.5 py-1 rounded-pill" style="background: rgba(16, 124, 65, 0.12); color: #107C41; font-weight: 700; font-size: 0.74rem; border: 1px solid rgba(16, 124, 65, 0.25);">
+                <i class="fas fa-circle-check me-1"></i> POWER BI SUITE
+            </span>
+            <div class="d-flex align-items-center bg-white border rounded px-2 py-1 shadow-sm" style="font-size: 0.8rem;">
+                <span class="text-secondary me-2 fw-semibold">Reporting Horizon:</span>
+                <select class="form-select form-select-sm border-0 bg-transparent py-0 ps-1 pe-3 fw-bold text-dark" style="font-size: 0.8rem; box-shadow: none;" @bind="SelectedPeriod">
+                    <option value="Past 6 Months">Past 6 Months (Jan - Jun)</option>
+                    <option value="Q2 Current">Q2 Reconciled</option>
+                    <option value="Full Year 2025">Fiscal Full Year</option>
+                </select>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-success px-3 fw-bold shadow-sm" @onclick="RefreshData" disabled="@IsLoading" style="border-color: #107C41; color: #107C41;">
+                <i class="fas fa-sync-alt me-1 @(IsLoading ? "fa-spin" : "")"></i> Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- ── TOP ROW: Cash in Bank | Burn Rate | Expenses 3-Line ──────────── -->
+    <div class="row g-2 mb-2">
+
+        <!-- 1. Cash in Bank -->
+        <div class="col-12 col-lg-4">
+            <div class="chart-card bg-white shadow-sm p-3 h-100">
+                <div class="d-flex justify-content-between align-items-baseline mb-1">
+                    <span class="card-subtitle-label">Cash in bank</span>
+                </div>
+                <div class="d-flex align-items-baseline gap-2 mb-1">
+                    <h3 class="hero-amount mb-0 text-dark">$@CashInBankCurrent.ToString("0.0")K</h3>
+                    <span class="text-muted" style="font-size: 0.76rem;">Current</span>
+                </div>
+                <div class="text-muted mb-2" style="font-size: 0.72rem;">Past 6 months</div>
+
+                <!-- Column Bars: Jan to June -->
+                <div class="position-relative pt-1">
+                    <div class="d-flex justify-content-between align-items-end" style="height: 125px; border-bottom: 1px solid #ced4da; padding-bottom: 2px;">
+                        @foreach (var c in CashHistoryList)
+                        {
+                            <div class="d-flex flex-column align-items-center flex-grow-1" style="max-width: 14%;">
+                                <div class="w-75 rounded-top" 
+                                     style="height: @((c.CashAmountK / 1000.0) * 100)%; background-color: #00A88F;"
+                                     title="@c.Month: $@c.CashAmountK.ToString("0.0")K">
+                                </div>
+                                <span class="x-axis-label mt-1">@c.Month</span>
+                            </div>
+                        }
+                    </div>
+                    <div class="d-flex justify-content-between text-muted mt-1" style="font-size: 0.62rem;">
+                        <span>$0M</span>
+                        <span>$0.5M</span>
+                        <span>$1M</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Burn Rate -->
+        <div class="col-12 col-lg-4">
+            <div class="chart-card bg-white shadow-sm p-3 h-100">
+                <div class="d-flex justify-content-between align-items-baseline mb-1">
+                    <span class="card-subtitle-label">Burn</span>
+                </div>
+                <div class="d-flex align-items-baseline gap-2 mb-1">
+                    <h3 class="hero-amount mb-0 text-dark">$@BurnRateAvg.ToString("0.0")K</h3>
+                    <span class="text-muted" style="font-size: 0.76rem;">6 month avg</span>
+                </div>
+                <div class="text-muted mb-2" style="font-size: 0.72rem;">Past 6 months</div>
+
+                <!-- Line Chart: Jan to June -->
+                <div class="position-relative pt-1">
+                    <svg width="100%" height="125" viewBox="0 0 320 125" preserveAspectRatio="none">
+                        <!-- Horizontal Grid lines -->
+                        <line x1="20" y1="15" x2="300" y2="15" stroke="#f1f3f5" stroke-width="1" />
+                        <line x1="20" y1="50" x2="300" y2="50" stroke="#f1f3f5" stroke-width="1" />
+                        <line x1="20" y1="85" x2="300" y2="85" stroke="#f1f3f5" stroke-width="1" />
+                        <line x1="20" y1="110" x2="300" y2="110" stroke="#ced4da" stroke-width="1" />
+
+                        <!-- Burn Line (peaks in March at 112K) -->
+                        <polyline points="35,82 85,76 140,25 195,92 250,68 290,48"
+                                  fill="none" stroke="#00A88F" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+
+                        <!-- Points -->
+                        <circle cx="35" cy="82" r="3" fill="#00A88F" />
+                        <circle cx="85" cy="76" r="3" fill="#00A88F" />
+                        <circle cx="140" cy="25" r="3.5" fill="#00A88F" />
+                        <circle cx="195" cy="92" r="3" fill="#00A88F" />
+                        <circle cx="250" cy="68" r="3" fill="#00A88F" />
+                        <circle cx="290" cy="48" r="3" fill="#00A88F" />
+                    </svg>
+                    <div class="d-flex justify-content-between text-muted px-2" style="font-size: 0.62rem;">
+                        <span>Jan</span><span>Feb</span><span>March</span><span>April</span><span>May</span><span>June</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Expenses (3-Line Trend) -->
+        <div class="col-12 col-lg-4">
+            <div class="chart-card bg-white shadow-sm p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="card-subtitle-label">Expenses</span>
+                    <span class="text-muted" style="font-size: 0.7rem;">$230K max</span>
+                </div>
+
+                <!-- Legend -->
+                <div class="d-flex align-items-center gap-2 mb-2" style="font-size: 0.65rem;">
+                    <span><i class="fas fa-circle me-1" style="font-size:0.5rem; color:#00A88F;"></i> Salary (inc on cost)</span>
+                    <span><i class="fas fa-circle me-1" style="font-size:0.5rem; color:#F57C00;"></i> Fixed costs</span>
+                    <span><i class="fas fa-circle me-1" style="font-size:0.5rem; color:#8E24AA;"></i> Expenses</span>
+                </div>
+
+                <!-- 3-Line SVG Chart -->
+                <div class="position-relative pt-1">
+                    <svg width="100%" height="125" viewBox="0 0 320 125" preserveAspectRatio="none">
+                        <!-- Horizontal Grid lines -->
+                        <line x1="20" y1="15" x2="300" y2="15" stroke="#f1f3f5" stroke-width="1" />
+                        <line x1="20" y1="50" x2="300" y2="50" stroke="#f1f3f5" stroke-width="1" />
+                        <line x1="20" y1="85" x2="300" y2="85" stroke="#f1f3f5" stroke-width="1" />
+                        <line x1="20" y1="110" x2="300" y2="110" stroke="#ced4da" stroke-width="1" />
+
+                        <!-- Line 1: Salary (Cyan #00A88F) -->
+                        <polyline points="35,28 85,28 140,22 195,22 250,16 290,16"
+                                  fill="none" stroke="#00A88F" stroke-width="2.5" stroke-linecap="round" />
+
+                        <!-- Line 2: Expenses (Purple #8E24AA) with March Peak -->
+                        <polyline points="35,68 85,68 140,32 195,84 250,84 290,56"
+                                  fill="none" stroke="#8E24AA" stroke-width="2" stroke-linecap="round" />
+
+                        <!-- Line 3: Fixed Costs (Amber #F57C00) -->
+                        <polyline points="35,98 85,98 140,96 195,96 250,92 290,92"
+                                  fill="none" stroke="#F57C00" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                    <div class="d-flex justify-content-between text-muted px-2" style="font-size: 0.62rem;">
+                        <span>Jan</span><span>Feb</span><span>March</span><span>April</span><span>May</span><span>June</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ── MIDDLE ROW: Solvency Runway | Debtors | Debtors 6-Month Trend ── -->
+    <div class="row g-2 mb-2">
+
+        <!-- 1. Solvency & Runway -->
+        <div class="col-12 col-lg-5">
+            <div class="chart-card bg-white shadow-sm p-3 h-100">
+                <span class="card-subtitle-label mb-2 d-block">Solvency</span>
+
+                <!-- Green Runway Status Box -->
+                <div class="solvency-box mb-3 p-2 px-3 d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-baseline gap-2">
+                        <span class="solvency-num">@SolvencyRunwayMonths.ToString("0.0")mth</span>
+                        <span class="solvency-sub">Runway</span>
+                    </div>
+                    <div class="solvency-check-icon">
+                        <i class="fas fa-check"></i>
+                    </div>
+                </div>
+
+                <!-- Income / Outgoings Chart -->
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="text-secondary fw-semibold" style="font-size: 0.74rem;">Income / outgoings</span>
+                    <div class="d-flex align-items-center gap-2" style="font-size: 0.65rem;">
+                        <span><span class="legend-dot" style="background:#00A88F;"></span> Income</span>
+                        <span><span class="legend-dot" style="background:#F57C00;"></span> Outgoings</span>
+                    </div>
+                </div>
+
+                <div class="position-relative pt-2">
+                    <div class="d-flex justify-content-between align-items-end" style="height: 110px; border-bottom: 1px solid #ced4da; padding-bottom: 2px;">
+                        @foreach (var s in SolvencyHistoryList)
+                        {
+                            <div class="d-flex flex-column align-items-center flex-grow-1" style="max-width: 15%;">
+                                <div class="d-flex align-items-end gap-1 h-100">
+                                    <div class="column-bar" style="height: @((s.IncomeK / 350.0) * 100)%; background:#00A88F; width: 8px;" title="Income: $@s.IncomeK K"></div>
+                                    <div class="column-bar" style="height: @((s.OutgoingsK / 350.0) * 100)%; background:#F57C00; width: 8px;" title="Outgoings: $@s.OutgoingsK K"></div>
+                                </div>
+                                <span class="x-axis-label mt-1">@s.Month</span>
+                            </div>
+                        }
+                    </div>
+                    <div class="d-flex justify-content-between text-muted mt-1" style="font-size: 0.62rem;">
+                        <span>$0</span>
+                        <span>$200K</span>
+                        <span>$400K</span>
+                        <span>$600K</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Debtors (Total & Over 45 Days) -->
+        <div class="col-12 col-lg-3">
+            <div class="chart-card bg-white shadow-sm p-3 h-100">
+                <span class="card-subtitle-label mb-1 d-block">Debtors</span>
+                <div class="d-flex align-items-baseline gap-2 mb-3">
+                    <h3 class="hero-amount mb-0 text-dark">$@DebtorsTotal.ToString("0")K</h3>
+                    <span class="text-muted" style="font-size: 0.76rem;">Total</span>
+                </div>
+
+                <!-- Red Alert Box: Over 45 Days -->
+                <div class="debtors-alert-box p-3 position-relative">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="alert-amount text-danger">$@DebtorsOver45Days.ToString("0")K</div>
+                            <div class="alert-sub text-muted">Over 45 days</div>
+                        </div>
+                        <div class="alert-exclamation-icon">
+                            <i class="fas fa-exclamation"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Debtors (Past 6 Months Column Chart) -->
+        <div class="col-12 col-lg-4">
+            <div class="chart-card bg-white shadow-sm p-3 h-100">
+                <span class="card-subtitle-label mb-2 d-block">Debtors (past 6 months)</span>
+
+                <div class="position-relative pt-2">
+                    <div class="d-flex justify-content-between align-items-end" style="height: 140px; border-bottom: 1px solid #ced4da; padding-bottom: 2px;">
+                        @foreach (var d in DebtorsTrendList)
+                        {
+                            <div class="d-flex flex-column align-items-center flex-grow-1" style="max-width: 14%;">
+                                <div class="w-75 rounded-top" 
+                                     style="height: @((d.DebtorsK / 400.0) * 100)%; background-color: #00A88F;"
+                                     title="@d.Month: $@d.DebtorsK K">
+                                </div>
+                                <span class="x-axis-label mt-1">@d.Month</span>
+                            </div>
+                        }
+                    </div>
+                    <div class="d-flex justify-content-between text-muted mt-1" style="font-size: 0.62rem;">
+                        <span>$0</span>
+                        <span>$100K</span>
+                        <span>$200K</span>
+                        <span>$300K</span>
+                        <span>$400K</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ── BOTTOM ROW: Expense Share | Bank Balances | Right Action Tables ─ -->
+    <div class="row g-2 mb-2">
+
+        <!-- 1. Expense Share Donut -->
+        <div class="col-12 col-lg-6">
+            <div class="chart-card bg-white shadow-sm p-3 h-100">
+                <h6 class="text-danger fw-bold mb-2" style="font-size: 0.8rem;">Expense share</h6>
+
+                <div class="row align-items-center">
+                    <div class="col-6 text-center">
+                        <div class="position-relative py-1">
+                            <svg width="170" height="150" viewBox="0 0 170 150">
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#f0f3f5" stroke-width="22" />
+
+                                <!-- Segment Rings -->
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#00897B" stroke-width="22" stroke-dasharray="276" stroke-dashoffset="204" transform="rotate(-90 85 75)" />
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#1E88E5" stroke-width="22" stroke-dasharray="276" stroke-dashoffset="223" transform="rotate(4 85 75)" />
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#5E35B1" stroke-width="22" stroke-dasharray="276" stroke-dashoffset="234" transform="rotate(73 85 75)" />
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#00ACC1" stroke-width="22" stroke-dasharray="276" stroke-dashoffset="241" transform="rotate(127 85 75)" />
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#FB8C00" stroke-width="22" stroke-dasharray="276" stroke-dashoffset="247" transform="rotate(173 85 75)" />
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#7CB342" stroke-width="22" stroke-dasharray="276" stroke-dashoffset="258" transform="rotate(211 85 75)" />
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#E53935" stroke-width="22" stroke-dasharray="276" stroke-dashoffset="259" transform="rotate(234 85 75)" />
+
+                                <!-- Inner white hole -->
+                                <circle cx="85" cy="75" r="32" fill="#ffffff" />
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- Legend on right -->
+                    <div class="col-6 ps-0" style="font-size: 0.65rem;">
+                        <div class="d-flex flex-column gap-1">
+                            @foreach (var exp in ExpenseShareList)
+                            {
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <span class="text-truncate" style="max-width: 140px;">
+                                        <span class="legend-dot" style="background:@exp.Color;"></span> @exp.Category
+                                    </span>
+                                    <span class="fw-bold text-dark">@exp.Percentage%</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Bank accounts Balance Donut -->
+        <div class="col-12 col-lg-6">
+            <div class="chart-card bg-white shadow-sm p-3 h-100">
+                <h6 class="text-danger fw-bold mb-2" style="font-size: 0.8rem;">Bank accounts Balance</h6>
+
+                <div class="row align-items-center">
+                    <div class="col-6 text-center">
+                        <div class="position-relative py-1">
+                            <svg width="170" height="150" viewBox="0 0 170 150">
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#f0f3f5" stroke-width="22" />
+
+                                <!-- 4 Bank Accounts -->
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#1E88E5" stroke-width="22" stroke-dasharray="276" stroke-dashoffset="160" transform="rotate(-90 85 75)" />
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#00897B" stroke-width="22" stroke-dasharray="276" stroke-dashoffset="199" transform="rotate(61 85 75)" />
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#43A047" stroke-width="22" stroke-dasharray="276" stroke-dashoffset="226" transform="rotate(162 85 75)" />
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#FB8C00" stroke-width="22" stroke-dasharray="276" stroke-dashoffset="243" transform="rotate(227 85 75)" />
+
+                                <!-- Inner white hole -->
+                                <circle cx="85" cy="75" r="32" fill="#ffffff" />
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- Legend on right -->
+                    <div class="col-6 ps-0" style="font-size: 0.65rem;">
+                        <div class="d-flex flex-column gap-2">
+                            @foreach (var bank in BankAccountsList)
+                            {
+                                <div class="border-bottom pb-1">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <span class="text-truncate fw-semibold" style="max-width: 140px;">
+                                            <span class="legend-dot" style="background:@bank.Color;"></span> @bank.BankName
+                                        </span>
+                                        <span class="fw-bold text-dark">@bank.Percentage%</span>
+                                    </div>
+                                    <div class="text-muted ps-3" style="font-size: 0.62rem;">$@bank.BalanceK.ToString("0.0")K Available</div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ── DEDICATED RED SPECIFICATION PANELS (Vendors, Makers & Receivables) ─ -->
+    <div class="row g-2">
+
+        <!-- 1. Top 20 Vendors Names and Payment -->
+        <div class="col-12 col-xl-4">
+            <div class="chart-card bg-white shadow-sm p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="fw-bold text-danger mb-0" style="font-size: 0.82rem;">Top 20 Vendors Names and Payment</h6>
+                    <span class="badge bg-light text-secondary border px-2 py-0" style="font-size: 0.68rem;">Disbursements</span>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0" style="font-size: 0.72rem;">
+                        <thead class="bg-light text-secondary">
+                            <tr>
+                                <th>Vendor Name</th>
+                                <th class="text-end">Paid ($)</th>
+                                <th class="text-end">Pending</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var v in TopVendorsList)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold text-dark text-truncate" style="max-width: 140px;">@v.VendorName</div>
+                                        <small class="text-muted" style="font-size: 0.62rem;">@v.Category</small>
+                                    </td>
+                                    <td class="text-end fw-bold text-success">$@v.PaidAmount.ToString("N0")</td>
+                                    <td class="text-end text-muted">$@v.PendingAmount.ToString("N0")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Top 20 Makers Name and Payment -->
+        <div class="col-12 col-xl-4">
+            <div class="chart-card bg-white shadow-sm p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="fw-bold text-danger mb-0" style="font-size: 0.82rem;">Top 20 Makers Name and Payment</h6>
+                    <span class="badge bg-light text-secondary border px-2 py-0" style="font-size: 0.68rem;">Jobber Outwork</span>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0" style="font-size: 0.72rem;">
+                        <thead class="bg-light text-secondary">
+                            <tr>
+                                <th>Maker / Process</th>
+                                <th class="text-end">Paid ($)</th>
+                                <th class="text-end">Due</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var m in TopMakersList)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold text-dark text-truncate" style="max-width: 140px;">@m.MakerName</div>
+                                        <small class="text-muted" style="font-size: 0.62rem;">@m.ProcessName</small>
+                                    </td>
+                                    <td class="text-end fw-bold text-primary">$@m.PaidAmount.ToString("N0")</td>
+                                    <td class="text-end fw-bold text-danger">$@m.BalanceDue.ToString("N0")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Receivable Names and Amount -->
+        <div class="col-12 col-xl-4">
+            <div class="chart-card bg-white shadow-sm p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="fw-bold text-danger mb-0" style="font-size: 0.82rem;">Receivable Names and Amount</h6>
+                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-0" style="font-size: 0.68rem;">Aging Risk</span>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0" style="font-size: 0.72rem;">
+                        <thead class="bg-light text-secondary">
+                            <tr>
+                                <th>Customer / Region</th>
+                                <th class="text-end">Outstanding</th>
+                                <th class="text-end">Overdue</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var r in TopReceivablesList)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold text-dark text-truncate" style="max-width: 140px;">@r.CustomerName</div>
+                                        <small class="text-muted" style="font-size: 0.62rem;">@r.Country</small>
+                                    </td>
+                                    <td class="text-end fw-bold text-dark">$@r.TotalReceivable.ToString("N0")</td>
+                                    <td class="text-end">
+                                        @if (r.IsOver45Days)
+                                        {
+                                            <span class="badge bg-danger-subtle text-danger px-1 py-0" style="font-size: 0.65rem;">
+                                                @r.OverdueDays d (&gt;45d)
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted" style="font-size: 0.68rem;">@r.OverdueDays d</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<style>
+    .finance-dashboard-root {
+        color: #2c3e50;
+    }
+    .chart-card {
+        border-radius: 6px;
+        border: 1px solid #e9ecef;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .chart-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.06) !important;
+    }
+    .card-subtitle-label {
+        font-size: 0.88rem;
+        font-weight: 700;
+        color: #2c3e50;
+    }
+    .hero-amount {
+        font-size: 1.65rem;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+    }
+    .legend-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 4px;
+    }
+    .x-axis-label {
+        font-size: 0.64rem;
+        color: #6c757d;
+        font-weight: 600;
+    }
+
+    /* Solvency Runway Box */
+    .solvency-box {
+        border: 2px solid #00A88F;
+        border-radius: 4px;
+        background: rgba(0, 168, 143, 0.05);
+    }
+    .solvency-num {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #00A88F;
+        line-height: 1;
+    }
+    .solvency-sub {
+        font-size: 0.78rem;
+        color: #6c757d;
+        font-weight: 600;
+    }
+    .solvency-check-icon {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background-color: #00A88F;
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+    }
+
+    /* Debtors Alert Box */
+    .debtors-alert-box {
+        border: 1.5px solid #EF5350;
+        border-radius: 4px;
+        background: rgba(239, 83, 80, 0.05);
+    }
+    .alert-amount {
+        font-size: 1.45rem;
+        font-weight: 800;
+        line-height: 1.1;
+    }
+    .alert-sub {
+        font-size: 0.74rem;
+        font-weight: 600;
+    }
+    .alert-exclamation-icon {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background-color: #EF5350;
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+    }
+</style>

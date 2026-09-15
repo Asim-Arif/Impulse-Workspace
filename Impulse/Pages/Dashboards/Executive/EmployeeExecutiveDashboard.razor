@@ -1,0 +1,505 @@
+@page "/dashboards/employee-executive"
+@page "/dashboard/employee-executive"
+@attribute [Authorize]
+@namespace Impulse.Pages.Dashboards.Executive
+
+<PageTitle>Workforce &amp; Employee Executive Dashboard | Impulse ERP</PageTitle>
+
+<div class="container-fluid py-2 px-3 employee-dashboard-root" style="font-family: 'Calibri', 'Segoe UI', -apple-system, sans-serif; background-color: #f7f9fb; min-height: 100vh;">
+
+    <!-- ── Navigation Header ────────────────────────────────────────────── -->
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+        <div class="d-flex align-items-center gap-2">
+            <a href="/dashboards/executive" class="btn btn-sm btn-light border text-secondary shadow-sm rounded-pill px-3" style="font-size: 0.78rem;">
+                <i class="fas fa-arrow-left me-1"></i> Executive Dashboards
+            </a>
+            <span class="text-muted" style="font-size: 0.8rem;">/ Workforce &amp; Human Capital Intelligence</span>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge px-2.5 py-1 rounded-pill" style="background: rgba(46, 125, 50, 0.12); color: #2E7D32; font-weight: 700; font-size: 0.74rem; border: 1px solid rgba(46, 125, 50, 0.25);">
+                <i class="fas fa-circle-check me-1"></i> POWER BI SUITE
+            </span>
+            <div class="d-flex align-items-center bg-white border rounded px-2 py-1 shadow-sm" style="font-size: 0.8rem;">
+                <span class="text-secondary me-2 fw-semibold">Period:</span>
+                <select class="form-select form-select-sm border-0 bg-transparent py-0 ps-1 pe-3 fw-bold text-dark" style="font-size: 0.8rem; box-shadow: none;" @bind="SelectedPeriod">
+                    <option value="All Years (2000-2008)">All Historical Years (2000 - 2008)</option>
+                    <option value="2008">Current Fiscal 2008</option>
+                    <option value="2007">Fiscal 2007</option>
+                </select>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-success px-3 fw-bold shadow-sm" @onclick="RefreshData" disabled="@IsLoading" style="border-color: #4CAF50; color: #2E7D32;">
+                <i class="fas fa-sync-alt me-1 @(IsLoading ? "fa-spin" : "")"></i> Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- ── ROW 1: Salary/Bonus Table | Multi-Year Headcount | Compensation Dist ─ -->
+    <div class="row g-2 mb-2">
+
+        <!-- 1. Salary and Bonus by Department Table -->
+        <div class="col-12 col-xl-3">
+            <div class="chart-card bg-white shadow-sm p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="chart-card-title mb-0">Salary and Bonus by Department</h6>
+                    <div class="text-muted" style="font-size: 0.7rem;">
+                        <i class="fas fa-pencil-alt me-2 text-secondary"></i>
+                        <i class="fas fa-up-right-and-down-left-from-center text-secondary"></i>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm table-borderless align-middle mb-0" style="font-size: 0.74rem;">
+                        <thead>
+                            <tr class="border-bottom text-secondary" style="font-size: 0.72rem; font-weight: 700;">
+                                <th class="ps-1">Department</th>
+                                <th class="text-end">Base_Salary <i class="fas fa-arrow-down ms-1" style="font-size: 0.6rem;"></i></th>
+                                <th class="text-end pe-1">Bonus</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in DeptSalaryBonusList)
+                            {
+                                <tr>
+                                    <td class="ps-1 py-1 text-dark fw-semibold text-truncate" style="max-width: 95px;">@row.Department</td>
+                                    <td class="text-end py-1">
+                                        <span class="heat-cell" style="background-color: @row.BaseColor; color: #ffffff;">
+                                            $@row.BaseSalary.ToString("N0")
+                                        </span>
+                                    </td>
+                                    <td class="text-end pe-1 py-1">
+                                        <span class="heat-cell" style="background-color: @row.BonusColor; color: @(row.Bonus >= 6000 ? "#ffffff" : "#2c3e50");">
+                                            $@row.Bonus.ToString("N0")
+                                        </span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr class="border-top bg-light" style="font-weight: 800;">
+                                <td class="ps-1 py-1 text-secondary">Grand Total</td>
+                                <td class="text-end py-1 text-dark">$@TotalBaseSalary.ToString("N0")</td>
+                                <td class="text-end pe-1 py-1 text-dark">$@TotalBonus.ToString("N0")</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Employee Count by Department (Multi-Year Stacked Columns) -->
+        <div class="col-12 col-xl-5">
+            <div class="chart-card bg-white shadow-sm p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <h6 class="chart-card-title mb-0">Employee Count by Department</h6>
+                    <div class="text-muted" style="font-size: 0.7rem;">
+                        <i class="fas fa-pencil-alt me-2 text-secondary"></i>
+                        <i class="fas fa-up-right-and-down-left-from-center text-secondary"></i>
+                    </div>
+                </div>
+
+                <div class="row align-items-center h-100">
+                    <div class="col-9">
+                        <!-- Stacked Column Bar Graphic -->
+                        <div class="d-flex align-items-end justify-content-between pt-2" style="height: 195px; border-bottom: 1px solid #ced4da; border-left: 1px solid #ced4da; padding-left: 6px; padding-bottom: 2px;">
+                            @foreach (var y in YearlyDeptCounts)
+                            {
+                                <div class="d-flex flex-column align-items-center flex-grow-1" style="max-width: 10%;">
+                                    <!-- Stack Container -->
+                                    <div class="w-100 d-flex flex-column-reverse" style="height: @((y.Total / 85.0) * 100)%;" title="@y.Year: Total @y.Total employees">
+                                        <div style="height: @((y.Sales / (double)y.Total) * 100)%; background: #546E7A;" title="Sales: @y.Sales"></div>
+                                        <div style="height: @((y.RD / (double)y.Total) * 100)%; background: #00796B;" title="R&D: @y.RD"></div>
+                                        <div style="height: @((y.Marketing / (double)y.Total) * 100)%; background: #FF8F00;" title="Marketing: @y.Marketing"></div>
+                                        <div style="height: @((y.IT / (double)y.Total) * 100)%; background: #D84315;" title="IT: @y.IT"></div>
+                                        <div style="height: @((y.HumanResources / (double)y.Total) * 100)%; background: #8D6E63;" title="HR: @y.HumanResources"></div>
+                                        <div style="height: @((y.Finance / (double)y.Total) * 100)%; background: #37474F;" title="Finance: @y.Finance"></div>
+                                        <div style="height: @((y.CustomerSupport / (double)y.Total) * 100)%; background: #00BCD4;" title="Support: @y.CustomerSupport"></div>
+                                        <div style="height: @((y.Administration / (double)y.Total) * 100)%; background: #03A9F4;" title="Admin: @y.Administration"></div>
+                                        <div style="height: @((y.Accounting / (double)y.Total) * 100)%; background: #8BC34A;" title="Accounting: @y.Accounting"></div>
+                                    </div>
+                                    <span class="x-axis-label mt-1">@y.Year</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Legend on right -->
+                    <div class="col-3 ps-0" style="font-size: 0.65rem;">
+                        <div class="d-flex flex-column gap-1">
+                            <span><span class="legend-rect" style="background:#8BC34A;"></span> Accounting</span>
+                            <span><span class="legend-rect" style="background:#03A9F4;"></span> Administration</span>
+                            <span><span class="legend-rect" style="background:#00BCD4;"></span> Support</span>
+                            <span><span class="legend-rect" style="background:#37474F;"></span> Finance</span>
+                            <span><span class="legend-rect" style="background:#8D6E63;"></span> HR</span>
+                            <span><span class="legend-rect" style="background:#D84315;"></span> IT</span>
+                            <span><span class="legend-rect" style="background:#FF8F00;"></span> Marketing</span>
+                            <span><span class="legend-rect" style="background:#00796B;"></span> R&amp;D</span>
+                            <span><span class="legend-rect" style="background:#546E7A;"></span> Sales</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Compensation Distribution by Department -->
+        <div class="col-12 col-xl-4">
+            <div class="chart-card bg-white shadow-sm p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <h6 class="chart-card-title mb-0">Compensation distribution by Department</h6>
+                    <div class="text-muted" style="font-size: 0.7rem;">
+                        <i class="fas fa-pencil-alt me-2 text-secondary"></i>
+                        <i class="fas fa-up-right-and-down-left-from-center text-secondary"></i>
+                    </div>
+                </div>
+
+                <!-- Legend -->
+                <div class="d-flex justify-content-end gap-2 mb-1" style="font-size: 0.65rem;">
+                    <span><span class="legend-rect" style="background:#7CB342;"></span> Base_Salary</span>
+                    <span><span class="legend-rect" style="background:#00BCD4;"></span> Bonus</span>
+                    <span><span class="legend-rect" style="background:#1565C0;"></span> Commission</span>
+                    <span><span class="legend-rect" style="background:#263238;"></span> Overtime</span>
+                </div>
+
+                <!-- Horizontal Stacked Bars -->
+                <div class="compensation-bars-container pt-1">
+                    @foreach (var c in CompensationDistributionList)
+                    {
+                        <div class="d-flex align-items-center mb-1">
+                            <span class="text-truncate text-secondary pe-2 text-end" style="width: 28%; font-size: 0.68rem;">@c.Department</span>
+                            <div class="d-flex flex-grow-1" style="height: 12px; background: #f0f3f5; border-radius: 2px;">
+                                <div style="width: @((c.BaseSalaryMil / 5.0) * 100)%; background: #7CB342;" title="Base: $@c.BaseSalaryMil.ToString("0.0")M"></div>
+                                <div style="width: @((c.BonusMil / 5.0) * 100)%; background: #00BCD4;" title="Bonus: $@c.BonusMil.ToString("0.00")M"></div>
+                                <div style="width: @((c.CommissionMil / 5.0) * 100)%; background: #1565C0;" title="Commission: $@c.CommissionMil.ToString("0.00")M"></div>
+                                <div style="width: @((c.OvertimeMil / 5.0) * 100)%; background: #263238;" title="Overtime: $@c.OvertimeMil.ToString("0.00")M"></div>
+                            </div>
+                        </div>
+                    }
+                    <div class="d-flex justify-content-between text-muted border-top mt-2 pt-1 ps-4" style="font-size: 0.65rem; margin-left: 28%;">
+                        <span>0</span>
+                        <span>$5,000,000</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ── ROW 2: Salary by Location & Year Matrix | Employees by Dept Donut ─ -->
+    <div class="row g-2 mb-2">
+
+        <!-- 1. Salary by Location and Year (Matrix Table) -->
+        <div class="col-12 col-xl-8">
+            <div class="chart-card bg-white shadow-sm p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="chart-card-title mb-0">Salary by Location and Year</h6>
+                    <div class="text-muted" style="font-size: 0.7rem;">
+                        <i class="fas fa-pencil-alt me-2 text-secondary"></i>
+                        <i class="fas fa-up-right-and-down-left-from-center text-secondary"></i>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0 matrix-table" style="font-size: 0.72rem;">
+                        <thead>
+                            <tr class="bg-light text-secondary border-bottom" style="font-size: 0.7rem; font-weight: 700;">
+                                <th class="ps-2">Location</th>
+                                <th class="text-center">2000</th>
+                                <th class="text-center">2001</th>
+                                <th class="text-center">2002</th>
+                                <th class="text-center">2003</th>
+                                <th class="text-center">2004</th>
+                                <th class="text-center">2005</th>
+                                <th class="text-center">2006</th>
+                                <th class="text-center">2007</th>
+                                <th class="text-center pe-2">2008</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var loc in LocationSalaryRows)
+                            {
+                                <tr>
+                                    <td class="fw-bold ps-2 text-dark">@loc.Location</td>
+                                    @foreach (var yr in new[] { "2000", "2001", "2002", "2003", "2004", "2005", "2006", "2007", "2008" })
+                                    {
+                                        var val = loc.YearValues.ContainsKey(yr) ? loc.YearValues[yr] : 0;
+                                        <td class="text-center px-1">
+                                            @if (val > 0)
+                                            {
+                                                <div class="position-relative matrix-bar-cell">
+                                                    <div class="matrix-blue-bar" style="width: @((val / 3200000.0) * 100)%;"></div>
+                                                    <span class="matrix-cell-val">@val.ToString("$#,##0")</span>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">-</span>
+                                            }
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr class="bg-light fw-bold border-top">
+                                <td class="ps-2 text-secondary">Grand Total</td>
+                                @foreach (var yr in new[] { "2000", "2001", "2002", "2003", "2004", "2005", "2006", "2007", "2008" })
+                                {
+                                    <td class="text-center px-1 text-dark" style="font-size: 0.68rem;">
+                                        @MatrixGrandTotals[yr].ToString("$#,##0")
+                                    </td>
+                                }
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Employees by Department Donut Chart -->
+        <div class="col-12 col-xl-4">
+            <div class="chart-card bg-white shadow-sm p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <h6 class="chart-card-title mb-0">Employees by Department</h6>
+                    <div class="text-muted" style="font-size: 0.7rem;">
+                        <i class="fas fa-pencil-alt me-2 text-secondary"></i>
+                        <i class="fas fa-up-right-and-down-left-from-center text-secondary"></i>
+                    </div>
+                </div>
+
+                <div class="row align-items-center h-100">
+                    <div class="col-7 text-center">
+                        <div class="position-relative py-2">
+                            <svg width="170" height="150" viewBox="0 0 170 150">
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#f0f3f5" stroke-width="22" />
+
+                                <!-- Segments with counts inside -->
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#8BC34A" stroke-width="22" stroke-dasharray="276" stroke-dashoffset="242" transform="rotate(-90 85 75)" />
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#03A9F4" stroke-width="22" stroke-dasharray="276" stroke-dashoffset="243" transform="rotate(-46 85 75)" />
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#00BCD4" stroke-width="22" stroke-dasharray="276" stroke-dashoffset="238" transform="rotate(-3 85 75)" />
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#37474F" stroke-width="22" stroke-dasharray="276" stroke-dashoffset="262" transform="rotate(46 85 75)" />
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#8D6E63" stroke-width="22" stroke-dasharray="276" stroke-dashoffset="248" transform="rotate(64 85 75)" />
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#D84315" stroke-width="22" stroke-dasharray="276" stroke-dashoffset="256" transform="rotate(100 85 75)" />
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#FF8F00" stroke-width="22" stroke-dasharray="276" stroke-dashoffset="236" transform="rotate(126 85 75)" />
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#00796B" stroke-width="22" stroke-dasharray="276" stroke-dashoffset="251" transform="rotate(178 85 75)" />
+                                <circle cx="85" cy="75" r="44" fill="none" stroke="#546E7A" stroke-width="22" stroke-dasharray="276" stroke-dashoffset="235" transform="rotate(211 85 75)" />
+
+                                <!-- Inner white hole -->
+                                <circle cx="85" cy="75" r="32" fill="#ffffff" />
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- Donut Legend -->
+                    <div class="col-5 ps-0" style="font-size: 0.65rem;">
+                        <div class="d-flex flex-column gap-1">
+                            @foreach (var d in EmployeesByDeptDonut)
+                            {
+                                <span><span class="legend-rect" style="background:@d.Color;"></span> @d.Department (@d.Count)</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ── ROW 3: Top Attendance | Bonus by Dept & Year | Outstanding Liab ── -->
+    <div class="row g-2">
+
+        <!-- 1. Top 20 Employees with No Absent and Leave -->
+        <div class="col-12 col-xl-4">
+            <div class="chart-card bg-white shadow-sm p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <h6 class="chart-card-title mb-0">Top 20 employees with no absent and leave</h6>
+                    <div class="text-muted" style="font-size: 0.7rem;">
+                        <i class="fas fa-pencil-alt me-2 text-secondary"></i>
+                        <i class="fas fa-up-right-and-down-left-from-center text-secondary"></i>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mb-1" style="font-size: 0.65rem;">
+                    <span><span class="legend-rect" style="background:#7CB342;"></span> Base</span>
+                    <span><span class="legend-rect" style="background:#00BCD4;"></span> Bonus</span>
+                    <span><span class="legend-rect" style="background:#1565C0;"></span> Comm</span>
+                    <span><span class="legend-rect" style="background:#263238;"></span> OT</span>
+                </div>
+
+                <div class="pt-1">
+                    @foreach (var e in TopAttendanceEmployees)
+                    {
+                        <div class="d-flex align-items-center mb-1">
+                            <span class="text-truncate text-secondary pe-2 text-end" style="width: 32%; font-size: 0.66rem;" title="@e.Department">@e.Department</span>
+                            <div class="d-flex flex-grow-1" style="height: 11px; background: #f0f3f5; border-radius: 2px;">
+                                <div style="width: @((e.BaseSalaryMil / 5.0) * 100)%; background: #7CB342;"></div>
+                                <div style="width: @((e.BonusMil / 5.0) * 100)%; background: #00BCD4;"></div>
+                                <div style="width: @((e.CommissionMil / 5.0) * 100)%; background: #1565C0;"></div>
+                                <div style="width: @((e.OvertimeMil / 5.0) * 100)%; background: #263238;"></div>
+                            </div>
+                        </div>
+                    }
+                    <div class="d-flex justify-content-between text-muted border-top mt-2 pt-1 ps-4" style="font-size: 0.65rem; margin-left: 32%;">
+                        <span>0</span>
+                        <span>$5,000,000</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Bonus by Dept and Year (Heatmap Matrix) -->
+        <div class="col-12 col-xl-4">
+            <div class="chart-card bg-white shadow-sm p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="chart-card-title mb-0">Bonus by dept and Year</h6>
+                    <div class="text-muted" style="font-size: 0.7rem;">
+                        <i class="fas fa-pencil-alt me-2 text-secondary"></i>
+                        <i class="fas fa-up-right-and-down-left-from-center text-secondary"></i>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0 matrix-table" style="font-size: 0.68rem;">
+                        <thead>
+                            <tr class="text-secondary" style="font-size: 0.65rem;">
+                                <th></th>
+                                @foreach (var yr in new[] { "2000", "2001", "2002", "2003", "2004", "2005", "2006", "2007", "2008" })
+                                {
+                                    <th class="text-center px-1" style="transform: rotate(-90deg); height: 28px;">@yr</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var s in StateBonusHeatmapRows)
+                            {
+                                <tr>
+                                    <td class="fw-bold pe-1 text-dark">@s.StateCode</td>
+                                    @foreach (var yr in new[] { "2000", "2001", "2002", "2003", "2004", "2005", "2006", "2007", "2008" })
+                                    {
+                                        var val = s.YearBonus.ContainsKey(yr) ? s.YearBonus[yr] : 0;
+                                        <td class="text-center p-1" style="background-color: @GetHeatmapBg(val); color: @GetHeatmapTextColor(val); font-size: 0.62rem; font-weight: 600;">
+                                            @if (val > 0)
+                                            {
+                                                <span>$@val.ToString("N0")</span>
+                                            }
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Gradient Legend Scale -->
+                <div class="d-flex align-items-center justify-content-between mt-3 pt-2 border-top" style="font-size: 0.68rem;">
+                    <span class="text-muted">290</span>
+                    <div class="flex-grow-1 mx-2" style="height: 10px; background: linear-gradient(to right, #C8E6C9, #81C784, #4CAF50, #00796B); border-radius: 2px;"></div>
+                    <span class="text-muted">7490</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Department Wise Outstanding Liabilities -->
+        <div class="col-12 col-xl-4">
+            <div class="chart-card bg-white shadow-sm p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <h6 class="chart-card-title mb-0">Department wise outstanding long term and short term</h6>
+                    <div class="text-muted" style="font-size: 0.7rem;">
+                        <i class="fas fa-pencil-alt me-2 text-secondary"></i>
+                        <i class="fas fa-up-right-and-down-left-from-center text-secondary"></i>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mb-2" style="font-size: 0.65rem;">
+                    <span><span class="legend-rect" style="background:#7CB342;"></span> Short Term</span>
+                    <span><span class="legend-rect" style="background:#00BCD4;"></span> Long Term</span>
+                </div>
+
+                <div class="pt-1">
+                    @foreach (var o in DeptOutstandingList)
+                    {
+                        <div class="d-flex align-items-center mb-1">
+                            <span class="text-truncate text-secondary pe-2 text-end" style="width: 28%; font-size: 0.68rem;">@o.Department</span>
+                            <div class="d-flex flex-grow-1" style="height: 12px; background: #f0f3f5; border-radius: 2px;">
+                                <div style="width: @((o.ShortTerm / 5.0) * 100)%; background: #7CB342;" title="Short Term: $@o.ShortTerm.ToString("0.0")M"></div>
+                                <div style="width: @((o.LongTerm / 5.0) * 100)%; background: #00BCD4;" title="Long Term: $@o.LongTerm.ToString("0.0")M"></div>
+                            </div>
+                        </div>
+                    }
+                    <div class="d-flex justify-content-between text-muted border-top mt-2 pt-1 ps-4" style="font-size: 0.65rem; margin-left: 28%;">
+                        <span>0</span>
+                        <span>$5,000,000</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<style>
+    .employee-dashboard-root {
+        color: #2c3e50;
+    }
+    .chart-card {
+        border-radius: 6px;
+        border: 1px solid #e9ecef;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .chart-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.06) !important;
+    }
+    .chart-card-title {
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #2c3e50;
+    }
+    .legend-rect {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 1px;
+        margin-right: 3px;
+    }
+
+    /* Heat cells in table 1 */
+    .heat-cell {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-weight: 600;
+        font-size: 0.72rem;
+        min-width: 65px;
+        text-align: right;
+    }
+
+    /* Location Matrix Bars */
+    .matrix-bar-cell {
+        height: 18px;
+        background-color: #eef2f5;
+        border-radius: 2px;
+        overflow: hidden;
+    }
+    .matrix-blue-bar {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        background-color: #42A5F5;
+        border-radius: 2px;
+    }
+    .matrix-cell-val {
+        position: relative;
+        z-index: 2;
+        font-size: 0.64rem;
+        font-weight: 700;
+        line-height: 18px;
+        color: #1a252f;
+    }
+    .x-axis-label {
+        font-size: 0.64rem;
+        color: #6c757d;
+        font-weight: 600;
+    }
+</style>

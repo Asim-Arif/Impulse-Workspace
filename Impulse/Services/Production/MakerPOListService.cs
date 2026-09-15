@@ -23,7 +23,7 @@ namespace Impulse.Services.Production
         public Task<List<LookupItemInt>> GetProcessesAsync() => _dataAccess.GetProcessesAsync();
         public Task<List<LookupItemString>> GetEmployeesAsync() => _dataAccess.GetEmployeesAsync();
         public Task<bool> AuthorizeIssuancesAsync(IEnumerable<long> entryIds, string userName, string machineName) => _dataAccess.AuthorizeIssuancesAsync(entryIds, userName, machineName);
-        public Task<bool> CloseMakerPOAsync(long entryId) => _dataAccess.CloseMakerPOAsync(entryId);
+        public Task<bool> CloseMakerPOAsync(long entryId, string? masterPoNo = null) => _dataAccess.CloseMakerPOAsync(entryId, masterPoNo);
         public Task<(bool ShortLoan, bool LongLoan)> CheckLoanExistsAsync(string masterPoNo) => _dataAccess.CheckLoanExistsAsync(masterPoNo);
         public Task<int> CheckReceivingExistsAsync(long entryId) => _dataAccess.CheckReceivingExistsAsync(entryId);
         public Task<bool> DeleteIssuanceAsync(long entryId) => _dataAccess.DeleteIssuanceAsync(entryId);

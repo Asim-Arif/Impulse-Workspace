@@ -15,7 +15,7 @@ namespace DataAccessLibrary.Interface.Production
         Task<List<LookupItemInt>> GetProcessesAsync();
         Task<List<LookupItemString>> GetEmployeesAsync();
         Task<bool> AuthorizeIssuancesAsync(IEnumerable<long> entryIds, string userName, string machineName);
-        Task<bool> CloseMakerPOAsync(long entryId);
+        Task<bool> CloseMakerPOAsync(long entryId, string? masterPoNo = null);
         Task<(bool ShortLoan, bool LongLoan)> CheckLoanExistsAsync(string masterPoNo);
         Task<int> CheckReceivingExistsAsync(long entryId);
         Task<bool> DeleteIssuanceAsync(long entryId);

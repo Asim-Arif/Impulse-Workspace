@@ -1,0 +1,743 @@
+@page "/dashboards/manufacturing-executive"
+@page "/dashboard/manufacturing-executive"
+@attribute [Authorize]
+@namespace Impulse.Pages.Dashboards.Manufacturing
+@using Radzen
+@using Radzen.Blazor
+
+<PageTitle>Product Manufacturing Dashboard | Impulse ERP</PageTitle>
+
+<div class="container-fluid py-2 px-3 manufacturing-dashboard-root" style="font-family: 'Calibri', 'Segoe UI', -apple-system, sans-serif; background-color: #f7f9fb; min-height: 100vh;">
+
+    <!-- ── Breadcrumb to Executive Dashboards ────────────────────────── -->
+    <div class="d-flex align-items-center gap-2 mb-2">
+        <a href="/dashboards/executive" class="btn btn-sm btn-light border text-secondary shadow-sm rounded-pill px-3" style="font-size: 0.78rem;">
+            <i class="fas fa-arrow-left me-1"></i> Executive Dashboards
+        </a>
+        <span class="text-muted" style="font-size: 0.78rem;">/ Product Manufacturing</span>
+    </div>
+
+    <!-- ── Master Slide Header ─────────────────────────────────────────── -->
+    <div class="card border-0 shadow-sm mb-3 bg-white" style="border-radius: 8px;">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div>
+                    <h1 class="slide-main-title mb-1">Product Manufacturing Dashboards</h1>
+                    <p class="slide-subtitle mb-0">
+                        Following executive view shows product manufacturing analytics. This includes production rate, overall productivity, unit loss and operators availability status.
+                    </p>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="badge px-2 py-1 rounded-pill" style="background: rgba(139, 174, 38, 0.15); color: #4B6F05; font-weight: 700; font-size: 0.75rem; border: 1px solid rgba(139, 174, 38, 0.3);">
+                        <i class="fas fa-circle-check me-1"></i> POWER BI SUITE
+                    </span>
+                    <div class="d-flex align-items-center bg-light border rounded px-2 py-1" style="font-size: 0.8rem;">
+                        <span class="text-secondary me-2 fw-semibold">Period:</span>
+                        <select class="form-select form-select-sm border-0 bg-transparent py-0 ps-1 pe-3 fw-bold text-dark" style="font-size: 0.8rem; box-shadow: none;" @bind="SelectedPeriod">
+                            <option value="YTD">YTD (2024)</option>
+                            <option value="Q3">Q3 2024</option>
+                            <option value="MTD">MTD (Current Month)</option>
+                        </select>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-success px-3 fw-bold" @onclick="RefreshData" disabled="@IsLoading" style="border-color: #8BAE26; color: #4B6F05;">
+                        <i class="fas fa-sync-alt me-1 @(IsLoading ? "fa-spin" : "")"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── ROW 1: 4 Top KPI Scorecard Cards ────────────────────────────── -->
+    <div class="row g-3 mb-3">
+
+        <!-- Card 1: Units YTD -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="kpi-scorecard shadow-sm h-100 p-3 bg-white">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <div class="kpi-title">Units YTD</div>
+                        <div class="kpi-subtitle">Units Produced</div>
+                    </div>
+                    <span class="kpi-red-badge">Demand and produced</span>
+                </div>
+
+                <div class="d-flex align-items-center justify-content-between mt-1">
+                    <div>
+                        <div class="kpi-hero-number">@UnitsYtdActual.ToString("N0")</div>
+                        <div class="kpi-target-label mt-1">
+                            Target <span class="ms-1 fw-bold text-secondary">@UnitsYtdTarget.ToString("N0")</span>
+                        </div>
+                    </div>
+
+                    <!-- Mini Sparkline Area Chart -->
+                    <div class="sparkline-container text-end">
+                        <svg width="105" height="42" viewBox="0 0 105 42" class="sparkline-svg">
+                            <defs>
+                                <linearGradient id="sparkGrad1" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" stop-color="#8BAE26" stop-opacity="0.85" />
+                                    <stop offset="100%" stop-color="#8BAE26" stop-opacity="0.15" />
+                                </linearGradient>
+                            </defs>
+                            <polygon points="0,42 0,26 15,22 30,28 45,18 60,24 75,10 90,14 105,8 105,42" fill="url(#sparkGrad1)" />
+                            <polyline points="0,26 15,22 30,28 45,18 60,24 75,10 90,14 105,8" fill="none" stroke="#66870D" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                        <div class="variance-pill variance-negative mt-1">
+                            <i class="fas fa-arrow-down me-1"></i> @UnitsYtdVariancePercent.ToString("0")%
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 2: Units: Lost -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="kpi-scorecard shadow-sm h-100 p-3 bg-white">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <div class="kpi-title">Units: Lost</div>
+                        <div class="kpi-subtitle">Unit loss</div>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center justify-content-between mt-1">
+                    <div>
+                        <div class="kpi-hero-number">@UnitsLostTotal</div>
+                        <div class="kpi-target-label mt-1 text-muted">
+                            Allowable scrap: <span class="fw-bold text-secondary">550</span>
+                        </div>
+                    </div>
+
+                    <!-- Mini Sparkline Area Chart -->
+                    <div class="sparkline-container text-end">
+                        <svg width="105" height="42" viewBox="0 0 105 42" class="sparkline-svg">
+                            <defs>
+                                <linearGradient id="sparkGrad2" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" stop-color="#00A88F" stop-opacity="0.85" />
+                                    <stop offset="100%" stop-color="#00A88F" stop-opacity="0.15" />
+                                </linearGradient>
+                            </defs>
+                            <polygon points="0,42 0,35 20,32 40,25 60,30 80,18 105,12 105,42" fill="url(#sparkGrad2)" />
+                            <polyline points="0,35 20,32 40,25 60,30 80,18 105,12" fill="none" stroke="#007A68" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                        <div class="variance-pill variance-positive mt-1">
+                            <i class="fas fa-arrow-down me-1"></i> -13.5% vs Q2
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 3: Overall Plant Productivity -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="kpi-scorecard shadow-sm h-100 p-3 bg-white">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <div class="kpi-title">Overall Plant Productivity</div>
+                        <div class="kpi-subtitle">Productivity</div>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center justify-content-between mt-1">
+                    <div>
+                        <div class="kpi-hero-number">@PlantProductivityActual.ToString("0.00")%</div>
+                        <div class="kpi-target-label mt-1">
+                            Target <span class="ms-1 fw-bold text-secondary">@PlantProductivityTarget.ToString("0.00")%</span>
+                        </div>
+                    </div>
+
+                    <!-- Mini Sparkline Area Chart -->
+                    <div class="sparkline-container text-end">
+                        <svg width="105" height="42" viewBox="0 0 105 42" class="sparkline-svg">
+                            <defs>
+                                <linearGradient id="sparkGrad3" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" stop-color="#8BAE26" stop-opacity="0.85" />
+                                    <stop offset="100%" stop-color="#8BAE26" stop-opacity="0.15" />
+                                </linearGradient>
+                            </defs>
+                            <polygon points="0,42 0,28 18,24 36,20 54,22 72,15 90,12 105,6 105,42" fill="url(#sparkGrad3)" />
+                            <polyline points="0,28 18,24 36,20 54,22 72,15 90,12 105,6" fill="none" stroke="#66870D" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                        <div class="variance-pill variance-positive mt-1">
+                            <i class="fas fa-arrow-up me-1"></i> @PlantProductivityVariance.ToString("0")%
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 4: Units: Rework -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="kpi-scorecard shadow-sm h-100 p-3 bg-white">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <div class="kpi-title">Units: Rework</div>
+                        <div class="kpi-subtitle">Unit loss</div>
+                    </div>
+                    <span class="kpi-red-badge">Rework</span>
+                </div>
+
+                <div class="d-flex align-items-center justify-content-between mt-1">
+                    <div>
+                        <div class="kpi-hero-number">@UnitsReworkTotal</div>
+                        <div class="kpi-target-label mt-1 text-muted">
+                            Rework Rate: <span class="fw-bold text-secondary">0.011%</span>
+                        </div>
+                    </div>
+
+                    <!-- Mini Sparkline Area Chart -->
+                    <div class="sparkline-container text-end">
+                        <svg width="105" height="42" viewBox="0 0 105 42" class="sparkline-svg">
+                            <defs>
+                                <linearGradient id="sparkGrad4" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" stop-color="#00A88F" stop-opacity="0.85" />
+                                    <stop offset="100%" stop-color="#00A88F" stop-opacity="0.15" />
+                                </linearGradient>
+                            </defs>
+                            <polygon points="0,42 0,32 20,18 40,30 60,15 80,10 105,28 105,42" fill="url(#sparkGrad4)" />
+                            <polyline points="0,32 20,18 40,30 60,15 80,10 105,28" fill="none" stroke="#007A68" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                        <div class="variance-pill variance-positive mt-1">
+                            <i class="fas fa-check me-1"></i> Stabilized
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ── ROW 2: Mid-Tier Visuals (Bar Charts & Concentric Radial Callouts) ─ -->
+    <div class="row g-3 mb-3">
+
+        <!-- 1. Overall Productivity : YTD (Horizontal Stacked Bar 1) -->
+        <div class="col-12 col-lg-3">
+            <div class="card border-0 shadow-sm h-100 p-3 bg-white" style="border-radius: 8px;">
+                <div class="d-flex justify-content-between align-items-baseline mb-2">
+                    <div>
+                        <h6 class="visual-card-title mb-0">Overall Productivity : YTD</h6>
+                        <small class="text-muted" style="font-size: 0.72rem;">Productivity</small>
+                    </div>
+                    <span class="badge bg-light text-secondary border px-2 py-1" style="font-size: 0.7rem;">2024</span>
+                </div>
+
+                <!-- Custom Power BI Horizontal Multi-Tier Bars -->
+                <div class="horizontal-bar-wrapper my-auto py-2">
+                    @foreach (var item in OverallProductivityYtdList)
+                    {
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1" style="font-size: 0.74rem;">
+                                <span class="fw-semibold text-dark">@item.Category</span>
+                                <span class="text-muted fw-bold">@item.Total.ToString("N0")</span>
+                            </div>
+                            <div class="progress" style="height: 12px; border-radius: 3px; background-color: #f1f3f5;">
+                                <div class="progress-bar" role="progressbar" style="width: 32%; background-color: #8BAE26;" title="Machine-A: @item.MachineA.ToString("N0")"></div>
+                                <div class="progress-bar" role="progressbar" style="width: 38%; background-color: #00A88F;" title="Machine-B: @item.MachineB.ToString("N0")"></div>
+                                <div class="progress-bar" role="progressbar" style="width: 30%; background-color: #20645B;" title="Machine-C: @item.MachineC.ToString("N0")"></div>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Axis ticks -->
+                    <div class="d-flex justify-content-between text-muted mt-2 border-top pt-1" style="font-size: 0.65rem;">
+                        <span>88,000</span>
+                        <span>95,000</span>
+                        <span>105,000</span>
+                        <span>115,000</span>
+                        <span>125,000</span>
+                    </div>
+
+                    <!-- Legend -->
+                    <div class="d-flex justify-content-center gap-3 mt-3 pt-2" style="font-size: 0.7rem;">
+                        <span class="d-flex align-items-center"><span class="legend-dot" style="background:#8BAE26;"></span> Machine-A</span>
+                        <span class="d-flex align-items-center"><span class="legend-dot" style="background:#00A88F;"></span> Machine-B</span>
+                        <span class="d-flex align-items-center"><span class="legend-dot" style="background:#20645B;"></span> Machine-C</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Lost Units: Causes (Concentric Radial Gauge with Pointer Callouts) -->
+        <div class="col-12 col-lg-3">
+            <div class="card border-0 shadow-sm h-100 p-3 bg-white" style="border-radius: 8px;">
+                <div class="d-flex justify-content-between align-items-baseline mb-1">
+                    <div>
+                        <h6 class="visual-card-title mb-0">Lost Units: Causes</h6>
+                        <small class="text-muted" style="font-size: 0.72rem;">Unit scrap</small>
+                    </div>
+                    <span class="kpi-red-badge">Reject Types and Pcs</span>
+                </div>
+
+                <!-- Concentric Donut / Radial Ring Graphic with Callout Lines -->
+                <div class="radial-callout-wrapper position-relative text-center my-auto py-2">
+                    <svg width="240" height="170" viewBox="0 0 240 170" class="mx-auto d-block">
+                        <!-- Concentric Circles Background Track -->
+                        <circle cx="120" cy="85" r="56" fill="none" stroke="#f0f3f5" stroke-width="6" />
+                        <circle cx="120" cy="85" r="46" fill="none" stroke="#f0f3f5" stroke-width="6" />
+                        <circle cx="120" cy="85" r="36" fill="none" stroke="#f0f3f5" stroke-width="6" />
+
+                        <!-- Active Concentric Segment Rings -->
+                        <!-- Outer Ring: Tooling Error (Olive #8BAE26) -->
+                        <circle cx="120" cy="85" r="56" fill="none" stroke="#8BAE26" stroke-width="6"
+                                stroke-dasharray="351" stroke-dashoffset="140" stroke-linecap="round"
+                                transform="rotate(-90 120 85)" />
+
+                        <!-- Middle Ring: Opener / Operator (Teal #00A88F) -->
+                        <circle cx="120" cy="85" r="46" fill="none" stroke="#00A88F" stroke-width="6"
+                                stroke-dasharray="289" stroke-dashoffset="130" stroke-linecap="round"
+                                transform="rotate(45 120 85)" />
+
+                        <!-- Inner Ring: Physical Damage (Dark Green #20645B) -->
+                        <circle cx="120" cy="85" r="36" fill="none" stroke="#20645B" stroke-width="6"
+                                stroke-dasharray="226" stroke-dashoffset="120" stroke-linecap="round"
+                                transform="rotate(160 120 85)" />
+
+                        <!-- Center Metric Circle -->
+                        <circle cx="120" cy="85" r="26" fill="#ffffff" filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.06))" />
+                        <text x="120" y="91" text-anchor="middle" font-size="16" font-weight="700" fill="#2c3e50" font-family="'Calibri', sans-serif">
+                            @UnitsLostTotal
+                        </text>
+
+                        <!-- Callout Pins & Lines -->
+                        <!-- Top-Left: Tooling Error -->
+                        <polyline points="72,52 48,52" fill="none" stroke="#b0bec5" stroke-width="1.2" stroke-dasharray="2,2" />
+                        <circle cx="72" cy="52" r="3" fill="#8BAE26" />
+
+                        <!-- Top-Right: Opener Damage -->
+                        <polyline points="168,52 192,52" fill="none" stroke="#b0bec5" stroke-width="1.2" stroke-dasharray="2,2" />
+                        <circle cx="168" cy="52" r="3" fill="#00A88F" />
+
+                        <!-- Bottom-Left: Physical Damage -->
+                        <polyline points="72,118 48,118" fill="none" stroke="#b0bec5" stroke-width="1.2" stroke-dasharray="2,2" />
+                        <circle cx="72" cy="118" r="3" fill="#20645B" />
+
+                        <!-- Bottom-Right: Other Causes -->
+                        <polyline points="168,118 192,118" fill="none" stroke="#b0bec5" stroke-width="1.2" stroke-dasharray="2,2" />
+                        <circle cx="168" cy="118" r="3" fill="#5C946E" />
+                    </svg>
+
+                    <!-- HTML Callout Labels around the SVG -->
+                    <div class="callout-label top-left-label">
+                        <span class="label-name">Tooling Error</span>
+                        <span class="label-val text-success">168 pcs</span>
+                    </div>
+                    <div class="callout-label top-right-label">
+                        <span class="label-name">Opener Damage</span>
+                        <span class="label-val text-info">142 pcs</span>
+                    </div>
+                    <div class="callout-label bottom-left-label">
+                        <span class="label-name">Physical Damage</span>
+                        <span class="label-val text-secondary">98 pcs</span>
+                    </div>
+                    <div class="callout-label bottom-right-label">
+                        <span class="label-name">Other Causes</span>
+                        <span class="label-val text-muted">68 pcs</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Overall Productivity : YTD (Horizontal Progress Bar 2 - Scale 0-100) -->
+        <div class="col-12 col-lg-3">
+            <div class="card border-0 shadow-sm h-100 p-3 bg-white" style="border-radius: 8px;">
+                <div class="d-flex justify-content-between align-items-baseline mb-2">
+                    <div>
+                        <h6 class="visual-card-title mb-0">Overall Productivity : YTD</h6>
+                        <small class="text-muted" style="font-size: 0.72rem;">Productivity</small>
+                    </div>
+                    <span class="badge bg-light text-secondary border px-2 py-1" style="font-size: 0.7rem;">% Index</span>
+                </div>
+
+                <!-- Horizontal Multi-Bars on 0-100 scale -->
+                <div class="horizontal-bar-wrapper my-auto py-2">
+                    @foreach (var item in SecondaryProductivityList)
+                    {
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1" style="font-size: 0.74rem;">
+                                <span class="fw-semibold text-dark">@item.Category</span>
+                                <span class="text-muted fw-bold">@item.MachineC%</span>
+                            </div>
+                            <div class="progress" style="height: 12px; border-radius: 3px; background-color: #f1f3f5;">
+                                <div class="progress-bar" role="progressbar" style="width: @(item.MachineA)%; background-color: #8BAE26;" title="Machine-A: @item.MachineA%"></div>
+                                <div class="progress-bar" role="progressbar" style="width: @(item.MachineB - item.MachineA)%; background-color: #00A88F;" title="Machine-B: @item.MachineB%"></div>
+                                <div class="progress-bar" role="progressbar" style="width: @(item.MachineC - item.MachineB)%; background-color: #20645B;" title="Machine-C: @item.MachineC%"></div>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Axis ticks -->
+                    <div class="d-flex justify-content-between text-muted mt-2 border-top pt-1" style="font-size: 0.65rem;">
+                        <span>0</span>
+                        <span>20</span>
+                        <span>40</span>
+                        <span>60</span>
+                        <span>80</span>
+                        <span>100</span>
+                    </div>
+
+                    <!-- Legend -->
+                    <div class="d-flex justify-content-center gap-3 mt-3 pt-2" style="font-size: 0.7rem;">
+                        <span class="d-flex align-items-center"><span class="legend-dot" style="background:#8BAE26;"></span> Machine-A</span>
+                        <span class="d-flex align-items-center"><span class="legend-dot" style="background:#00A88F;"></span> Machine-B</span>
+                        <span class="d-flex align-items-center"><span class="legend-dot" style="background:#20645B;"></span> Machine-C</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Units: Causes (Concentric Radial Gauge for Rework) -->
+        <div class="col-12 col-lg-3">
+            <div class="card border-0 shadow-sm h-100 p-3 bg-white" style="border-radius: 8px;">
+                <div class="d-flex justify-content-between align-items-baseline mb-1">
+                    <div>
+                        <h6 class="visual-card-title mb-0">Units: Causes</h6>
+                        <small class="text-muted" style="font-size: 0.72rem;">Rework detail</small>
+                    </div>
+                    <span class="kpi-red-badge">Rework Type and qty</span>
+                </div>
+
+                <!-- Concentric Donut / Radial Ring Graphic with Callout Lines -->
+                <div class="radial-callout-wrapper position-relative text-center my-auto py-2">
+                    <svg width="240" height="170" viewBox="0 0 240 170" class="mx-auto d-block">
+                        <!-- Concentric Circles Background Track -->
+                        <circle cx="120" cy="85" r="56" fill="none" stroke="#f0f3f5" stroke-width="6" />
+                        <circle cx="120" cy="85" r="46" fill="none" stroke="#f0f3f5" stroke-width="6" />
+                        <circle cx="120" cy="85" r="36" fill="none" stroke="#f0f3f5" stroke-width="6" />
+
+                        <!-- Active Concentric Segment Rings -->
+                        <circle cx="120" cy="85" r="56" fill="none" stroke="#8BAE26" stroke-width="6"
+                                stroke-dasharray="351" stroke-dashoffset="155" stroke-linecap="round"
+                                transform="rotate(-90 120 85)" />
+
+                        <circle cx="120" cy="85" r="46" fill="none" stroke="#00A88F" stroke-width="6"
+                                stroke-dasharray="289" stroke-dashoffset="140" stroke-linecap="round"
+                                transform="rotate(30 120 85)" />
+
+                        <circle cx="120" cy="85" r="36" fill="none" stroke="#20645B" stroke-width="6"
+                                stroke-dasharray="226" stroke-dashoffset="130" stroke-linecap="round"
+                                transform="rotate(140 120 85)" />
+
+                        <!-- Center Metric Circle -->
+                        <circle cx="120" cy="85" r="26" fill="#ffffff" filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.06))" />
+                        <text x="120" y="91" text-anchor="middle" font-size="16" font-weight="700" fill="#2c3e50" font-family="'Calibri', sans-serif">
+                            @UnitsReworkTotal
+                        </text>
+
+                        <!-- Callout Pins & Lines -->
+                        <polyline points="72,52 48,52" fill="none" stroke="#b0bec5" stroke-width="1.2" stroke-dasharray="2,2" />
+                        <circle cx="72" cy="52" r="3" fill="#8BAE26" />
+
+                        <polyline points="168,52 192,52" fill="none" stroke="#b0bec5" stroke-width="1.2" stroke-dasharray="2,2" />
+                        <circle cx="168" cy="52" r="3" fill="#00A88F" />
+
+                        <polyline points="72,118 48,118" fill="none" stroke="#b0bec5" stroke-width="1.2" stroke-dasharray="2,2" />
+                        <circle cx="72" cy="118" r="3" fill="#20645B" />
+
+                        <polyline points="168,118 192,118" fill="none" stroke="#b0bec5" stroke-width="1.2" stroke-dasharray="2,2" />
+                        <circle cx="168" cy="118" r="3" fill="#5C946E" />
+                    </svg>
+
+                    <!-- HTML Callout Labels around the SVG -->
+                    <div class="callout-label top-left-label">
+                        <span class="label-name">Tolerance</span>
+                        <span class="label-val text-success">185 pcs</span>
+                    </div>
+                    <div class="callout-label top-right-label">
+                        <span class="label-name">Surface Flaw</span>
+                        <span class="label-val text-info">135 pcs</span>
+                    </div>
+                    <div class="callout-label bottom-left-label">
+                        <span class="label-name">Heat Re-run</span>
+                        <span class="label-val text-secondary">89 pcs</span>
+                    </div>
+                    <div class="callout-label bottom-right-label">
+                        <span class="label-name">Deburr Flaw</span>
+                        <span class="label-val text-muted">67 pcs</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ── ROW 3: Bottom Breakdown Visuals & Annotations ───────────────── -->
+    <div class="row g-3 mb-3">
+
+        <!-- 1. Productivity by : Machine (Vertical Grouped Columns) -->
+        <div class="col-12 col-lg-5">
+            <div class="card border-0 shadow-sm h-100 p-3 bg-white" style="border-radius: 8px;">
+                <div class="d-flex justify-content-between align-items-baseline mb-2">
+                    <div>
+                        <h6 class="visual-card-title mb-0">Productivity by : Machine</h6>
+                        <small class="text-muted" style="font-size: 0.72rem;">Workstation output vs capacity index</small>
+                    </div>
+                    <span class="badge bg-light text-secondary border px-2 py-1" style="font-size: 0.7rem;">0 - 100 Index</span>
+                </div>
+
+                <!-- Visual Grouped Bar Chart -->
+                <div class="grouped-columns-wrapper pt-2">
+                    <div class="d-flex justify-content-between align-items-end" style="height: 140px; border-bottom: 2px solid #e0e6ed; padding-bottom: 4px;">
+                        @foreach (var m in MachineProductivityList)
+                        {
+                            <div class="d-flex flex-column align-items-center flex-grow-1" style="max-width: 12%;">
+                                <div class="d-flex align-items-end gap-1 h-100">
+                                    <!-- Bar 1: Olive -->
+                                    <div class="column-bar" style="height: @(m.OutputQty)%; background: #8BAE26;" title="@m.Machine Output: @m.OutputQty%"></div>
+                                    <!-- Bar 2: Teal -->
+                                    <div class="column-bar" style="height: @(m.EfficiencyRate)%; background: #00A88F;" title="@m.Machine Efficiency: @m.EfficiencyRate%"></div>
+                                    <!-- Bar 3: Light Olive -->
+                                    <div class="column-bar" style="height: @(m.CapacityUtil)%; background: #B4D330;" title="@m.Machine Capacity: @m.CapacityUtil%"></div>
+                                </div>
+                                <span class="machine-label mt-1">@m.Machine</span>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Legend -->
+                    <div class="d-flex justify-content-center gap-3 mt-2 pt-1" style="font-size: 0.7rem;">
+                        <span class="d-flex align-items-center"><span class="legend-dot" style="background:#8BAE26;"></span> Machine - A</span>
+                        <span class="d-flex align-items-center"><span class="legend-dot" style="background:#00A88F;"></span> Machine - B</span>
+                        <span class="d-flex align-items-center"><span class="legend-dot" style="background:#B4D330;"></span> Machine - C</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Purchase Process & PTC Closed Process (Maker Balance) -->
+        <div class="col-12 col-lg-4">
+            <div class="card border-0 shadow-sm h-100 p-3 bg-white" style="border-radius: 8px;">
+                <div class="d-flex justify-content-between align-items-baseline mb-2">
+                    <div>
+                        <h6 class="visual-card-title mb-0">Productivity by : Machine</h6>
+                        <small class="text-muted" style="font-size: 0.72rem;">Process pipeline balance</small>
+                    </div>
+                    <span class="kpi-red-badge">Purchase Process &amp; PTC Closed</span>
+                </div>
+
+                <!-- Visual Grouped Bar Chart -->
+                <div class="grouped-columns-wrapper pt-2">
+                    <div class="d-flex justify-content-between align-items-end" style="height: 140px; border-bottom: 2px solid #e0e6ed; padding-bottom: 4px;">
+                        @foreach (var p in MakerProcessList)
+                        {
+                            <div class="d-flex flex-column align-items-center flex-grow-1" style="max-width: 12%;">
+                                <div class="d-flex align-items-end gap-1 h-100">
+                                    <!-- Bar 1: Olive (Issued) -->
+                                    <div class="column-bar" style="height: @(p.IssuedQty * 1.8)%; background: #8BAE26;" title="@p.ProcessName Issued: @p.IssuedQty"></div>
+                                    <!-- Bar 2: Teal (PTC Closed) -->
+                                    <div class="column-bar" style="height: @(p.PtcClosedQty * 1.8)%; background: #00A88F;" title="@p.ProcessName PTC Closed: @p.PtcClosedQty"></div>
+                                    <!-- Bar 3: Light Teal (Pending) -->
+                                    <div class="column-bar" style="height: @(p.BalancePending * 8)%; background: #56C5B3;" title="@p.ProcessName Balance: @p.BalancePending"></div>
+                                </div>
+                                <span class="machine-label mt-1 text-truncate" style="max-width: 32px;" title="@p.ProcessName">@p.ProcessName</span>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Legend -->
+                    <div class="d-flex justify-content-center gap-3 mt-2 pt-1" style="font-size: 0.7rem;">
+                        <span class="d-flex align-items-center"><span class="legend-dot" style="background:#8BAE26;"></span> Machine - A</span>
+                        <span class="d-flex align-items-center"><span class="legend-dot" style="background:#00A88F;"></span> Machine - B</span>
+                        <span class="d-flex align-items-center"><span class="legend-dot" style="background:#56C5B3;"></span> Machine - C</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Red Annotations & Strategic Requirements Panel -->
+        <div class="col-12 col-lg-3">
+            <div class="card border-0 shadow-sm h-100 p-3 bg-white" style="border-radius: 8px;">
+                <div class="d-flex justify-content-between align-items-baseline mb-2">
+                    <h6 class="visual-card-title mb-0">Production Focus Areas</h6>
+                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-0" style="font-size: 0.68rem; font-weight: 700;">SPEC</span>
+                </div>
+
+                <div class="d-flex flex-column gap-3 my-auto py-2">
+                    <!-- Note 1 -->
+                    <div class="d-flex align-items-start gap-2">
+                        <div class="badge-red-dash mt-1 flex-shrink-0"></div>
+                        <div>
+                            <span class="focus-req-title">Department wise productivity</span>
+                            <p class="focus-req-desc mb-0">Based on employee issued process &amp; active workforce throughput tracking.</p>
+                        </div>
+                    </div>
+
+                    <!-- Note 2 -->
+                    <div class="d-flex align-items-start gap-2">
+                        <div class="badge-red-dash mt-1 flex-shrink-0"></div>
+                        <div>
+                            <span class="focus-req-title">Maker Balance Summary</span>
+                            <p class="focus-req-desc mb-0">Vendor open balances, jobber work-in-progress reconciliation &amp; batch returns.</p>
+                        </div>
+                    </div>
+
+                    <!-- Note 3 -->
+                    <div class="d-flex align-items-start gap-2">
+                        <div class="badge-red-dash mt-1 flex-shrink-0"></div>
+                        <div>
+                            <span class="focus-req-title">Maker Performance Report</span>
+                            <p class="focus-req-desc mb-0">On-time delivery, defect rejection rate &amp; process closing cycle durations.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ── Slide Footer Note ───────────────────────────────────────────── -->
+    <div class="text-center text-muted pb-3" style="font-size: 0.72rem;">
+        This Graph/Chart is linked to live ERP Production Data, and changes automatically based on operational process updates.
+    </div>
+
+</div>
+
+<style>
+    .manufacturing-dashboard-root {
+        color: #212529;
+    }
+    .slide-main-title {
+        font-size: 1.6rem;
+        font-weight: 300;
+        color: #2c3e50;
+        letter-spacing: -0.5px;
+    }
+    .slide-subtitle {
+        font-size: 0.78rem;
+        color: #7f8c8d;
+    }
+
+    /* KPI Cards */
+    .kpi-scorecard {
+        border-radius: 8px;
+        border: 1px solid #eef2f5;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .kpi-scorecard:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.06) !important;
+    }
+    .kpi-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #2c3e50;
+        line-height: 1.2;
+    }
+    .kpi-subtitle {
+        font-size: 0.75rem;
+        color: #95a5a6;
+    }
+    .kpi-hero-number {
+        font-size: 1.7rem;
+        font-weight: 800;
+        color: #2c3e50;
+        letter-spacing: -0.5px;
+        line-height: 1.1;
+    }
+    .kpi-target-label {
+        font-size: 0.75rem;
+        color: #7f8c8d;
+    }
+    .kpi-red-badge {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #e74c3c;
+    }
+    .variance-pill {
+        display: inline-block;
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 4px;
+    }
+    .variance-negative {
+        background-color: #00A88F;
+        color: #ffffff;
+    }
+    .variance-positive {
+        background-color: #8BAE26;
+        color: #ffffff;
+    }
+
+    /* Visual Headers */
+    .visual-card-title {
+        font-size: 0.88rem;
+        font-weight: 700;
+        color: #2c3e50;
+    }
+    .legend-dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        margin-right: 5px;
+    }
+
+    /* Concentric Radial Graphic Callouts */
+    .radial-callout-wrapper {
+        min-height: 180px;
+    }
+    .callout-label {
+        position: absolute;
+        font-size: 0.68rem;
+        line-height: 1.1;
+        text-align: left;
+    }
+    .callout-label .label-name {
+        display: block;
+        font-weight: 600;
+        color: #495057;
+    }
+    .callout-label .label-val {
+        font-size: 0.64rem;
+        font-weight: 700;
+    }
+    .top-left-label {
+        top: 28px;
+        left: 0;
+        text-align: left;
+    }
+    .top-right-label {
+        top: 28px;
+        right: 0;
+        text-align: right;
+    }
+    .bottom-left-label {
+        bottom: 24px;
+        left: 0;
+        text-align: left;
+    }
+    .bottom-right-label {
+        bottom: 24px;
+        right: 0;
+        text-align: right;
+    }
+
+    /* Grouped Columns */
+    .column-bar {
+        width: 6px;
+        border-radius: 2px 2px 0 0;
+        transition: height 0.25s ease;
+    }
+    .machine-label {
+        font-size: 0.65rem;
+        color: #6c757d;
+        font-weight: 600;
+    }
+
+    /* Red Annotations Panel */
+    .badge-red-dash {
+        width: 12px;
+        height: 3px;
+        background-color: #e74c3c;
+        border-radius: 2px;
+    }
+    .focus-req-title {
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #c0392b;
+    }
+    .focus-req-desc {
+        font-size: 0.74rem;
+        color: #6c757d;
+        line-height: 1.35;
+    }
+</style>

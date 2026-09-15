@@ -271,11 +271,19 @@ namespace DataAccessLibrary.DAC.Production
             return rows > 0;
         }
 
-        public async Task<bool> CloseMakerPOAsync(long entryId)
+        public async Task<bool> CloseMakerPOAsync(long entryId, string? masterPoNo = null)
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
-            string sql = "UPDATE VendIssued SET Closed = 1 WHERE EntryID = @EntryID";
-            int rows = await db.ExecuteAsync(sql, new { EntryID = entryId });
+            string sql;
+            if (!string.IsNullOrWhiteSpace(masterPoNo))
+            {
+                sql = "UPDATE VendIssued SET Closed = 1 WHERE MasterPONo = @MasterPONo OR EntryID = @EntryID";
+            }
+            else
+            {
+                sql = "UPDATE VendIssued SET Closed = 1 WHERE EntryID = @EntryID";
+            }
+            int rows = await db.ExecuteAsync(sql, new { EntryID = entryId, MasterPONo = masterPoNo });
             return rows > 0;
         }
 

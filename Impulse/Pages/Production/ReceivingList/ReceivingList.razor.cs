@@ -1104,24 +1104,70 @@ namespace Impulse.Pages.Production.ReceivingList
         public async Task PrintSlip(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            if (SelectedItem == null || !SelectedItem.IssuanceRefID.HasValue) return;
+            if (SelectedItem == null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Warning",
+                    Detail = "Please select a receiving record first.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            long issuanceId = SelectedItem.Issuance_RefID ?? SelectedItem.IssuanceRefID ?? 0;
+            if (issuanceId <= 0)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Print Slip",
+                    Detail = "This receiving record is not linked to an Issuance Slip.",
+                    Duration = 4000
+                });
+                return;
+            }
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "IssSlipWithRcving.rpt",
-                SelectionFormula = $"{{VendIssued.EntryID}} = {SelectedItem.IssuanceRefID.Value}"
+                SelectionFormula = $"{{VendIssued.EntryID}} = {issuanceId}"
             });
         }
 
         public async Task PrintSlipMini(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            if (SelectedItem == null || !SelectedItem.IssuanceRefID.HasValue) return;
+            if (SelectedItem == null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Warning",
+                    Detail = "Please select a receiving record first.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            long issuanceId = SelectedItem.Issuance_RefID ?? SelectedItem.IssuanceRefID ?? 0;
+            if (issuanceId <= 0)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Print Slip (Mini)",
+                    Detail = "This receiving record is not linked to an Issuance Slip.",
+                    Duration = 4000
+                });
+                return;
+            }
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "IssSlipWithRcving_Mini.rpt",
-                SelectionFormula = $"{{VendIssued.EntryID}} = {SelectedItem.IssuanceRefID.Value}",
+                SelectionFormula = $"{{VendIssued.EntryID}} = {issuanceId}",
                 FormulaValues = new Dictionary<string, object>
                 {
                     { "SubFilter", $"{{VendRcvdDetail.EntryID}} = {SelectedItem.VRD_EntryID}" }
@@ -1132,18 +1178,24 @@ namespace Impulse.Pages.Production.ReceivingList
         public async Task PrintPTC(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            if (!HasValidLotNo) return;
+            if (!HasValidLotNo)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Print PTC",
+                    Detail = "Please select a record with a valid Lot No.",
+                    Duration = 4000
+                });
+                return;
+            }
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
-                ReportName = "PTCQEL.rpt",
+                ReportName = "PTCQel.rpt",
                 Parameters = new Dictionary<string, object>
                 {
                     { "@LotNo", SelectedItem!.LotNo }
-                },
-                FormulaValues = new Dictionary<string, object>
-                {
-                    { "ComputerName", $"'IMPULSE-WEB'" }
                 }
             });
         }
@@ -1151,7 +1203,17 @@ namespace Impulse.Pages.Production.ReceivingList
         public async Task PrintPTCMini(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            if (!HasValidLotNo) return;
+            if (!HasValidLotNo)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Print PTC (Mini)",
+                    Detail = "Please select a record with a valid Lot No.",
+                    Duration = 4000
+                });
+                return;
+            }
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
@@ -1159,10 +1221,6 @@ namespace Impulse.Pages.Production.ReceivingList
                 Parameters = new Dictionary<string, object>
                 {
                     { "@LotNo", SelectedItem!.LotNo }
-                },
-                FormulaValues = new Dictionary<string, object>
-                {
-                    { "ComputerName", $"'IMPULSE-WEB'" }
                 }
             });
         }
@@ -1170,7 +1228,17 @@ namespace Impulse.Pages.Production.ReceivingList
         public async Task PrintPTCWithCost(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            if (!HasValidLotNo) return;
+            if (!HasValidLotNo)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Print PTC (With Cost)",
+                    Detail = "Please select a record with a valid Lot No.",
+                    Duration = 4000
+                });
+                return;
+            }
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
@@ -1178,10 +1246,6 @@ namespace Impulse.Pages.Production.ReceivingList
                 Parameters = new Dictionary<string, object>
                 {
                     { "@LotNo", SelectedItem!.LotNo }
-                },
-                FormulaValues = new Dictionary<string, object>
-                {
-                    { "ComputerName", $"'IMPULSE-WEB'" }
                 }
             });
         }
@@ -1189,7 +1253,17 @@ namespace Impulse.Pages.Production.ReceivingList
         public async Task PrintRepairSlip(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            if (!HasValidLotNo) return;
+            if (SelectedItem == null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Print Repair Slip",
+                    Detail = "Please select a receiving record first.",
+                    Duration = 4000
+                });
+                return;
+            }
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
@@ -1259,11 +1333,20 @@ namespace Impulse.Pages.Production.ReceivingList
             var parts = new List<string>();
 
             if (Filter.MakerIds != null && Filter.MakerIds.Any())
-                parts.Add($"Maker: {string.Join(",", Filter.MakerIds)}");
+            {
+                var makerNames = Makers.Where(m => Filter.MakerIds.Contains(m.Id)).Select(m => m.Name);
+                parts.Add($"Maker: {(makerNames.Any() ? string.Join(",", makerNames) : string.Join(",", Filter.MakerIds))}");
+            }
             if (Filter.ProcessIds != null && Filter.ProcessIds.Any())
-                parts.Add($"Process: {string.Join(",", Filter.ProcessIds)}");
+            {
+                var procNames = Processes.Where(p => Filter.ProcessIds.Contains(p.Id)).Select(p => p.Name);
+                parts.Add($"Process: {(procNames.Any() ? string.Join(",", procNames) : string.Join(",", Filter.ProcessIds))}");
+            }
             if (Filter.ItemCatIds != null && Filter.ItemCatIds.Any())
-                parts.Add($"Category: {string.Join(",", Filter.ItemCatIds)}");
+            {
+                var catNames = Categories.Where(c => Filter.ItemCatIds.Contains(c.Id)).Select(c => c.Name);
+                parts.Add($"Category: {(catNames.Any() ? string.Join(",", catNames) : string.Join(",", Filter.ItemCatIds))}");
+            }
             if (SelectedArticle != null)
                 parts.Add($"Article: {SelectedArticle.Name}");
             if (Filter.CustomerCodes != null && Filter.CustomerCodes.Any())
@@ -1278,19 +1361,113 @@ namespace Impulse.Pages.Production.ReceivingList
                 parts.Add($"In-Active Days: {Filter.InActiveDays}");
             if (Filter.ShowMasterPOOnly) parts.Add("Master POs Only");
             if (Filter.ShowLastOnly) parts.Add("Last Process Done");
+            if (Filter.RepairLots) parts.Add("Repair Lots");
+            if (Filter.RejectionLots) parts.Add("Rejection Lots");
 
             return string.Join(" | ", parts);
+        }
+
+        private string BuildSelectionFormula(out string dateRangeStr)
+        {
+            var conditions = new List<string>();
+            DateTime dtFrom = Filter.DtFrom;
+            DateTime dtTo = Filter.DtTo;
+
+            DateTime now = DateTime.Today;
+            switch (Filter.DateRangeIndex)
+            {
+                case 0: dtFrom = now; dtTo = now; break;
+                case 1: dtFrom = now.AddDays(-15); dtTo = now; break;
+                case 2: dtFrom = now.AddDays(-30); dtTo = now; break;
+                case 3: dtFrom = now.AddDays(-60); dtTo = now; break;
+                case 4: dtFrom = now.AddDays(-90); dtTo = now; break;
+                case 5:
+                    dtFrom = Filter.DtFrom;
+                    dtTo = Filter.DtTo;
+                    break;
+            }
+
+            // In legacy logic, if LotNo or OrderNo is specified, date filter is bypassed
+            if (string.IsNullOrWhiteSpace(Filter.LotNo) && string.IsNullOrWhiteSpace(Filter.OrderNo))
+            {
+                conditions.Add($"{{VVendReceivingList.DT}} in Date({dtFrom.Year}, {dtFrom.Month}, {dtFrom.Day}) to Date({dtTo.Year}, {dtTo.Month}, {dtTo.Day})");
+            }
+
+            dateRangeStr = $"{dtFrom:dd-MMM-yyyy} to {dtTo:dd-MMM-yyyy}";
+
+            // 1. Maker Filter (VenderName)
+            if (Filter.MakerIds != null && Filter.MakerIds.Any())
+            {
+                var makerNames = Makers
+                    .Where(m => Filter.MakerIds.Contains(m.Id))
+                    .Select(m => m.Name.Contains("}") ? m.Name.Substring(m.Name.IndexOf('}') + 1).Trim() : m.Name.Trim())
+                    .Select(n => $"'{n.Replace("'", "''")}'");
+
+                if (makerNames.Any())
+                {
+                    conditions.Add($"{{VVendReceivingList.VenderName}} in [{string.Join(",", makerNames)}]");
+                }
+            }
+
+            // 2. Item / Article Filter (ItemCode)
+            if (!string.IsNullOrWhiteSpace(Filter.ItemId) && Filter.ItemId != "0")
+            {
+                conditions.Add($"{{VVendReceivingList.ItemCode}} = '{Filter.ItemId.Trim().Replace("'", "''")}'");
+            }
+
+            // 3. Process Filter (Description)
+            if (Filter.ProcessIds != null && Filter.ProcessIds.Any())
+            {
+                var procNames = Processes
+                    .Where(p => Filter.ProcessIds.Contains(p.Id))
+                    .Select(p => $"'{p.Name.Replace("'", "''")}'");
+
+                if (procNames.Any())
+                {
+                    conditions.Add($"{{VVendReceivingList.Description}} in [{string.Join(",", procNames)}]");
+                }
+            }
+
+            // 4. Lot No Filter (LotNo)
+            if (!string.IsNullOrWhiteSpace(Filter.LotNo))
+            {
+                conditions.Add($"{{VVendReceivingList.LotNo}} = '{Filter.LotNo.Trim().Replace("'", "''")}'");
+            }
+
+            // 5. Customer Filter (CustCode)
+            if (Filter.CustomerCodes != null && Filter.CustomerCodes.Any())
+            {
+                var custs = Filter.CustomerCodes.Select(c => $"'{c.Replace("'", "''")}'");
+                conditions.Add($"{{VVendReceivingList.CustCode}} in [{string.Join(",", custs)}]");
+            }
+
+
+            // 7. Repair / Rejection
+            if (Filter.RepairLots && Filter.RejectionLots)
+            {
+                conditions.Add("({VVendReceivingList.ReWorkQty} > 0 or {VVendReceivingList.Wastage} > 0)");
+            }
+            else if (Filter.RepairLots)
+            {
+                conditions.Add("{VVendReceivingList.ReWorkQty} > 0");
+            }
+            else if (Filter.RejectionLots)
+            {
+                conditions.Add("{VVendReceivingList.Wastage} > 0");
+            }
+
+            return conditions.Any() ? string.Join(" and ", conditions) : string.Empty;
         }
 
         public async Task PrintList(ItemClickEventArgs args)
         {
             string filtersStr = BuildFiltersString();
-            string dateRangeStr = $"{Filter.DtFrom:dd-MMM-yyyy} to {Filter.DtTo:dd-MMM-yyyy}";
+            string selectionFormula = BuildSelectionFormula(out string dateRangeStr);
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "ReceivingList.rpt",
-                SelectionFormula = string.Empty,
+                SelectionFormula = selectionFormula,
                 FormulaValues = new Dictionary<string, object>
                 {
                     { "Filters", $"'{filtersStr}'" },
@@ -1302,12 +1479,12 @@ namespace Impulse.Pages.Production.ReceivingList
         public async Task PrintProcessList(ItemClickEventArgs args)
         {
             string filtersStr = BuildFiltersString();
-            string dateRangeStr = $"{Filter.DtFrom:dd-MMM-yyyy} to {Filter.DtTo:dd-MMM-yyyy}";
+            string selectionFormula = BuildSelectionFormula(out string dateRangeStr);
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "ReceivingList_Process.rpt",
-                SelectionFormula = string.Empty,
+                SelectionFormula = selectionFormula,
                 FormulaValues = new Dictionary<string, object>
                 {
                     { "Filters", $"'{filtersStr}'" },
@@ -1319,12 +1496,12 @@ namespace Impulse.Pages.Production.ReceivingList
         public async Task PrintListSummary(ItemClickEventArgs args)
         {
             string filtersStr = BuildFiltersString();
-            string dateRangeStr = $"{Filter.DtFrom:dd-MMM-yyyy} to {Filter.DtTo:dd-MMM-yyyy}";
+            string selectionFormula = BuildSelectionFormula(out string dateRangeStr);
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "ReceivingListSummary.rpt",
-                SelectionFormula = string.Empty,
+                SelectionFormula = selectionFormula,
                 FormulaValues = new Dictionary<string, object>
                 {
                     { "Filters", $"'{filtersStr}'" },

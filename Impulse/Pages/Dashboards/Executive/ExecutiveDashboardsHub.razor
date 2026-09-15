@@ -1,0 +1,232 @@
+@page "/dashboards/executive"
+@page "/dashboard/executive"
+@attribute [Authorize]
+@namespace Impulse.Pages.Dashboards.Executive
+
+<PageTitle>Executive Dashboards Suite | Impulse ERP</PageTitle>
+
+<div class="container-fluid py-3 px-4 exec-hub-root" style="font-family: 'Calibri', 'Segoe UI', sans-serif; background-color: #f7f9fb; min-height: 100vh;">
+
+    <!-- ── Breadcrumb / Back Link ──────────────────────────────────────── -->
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <a href="/dashboards" class="btn btn-sm btn-light border text-secondary shadow-sm rounded-pill px-3" style="font-size: 0.8rem;">
+            <i class="fas fa-arrow-left me-1"></i> Back to Dashboards Hub
+        </a>
+        <span class="text-muted" style="font-size: 0.8rem;">/ Executive Dashboards Suite</span>
+    </div>
+
+    <!-- ── Executive Cockpit Hero Header ───────────────────────────────── -->
+    <div class="card border-0 shadow-sm mb-4 bg-white" style="border-radius: 12px; border-left: 5px solid #8BAE26 !important;">
+        <div class="card-body p-4">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="exec-icon-box shadow-sm">
+                        <i class="fas fa-chart-pie text-white" style="font-size: 1.5rem;"></i>
+                    </div>
+                    <div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <h1 class="exec-title mb-0">Executive Dashboards Suite</h1>
+                            <span class="badge rounded-pill px-2.5 py-1" style="background: rgba(139, 174, 38, 0.15); color: #4B6F05; font-size: 0.72rem; font-weight: 700; border: 1px solid rgba(139, 174, 38, 0.3);">
+                                <i class="fas fa-bolt me-1 text-warning"></i> POWER BI STYLE
+                            </span>
+                        </div>
+                        <p class="exec-subtitle mb-0 text-muted">
+                            Executive-grade visual analytics, cross-departmental KPI cockpits, and high-impact operational intelligence.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Quick Stats Badge -->
+                <div class="d-flex align-items-center gap-2">
+                    <div class="stat-pill bg-light border px-3 py-2 rounded-3 text-center">
+                        <div class="fw-bold text-dark" style="font-size: 1.1rem; line-height: 1.1;">@DashboardsList.Count(d => d.Status == "Active")</div>
+                        <small class="text-muted" style="font-size: 0.7rem; text-transform: uppercase;">Active</small>
+                    </div>
+                    <div class="stat-pill bg-light border px-3 py-2 rounded-3 text-center">
+                        <div class="fw-bold text-secondary" style="font-size: 1.1rem; line-height: 1.1;">@DashboardsList.Count(d => d.Status == "Planned")</div>
+                        <small class="text-muted" style="font-size: 0.7rem; text-transform: uppercase;">Planned</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Featured Flagship Dashboard Banner ──────────────────────────── -->
+    <div class="card border-0 shadow-sm mb-4 featured-flagship-card" style="border-radius: 12px; overflow: hidden; background: linear-gradient(135deg, #ffffff 0%, #f4f8ec 100%); border: 1px solid rgba(139, 174, 38, 0.3) !important;">
+        <div class="card-body p-4 position-relative">
+            <div class="row align-items-center">
+                <div class="col-lg-8">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="badge px-2 py-1 text-white fw-bold rounded-pill" style="background: #8BAE26; font-size: 0.72rem;">
+                            <i class="fas fa-star me-1"></i> FEATURED EXECUTIVE VIEW
+                        </span>
+                        <span class="text-secondary fw-semibold" style="font-size: 0.76rem;">Shop Floor &amp; Maker Performance</span>
+                    </div>
+
+                    <h2 class="fw-bold text-dark mb-2" style="font-size: 1.45rem;">Product Manufacturing Dashboard</h2>
+                    <p class="text-secondary mb-3" style="font-size: 0.88rem; line-height: 1.45; max-width: 680px;">
+                        Comprehensive executive view with 4 Top KPI cards (Units YTD, Scrap Loss, Plant Productivity %, Rework), 
+                        distinctive concentric radial ring gauges with pointer callout pins, machine throughput comparisons, and Maker Balance reconciliations.
+                    </p>
+
+                    <!-- Highlights row -->
+                    <div class="d-flex flex-wrap gap-2 mb-4">
+                        <span class="highlight-chip"><i class="fas fa-check-circle text-success me-1"></i> 4.28M Units Produced (YTD)</span>
+                        <span class="highlight-chip"><i class="fas fa-chart-line text-success me-1"></i> 77.12% Overall Plant Productivity</span>
+                        <span class="highlight-chip"><i class="fas fa-circle-notch text-primary me-1"></i> Concentric Radial Reject Callouts</span>
+                        <span class="highlight-chip"><i class="fas fa-arrows-split-up-and-left text-info me-1"></i> Maker Balance &amp; PTC Closed</span>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2">
+                        <a href="/dashboards/manufacturing-executive" class="btn btn-success fw-bold px-4 py-2 rounded-pill shadow-sm" style="background: #8BAE26; border-color: #8BAE26;">
+                            <i class="fas fa-arrow-up-right-from-square me-2"></i> Launch Manufacturing Dashboard
+                        </a>
+                        <span class="text-muted ms-2" style="font-size: 0.75rem;">
+                            <i class="fas fa-check-double text-success me-1"></i> Slide Layout Ready
+                        </span>
+                    </div>
+                </div>
+
+                <div class="col-lg-4 d-none d-lg-block text-end">
+                    <div class="watermark-icon">
+                        <i class="fas fa-industry"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Executive Suite Catalog ─────────────────────────────────────── -->
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h5 class="fw-bold text-dark mb-0">Executive Dashboards Catalog</h5>
+        <span class="text-muted" style="font-size: 0.78rem;">Explore available and planned executive cockpits</span>
+    </div>
+
+    <div class="row g-3">
+        @foreach (var dash in DashboardsList)
+        {
+            <div class="col-12 col-md-6 col-xl-3">
+                <div class="card h-100 border-0 shadow-sm exec-card p-3 bg-white" style="border-radius: 10px; border-top: 4px solid @dash.AccentColor !important;">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div class="dash-card-icon" style="background: @(dash.AccentColor)18; color: @dash.AccentColor;">
+                            <i class="@dash.IconClass"></i>
+                        </div>
+                        @if (dash.Status == "Active")
+                        {
+                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 rounded-pill" style="font-size: 0.68rem; font-weight: 700;">
+                                <i class="fas fa-circle me-1" style="font-size: 0.5rem;"></i> ACTIVE
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-light text-secondary border px-2 py-1 rounded-pill" style="font-size: 0.68rem; font-weight: 600;">
+                                <i class="fas fa-clock me-1 text-muted"></i> PLANNED
+                            </span>
+                        }
+                    </div>
+
+                    <h6 class="fw-bold text-dark mb-1" style="font-size: 0.95rem;">@dash.Title</h6>
+                    <p class="text-muted mb-3 flex-grow-1" style="font-size: 0.78rem; line-height: 1.35;">
+                        @dash.Subtitle
+                    </p>
+
+                    <!-- Key highlights list -->
+                    <div class="card-highlights mb-3">
+                        @foreach (var hl in dash.Highlights.Take(3))
+                        {
+                            <div class="highlight-line text-secondary">
+                                <i class="fas fa-angle-right me-1" style="color: @dash.AccentColor;"></i> @hl
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Footer Action -->
+                    <div class="pt-2 border-top mt-auto">
+                        @if (dash.Status == "Active")
+                        {
+                            <a href="@dash.Route" class="btn btn-sm w-100 fw-bold rounded-pill" style="background: @dash.AccentColor; color: #ffffff;">
+                                Open Dashboard <i class="fas fa-chevron-right ms-1"></i>
+                            </a>
+                        }
+                        else
+                        {
+                            <button class="btn btn-sm w-100 btn-light border text-muted rounded-pill" disabled style="font-size: 0.76rem;">
+                                Coming in Next Phase
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+</div>
+
+<style>
+    .exec-hub-root {
+        color: #2c3e50;
+    }
+    .exec-icon-box {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #8BAE26 0%, #4B6F05 100%);
+        box-shadow: 0 4px 12px rgba(139, 174, 38, 0.35);
+    }
+    .exec-title {
+        font-size: 1.45rem;
+        font-weight: 700;
+        color: #2c3e50;
+        letter-spacing: -0.3px;
+    }
+    .exec-subtitle {
+        font-size: 0.82rem;
+    }
+    .highlight-chip {
+        display: inline-block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        background-color: #ffffff;
+        color: #495057;
+        padding: 4px 10px;
+        border-radius: 20px;
+        border: 1px solid #e2e8f0;
+    }
+    .watermark-icon {
+        font-size: 8rem;
+        color: rgba(139, 174, 38, 0.12);
+        line-height: 1;
+        margin-right: 1.5rem;
+    }
+    .exec-card {
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+    .exec-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.06) !important;
+    }
+    .dash-card-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+    }
+    .card-highlights {
+        background-color: #f8fafc;
+        border-radius: 6px;
+        padding: 8px 10px;
+    }
+    .highlight-line {
+        font-size: 0.72rem;
+        line-height: 1.4;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+</style>

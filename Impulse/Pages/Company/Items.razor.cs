@@ -16,6 +16,7 @@ namespace Impulse.Pages.Company
         [Inject] private INotificationService NotificationService { get; set; } = null!;
         [Inject] private IReportNavigationService ReportNavigation { get; set; } = null!;
         [Inject] private IBlazorContextMenuService BlazorContextMenuService { get; set; } = null!;
+        [Inject] private NavigationManager NavigationManager { get; set; } = null!;
 
         private bool isLoading = true;
         private bool showInactive = false;
@@ -303,7 +304,12 @@ namespace Impulse.Pages.Company
 
         private void NewItem(ItemClickEventArgs? e = null)
         {
-            NotificationService.ShowInformation("New Item", "Opening New Item form dialog...");
+            NavigateToNewItem();
+        }
+
+        private void NavigateToNewItem()
+        {
+            NavigationManager.NavigateTo("/company/new-item");
         }
 
         private void NewCategory(ItemClickEventArgs? e = null)
@@ -319,7 +325,13 @@ namespace Impulse.Pages.Company
                 NotificationService.ShowWarning("No item selected", "Please select an item to edit.");
                 return;
             }
-            NotificationService.ShowInformation("Edit Item", $"Editing item {item.ItemID}...");
+            EditItemRow(item);
+        }
+
+        private void EditItemRow(CompanyItemModel item)
+        {
+            highlightedItem = item;
+            NavigationManager.NavigateTo($"/company/new-item/{Uri.EscapeDataString(item.ItemID)}");
         }
 
         private void DeleteItem(ItemClickEventArgs? e = null)
@@ -341,7 +353,7 @@ namespace Impulse.Pages.Company
                 NotificationService.ShowWarning("No item selected", "Please select an item to copy.");
                 return;
             }
-            NotificationService.ShowInformation("Copy Item", $"Copying item details for {item.ItemID}...");
+            NavigationManager.NavigateTo($"/company/new-item/copy/{Uri.EscapeDataString(item.ItemID)}");
         }
 
         private async Task ToggleActive(ItemClickEventArgs? e = null)
@@ -418,28 +430,6 @@ namespace Impulse.Pages.Company
             {
                 NotificationService.ShowError("Error assigning processes", ex.Message);
             }
-        }
-
-        private void ViewSales(ItemClickEventArgs? e = null)
-        {
-            var item = GetItemContext(e);
-            if (item == null)
-            {
-                NotificationService.ShowWarning("No item selected", "Please select an item first.");
-                return;
-            }
-            NotificationService.ShowInformation("Item Sales", $"Opening item sales history for {item.ItemID}...");
-        }
-
-        private void ViewPurchases(ItemClickEventArgs? e = null)
-        {
-            var item = GetItemContext(e);
-            if (item == null)
-            {
-                NotificationService.ShowWarning("No item selected", "Please select an item first.");
-                return;
-            }
-            NotificationService.ShowInformation("Item Purchases", $"Opening item purchases history for {item.ItemID}...");
         }
 
         private void ResetProcessGroups(ItemClickEventArgs? e = null)

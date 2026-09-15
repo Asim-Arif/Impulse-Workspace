@@ -276,14 +276,10 @@ namespace Impulse.Pages.Production.ProductionItemList
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
-                ReportName = "PTCQEL.rpt",
+                ReportName = "PTCQel.rpt",
                 Parameters = new Dictionary<string, object>
                 {
                     { "@LotNo", item.LotNo }
-                },
-                FormulaValues = new Dictionary<string, object>
-                {
-                    { "ComputerName", $"'IMPULSE-WEB'" }
                 }
             });
         }

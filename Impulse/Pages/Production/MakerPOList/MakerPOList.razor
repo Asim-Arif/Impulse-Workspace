@@ -249,7 +249,9 @@
                                 bool isChecked = CheckedIds.Contains(currentItem.EntryID);
                                 bool isSelected = SelectedItem?.EntryID == currentItem.EntryID;
 
-                                <ContextMenuTrigger WrapperTag="tr" MenuId="rowContextMenu" Data="@currentItem" @onclick="@(() => SelectRow(currentItem))"
+                                <ContextMenuTrigger WrapperTag="tr" MenuId="rowContextMenu" Data="@currentItem"
+                                                    @onclick="@(() => SelectRow(currentItem))"
+                                                    @oncontextmenu="@(() => SelectRow(currentItem))"
                                                     class="@($"{GetRowClass(currentItem)} {(isSelected ? "table-primary" : "")}")" style="cursor: pointer;">
                                     <td class="text-center" @onclick:stopPropagation="true">
                                         <input class="form-check-input" type="checkbox" checked="@isChecked" @onchange="@((e) => ToggleRowCheck(currentItem.EntryID, e.Value))" />
@@ -295,10 +297,10 @@
 <ContextMenu Id="rowContextMenu" Template="Win11Style">
     <div class="win11-section-header px-3 py-1 text-muted small fw-bold border-bottom">ROUTINE ACTIONS</div>
     <Item OnClick="@DeleteSelected"><i class="fas fa-trash text-danger me-2"></i> Delete Selected</Item>
-    <Item OnClick="@CloseMakerPO" Enabled="@CanCloseMakerPO"><i class="fas fa-lock text-warning me-2"></i> Close Maker PO</Item>
-    <Item OnClick="@EditPromises" Enabled="@SelectedHasMasterPO"><i class="fas fa-calendar-alt text-info me-2"></i> Edit Promises</Item>
+    <Item OnClick="@CloseMakerPO"><i class="fas fa-lock text-warning me-2"></i> Close Maker PO</Item>
+    <Item OnClick="@EditPromises"><i class="fas fa-calendar-alt text-info me-2"></i> Edit Promises</Item>
     <Item OnClick="@AddBookmark"><i class="fas fa-bookmark text-primary me-2"></i> Add Bookmark</Item>
-    <Item OnClick="@AddFollowup" Enabled="@SelectedHasOrderNo"><i class="fas fa-plus-circle text-success me-2"></i> Add Followup Entries</Item>
+    <Item OnClick="@AddFollowup"><i class="fas fa-plus-circle text-success me-2"></i> Add Followup Entries</Item>
 
     <div class="win11-section-header px-3 py-1 text-muted small fw-bold border-bottom border-top mt-1">ISSUANCE SLIPS & PO PRINTS</div>
     <Item OnClick="@PrintIssSlip"><i class="fas fa-print text-dark me-2"></i> Print Purchase Order (Issuance Slip)</Item>
@@ -316,10 +318,10 @@
     <Item OnClick="@PrintItemPictures"><i class="fas fa-image text-success me-2"></i> Item Pictures</Item>
 
     <div class="win11-section-header px-3 py-1 text-muted small fw-bold border-bottom border-top mt-1">PTC & PURCHASER REPORTS</div>
-    <Item OnClick="@PrintPTC" Enabled="@HasValidLotNo"><i class="fas fa-file text-dark me-2"></i> Print PTC</Item>
-    <Item OnClick="@PrintPTCMini" Enabled="@HasValidLotNo"><i class="fas fa-file-alt text-dark me-2"></i> Print PTC (Mini)</Item>
-    <Item OnClick="@PrintPTCWithPrice" Enabled="@HasValidLotNo"><i class="fas fa-file-invoice-dollar text-success me-2"></i> Print PTC (With Price)</Item>
-    <Item OnClick="@PrintOrdersOfPurchaser" Enabled="@HasPurchaserSelected"><i class="fas fa-user text-primary me-2"></i> Print Orders of Purchaser</Item>
+    <Item OnClick="@PrintPTC"><i class="fas fa-file text-dark me-2"></i> Print PTC</Item>
+    <Item OnClick="@PrintPTCMini"><i class="fas fa-file-alt text-dark me-2"></i> Print PTC (Mini)</Item>
+    <Item OnClick="@PrintPTCWithPrice"><i class="fas fa-file-invoice-dollar text-success me-2"></i> Print PTC (With Price)</Item>
+    <Item OnClick="@PrintOrdersOfPurchaser"><i class="fas fa-user text-primary me-2"></i> Print Orders of Purchaser</Item>
     <Item OnClick="@PrintPurchasePlan"><i class="fas fa-calendar text-primary me-2"></i> Print Purchase Plan</Item>
     <Item OnClick="@PrintPurchaseCalendar"><i class="fas fa-calendar-check text-success me-2"></i> Purchase Calendar</Item>
     <Item OnClick="@PrintFollowupReport"><i class="fas fa-tasks text-info me-2"></i> Print Followup Report</Item>

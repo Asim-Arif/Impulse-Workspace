@@ -548,27 +548,50 @@ namespace Impulse.Pages.Production.MakerPOList
         {
             ResolveRowItem(args);
 
-            if (SelectedItem == null) return;
-            if (!string.IsNullOrWhiteSpace(SelectedItem.MasterPONo))
+            if (SelectedItem == null)
             {
                 NotificationService.Notify(new Radzen.NotificationMessage
                 {
                     Severity = Radzen.NotificationSeverity.Warning,
-                    Summary = "Cannot Close",
-                    Detail = "Only non-Master PO orders can be closed here.",
+                    Summary = "No Selection",
+                    Detail = "Please select an order first.",
+                    Duration = 3000
+                });
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(SelectedItem.LotNo) && SelectedItem.LotNo != "0")
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Not a PO",
+                    Detail = "This is a Lot, not a Purchase Order.",
                     Duration = 4000
                 });
                 return;
             }
 
-            bool success = await MakerPOListService.CloseMakerPOAsync(SelectedItem.EntryID);
+            if (string.IsNullOrWhiteSpace(SelectedItem.MasterPONo))
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Cannot Close",
+                    Detail = "Only Master POs can be closed.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            bool success = await MakerPOListService.CloseMakerPOAsync(SelectedItem.EntryID, SelectedItem.MasterPONo);
             if (success)
             {
                 NotificationService.Notify(new Radzen.NotificationMessage
                 {
                     Severity = Radzen.NotificationSeverity.Success,
-                    Summary = "PO Closed",
-                    Detail = $"Order #{SelectedItem.RecieptID} marked closed.",
+                    Summary = "Master PO Closed",
+                    Detail = $"Master PO #{SelectedItem.MasterPONo} marked closed.",
                     Duration = 4000
                 });
                 await LoadDataAsync();
@@ -578,7 +601,29 @@ namespace Impulse.Pages.Production.MakerPOList
         public void EditPromises(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            if (SelectedItem == null || string.IsNullOrWhiteSpace(SelectedItem.MasterPONo)) return;
+            if (SelectedItem == null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "No Selection",
+                    Detail = "Please select an order first.",
+                    Duration = 3000
+                });
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(SelectedItem.MasterPONo))
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "No Master PO",
+                    Detail = "The selected order does not have a Master PO #.",
+                    Duration = 4000
+                });
+                return;
+            }
+
             NotificationService.Notify(new Radzen.NotificationMessage
             {
                 Severity = Radzen.NotificationSeverity.Info,
@@ -604,7 +649,29 @@ namespace Impulse.Pages.Production.MakerPOList
         public void AddFollowup(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            if (SelectedItem == null) return;
+            if (SelectedItem == null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "No Selection",
+                    Detail = "Please select an order first.",
+                    Duration = 3000
+                });
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(SelectedItem.OrderNo))
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "No Order #",
+                    Detail = "The selected order does not have an Order #.",
+                    Duration = 4000
+                });
+                return;
+            }
+
             NotificationService.Notify(new Radzen.NotificationMessage
             {
                 Severity = Radzen.NotificationSeverity.Info,
@@ -697,14 +764,41 @@ namespace Impulse.Pages.Production.MakerPOList
             });
         }
 
+        private bool CheckHasMasterPO()
+        {
+            if (SelectedItem == null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "No Selection",
+                    Detail = "Please select an order first.",
+                    Duration = 3000
+                });
+                return false;
+            }
+            if (string.IsNullOrWhiteSpace(SelectedItem.MasterPONo))
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "No Master PO",
+                    Detail = "The selected order does not have a Master PO #.",
+                    Duration = 4000
+                });
+                return false;
+            }
+            return true;
+        }
+
         public async Task PrintMasterPOOffice(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            if (SelectedItem == null || string.IsNullOrWhiteSpace(SelectedItem.MasterPONo)) return;
+            if (!CheckHasMasterPO()) return;
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "IssList.rpt",
-                SelectionFormula = $"{{VendIssued.MasterPONo}} = '{SelectedItem.MasterPONo}'",
+                SelectionFormula = $"{{VendIssued.MasterPONo}} = '{SelectedItem!.MasterPONo}'",
                 FormulaValues = new Dictionary<string, object> { { "Copy", "'OFFICE COPY'" } }
             });
         }
@@ -712,11 +806,11 @@ namespace Impulse.Pages.Production.MakerPOList
         public async Task PrintMasterPOMaker(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            if (SelectedItem == null || string.IsNullOrWhiteSpace(SelectedItem.MasterPONo)) return;
+            if (!CheckHasMasterPO()) return;
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "IssList.rpt",
-                SelectionFormula = $"{{VendIssued.MasterPONo}} = '{SelectedItem.MasterPONo}'",
+                SelectionFormula = $"{{VendIssued.MasterPONo}} = '{SelectedItem!.MasterPONo}'",
                 FormulaValues = new Dictionary<string, object> { { "Copy", "'MAKER COPY'" } }
             });
         }
@@ -724,11 +818,11 @@ namespace Impulse.Pages.Production.MakerPOList
         public async Task PrintMasterPOAccounts(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            if (SelectedItem == null || string.IsNullOrWhiteSpace(SelectedItem.MasterPONo)) return;
+            if (!CheckHasMasterPO()) return;
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "IssList.rpt",
-                SelectionFormula = $"{{VendIssued.MasterPONo}} = '{SelectedItem.MasterPONo}'",
+                SelectionFormula = $"{{VendIssued.MasterPONo}} = '{SelectedItem!.MasterPONo}'",
                 FormulaValues = new Dictionary<string, object> { { "Copy", "'ACCOUNTS COPY'" } }
             });
         }
@@ -736,11 +830,11 @@ namespace Impulse.Pages.Production.MakerPOList
         public async Task PrintMasterPOHideRate(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            if (SelectedItem == null || string.IsNullOrWhiteSpace(SelectedItem.MasterPONo)) return;
+            if (!CheckHasMasterPO()) return;
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "IssList.rpt",
-                SelectionFormula = $"{{VendIssued.MasterPONo}} = '{SelectedItem.MasterPONo}'",
+                SelectionFormula = $"{{VendIssued.MasterPONo}} = '{SelectedItem!.MasterPONo}'",
                 FormulaValues = new Dictionary<string, object> { { "HideRate", true } }
             });
         }
@@ -748,39 +842,58 @@ namespace Impulse.Pages.Production.MakerPOList
         public async Task PrintMasterPOStatus(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            if (SelectedItem == null || string.IsNullOrWhiteSpace(SelectedItem.MasterPONo)) return;
+            if (!CheckHasMasterPO()) return;
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "MasterPOStatus.rpt",
-                SelectionFormula = $"{{VendIssued.MasterPONo}} = '{SelectedItem.MasterPONo}'"
+                SelectionFormula = $"{{VendIssued.MasterPONo}} = '{SelectedItem!.MasterPONo}'"
             });
         }
 
         public async Task PrintItemPictures(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            if (SelectedItem == null || string.IsNullOrWhiteSpace(SelectedItem.MasterPONo)) return;
+            if (!CheckHasMasterPO()) return;
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "IssListArticlePic.rpt",
-                SelectionFormula = $"{{VendIssued.MasterPONo}} = '{SelectedItem.MasterPONo}'"
+                SelectionFormula = $"{{VendIssued.MasterPONo}} = '{SelectedItem!.MasterPONo}'"
             });
         }
 
         public async Task PrintPTC(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            if (!HasValidLotNo) return;
+            if (SelectedItem == null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "No Selection",
+                    Detail = "Please select an order first.",
+                    Duration = 3000
+                });
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(SelectedItem.LotNo) || SelectedItem.LotNo == "0")
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Not a Lot",
+                    Detail = "This is a PO, not a Lot.",
+                    Duration = 4000
+                });
+                return;
+            }
+
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
-                ReportName = "PTCQEL.rpt",
+                ReportName = "PTCQel.rpt",
                 Parameters = new Dictionary<string, object>
                 {
-                    { "@LotNo", SelectedItem!.LotNo }
-                },
-                FormulaValues = new Dictionary<string, object>
-                {
-                    { "ComputerName", $"'IMPULSE-WEB'" }
+                    { "@LotNo", SelectedItem.LotNo }
                 }
             });
         }
@@ -788,17 +901,36 @@ namespace Impulse.Pages.Production.MakerPOList
         public async Task PrintPTCMini(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            if (!HasValidLotNo) return;
+            if (SelectedItem == null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "No Selection",
+                    Detail = "Please select an order first.",
+                    Duration = 3000
+                });
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(SelectedItem.LotNo) || SelectedItem.LotNo == "0")
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Not a Lot",
+                    Detail = "This is a PO, not a Lot.",
+                    Duration = 4000
+                });
+                return;
+            }
+
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "PTCQEL_Mini.rpt",
                 Parameters = new Dictionary<string, object>
                 {
-                    { "@LotNo", SelectedItem!.LotNo }
-                },
-                FormulaValues = new Dictionary<string, object>
-                {
-                    { "ComputerName", $"'IMPULSE-WEB'" }
+                    { "@LotNo", SelectedItem.LotNo }
                 }
             });
         }
@@ -806,17 +938,36 @@ namespace Impulse.Pages.Production.MakerPOList
         public async Task PrintPTCWithPrice(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            if (!HasValidLotNo) return;
+            if (SelectedItem == null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "No Selection",
+                    Detail = "Please select an order first.",
+                    Duration = 3000
+                });
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(SelectedItem.LotNo) || SelectedItem.LotNo == "0")
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Not a Lot",
+                    Detail = "This is a PO, not a Lot.",
+                    Duration = 4000
+                });
+                return;
+            }
+
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "PTCQELWithPrice.rpt",
                 Parameters = new Dictionary<string, object>
                 {
-                    { "@LotNo", SelectedItem!.LotNo }
-                },
-                FormulaValues = new Dictionary<string, object>
-                {
-                    { "ComputerName", $"'IMPULSE-WEB'" }
+                    { "@LotNo", SelectedItem.LotNo }
                 }
             });
         }
@@ -824,7 +975,17 @@ namespace Impulse.Pages.Production.MakerPOList
         public async Task PrintOrdersOfPurchaser(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            if (!HasPurchaserSelected) return;
+            if (!HasPurchaserSelected)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Purchaser Required",
+                    Detail = "Please select a Purchaser in the filter first.",
+                    Duration = 4000
+                });
+                return;
+            }
 
             string formula = $"{{VVendIssdDetail_Simple.VID_EmpID}} = '{Filter.PurchaserEmpId}' AND {{VVendIssdDetail_Simple.DT}} in Date({Filter.DtFrom.Year}, {Filter.DtFrom.Month}, {Filter.DtFrom.Day}) to Date({Filter.DtTo.Year}, {Filter.DtTo.Month}, {Filter.DtTo.Day})";
             if (!string.IsNullOrWhiteSpace(Filter.OrderNo))
@@ -901,11 +1062,20 @@ namespace Impulse.Pages.Production.MakerPOList
             List<string> parts = new List<string>();
 
             if (Filter.MakerIds != null && Filter.MakerIds.Any())
-                parts.Add($"Maker: {string.Join(",", Filter.MakerIds)}");
+            {
+                var makerNames = Makers.Where(m => Filter.MakerIds.Contains(m.Id)).Select(m => m.Name);
+                parts.Add($"Maker: {(makerNames.Any() ? string.Join(",", makerNames) : string.Join(",", Filter.MakerIds))}");
+            }
             if (Filter.ProcessIds != null && Filter.ProcessIds.Any())
-                parts.Add($"Process: {string.Join(",", Filter.ProcessIds)}");
+            {
+                var procNames = Processes.Where(p => Filter.ProcessIds.Contains(p.Id)).Select(p => p.Name);
+                parts.Add($"Process: {(procNames.Any() ? string.Join(",", procNames) : string.Join(",", Filter.ProcessIds))}");
+            }
             if (Filter.ItemCatIds != null && Filter.ItemCatIds.Any())
-                parts.Add($"Category: {string.Join(",", Filter.ItemCatIds)}");
+            {
+                var catNames = Categories.Where(c => Filter.ItemCatIds.Contains(c.Id)).Select(c => c.Name);
+                parts.Add($"Category: {(catNames.Any() ? string.Join(",", catNames) : string.Join(",", Filter.ItemCatIds))}");
+            }
             if (SelectedArticle != null)
                 parts.Add($"Article: {SelectedArticle.Name}");
             if (Filter.CustomerCodes != null && Filter.CustomerCodes.Any())
@@ -918,22 +1088,174 @@ namespace Impulse.Pages.Production.MakerPOList
                 parts.Add($"Master PO: {Filter.MasterPONo}");
             if (!string.IsNullOrWhiteSpace(Filter.InActiveDays))
                 parts.Add($"In-Active Days: {Filter.InActiveDays}");
+            if (Filter.ShowMasterPOOnly)
+                parts.Add("Master POs Only");
+            if (Filter.MasterPOOpen)
+                parts.Add("Open Master POs Only");
+            if (Filter.RepairLots)
+                parts.Add("Repair Lots Only");
 
             return string.Join(" | ", parts);
         }
 
+        private string BuildSelectionFormula(out string dateRangeStr)
+        {
+            var conditions = new List<string>();
+            DateTime dtFrom = Filter.DtFrom;
+            DateTime dtTo = Filter.DtTo;
+
+            // 1. Due Days or Date Range
+            if (Filter.DueDaysMode > 0)
+            {
+                int dueDays = Filter.DueDaysMode switch
+                {
+                    1 => 3,
+                    2 => 7,
+                    3 => Filter.DueDaysCustom,
+                    _ => 0
+                };
+                DateTime targetDt = DateTime.Today.AddDays(dueDays);
+                dtFrom = targetDt < DateTime.Today ? targetDt : DateTime.Today;
+                dtTo = targetDt < DateTime.Today ? DateTime.Today : targetDt;
+
+                conditions.Add($"{{VVendIssued.DT}} in Date({dueFromDate(dtFrom)}) to Date({dueToDate(dtTo)})");
+            }
+            else
+            {
+                DateTime now = DateTime.Today;
+                switch (Filter.DateRangeIndex)
+                {
+                    case 0: dtFrom = now; dtTo = now; break;
+                    case 1: dtFrom = now.AddDays(-15); dtTo = now; break;
+                    case 2: dtFrom = now.AddDays(-30); dtTo = now; break;
+                    case 3: dtFrom = now.AddDays(-60); dtTo = now; break;
+                    case 4: dtFrom = now.AddDays(-90); dtTo = now; break;
+                    case 5:
+                        dtFrom = Filter.DtFrom;
+                        dtTo = Filter.DtTo;
+                        break;
+                }
+
+                // In legacy logic, if LotNo, OrderNo, or MasterPONo is specified, date filter is bypassed
+                if (string.IsNullOrWhiteSpace(Filter.LotNo) && string.IsNullOrWhiteSpace(Filter.OrderNo) && string.IsNullOrWhiteSpace(Filter.MasterPONo))
+                {
+                    conditions.Add($"{{VVendIssued.DT}} in Date({dtFrom.Year}, {dtFrom.Month}, {dtFrom.Day}) to Date({dtTo.Year}, {dtTo.Month}, {dtTo.Day})");
+                }
+            }
+
+            dateRangeStr = $"{dtFrom:dd-MMM-yyyy} to {dtTo:dd-MMM-yyyy}";
+
+            // 2. Maker Filter (VendID)
+            if (Filter.MakerIds != null && Filter.MakerIds.Any())
+            {
+                conditions.Add($"{{VVendIssued.VendID}} in [{string.Join(",", Filter.MakerIds)}]");
+            }
+
+            // 3. Item / Article Filter (ItemID)
+            if (!string.IsNullOrWhiteSpace(Filter.ItemId) && Filter.ItemId != "0")
+            {
+                conditions.Add($"{{VVendIssued.ItemID}} = '{Filter.ItemId.Replace("'", "''")}'");
+            }
+
+            // 4. Category Filter (CatID)
+            if (Filter.ItemCatIds != null && Filter.ItemCatIds.Any())
+            {
+                if (Filter.ItemCatIds.All(c => int.TryParse(c, out _)))
+                {
+                    conditions.Add($"{{VVendIssued.CatID}} in [{string.Join(",", Filter.ItemCatIds)}]");
+                }
+                else
+                {
+                    var cats = Filter.ItemCatIds.Select(c => $"'{c.Replace("'", "''")}'");
+                    conditions.Add($"{{VVendIssued.CatID}} in [{string.Join(",", cats)}]");
+                }
+            }
+
+            // 5. Item Group Filter (GroupID)
+            if (Filter.ItemGroupIds != null && Filter.ItemGroupIds.Any())
+            {
+                conditions.Add($"{{VVendIssued.GroupID}} in [{string.Join(",", Filter.ItemGroupIds)}]");
+            }
+
+            // 6. Process Filter (ProcessID)
+            if (Filter.ProcessIds != null && Filter.ProcessIds.Any())
+            {
+                conditions.Add($"{{VVendIssued.ProcessID}} in [{string.Join(",", Filter.ProcessIds)}]");
+            }
+
+            // 7. Lot No Filter (LotNo)
+            if (!string.IsNullOrWhiteSpace(Filter.LotNo))
+            {
+                conditions.Add($"{{VVendIssued.LotNo}} = '{Filter.LotNo.Trim().Replace("'", "''")}'");
+            }
+
+            // 8. Order No Filter (OrderNo)
+            if (!string.IsNullOrWhiteSpace(Filter.OrderNo))
+            {
+                conditions.Add($"{{VVendIssued.OrderNo}} = '{Filter.OrderNo.Trim().Replace("'", "''")}'");
+            }
+
+            // 9. Master PO No (MasterPONo)
+            if (!string.IsNullOrWhiteSpace(Filter.MasterPONo))
+            {
+                conditions.Add($"{{VVendIssued.MasterPONo}} = '{Filter.MasterPONo.Trim().Replace("'", "''")}'");
+            }
+
+            // 10. Show Master PO Only
+            if (Filter.ShowMasterPOOnly)
+            {
+                conditions.Add("not IsNull({VVendIssued.MasterPONo}) and {VVendIssued.MasterPONo} <> ''");
+            }
+
+            // 11. Repair Lots
+            if (Filter.RepairLots)
+            {
+                conditions.Add("{VVendIssued.ReWorkLot} = 1");
+            }
+
+            // 12. Regular Lots Only
+            if (Filter.RegularLotsOnly)
+            {
+                conditions.Add("{VVendIssued.ReWorkLot} = 0");
+            }
+
+            // 13. Bookmarks
+            if (Filter.Bookmarks)
+            {
+                conditions.Add("not IsNull({VVendIssued.BookMarkEntryID})");
+            }
+
+            // 14. Customer Codes (CustCode)
+            if (Filter.CustomerCodes != null && Filter.CustomerCodes.Any())
+            {
+                var custs = Filter.CustomerCodes.Select(c => $"'{c.Replace("'", "''")}'");
+                conditions.Add($"{{VVendIssued.CustCode}} in [{string.Join(",", custs)}]");
+            }
+
+            // 15. Purchaser
+            if (!string.IsNullOrWhiteSpace(Filter.PurchaserEmpId) && Filter.PurchaserEmpId != "0")
+            {
+                conditions.Add($"{{VVendIssued.IssEmpID}} = '{Filter.PurchaserEmpId.Replace("'", "''")}'");
+            }
+
+            return conditions.Any() ? string.Join(" and ", conditions) : string.Empty;
+        }
+
+        private static string dueFromDate(DateTime d) => $"{d.Year}, {d.Month}, {d.Day}";
+        private static string dueToDate(DateTime d) => $"{d.Year}, {d.Month}, {d.Day}";
+
         public async Task PrintThisList(ItemClickEventArgs args)
         {
             string filtersStr = BuildFiltersString();
-            string dateRangeStr = $"{Filter.DtFrom:dd-MMM-yyyy} to {Filter.DtTo:dd-MMM-yyyy}";
+            string selectionFormula = BuildSelectionFormula(out string dateRangeStr);
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "IssuanceList.rpt",
-                SelectionFormula = string.Empty,
+                SelectionFormula = selectionFormula,
                 FormulaValues = new Dictionary<string, object>
                 {
-                    { "Filters", $"'{filtersStr}'" },
+                    { "Filters", $"'{filtersStr.Replace("'", "''")}'" },
                     { "DateRange", $"'{dateRangeStr}'" }
                 }
             });
@@ -942,15 +1264,15 @@ namespace Impulse.Pages.Production.MakerPOList
         public async Task PrintBatchWiseList(ItemClickEventArgs args)
         {
             string filtersStr = BuildFiltersString();
-            string dateRangeStr = $"{Filter.DtFrom:dd-MMM-yyyy} to {Filter.DtTo:dd-MMM-yyyy}";
+            string selectionFormula = BuildSelectionFormula(out string dateRangeStr);
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "IssuanceList_BatchNoWise.rpt",
-                SelectionFormula = string.Empty,
+                SelectionFormula = selectionFormula,
                 FormulaValues = new Dictionary<string, object>
                 {
-                    { "Filters", $"'{filtersStr}'" },
+                    { "Filters", $"'{filtersStr.Replace("'", "''")}'" },
                     { "DateRange", $"'{dateRangeStr}'" }
                 }
             });
@@ -960,15 +1282,15 @@ namespace Impulse.Pages.Production.MakerPOList
         {
             bool hasRight = await MakerPOListService.GetUserRightAsync("MIL_Print_Maker_Issuance_Report_Valuewise", "Admin");
             string filtersStr = BuildFiltersString();
-            string dateRangeStr = $"{Filter.DtFrom:dd-MMM-yyyy} to {Filter.DtTo:dd-MMM-yyyy}";
+            string selectionFormula = BuildSelectionFormula(out string dateRangeStr);
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "MakerIssuanceReportValuewise.rpt",
-                SelectionFormula = string.Empty,
+                SelectionFormula = selectionFormula,
                 FormulaValues = new Dictionary<string, object>
                 {
-                    { "Filters", $"'{filtersStr}'" },
+                    { "Filters", $"'{filtersStr.Replace("'", "''")}'" },
                     { "DateRange", $"'{dateRangeStr}'" }
                 }
             });
@@ -977,15 +1299,15 @@ namespace Impulse.Pages.Production.MakerPOList
         public async Task PrintMakerList(ItemClickEventArgs args)
         {
             string filtersStr = BuildFiltersString();
-            string dateRangeStr = $"{Filter.DtFrom:dd-MMM-yyyy} to {Filter.DtTo:dd-MMM-yyyy}";
+            string selectionFormula = BuildSelectionFormula(out string dateRangeStr);
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "MakerList_Issuance.rpt",
-                SelectionFormula = string.Empty,
+                SelectionFormula = selectionFormula,
                 FormulaValues = new Dictionary<string, object>
                 {
-                    { "Filters", $"'{filtersStr}'" },
+                    { "Filters", $"'{filtersStr.Replace("'", "''")}'" },
                     { "DateRange", $"'{dateRangeStr}'" }
                 }
             });

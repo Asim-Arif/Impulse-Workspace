@@ -227,6 +227,7 @@
 
                                 <ContextMenuTrigger WrapperTag="tr" MenuId="rowContextMenu" Data="@currentItem"
                                                     @onclick="@(() => SelectRow(currentItem))"
+                                                    @oncontextmenu="@(() => SelectRow(currentItem))"
                                                     class="@($"{GetRowClass(currentItem)} {(isSelected ? "table-primary" : "")}")"
                                                     style="cursor: pointer;">
                                     <td>@(index++)</td>

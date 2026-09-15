@@ -107,6 +107,12 @@
 
                 <!-- Action Buttons -->
                 <div class="col d-flex align-items-end justify-content-end gap-2 pb-1">
+                    <button type="button" class="btn btn-success btn-sm fw-semibold" @onclick="NavigateToNewItem" title="Add New Item">
+                        <i class="fas fa-plus me-1"></i> Add Item
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm fw-semibold" @onclick="() => EditItem(null)" disabled="@(highlightedItem == null)" title="Edit Selected Item">
+                        <i class="fas fa-pencil-alt me-1"></i> Edit Item
+                    </button>
                     <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => RefreshList(null)" title="Refresh List">
                         <i class="fas fa-sync-alt"></i>
                     </button>
@@ -182,7 +188,8 @@
                                                                     MouseButtonTrigger="MouseButtonTrigger.Right"
                                                                     style="cursor:pointer;"
                                                                     CssClass="@(isSelected ? "table-primary fw-semibold" : "")"
-                                                                    @onclick="() => SelectItem(item)">
+                                                                    @onclick="() => SelectItem(item)"
+                                                                    @ondblclick="() => EditItemRow(item)">
                                                     <td class="font-monospace text-primary">@item.ItemID</td>
                                                     <td>@item.ItemGroup</td>
                                                     <td>@item.ItemName</td>
@@ -287,12 +294,6 @@
     </Item>
     <Item class="win11-menu-item" OnClick="@AssignAllProcesses">
         <i class="fas fa-spinner fa-fw win11-icon"></i> Assign All Processes
-    </Item>
-    <Item class="win11-menu-item" OnClick="@ViewSales">
-        <i class="fas fa-dollar-sign fa-fw win11-icon"></i> View Sales
-    </Item>
-    <Item class="win11-menu-item" OnClick="@ViewPurchases">
-        <i class="fas fa-shopping-cart fa-fw win11-icon"></i> View Purchases
     </Item>
     <Item class="win11-menu-item" OnClick="@ResetProcessGroups">
         <i class="fas fa-rotate-left fa-fw win11-icon"></i> Reset Process Groups

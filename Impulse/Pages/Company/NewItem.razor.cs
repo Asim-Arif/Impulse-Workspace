@@ -10,6 +10,9 @@ namespace Impulse.Pages.Company
         [Parameter]
         public string? ItemId { get; set; }
 
+        [Parameter]
+        public string? CopyFromId { get; set; }
+
         // ── Injected services ────────────────────────────────────────────────
         [Inject] public IItemService ItemService { get; set; } = default!;
         [Inject] public NavigationManager NavigationManager { get; set; } = default!;
@@ -45,7 +48,50 @@ namespace Impulse.Pages.Company
         {
             await LoadLookups();
 
-            if (!IsAdd)
+            if (!string.IsNullOrEmpty(CopyFromId))
+            {
+                var existing = await ItemService.GetItemByIdAsync(CopyFromId);
+                if (existing != null)
+                {
+                    Item = existing;
+                    Item.ItemID = string.Empty;
+                    Item.ItemName = $"{existing.ItemName} (Copy)";
+                    Item.Processes = await ItemService.GetItemProcessesAsync(CopyFromId);
+                    foreach (var p in Item.Processes)
+                    {
+                        p.EntryID = null;
+                    }
+                    Item.CatalogRefs = await ItemService.GetItemCatalogRefsAsync(CopyFromId);
+                    foreach (var cr in Item.CatalogRefs)
+                    {
+                        cr.EntryID = null;
+                    }
+
+                    SelectedCategory = Categories.FirstOrDefault(c => c.CatID == Item.CatID);
+                    SelectedItemGroup = ItemGroups.FirstOrDefault(g => g.ID == Item.GroupID);
+                    SelectedMainGroup = MainGroups.FirstOrDefault(m => m.MainGroupID == Item.MainGroupID);
+
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Info,
+                        Summary = "Item Copied",
+                        Detail = $"Details copied from '{CopyFromId}'. Enter a new Item Code and save.",
+                        Duration = 5000
+                    });
+                }
+                else
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Error,
+                        Summary = "Not Found",
+                        Detail = $"Source item '{CopyFromId}' was not found.",
+                        Duration = 4000
+                    });
+                    NavigationManager.NavigateTo("/company/items");
+                }
+            }
+            else if (!IsAdd)
             {
                 var existing = await ItemService.GetItemByIdAsync(ItemId!);
                 if (existing != null)

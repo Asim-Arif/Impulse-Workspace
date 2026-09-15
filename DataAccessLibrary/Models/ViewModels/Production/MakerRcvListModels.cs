@@ -56,7 +56,12 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string OrderNo { get; set; } = string.Empty;
         public string MasterPONo { get; set; } = string.Empty;
         public string InternalRefNo { get; set; } = string.Empty;
-        public long? IssuanceRefID { get; set; }   // VendIssued.EntryID linked
+        public long? Issuance_RefID { get; set; }   // VendIssued.EntryID linked
+        public long? IssuanceRefID
+        {
+            get => Issuance_RefID;
+            set => Issuance_RefID = value;
+        }
 
         // Classification
         public string CatID { get; set; } = string.Empty;
@@ -75,6 +80,11 @@ namespace DataAccessLibrary.Models.ViewModels.Production
 
         // Extra
         public string Employees { get; set; } = string.Empty;
+        public string Empoloyees
+        {
+            get => Employees;
+            set => Employees = value;
+        }
         public DateTime? EntryDT { get; set; }
     }
 

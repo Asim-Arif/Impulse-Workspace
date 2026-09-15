@@ -1,0 +1,771 @@
+@page "/dashboards/export-executive"
+@page "/dashboard/export-executive"
+@attribute [Authorize]
+@namespace Impulse.Pages.Dashboards.Executive
+@using Radzen
+@using Radzen.Blazor
+
+<PageTitle>Export &amp; Commercial Executive Dashboard | Impulse ERP</PageTitle>
+
+<div class="container-fluid py-2 px-3 export-dashboard-root" style="font-family: 'Calibri', 'Segoe UI', -apple-system, sans-serif; background-color: #f7f9fb; min-height: 100vh;">
+
+    <!-- ── Master Navigation & Header Bar ───────────────────────────────── -->
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+        <div class="d-flex align-items-center gap-2">
+            <a href="/dashboards/executive" class="btn btn-sm btn-light border text-secondary shadow-sm rounded-pill px-3" style="font-size: 0.78rem;">
+                <i class="fas fa-arrow-left me-1"></i> Executive Dashboards
+            </a>
+            <span class="text-muted" style="font-size: 0.8rem;">/ Export &amp; Commercial Intelligence</span>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge px-2.5 py-1 rounded-pill" style="background: rgba(0, 168, 143, 0.12); color: #007A68; font-weight: 700; font-size: 0.74rem; border: 1px solid rgba(0, 168, 143, 0.25);">
+                <i class="fas fa-circle-check me-1"></i> POWER BI SUITE
+            </span>
+            <div class="d-flex align-items-center bg-white border rounded px-2 py-1 shadow-sm" style="font-size: 0.8rem;">
+                <span class="text-secondary me-2 fw-semibold">Fiscal Period:</span>
+                <select class="form-select form-select-sm border-0 bg-transparent py-0 ps-1 pe-3 fw-bold text-dark" style="font-size: 0.8rem; box-shadow: none;" @bind="SelectedPeriod">
+                    <option value="FY 2025-2026">FY 2025-2026 (All Months)</option>
+                    <option value="H1 2025-2026">H1 (Jul - Dec)</option>
+                    <option value="H2 2025-2026">H2 (Jan - Jun)</option>
+                </select>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary px-3 fw-bold shadow-sm" @onclick="RefreshData" disabled="@IsLoading" style="border-color: #00A88F; color: #007A68;">
+                <i class="fas fa-sync-alt me-1 @(IsLoading ? "fa-spin" : "")"></i> Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- ── MAIN DASHBOARD GRID (Left KPI Rail + Visual Canvas) ──────────── -->
+    <div class="row g-2">
+
+        <!-- ═════════════════════════════════════════════════════════════════ -->
+        <!-- LEFT COLUMN: Vertical KPI Rail (~18% width on large screens)   -->
+        <!-- ═════════════════════════════════════════════════════════════════ -->
+        <div class="col-12 col-lg-2">
+            <div class="d-flex flex-column gap-2 h-100">
+
+                <!-- Header Block: KPIs -->
+                <div class="kpi-rail-card bg-white shadow-sm text-center py-2">
+                    <div class="kpi-rail-header-title">KPIs</div>
+                </div>
+
+                <!-- KPI 1: Sales & YoY -->
+                <div class="kpi-rail-card bg-white shadow-sm p-3 position-relative">
+                    <div class="kpi-rail-yoy text-success">
+                        <span class="yoy-label">YoY</span>
+                        <span class="yoy-val">@YoyGrowthPercent% &uarr;</span>
+                    </div>
+                    <div class="kpi-rail-number">@SalesActual.ToString("N0")</div>
+                    <div class="kpi-rail-label">Sales</div>
+                </div>
+
+                <!-- KPI 2: Sales Target -->
+                <div class="kpi-rail-card bg-white shadow-sm p-3 text-center">
+                    <div class="kpi-rail-number">@SalesTarget.ToString("N0")</div>
+                    <div class="kpi-rail-label">Sales Target</div>
+                </div>
+
+                <!-- KPI 3: Target Achievement (Radial Donut Gauge) -->
+                <div class="kpi-rail-card bg-white shadow-sm p-3 text-center">
+                    <div class="d-flex justify-content-center my-1">
+                        <div class="achievement-radial-wrap">
+                            <svg width="68" height="68" viewBox="0 0 68 68">
+                                <circle cx="34" cy="34" r="28" fill="none" stroke="#e9ecef" stroke-width="6" />
+                                <circle cx="34" cy="34" r="28" fill="none" stroke="#00A88F" stroke-width="6"
+                                        stroke-dasharray="176" stroke-dashoffset="0" stroke-linecap="round" />
+                                <circle cx="34" cy="34" r="22" fill="#00A88F" />
+                                <text x="34" y="38" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff" font-family="'Calibri', sans-serif">
+                                    @TargetAchievementPercent%
+                                </text>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="kpi-rail-label mt-1">Target Achievement</div>
+                </div>
+
+                <!-- KPI 4: Sales Last Year -->
+                <div class="kpi-rail-card bg-white shadow-sm p-3 text-center">
+                    <div class="kpi-rail-number">@SalesLastYear.ToString("N0")</div>
+                    <div class="kpi-rail-label">Sales Last Year</div>
+                </div>
+
+                <!-- KPI 5: Gross Profit -->
+                <div class="kpi-rail-card bg-white shadow-sm p-3 text-center">
+                    <div class="kpi-rail-number">@GrossProfit.ToString("N0")</div>
+                    <div class="kpi-rail-label">Gross Profit</div>
+                </div>
+
+                <!-- KPI 6: Gross Profit Margin -->
+                <div class="kpi-rail-card bg-white shadow-sm p-3 text-center">
+                    <div class="kpi-rail-number">@GrossProfitMarginPercent%</div>
+                    <div class="kpi-rail-label">Gross Profit Margin</div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ═════════════════════════════════════════════════════════════════ -->
+        <!-- RIGHT AREA: Multi-Tier Visual Charts (~82% width)                -->
+        <!-- ═════════════════════════════════════════════════════════════════ -->
+        <div class="col-12 col-lg-10">
+
+            <!-- ── ROW 1: Product Breakdown & 12-Month Actual vs Target ────── -->
+            <div class="row g-2 mb-2">
+
+                <!-- 1. Sales (Amount) by Product/Category -->
+                <div class="col-12 col-xl-5">
+                    <div class="chart-card bg-white shadow-sm p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="chart-card-title mb-0">Sales (Amount) by Product/Category</h6>
+                        </div>
+
+                        <!-- Legend -->
+                        <div class="d-flex align-items-center gap-3 mb-2" style="font-size: 0.68rem;">
+                            <span class="d-flex align-items-center"><span class="legend-rect me-1" style="background:#00A2E8;"></span> Above Target</span>
+                            <span class="d-flex align-items-center"><span class="legend-rect me-1" style="background:#bdc3c7;"></span> Below Target</span>
+                            <span class="d-flex align-items-center"><span class="legend-tick me-1"></span> Target</span>
+                        </div>
+
+                        <!-- Column Bars with Target Marker Ticks -->
+                        <div class="product-bars-container pt-2">
+                            <div class="d-flex justify-content-between align-items-end" style="height: 155px; border-bottom: 1px solid #ced4da; padding-bottom: 2px;">
+                                @foreach (var prod in ProductSalesList)
+                                {
+                                    <div class="d-flex flex-column align-items-center flex-grow-1" style="max-width: 18%;">
+                                        <!-- Value label on bar or above -->
+                                        <div class="bar-column-wrapper position-relative w-100 d-flex flex-column align-items-center justify-content-end" style="height: 100%;">
+                                            <!-- Target cap tick -->
+                                            <div class="target-cap-marker" style="bottom: @((prod.TargetSales / 6000.0) * 100)%;"></div>
+                                            
+                                            <!-- Bar -->
+                                            <div class="product-bar w-75 position-relative text-center" 
+                                                 style="height: @((prod.ActualSales / 6000.0) * 100)%; background-color: @(prod.IsAboveTarget ? "#00A2E8" : "#bdc3c7");"
+                                                 title="@prod.ProductName: @prod.ActualSales.ToString("N0") (Target: @prod.TargetSales.ToString("N0"))">
+                                                <span class="bar-inner-text">@prod.ActualSales</span>
+                                            </div>
+                                        </div>
+                                        <span class="x-axis-label mt-1 text-truncate" title="@prod.ProductName">@prod.ProductName</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Actual Sales vs Target (12-Month Series) -->
+                <div class="col-12 col-xl-7">
+                    <div class="chart-card bg-white shadow-sm p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <h6 class="chart-card-title mb-0">Actual Sales vs Target</h6>
+                        </div>
+
+                        <!-- Legend -->
+                        <div class="d-flex align-items-center flex-wrap gap-2 mb-2" style="font-size: 0.68rem;">
+                            <span class="d-flex align-items-center"><span class="legend-rect me-1" style="background:#00A88F;"></span> Actual &gt;= 100% of Target</span>
+                            <span class="d-flex align-items-center"><span class="legend-rect me-1" style="background:#E5A823;"></span> Actual &lt;100% and &gt;=90%</span>
+                            <span class="d-flex align-items-center"><span class="legend-rect me-1" style="background:#E74C3C;"></span> Actual &lt;90% of Target</span>
+                            <span class="d-flex align-items-center"><span class="legend-tick me-1"></span> Target</span>
+                        </div>
+
+                        <!-- Monthly Bar Chart -->
+                        <div class="monthly-bars-container pt-1">
+                            <div class="d-flex justify-content-between align-items-end" style="height: 155px; border-bottom: 1px solid #ced4da; padding-bottom: 2px;">
+                                @foreach (var m in MonthlySalesList)
+                                {
+                                    <div class="d-flex flex-column align-items-center flex-grow-1" style="max-width: 8%;">
+                                        <div class="bar-column-wrapper position-relative w-100 d-flex flex-column align-items-center justify-content-end" style="height: 100%;">
+                                            <!-- Target cap tick -->
+                                            <div class="target-cap-marker" style="bottom: @((m.Target / 2000.0) * 100)%;"></div>
+
+                                            <!-- Bar -->
+                                            <div class="monthly-bar w-75 position-relative text-center" 
+                                                 style="height: @((m.Actual / 2000.0) * 100)%; background-color: @m.StatusColor;"
+                                                 title="@m.Month: @m.Actual (Target: @m.Target)">
+                                                <span class="bar-inner-text-vertical">@m.Actual</span>
+                                            </div>
+                                        </div>
+                                        <span class="x-axis-label mt-1">@m.Month</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ── ROW 2: Regional Performance & 2 Donut Distributions ──────── -->
+            <div class="row g-2 mb-2">
+
+                <!-- 1. Sales (Amount) by Region -->
+                <div class="col-12 col-md-4">
+                    <div class="chart-card bg-white shadow-sm p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <h6 class="chart-card-title mb-0">Sales (Amount) by Region</h6>
+                        </div>
+                        <div class="d-flex align-items-center gap-3 mb-2" style="font-size: 0.68rem;">
+                            <span class="d-flex align-items-center"><span class="legend-rect me-1" style="background:#00A2E8;"></span> Actual</span>
+                            <span class="d-flex align-items-center"><span class="legend-rect me-1" style="background:#90CAF9;"></span> Target</span>
+                        </div>
+
+                        <div class="regional-bars-wrapper py-1">
+                            @foreach (var r in RegionalSalesList)
+                            {
+                                <div class="mb-2">
+                                    <div class="d-flex justify-content-between align-items-center mb-1" style="font-size: 0.72rem;">
+                                        <span class="fw-semibold text-dark">@r.Region</span>
+                                        <span class="fw-bold text-primary">@r.Target.ToString("N0")</span>
+                                    </div>
+                                    <div class="position-relative" style="height: 14px; background: #90CAF9; border-radius: 2px;">
+                                        <div style="width: @((r.Actual / (double)r.Target) * 100)%; height: 100%; background: #00A2E8; border-radius: 2px;"
+                                             title="@r.Region: Actual @r.Actual / Target @r.Target">
+                                        </div>
+                                        <span class="bar-val-overlay">@r.Actual.ToString("N0")</span>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. MAIN CATEGORY Donut Chart -->
+                <div class="col-12 col-md-4">
+                    <div class="chart-card bg-white shadow-sm p-3 h-100">
+                        <h6 class="chart-card-title mb-1 text-center" style="font-size: 0.8rem; text-transform: uppercase;">MAIN CATEGORY</h6>
+
+                        <div class="donut-visual-container position-relative text-center py-1">
+                            <svg width="190" height="135" viewBox="0 0 190 135" class="mx-auto d-block">
+                                <circle cx="95" cy="68" r="46" fill="none" stroke="#f0f3f5" stroke-width="18" />
+
+                                <!-- Segments -->
+                                <!-- Distributor (35%) Blue -->
+                                <circle cx="95" cy="68" r="46" fill="none" stroke="#2E86C1" stroke-width="18"
+                                        stroke-dasharray="289" stroke-dashoffset="101" transform="rotate(-90 95 68)" />
+                                <!-- Dealer (25%) Light Blue -->
+                                <circle cx="95" cy="68" r="46" fill="none" stroke="#5DADE2" stroke-width="18"
+                                        stroke-dasharray="289" stroke-dashoffset="216" transform="rotate(36 95 68)" />
+                                <!-- Retail (20%) Amber -->
+                                <circle cx="95" cy="68" r="46" fill="none" stroke="#F39C12" stroke-width="18"
+                                        stroke-dasharray="289" stroke-dashoffset="231" transform="rotate(126 95 68)" />
+                                <!-- Corporate (15%) Orange -->
+                                <circle cx="95" cy="68" r="46" fill="none" stroke="#E67E22" stroke-width="18"
+                                        stroke-dasharray="289" stroke-dashoffset="245" transform="rotate(198 95 68)" />
+                                <!-- Online (5%) Teal -->
+                                <circle cx="95" cy="68" r="46" fill="none" stroke="#16A085" stroke-width="18"
+                                        stroke-dasharray="289" stroke-dashoffset="274" transform="rotate(252 95 68)" />
+                            </svg>
+
+                            <!-- Callout Labels -->
+                            <div class="donut-callout d-top-right">
+                                <span class="d-block fw-bold text-dark">Distributor</span>
+                                <span class="text-muted">5,761, 35%</span>
+                            </div>
+                            <div class="donut-callout d-bottom-right">
+                                <span class="d-block fw-bold text-dark">Dealer</span>
+                                <span class="text-muted">4,115, 25%</span>
+                            </div>
+                            <div class="donut-callout d-bottom-left">
+                                <span class="d-block fw-bold text-dark">Retail</span>
+                                <span class="text-muted">3,292, 20%</span>
+                            </div>
+                            <div class="donut-callout d-top-left">
+                                <span class="d-block fw-bold text-dark">Corporate</span>
+                                <span class="text-muted">2,469, 15%</span>
+                            </div>
+                            <div class="donut-callout d-top-center">
+                                <span class="d-block fw-bold text-dark">Online</span>
+                                <span class="text-muted">823, 5%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. SALES BY CUSTOMERS Donut Chart -->
+                <div class="col-12 col-md-4">
+                    <div class="chart-card bg-white shadow-sm p-3 h-100">
+                        <h6 class="chart-card-title mb-1 text-center" style="font-size: 0.8rem; text-transform: uppercase;">SALES BY CUSTOMERS</h6>
+
+                        <div class="donut-visual-container position-relative text-center py-1">
+                            <svg width="190" height="135" viewBox="0 0 190 135" class="mx-auto d-block">
+                                <circle cx="95" cy="68" r="46" fill="none" stroke="#f0f3f5" stroke-width="18" />
+
+                                <!-- Segments -->
+                                <!-- Distributor 35% -->
+                                <circle cx="95" cy="68" r="46" fill="none" stroke="#00A88F" stroke-width="18"
+                                        stroke-dasharray="289" stroke-dashoffset="101" transform="rotate(-90 95 68)" />
+                                <!-- Dealer 25% -->
+                                <circle cx="95" cy="68" r="46" fill="none" stroke="#1E88E5" stroke-width="18"
+                                        stroke-dasharray="289" stroke-dashoffset="216" transform="rotate(36 95 68)" />
+                                <!-- Retail 20% -->
+                                <circle cx="95" cy="68" r="46" fill="none" stroke="#5E35B1" stroke-width="18"
+                                        stroke-dasharray="289" stroke-dashoffset="231" transform="rotate(126 95 68)" />
+                                <!-- Corporate 15% -->
+                                <circle cx="95" cy="68" r="46" fill="none" stroke="#FB8C00" stroke-width="18"
+                                        stroke-dasharray="289" stroke-dashoffset="245" transform="rotate(198 95 68)" />
+                                <!-- Online 5% -->
+                                <circle cx="95" cy="68" r="46" fill="none" stroke="#43A047" stroke-width="18"
+                                        stroke-dasharray="289" stroke-dashoffset="274" transform="rotate(252 95 68)" />
+                            </svg>
+
+                            <!-- Callout Labels -->
+                            <div class="donut-callout d-top-right">
+                                <span class="d-block fw-bold text-dark">Distributor</span>
+                                <span class="text-muted">5,761, 35%</span>
+                            </div>
+                            <div class="donut-callout d-bottom-right">
+                                <span class="d-block fw-bold text-dark">Dealer</span>
+                                <span class="text-muted">4,115, 25%</span>
+                            </div>
+                            <div class="donut-callout d-bottom-left">
+                                <span class="d-block fw-bold text-dark">Retail</span>
+                                <span class="text-muted">3,292, 20%</span>
+                            </div>
+                            <div class="donut-callout d-top-left">
+                                <span class="d-block fw-bold text-dark">Corporate</span>
+                                <span class="text-muted">2,469, 15%</span>
+                            </div>
+                            <div class="donut-callout d-top-center">
+                                <span class="d-block fw-bold text-dark">Online</span>
+                                <span class="text-muted">823, 5%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ── ROW 3: Sales Growth (+ / - %) & Top Items Rankings ───────── -->
+            <div class="row g-2 mb-2">
+
+                <!-- 1. Sales Growth (Diverging Waterfall / Growth Columns) -->
+                <div class="col-12 col-xl-6">
+                    <div class="chart-card bg-white shadow-sm p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <h6 class="chart-card-title mb-0">Sales Growth</h6>
+                            <span class="badge bg-light text-secondary border px-2 py-0" style="font-size: 0.68rem;">MoM %</span>
+                        </div>
+
+                        <!-- Diverging Zero-Axis Bar Chart -->
+                        <div class="growth-chart-container position-relative pt-2" style="height: 140px;">
+                            <!-- Zero Axis Line at 50% height -->
+                            <div class="zero-axis-line"></div>
+
+                            <div class="d-flex justify-content-between h-100 align-items-center">
+                                @foreach (var g in MonthlyGrowthList)
+                                {
+                                    <div class="d-flex flex-column align-items-center flex-grow-1 position-relative h-100" style="max-width: 8%;">
+                                        @if (g.IsPositive)
+                                        {
+                                            <!-- Positive Bar (from middle upwards) -->
+                                            <div class="growth-bar-pos position-absolute text-center" 
+                                                 style="bottom: 50%; height: @((g.GrowthPercent / 60.0) * 45)%; background: #00A88F;"
+                                                 title="@g.Month: +@g.GrowthPercent%">
+                                                <span class="growth-label-pos">@g.GrowthPercent%</span>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <!-- Negative Bar (from middle downwards) -->
+                                            <div class="growth-bar-neg position-absolute text-center" 
+                                                 style="top: 50%; height: @((Math.Abs(g.GrowthPercent) / 60.0) * 45)%; background: #E74C3C;"
+                                                 title="@g.Month: @g.GrowthPercent%">
+                                                <span class="growth-label-neg">@g.GrowthPercent%</span>
+                                            </div>
+                                        }
+
+                                        <!-- Month Label at bottom -->
+                                        <span class="x-axis-label position-absolute" style="bottom: 0;">@g.Month</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Top 20 items sales by QTY -->
+                <div class="col-12 col-md-6 col-xl-3">
+                    <div class="chart-card bg-white shadow-sm p-3 h-100">
+                        <h6 class="chart-card-title mb-1" style="font-size: 0.76rem;">Top 20 items sales by QTY</h6>
+                        <div class="d-flex align-items-center gap-2 mb-2" style="font-size: 0.65rem;">
+                            <span class="d-flex align-items-center"><span class="legend-rect me-1" style="background:#00A2E8;"></span> qty</span>
+                            <span class="d-flex align-items-center"><span class="legend-rect me-1" style="background:#e0e0e0;"></span> value</span>
+                        </div>
+
+                        <div class="top-ranking-bars py-1">
+                            @foreach (var item in TopItemsList)
+                            {
+                                <div class="mb-2">
+                                    <div class="d-flex justify-content-between align-items-center mb-0" style="font-size: 0.7rem;">
+                                        <span class="text-secondary">@item.RegionOrGroup</span>
+                                        <span class="fw-bold text-dark">@item.Qty.ToString("N0")</span>
+                                    </div>
+                                    <div class="progress" style="height: 10px; border-radius: 2px; background: #e0e0e0;">
+                                        <div class="progress-bar" role="progressbar" style="width: @((item.Qty / 6000.0) * 100)%; background: #00A2E8;"></div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Top 20 items sales by Value -->
+                <div class="col-12 col-md-6 col-xl-3">
+                    <div class="chart-card bg-white shadow-sm p-3 h-100">
+                        <h6 class="chart-card-title mb-1" style="font-size: 0.76rem;">Top 20 items sales by value</h6>
+                        <div class="d-flex align-items-center gap-2 mb-2" style="font-size: 0.65rem;">
+                            <span class="d-flex align-items-center"><span class="legend-rect me-1" style="background:#00A2E8;"></span> qty</span>
+                            <span class="d-flex align-items-center"><span class="legend-rect me-1" style="background:#e0e0e0;"></span> value</span>
+                        </div>
+
+                        <div class="top-ranking-bars py-1">
+                            @foreach (var item in TopItemsList)
+                            {
+                                <div class="mb-2">
+                                    <div class="d-flex justify-content-between align-items-center mb-0" style="font-size: 0.7rem;">
+                                        <span class="text-secondary">@item.RegionOrGroup</span>
+                                        <span class="fw-bold text-dark">@item.Qty.ToString("N0")</span>
+                                    </div>
+                                    <div class="progress" style="height: 10px; border-radius: 2px; background: #e0e0e0;">
+                                        <div class="progress-bar" role="progressbar" style="width: @((item.Qty / 6000.0) * 100)%; background: #00A2E8;"></div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ── ROW 4: Bottom Demand & Supply Trend Lines (Dual-Axis) ───── -->
+            <div class="row g-2">
+
+                <!-- 1. Demand and Supply by QTY -->
+                <div class="col-12 col-xl-6">
+                    <div class="chart-card bg-white shadow-sm p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="d-flex align-items-center gap-2" style="font-size: 0.7rem;">
+                                <span class="d-flex align-items-center text-success"><i class="fas fa-circle me-1" style="font-size:0.5rem; color:#00A88F;"></i> Supply</span>
+                                <span class="d-flex align-items-center" style="color:#E67E22;"><i class="fas fa-circle me-1" style="font-size:0.5rem;"></i> Demand</span>
+                            </span>
+                            <h6 class="chart-card-title mb-0" style="font-size: 0.76rem; text-transform: uppercase;">DEMAND AND SUPPLY BY QTY</h6>
+                            <span class="badge bg-light text-secondary border px-1" style="font-size: 0.65rem;">Scale: 800K</span>
+                        </div>
+
+                        <!-- Dual Line SVG Chart -->
+                        <div class="trend-chart-wrapper position-relative pt-1">
+                            <svg width="100%" height="150" viewBox="0 0 540 150" preserveAspectRatio="none" class="w-100">
+                                <!-- Horizontal Grid Lines -->
+                                <line x1="40" y1="20" x2="510" y2="20" stroke="#f1f3f5" stroke-width="1" />
+                                <line x1="40" y1="50" x2="510" y2="50" stroke="#f1f3f5" stroke-width="1" />
+                                <line x1="40" y1="80" x2="510" y2="80" stroke="#f1f3f5" stroke-width="1" />
+                                <line x1="40" y1="110" x2="510" y2="110" stroke="#f1f3f5" stroke-width="1" />
+                                <line x1="40" y1="130" x2="510" y2="130" stroke="#ced4da" stroke-width="1" />
+
+                                <!-- Left Axis Labels (K) -->
+                                <text x="35" y="24" text-anchor="end" font-size="8" fill="#95a5a6">800K</text>
+                                <text x="35" y="54" text-anchor="end" font-size="8" fill="#95a5a6">600K</text>
+                                <text x="35" y="84" text-anchor="end" font-size="8" fill="#95a5a6">400K</text>
+                                <text x="35" y="114" text-anchor="end" font-size="8" fill="#95a5a6">200K</text>
+                                <text x="35" y="133" text-anchor="end" font-size="8" fill="#95a5a6">0</text>
+
+                                <!-- Right Axis Labels -->
+                                <text x="515" y="24" text-anchor="start" font-size="8" fill="#95a5a6">8</text>
+                                <text x="515" y="54" text-anchor="start" font-size="8" fill="#95a5a6">6</text>
+                                <text x="515" y="84" text-anchor="start" font-size="8" fill="#95a5a6">4</text>
+                                <text x="515" y="114" text-anchor="start" font-size="8" fill="#95a5a6">2</text>
+                                <text x="515" y="133" text-anchor="start" font-size="8" fill="#95a5a6">0</text>
+
+                                <!-- Demand Line (Orange) -->
+                                <polyline points="50,68 85,82 125,68 165,54 205,40 245,20 285,82 325,110 365,124 405,40 445,68 485,40 510,68"
+                                          fill="none" stroke="#E67E22" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+
+                                <!-- Supply Line (Green) -->
+                                <polyline points="50,71 85,124 125,124 165,82 205,76 245,68 285,110 325,127 365,125 405,88 445,62 485,80 510,98"
+                                          fill="none" stroke="#00A88F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+
+                                <!-- Data markers Demand (Orange circles) -->
+                                <circle cx="50" cy="68" r="3" fill="#E67E22" /><circle cx="85" cy="82" r="3" fill="#E67E22" />
+                                <circle cx="125" cy="68" r="3" fill="#E67E22" /><circle cx="165" cy="54" r="3" fill="#E67E22" />
+                                <circle cx="205" cy="40" r="3" fill="#E67E22" /><circle cx="245" cy="20" r="3" fill="#E67E22" />
+                                <circle cx="285" cy="82" r="3" fill="#E67E22" /><circle cx="325" cy="110" r="3" fill="#E67E22" />
+                                <circle cx="365" cy="124" r="3" fill="#E67E22" /><circle cx="405" cy="40" r="3" fill="#E67E22" />
+                                <circle cx="445" cy="68" r="3" fill="#E67E22" /><circle cx="485" cy="40" r="3" fill="#E67E22" />
+                                <circle cx="510" cy="68" r="3" fill="#E67E22" />
+
+                                <!-- Data markers Supply (Green circles) -->
+                                <circle cx="50" cy="71" r="3" fill="#00A88F" /><circle cx="85" cy="124" r="3" fill="#00A88F" />
+                                <circle cx="125" cy="124" r="3" fill="#00A88F" /><circle cx="165" cy="82" r="3" fill="#00A88F" />
+                                <circle cx="205" cy="76" r="3" fill="#00A88F" /><circle cx="245" cy="68" r="3" fill="#00A88F" />
+                                <circle cx="285" cy="110" r="3" fill="#00A88F" /><circle cx="325" cy="127" r="3" fill="#00A88F" />
+                                <circle cx="365" cy="125" r="3" fill="#00A88F" /><circle cx="405" cy="88" r="3" fill="#00A88F" />
+                                <circle cx="445" cy="62" r="3" fill="#00A88F" /><circle cx="485" cy="80" r="3" fill="#00A88F" />
+                                <circle cx="510" cy="98" r="3" fill="#00A88F" />
+                            </svg>
+
+                            <!-- Timeline X Labels -->
+                            <div class="d-flex justify-content-between text-muted px-4" style="font-size: 0.62rem;">
+                                <span>Aug 2025</span><span>Nov 2025</span><span>Jan 2026</span><span>Apr 2026</span><span>Jul 2026</span><span>Aug 2026</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Demand and Supply by VALUE -->
+                <div class="col-12 col-xl-6">
+                    <div class="chart-card bg-white shadow-sm p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="d-flex align-items-center gap-2" style="font-size: 0.7rem;">
+                                <span class="d-flex align-items-center text-success"><i class="fas fa-circle me-1" style="font-size:0.5rem; color:#00A88F;"></i> Supply</span>
+                                <span class="d-flex align-items-center" style="color:#E67E22;"><i class="fas fa-circle me-1" style="font-size:0.5rem;"></i> Demand</span>
+                            </span>
+                            <h6 class="chart-card-title mb-0" style="font-size: 0.76rem; text-transform: uppercase;">DEMAND AND SUPPLY BY VALUE</h6>
+                            <span class="badge bg-light text-secondary border px-1" style="font-size: 0.65rem;">Scale: $800K</span>
+                        </div>
+
+                        <!-- Dual Line SVG Chart -->
+                        <div class="trend-chart-wrapper position-relative pt-1">
+                            <svg width="100%" height="150" viewBox="0 0 540 150" preserveAspectRatio="none" class="w-100">
+                                <!-- Horizontal Grid Lines -->
+                                <line x1="40" y1="20" x2="510" y2="20" stroke="#f1f3f5" stroke-width="1" />
+                                <line x1="40" y1="50" x2="510" y2="50" stroke="#f1f3f5" stroke-width="1" />
+                                <line x1="40" y1="80" x2="510" y2="80" stroke="#f1f3f5" stroke-width="1" />
+                                <line x1="40" y1="110" x2="510" y2="110" stroke="#f1f3f5" stroke-width="1" />
+                                <line x1="40" y1="130" x2="510" y2="130" stroke="#ced4da" stroke-width="1" />
+
+                                <!-- Left Axis Labels -->
+                                <text x="35" y="24" text-anchor="end" font-size="8" fill="#95a5a6">800K</text>
+                                <text x="35" y="54" text-anchor="end" font-size="8" fill="#95a5a6">600K</text>
+                                <text x="35" y="84" text-anchor="end" font-size="8" fill="#95a5a6">400K</text>
+                                <text x="35" y="114" text-anchor="end" font-size="8" fill="#95a5a6">200K</text>
+                                <text x="35" y="133" text-anchor="end" font-size="8" fill="#95a5a6">0</text>
+
+                                <!-- Right Axis Labels -->
+                                <text x="515" y="24" text-anchor="start" font-size="8" fill="#95a5a6">8</text>
+                                <text x="515" y="54" text-anchor="start" font-size="8" fill="#95a5a6">6</text>
+                                <text x="515" y="84" text-anchor="start" font-size="8" fill="#95a5a6">4</text>
+                                <text x="515" y="114" text-anchor="start" font-size="8" fill="#95a5a6">2</text>
+                                <text x="515" y="133" text-anchor="start" font-size="8" fill="#95a5a6">0</text>
+
+                                <!-- Demand Line (Orange) -->
+                                <polyline points="50,68 85,82 125,68 165,54 205,40 245,20 285,82 325,110 365,124 405,40 445,68 485,40 510,68"
+                                          fill="none" stroke="#E67E22" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+
+                                <!-- Supply Line (Green) -->
+                                <polyline points="50,71 85,124 125,124 165,82 205,76 245,68 285,110 325,127 365,125 405,88 445,62 485,80 510,98"
+                                          fill="none" stroke="#00A88F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+
+                                <!-- Data markers -->
+                                <circle cx="50" cy="68" r="3" fill="#E67E22" /><circle cx="85" cy="82" r="3" fill="#E67E22" />
+                                <circle cx="125" cy="68" r="3" fill="#E67E22" /><circle cx="165" cy="54" r="3" fill="#E67E22" />
+                                <circle cx="205" cy="40" r="3" fill="#E67E22" /><circle cx="245" cy="20" r="3" fill="#E67E22" />
+                                <circle cx="285" cy="82" r="3" fill="#E67E22" /><circle cx="325" cy="110" r="3" fill="#E67E22" />
+                                <circle cx="365" cy="124" r="3" fill="#E67E22" /><circle cx="405" cy="40" r="3" fill="#E67E22" />
+                                <circle cx="445" cy="68" r="3" fill="#E67E22" /><circle cx="485" cy="40" r="3" fill="#E67E22" />
+                                <circle cx="510" cy="68" r="3" fill="#E67E22" />
+
+                                <circle cx="50" cy="71" r="3" fill="#00A88F" /><circle cx="85" cy="124" r="3" fill="#00A88F" />
+                                <circle cx="125" cy="124" r="3" fill="#00A88F" /><circle cx="165" cy="82" r="3" fill="#00A88F" />
+                                <circle cx="205" cy="76" r="3" fill="#00A88F" /><circle cx="245" cy="68" r="3" fill="#00A88F" />
+                                <circle cx="285" cy="110" r="3" fill="#00A88F" /><circle cx="325" cy="127" r="3" fill="#00A88F" />
+                                <circle cx="365" cy="125" r="3" fill="#00A88F" /><circle cx="405" cy="88" r="3" fill="#00A88F" />
+                                <circle cx="445" cy="62" r="3" fill="#00A88F" /><circle cx="485" cy="80" r="3" fill="#00A88F" />
+                                <circle cx="510" cy="98" r="3" fill="#00A88F" />
+                            </svg>
+
+                            <!-- Timeline X Labels -->
+                            <div class="d-flex justify-content-between text-muted px-4" style="font-size: 0.62rem;">
+                                <span>Aug 2025</span><span>Nov 2025</span><span>Jan 2026</span><span>Apr 2026</span><span>Jul 2026</span><span>Aug 2026</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<style>
+    .export-dashboard-root {
+        color: #2c3e50;
+    }
+
+    /* Left KPI Rail Cards */
+    .kpi-rail-card {
+        border-radius: 6px;
+        border: 1px solid #e9ecef;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .kpi-rail-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.06) !important;
+    }
+    .kpi-rail-header-title {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #555;
+        letter-spacing: 0.5px;
+    }
+    .kpi-rail-number {
+        font-size: 1.6rem;
+        font-weight: 800;
+        color: #2c3e50;
+        letter-spacing: -0.5px;
+        line-height: 1.1;
+    }
+    .kpi-rail-label {
+        font-size: 0.76rem;
+        color: #7f8c8d;
+        font-weight: 600;
+    }
+    .kpi-rail-yoy {
+        position: absolute;
+        top: 10px;
+        right: 12px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        line-height: 1.1;
+        text-align: right;
+    }
+    .kpi-rail-yoy .yoy-label {
+        display: block;
+        font-size: 0.64rem;
+        color: #95a5a6;
+    }
+
+    /* Common Chart Cards */
+    .chart-card {
+        border-radius: 6px;
+        border: 1px solid #e9ecef;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .chart-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.06) !important;
+    }
+    .chart-card-title {
+        font-size: 0.84rem;
+        font-weight: 700;
+        color: #2c3e50;
+    }
+    .legend-rect {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 1px;
+    }
+    .legend-tick {
+        display: inline-block;
+        width: 12px;
+        height: 3px;
+        background-color: #000000;
+    }
+    .target-cap-marker {
+        position: absolute;
+        left: 5%;
+        width: 90%;
+        height: 2px;
+        background-color: #000000;
+        z-index: 3;
+    }
+
+    /* Column Bars */
+    .product-bar {
+        border-radius: 2px 2px 0 0;
+        transition: height 0.25s ease;
+    }
+    .monthly-bar {
+        border-radius: 2px 2px 0 0;
+        transition: height 0.25s ease;
+    }
+    .bar-inner-text {
+        font-size: 0.68rem;
+        color: #ffffff;
+        font-weight: 700;
+        display: block;
+        padding-top: 4px;
+    }
+    .bar-inner-text-vertical {
+        font-size: 0.58rem;
+        color: #ffffff;
+        font-weight: 700;
+        display: block;
+        padding-top: 3px;
+        transform: rotate(-90deg);
+        transform-origin: center;
+        margin-top: 8px;
+    }
+    .x-axis-label {
+        font-size: 0.65rem;
+        color: #6c757d;
+        font-weight: 600;
+    }
+
+    /* Regional Bars */
+    .bar-val-overlay {
+        position: absolute;
+        left: 6px;
+        top: 0;
+        font-size: 0.65rem;
+        color: #ffffff;
+        font-weight: 700;
+        line-height: 14px;
+    }
+
+    /* Donut Callouts */
+    .donut-callout {
+        position: absolute;
+        font-size: 0.64rem;
+        line-height: 1.15;
+    }
+    .d-top-right { top: 6px; right: 8px; text-align: right; }
+    .d-bottom-right { bottom: 6px; right: 8px; text-align: right; }
+    .d-bottom-left { bottom: 6px; left: 8px; text-align: left; }
+    .d-top-left { top: 6px; left: 8px; text-align: left; }
+    .d-top-center { top: 0px; left: 50%; transform: translateX(-50%); text-align: center; }
+
+    /* Growth Diverging Chart */
+    .zero-axis-line {
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background-color: #ced4da;
+        z-index: 1;
+    }
+    .growth-bar-pos {
+        width: 14px;
+        border-radius: 2px 2px 0 0;
+        z-index: 2;
+    }
+    .growth-bar-neg {
+        width: 14px;
+        border-radius: 0 0 2px 2px;
+        z-index: 2;
+    }
+    .growth-label-pos {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.58rem;
+        font-weight: 700;
+        color: #00A88F;
+        white-space: nowrap;
+    }
+    .growth-label-neg {
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.58rem;
+        font-weight: 700;
+        color: #E74C3C;
+        white-space: nowrap;
+    }
+</style>
