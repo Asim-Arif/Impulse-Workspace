@@ -254,7 +254,7 @@ namespace DataAccessLibrary.DAC.Payroll
                 emp.RelativeEmpID, emp.Sr, emp.IntDepartmentId, emp.IntJobTitleId, emp.IntGenderId,
                 emp.IntGuarantorId, emp.EmpCodes, emp.IntMeritalStatusId, emp.IntBloodGroupId,
                 emp.IntReligionId, emp.StrTitle, emp.StrCity, emp.StrProvince, emp.StrEmail, emp.StrFax,
-                emp.StrCast, emp.TempEmp, emp.Pay_Full_Salary, emp.CNIC_PDF, emp.CNIC_PDF_FileName,
+                emp.StrCast, TempEmp = emp.TempEmp ?? false, emp.Pay_Full_Salary, emp.CNIC_PDF, emp.CNIC_PDF_FileName,
                 emp.Caste, emp.Maslak
             };
 

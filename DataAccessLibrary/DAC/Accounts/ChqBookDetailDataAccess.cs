@@ -76,9 +76,7 @@ namespace DataAccessLibrary.DAC.Accounts
                                 Chqs = chqbook.Chqs,
                                 ManualNo = chqbook.ManualNo,
                                 ChqBookDetail = chqbook.ChqBookDetail,
-                                AccNo = chqbook.AccNo,
-                                UserName = chqbook.UserName,
-                                MachineName = chqbook.MachineName
+                                AccNo = chqbook.AccNo
                             },
                             commandType: CommandType.StoredProcedure, transaction: transaction
                         );
@@ -96,9 +94,9 @@ namespace DataAccessLibrary.DAC.Accounts
                             transaction.Rollback();
                             _logger.LogError(
                                 ex,
-                                "Error: {ErrorMessage}",
+                                "Error saving cheque book for account {AccNo} starting from {StartingFrom}: {ErrorMessage}",
+                                chqbook.AccNo,
                                 chqbook.StartingFrom,
-                                chqbook.Chqs,
                                 ex.Message
                             );
                             throw;

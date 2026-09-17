@@ -26,6 +26,7 @@ namespace Impulse.Pages.Company
         public List<ItemMainGroupModel> MainGroups { get; set; } = new();
         public List<UnitModel> Units { get; set; } = new();
         public List<ItemTypeModel> ItemTypes { get; set; } = new();
+        public List<ForeignCatalogLookupModel> ForeignCatalogs { get; set; } = new();
 
         public ItemCategoryModel? SelectedCategory { get; set; }
         public ItemGroupModel? SelectedItemGroup { get; set; }
@@ -34,13 +35,6 @@ namespace Impulse.Pages.Company
         public string ActiveTab { get; set; } = "GeneralInfo";
         public bool IsSaving { get; set; }
         public bool IsAdd => string.IsNullOrEmpty(ItemId);
-
-        // ── ItemType helper bridges byte? to select string value ─────────────
-        public string ItemTypeHelper
-        {
-            get => Item.ItemType?.ToString() ?? string.Empty;
-            set => Item.ItemType = byte.TryParse(value, out var b) ? b : null;
-        }
 
         // ── Lifecycle ────────────────────────────────────────────────────────
 
@@ -65,6 +59,21 @@ namespace Impulse.Pages.Company
                     foreach (var cr in Item.CatalogRefs)
                     {
                         cr.EntryID = null;
+                    }
+                    Item.RMComponents = await ItemService.GetItemRMComponentsAsync(CopyFromId);
+                    foreach (var rc in Item.RMComponents)
+                    {
+                        rc.EntryID = null;
+                    }
+                    Item.LookAlikes = await ItemService.GetItemLookAlikesAsync(CopyFromId);
+                    foreach (var l in Item.LookAlikes)
+                    {
+                        l.EntryID = null;
+                    }
+                    Item.SetDetails = await ItemService.GetItemSetDetailsAsync(CopyFromId);
+                    foreach (var s in Item.SetDetails)
+                    {
+                        s.EntryID = null;
                     }
 
                     SelectedCategory = Categories.FirstOrDefault(c => c.CatID == Item.CatID);
@@ -97,8 +106,11 @@ namespace Impulse.Pages.Company
                 if (existing != null)
                 {
                     Item = existing;
-                    Item.Processes   = await ItemService.GetItemProcessesAsync(ItemId!);
-                    Item.CatalogRefs = await ItemService.GetItemCatalogRefsAsync(ItemId!);
+                    Item.Processes    = await ItemService.GetItemProcessesAsync(ItemId!);
+                    Item.CatalogRefs  = await ItemService.GetItemCatalogRefsAsync(ItemId!);
+                    Item.RMComponents = await ItemService.GetItemRMComponentsAsync(ItemId!);
+                    Item.LookAlikes   = await ItemService.GetItemLookAlikesAsync(ItemId!);
+                    Item.SetDetails   = await ItemService.GetItemSetDetailsAsync(ItemId!);
 
                     SelectedCategory  = Categories.FirstOrDefault(c => c.CatID       == Item.CatID);
                     SelectedItemGroup = ItemGroups.FirstOrDefault(g => g.ID          == Item.GroupID);
@@ -127,14 +139,16 @@ namespace Impulse.Pages.Company
                 var mains  = ItemService.GetMainGroupsAsync();
                 var units  = ItemService.GetUnitsAsync();
                 var types  = ItemService.GetItemTypesAsync();
+                var foreignCatalogs = ItemService.GetForeignCatalogsLookupAsync();
 
-                await Task.WhenAll(cats, groups, mains, units, types);
+                await Task.WhenAll(cats, groups, mains, units, types, foreignCatalogs);
 
                 Categories = await cats;
                 ItemGroups = await groups;
                 MainGroups = await mains;
                 Units      = await units;
                 ItemTypes  = await types;
+                ForeignCatalogs = await foreignCatalogs;
             }
             catch (Exception ex)
             {
@@ -185,6 +199,18 @@ namespace Impulse.Pages.Company
         // ── Tab navigation ────────────────────────────────────────────────────
 
         public void ChangeTab(string tab) => ActiveTab = tab;
+
+        public void OnItemTypeChanged(ChangeEventArgs e)
+        {
+            if (int.TryParse(e.Value?.ToString(), out int val))
+            {
+                Item.ItemType = val;
+                if (Item.ItemType != 2 && ActiveTab == "SetDetail")
+                {
+                    ActiveTab = "GeneralInfo";
+                }
+            }
+        }
 
         // ── Save / Cancel ─────────────────────────────────────────────────────
 

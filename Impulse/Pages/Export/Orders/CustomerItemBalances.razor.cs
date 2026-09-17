@@ -231,7 +231,7 @@ namespace Impulse.Pages.Export.Orders
                 var request = new ReportRequest
                 {
                     ReportName = "OrderItemBalances.rpt",
-                    SelectionFormula = $"{{VFOrderItems.CustCode}}='{selectedCustomer.CustCode}' AND ({{VFOrderItems.Qty}}>{{VFOrderItems.ShippedQty}}) AND {{VFOrderItems.CustCode}} NOT IN('Stock')"
+                    SelectionFormula = $"{{VFOrderItems.CustCode}}='{selectedCustomer.CustCode}' AND ({{VFOrderItems.Qty}}>{{VFOrderItems.ShippedQty}}) AND NOT ({{VFOrderItems.CustCode}} IN ['Stock'])"
                 };
                 await ReportNavigation.PrintReportAsync(request);
             }

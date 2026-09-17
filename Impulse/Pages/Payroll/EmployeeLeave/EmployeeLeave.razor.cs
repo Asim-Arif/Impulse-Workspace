@@ -289,11 +289,7 @@ namespace Impulse.Pages.Payroll.EmployeeLeave
                 await ReportNavigationService.PrintReportAsync(new ReportRequest
                 {
                     ReportName = ReportNames.Payroll.EmpLeaveBalanceMonthly,
-                    SelectionFormula = selFormula,
-                    Parameters = new Dictionary<string, object>
-                    {
-                        { "@ForDate", Input.FromDate.ToString("dd-MMM-yyyy") }
-                    }
+                    SelectionFormula = selFormula
                 });
             }
             catch (Exception ex)

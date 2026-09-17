@@ -13,6 +13,16 @@ namespace Impulse.Services.Company
         Task<bool> ItemIdExistsAsync(string itemId);
         Task<List<ItemProcessModel>> GetItemProcessesAsync(string itemId);
         Task<List<ItemCatalogRefModel>> GetItemCatalogRefsAsync(string itemId);
+        Task<List<ItemRMComponentModel>> GetItemRMComponentsAsync(string itemId);
+        Task<List<ItemLookAlikeModel>> GetItemLookAlikesAsync(string itemId);
+        Task<List<ItemSetDetailModel>> GetItemSetDetailsAsync(string itemId);
+        Task<List<ProcessGroupLookupModel>> GetProcessGroupsLookupAsync();
+        Task<List<ProcessItemLookupModel>> GetProcessesLookupAsync(int? groupId = null);
+        Task<(int? GroupId, string? GroupName)> GetItemProcessFamilyAsync(string itemId);
+        Task<List<ForeignCatalogLookupModel>> GetForeignCatalogsLookupAsync();
+        Task<List<MaterialLookupModel>> GetMaterialLookupsAsync();
+        Task<List<ItemSearchLookupModel>> GetItemSearchLookupsAsync();
+        Task<List<ItemSetLookupModel>> GetItemSetLookupsAsync();
         Task<bool> SaveItemAsync(ItemDto item, bool isAdd);
     }
 }

@@ -1,0 +1,318 @@
+@using DataAccessLibrary.Models.ViewModels.Company
+@using Impulse.Services.Company
+@using Blazored.Typeahead
+@inject IItemService ItemService
+@inject Radzen.NotificationService NotificationService
+
+<div class="rm-components-container">
+
+    <fieldset class="border rounded p-3 mb-3" style="background: rgba(255, 255, 255, 0.6); border-color: #dee2e6 !important;">
+        <legend class="float-none w-auto px-2 fw-bold text-secondary mb-2" style="font-size: 0.92rem;">
+            <i class="fas fa-cubes me-1 text-primary"></i> RM Components
+        </legend>
+
+        @* ── Top Entry Row (Process, Material, Quantity) ── *@
+        <div class="row g-2 mb-3 align-items-end" style="position: relative !important; z-index: 9999 !important;">
+            
+            @* 1. Process Selector (Only processes added to this item) *@
+            <div class="col-12 col-md-4">
+                <label class="form-label mb-1 fw-semibold text-secondary" style="font-size: 0.85rem;">
+                    Process <span class="text-danger">*</span>
+                </label>
+                @if (AvailableProcesses.Any())
+                {
+                    <select class="form-select form-select-sm" style="height: 35px;" @bind="SelectedProcessId">
+                        <option value="0">&lt;Select Process&gt;</option>
+                        @foreach (var p in AvailableProcesses)
+                        {
+                            <option value="@p.ProcessID">@(string.IsNullOrEmpty(p.Description) ? $"Process #{p.ProcessID}" : p.Description)</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <select class="form-select form-select-sm text-muted" style="height: 35px;" disabled>
+                        <option value="0">&lt;No processes configured in Processes tab&gt;</option>
+                    </select>
+                    <small class="text-danger" style="font-size: 0.76rem;">
+                        <i class="fas fa-exclamation-circle me-1"></i>Add processes on the Processes tab first.
+                    </small>
+                }
+            </div>
+
+            @* 2. Material Selector (Raw Material or Semi-Finished) *@
+            <div class="col-12 col-md-5">
+                <label class="form-label mb-1 fw-semibold text-secondary" style="font-size: 0.85rem;">
+                    Material <span class="text-danger">*</span>
+                </label>
+                <BlazoredTypeahead SearchMethod="SearchMaterials"
+                                   EnableDropDown="true"
+                                   Data="MaterialLookups"
+                                   TValue="MaterialLookupModel"
+                                   TItem="MaterialLookupModel"
+                                   Value="SelectedMaterial"
+                                   ValueChanged="OnMaterialSelected"
+                                   ValueExpression="@(() => SelectedMaterial)"
+                                   Placeholder="Search material by code or name..."
+                                   MaximumSuggestions="1000">
+                    <SelectedTemplate Context="mat">
+                        <span class="badge @(mat.IsRawMaterial ? "bg-primary-subtle text-primary border border-primary-subtle" : "bg-warning-subtle text-dark border border-warning-subtle") me-1" style="font-size: 0.72rem;">
+                            @(mat.IsRawMaterial ? "RM" : "SF")
+                        </span>
+                        <strong>[@mat.MaterialCode]</strong> @mat.MaterialName
+                    </SelectedTemplate>
+                    <ResultTemplate Context="mat">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge @(mat.IsRawMaterial ? "bg-primary-subtle text-primary border border-primary-subtle" : "bg-warning-subtle text-dark border border-warning-subtle") me-1" style="font-size: 0.72rem;">
+                                    @(mat.IsRawMaterial ? "RM" : "SF")
+                                </span>
+                                <strong>[@mat.MaterialCode]</strong> @mat.MaterialName
+                            </div>
+                        </div>
+                    </ResultTemplate>
+                </BlazoredTypeahead>
+            </div>
+
+            @* 3. Quantity Input & Add Button *@
+            <div class="col-12 col-md-3">
+                <label class="form-label mb-1 fw-semibold text-secondary" style="font-size: 0.85rem;">
+                    Quantity <span class="text-danger">*</span>
+                </label>
+                <div class="d-flex align-items-center gap-1">
+                    <input type="number" step="any" min="0.0001" class="form-control form-control-sm text-end"
+                           style="height: 35px;"
+                           @bind="QuantityInput"
+                           @bind:event="oninput"
+                           @onkeydown="OnQuantityKeyDown"
+                           placeholder="Qty" />
+                    <button type="button" class="btn btn-primary btn-sm px-3 d-flex align-items-center"
+                            style="height: 35px;"
+                            @onclick="AddRMComponent"
+                            title="Add RM Component">
+                        <i class="fas fa-plus me-1"></i> Add
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        @* ── Components Grid (LVRM) ── *@
+        <div class="table-responsive border rounded bg-white" style="position: relative !important; z-index: 1 !important; min-height: 280px; max-height: 480px; overflow-y: auto;">
+            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                    <tr>
+                        <th style="width: 30%;">Process</th>
+                        <th style="width: 45%;">Material</th>
+                        <th style="width: 15%;" class="text-end">Quantity</th>
+                        <th style="width: 10%;" class="text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Item.RMComponents == null || !Item.RMComponents.Any())
+                    {
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-5">
+                                <i class="fas fa-cubes fa-2x text-black-50 d-block mb-2"></i>
+                                <em>No RM components added. Select a process, material, and quantity above to add.</em>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var comp in Item.RMComponents)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="fw-semibold text-dark">
+                                        @(string.IsNullOrEmpty(comp.ProcessName) ? $"Process #{comp.ProcessID}" : comp.ProcessName)
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge @(comp.IsRawMaterial ? "bg-primary-subtle text-primary border border-primary-subtle" : "bg-warning-subtle text-dark border border-warning-subtle") me-1" style="font-size: 0.72rem;">
+                                        @(comp.IsRawMaterial ? "RM" : "SF")
+                                    </span>
+                                    <span class="fw-bold text-dark">[@comp.MaterialCode]</span>
+                                    <span class="text-secondary ms-1">@comp.MaterialName</span>
+                                </td>
+                                <td class="text-end font-monospace fw-semibold">
+                                    @(comp.Qty?.ToString("G29") ?? "0")
+                                    @if (!string.IsNullOrEmpty(comp.Unit))
+                                    {
+                                        <small class="text-muted ms-1">@comp.Unit</small>
+                                    }
+                                </td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-link text-danger p-0"
+                                            @onclick="() => RemoveComponent(comp)"
+                                            title="Remove component">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+    </fieldset>
+
+</div>
+
+<style>
+    .rm-components-container .blazored-typeahead {
+        height: 35px !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public ItemDto Item { get; set; } = default!;
+
+    private List<MaterialLookupModel> MaterialLookups { get; set; } = new();
+    private MaterialLookupModel? SelectedMaterial { get; set; }
+    private int SelectedProcessId { get; set; }
+    private decimal? QuantityInput { get; set; }
+
+    private IEnumerable<ItemProcessModel> AvailableProcesses =>
+        Item.Processes?.Where(p => p.ProcessID > 0) ?? Enumerable.Empty<ItemProcessModel>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            MaterialLookups = await ItemService.GetMaterialLookupsAsync();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"Failed to load materials: {ex.Message}",
+                Duration = 4000
+            });
+        }
+    }
+
+    private Task<IEnumerable<MaterialLookupModel>> SearchMaterials(string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return Task.FromResult(MaterialLookups.AsEnumerable());
+
+        var filtered = MaterialLookups.Where(m =>
+            (!string.IsNullOrEmpty(m.MaterialCode) && m.MaterialCode.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
+            (!string.IsNullOrEmpty(m.MaterialName) && m.MaterialName.Contains(searchText, StringComparison.OrdinalIgnoreCase)));
+
+        return Task.FromResult(filtered);
+    }
+
+    private void OnMaterialSelected(MaterialLookupModel? material)
+    {
+        SelectedMaterial = material;
+    }
+
+    private async Task OnQuantityKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await AddRMComponent();
+        }
+    }
+
+    private Task AddRMComponent()
+    {
+        if (SelectedProcessId <= 0)
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Warning,
+                Summary = "Process Required",
+                Detail = "Please select a process from the list.",
+                Duration = 3000
+            });
+            return Task.CompletedTask;
+        }
+
+        if (SelectedMaterial == null || string.IsNullOrEmpty(SelectedMaterial.MaterialCode))
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Warning,
+                Summary = "Material Required",
+                Detail = "Please select a raw material or semi-finished component.",
+                Duration = 3000
+            });
+            return Task.CompletedTask;
+        }
+
+        if (!QuantityInput.HasValue || QuantityInput.Value <= 0)
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Warning,
+                Summary = "Invalid Quantity",
+                Detail = "Please enter a valid quantity greater than 0.",
+                Duration = 3000
+            });
+            return Task.CompletedTask;
+        }
+
+        // Duplicate check (matching legacy: cannot add the same material code twice)
+        if (Item.RMComponents.Any(c => string.Equals(c.MaterialCode, SelectedMaterial.MaterialCode, StringComparison.OrdinalIgnoreCase)))
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Warning,
+                Summary = "Duplicate Material",
+                Detail = $"Material '{SelectedMaterial.MaterialCode}' is already added.",
+                Duration = 3000
+            });
+            return Task.CompletedTask;
+        }
+
+        var process = AvailableProcesses.FirstOrDefault(p => p.ProcessID == SelectedProcessId);
+
+        var newComp = new ItemRMComponentModel
+        {
+            ItemID = Item.ItemID,
+            ProcessID = SelectedProcessId,
+            ProcessName = process?.Description,
+            RMID = SelectedMaterial.RMID,
+            MaterialCode = SelectedMaterial.MaterialCode,
+            MaterialName = SelectedMaterial.MaterialName,
+            IsRawMaterial = SelectedMaterial.IsRawMaterial,
+            Qty = QuantityInput.Value
+        };
+
+        Item.RMComponents.Add(newComp);
+
+        // Reset input fields
+        SelectedMaterial = null;
+        QuantityInput = null;
+
+        NotificationService.Notify(new Radzen.NotificationMessage
+        {
+            Severity = Radzen.NotificationSeverity.Success,
+            Summary = "Added",
+            Detail = $"Component '{newComp.MaterialCode}' added successfully.",
+            Duration = 2000
+        });
+
+        return Task.CompletedTask;
+    }
+
+    private void RemoveComponent(ItemRMComponentModel comp)
+    {
+        Item.RMComponents.Remove(comp);
+        NotificationService.Notify(new Radzen.NotificationMessage
+        {
+            Severity = Radzen.NotificationSeverity.Info,
+            Summary = "Removed",
+            Detail = $"Component '{comp.MaterialCode}' removed.",
+            Duration = 2000
+        });
+    }
+}

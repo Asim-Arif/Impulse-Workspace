@@ -1,0 +1,299 @@
+@using DataAccessLibrary.Models.ViewModels.Company
+@inject Radzen.NotificationService NotificationService
+@inject IJSRuntime JSRuntime
+
+<div class="picture-tab-container">
+
+    <div class="row g-3">
+
+        @* ── Left Box: Tech. Drawing ── *@
+        <div class="col-md-6">
+            <fieldset class="border rounded p-3 h-100" style="background: rgba(255, 255, 255, 0.5); border-color: #dee2e6 !important;">
+                <legend class="float-none w-auto px-2 fw-bold text-secondary mb-0" style="font-size: 0.92rem;">Tech. Drawing</legend>
+                
+                <div class="d-flex flex-column align-items-center justify-content-center p-3 border rounded bg-white" 
+                     style="height: 360px; border-style: dashed !important; border-width: 2px !important; border-color: #ced4da !important;">
+                    
+                    @if (Item.TechnicalDrawing == null || Item.TechnicalDrawing.Length == 0)
+                    {
+                        <div class="text-center">
+                            <i class="fas fa-file-pdf fa-3x text-muted mb-3"></i>
+                            <div>
+                                <label for="techDrawingInput" class="text-primary fw-semibold" 
+                                       style="text-decoration: underline; cursor: pointer; font-size: 1rem;">
+                                    Click to Add PDF
+                                </label>
+                            </div>
+                            <small class="text-muted d-block mt-2">Accepted format: PDF only</small>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center w-100 px-3">
+                            <i class="fas fa-file-pdf fa-4x text-danger mb-2"></i>
+                            <h6 class="fw-bold text-dark mb-1 text-truncate" title="@(Item.TechnicalDrawingFileName ?? $"{Item.ItemID} - Technical Drawing.pdf")">
+                                @(Item.TechnicalDrawingFileName ?? $"{Item.ItemID} - Technical Drawing.pdf")
+                            </h6>
+                            <div class="text-muted small mb-3">
+                                <span class="badge bg-success-subtle text-success border border-success-subtle me-1">PDF Attached</span>
+                                <span>@((Item.TechnicalDrawing.Length / 1024.0).ToString("N1")) KB</span>
+                            </div>
+
+                            <div class="d-flex justify-content-center flex-wrap gap-2 mt-2">
+                                <button type="button" class="btn btn-sm btn-primary" @onclick="OpenPdf">
+                                    <i class="fas fa-external-link-alt me-1"></i> Open PDF
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="DownloadPdf" title="Download PDF">
+                                    <i class="fas fa-download me-1"></i> Download
+                                </button>
+                                <label for="techDrawingInput" class="btn btn-sm btn-outline-secondary mb-0" style="cursor: pointer;">
+                                    <i class="fas fa-exchange-alt me-1"></i> Change
+                                </label>
+                                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="RemoveTechDrawing">
+                                    <i class="fas fa-trash me-1"></i> Remove
+                                </button>
+                            </div>
+                        </div>
+                    }
+
+                    <InputFile id="techDrawingInput" OnChange="OnTechDrawingSelected" accept=".pdf" style="display: none;" />
+                </div>
+            </fieldset>
+        </div>
+
+        @* ── Right Box: Picture ── *@
+        <div class="col-md-6">
+            <fieldset class="border rounded p-3 h-100" style="background: rgba(255, 255, 255, 0.5); border-color: #dee2e6 !important;">
+                <legend class="float-none w-auto px-2 fw-bold text-secondary mb-0" style="font-size: 0.92rem;">Picture</legend>
+                
+                <div class="d-flex flex-column align-items-center justify-content-center p-3 border rounded bg-white" 
+                     style="height: 360px; border-style: dashed !important; border-width: 2px !important; border-color: #ced4da !important;">
+                    
+                    @if (Item.ItemPic == null || Item.ItemPic.Length == 0)
+                    {
+                        <div class="text-center">
+                            <i class="fas fa-image fa-3x text-muted mb-3"></i>
+                            <div>
+                                <label for="pictureInput" class="text-primary fw-semibold" 
+                                       style="text-decoration: underline; cursor: pointer; font-size: 1rem;">
+                                    Double click to Add
+                                </label>
+                            </div>
+                            <small class="text-muted d-block mt-2">Accepted formats: JPG, JPEG, PNG, WEBP, BMP</small>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-column align-items-center justify-content-center w-100 h-100">
+                            <img src="@Item.ItemPicBase64" alt="Item Picture" 
+                                 style="max-height: 270px; max-width: 100%; object-fit: contain; border-radius: 6px;" />
+                            
+                            <div class="d-flex justify-content-center gap-2 mt-2">
+                                <label for="pictureInput" class="btn btn-sm btn-outline-secondary mb-0">
+                                    <i class="fas fa-exchange-alt me-1"></i> Change
+                                </label>
+                                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="RemovePicture">
+                                    <i class="fas fa-trash me-1"></i> Remove
+                                </button>
+                            </div>
+                        </div>
+                    }
+
+                    <InputFile id="pictureInput" OnChange="OnPictureSelected" accept="image/*" style="display: none;" />
+                </div>
+            </fieldset>
+        </div>
+
+    </div>
+
+    @* ── View Actual Size Action Button (Below Picture panel on the right) ── *@
+    <div class="d-flex justify-content-end mt-3">
+        <button type="button" class="btn btn-outline-dark btn-sm fw-bold px-3 py-2 shadow-sm"
+                disabled="@(Item.ItemPic == null || Item.ItemPic.Length == 0)"
+                @onclick="() => ShowActualSizeModal = true">
+            <i class="fas fa-search-plus me-1"></i> View Actual Size
+        </button>
+    </div>
+
+</div>
+
+@* ── Actual Size Preview Modal ── *@
+@if (ShowActualSizeModal && !string.IsNullOrEmpty(Item.ItemPicBase64))
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.7); z-index: 1055;">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header py-2 bg-light">
+                    <h6 class="modal-title fw-bold text-dark">
+                        <i class="fas fa-image me-2 text-primary"></i>Actual Size Image Preview
+                        @if (!string.IsNullOrEmpty(Item.ItemID))
+                        {
+                            <span class="text-muted ms-2 fw-normal">[@Item.ItemID] @Item.ItemName</span>
+                        }
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="() => ShowActualSizeModal = false"></button>
+                </div>
+                <div class="modal-body text-center p-3" style="background: #f8f9fa; overflow: auto; min-height: 400px;">
+                    <img src="@Item.ItemPicBase64" alt="Actual Size Preview" style="max-width: none;" />
+                </div>
+                <div class="modal-footer py-2 bg-light">
+                    <button type="button" class="btn btn-secondary btn-sm px-3" @onclick="() => ShowActualSizeModal = false">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public ItemDto Item { get; set; } = default!;
+
+    private bool ShowActualSizeModal { get; set; }
+
+    private async Task OnPictureSelected(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+            if (file != null)
+            {
+                using var stream = file.OpenReadStream(maxAllowedSize: 15 * 1024 * 1024);
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+                Item.ItemPic = ms.ToArray();
+
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Success,
+                    Summary = "Success",
+                    Detail = "Picture uploaded successfully.",
+                    Duration = 2500
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"Failed to upload picture: {ex.Message}",
+                Duration = 4000
+            });
+        }
+    }
+
+    private void RemovePicture()
+    {
+        Item.ItemPic = null;
+        NotificationService.Notify(new Radzen.NotificationMessage
+        {
+            Severity = Radzen.NotificationSeverity.Info,
+            Summary = "Removed",
+            Detail = "Picture removed.",
+            Duration = 2000
+        });
+    }
+
+    private async Task OnTechDrawingSelected(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+            if (file != null)
+            {
+                using var stream = file.OpenReadStream(maxAllowedSize: 25 * 1024 * 1024);
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+                Item.TechnicalDrawing = ms.ToArray();
+                Item.TechnicalDrawingFileName = file.Name;
+
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Success,
+                    Summary = "Success",
+                    Detail = "Technical Drawing PDF uploaded successfully.",
+                    Duration = 2500
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"Failed to upload PDF: {ex.Message}",
+                Duration = 4000
+            });
+        }
+    }
+
+    private void RemoveTechDrawing()
+    {
+        Item.TechnicalDrawing = null;
+        Item.TechnicalDrawingFileName = null;
+        NotificationService.Notify(new Radzen.NotificationMessage
+        {
+            Severity = Radzen.NotificationSeverity.Info,
+            Summary = "Removed",
+            Detail = "Technical Drawing removed.",
+            Duration = 2000
+        });
+    }
+
+    private async Task OpenPdf()
+    {
+        try
+        {
+            if (Item.TechnicalDrawing != null && Item.TechnicalDrawing.Length > 0)
+            {
+                var base64 = Convert.ToBase64String(Item.TechnicalDrawing);
+                await JSRuntime.InvokeVoidAsync("openPdfFromBase64", base64);
+            }
+            else
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "No File",
+                    Detail = "No Technical Drawing PDF is attached.",
+                    Duration = 3000
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"Cannot open PDF: {ex.Message}",
+                Duration = 4000
+            });
+        }
+    }
+
+    private async Task DownloadPdf()
+    {
+        try
+        {
+            if (Item.TechnicalDrawing != null && Item.TechnicalDrawing.Length > 0)
+            {
+                var fileName = Item.TechnicalDrawingFileName ?? $"{Item.ItemID}_TechDrawing.pdf";
+                await JSRuntime.InvokeVoidAsync("downloadFileFromBytes", Item.TechnicalDrawing, "application/pdf", fileName);
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"Cannot download PDF: {ex.Message}",
+                Duration = 4000
+            });
+        }
+    }
+}

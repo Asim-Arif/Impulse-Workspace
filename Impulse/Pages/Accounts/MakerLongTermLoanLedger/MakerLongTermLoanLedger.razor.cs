@@ -120,11 +120,15 @@ namespace Impulse.Pages.Accounts.MakerLongTermLoanLedger
 
             try
             {
-                string selectionFormula = $"{{VMakerAdvancesLedger.AccNo}}='{SelectedMaker.AccNo}' AND {{VMakerAdvancesLedger.DT}} in Date({FromDate.Year}, {FromDate.Month}, {FromDate.Day}) to Date({ToDate.Year}, {ToDate.Month}, {ToDate.Day})";
+                string selectionFormula = $"{{VMakerAdvancesLedger_Short.AccNo}}='{SelectedMaker.AccNo}' AND {{VMakerAdvancesLedger_Short.DT}} in Date({FromDate.Year}, {FromDate.Month}, {FromDate.Day}) to Date({ToDate.Year}, {ToDate.Month}, {ToDate.Day})";
                 var req = new ReportRequest
                 {
                     ReportName = "MakerAdvancesLedger_Long.rpt",
-                    SelectionFormula = selectionFormula
+                    SelectionFormula = selectionFormula,
+                    FormulaValues = new Dictionary<string, object>
+                    {
+                        { "OpeningBalance", LedgerData.OpeningBalance.ToString() }
+                    }
                 };
 
                 await ReportNavigation.PrintReportAsync(req);

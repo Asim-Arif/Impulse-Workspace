@@ -78,6 +78,7 @@ namespace Impulse.Pages.Payroll
                 Employee.JoinDate = DateTime.Today;
                 Employee.Active = true;
                 Employee.ExemptSettings = false;
+                Employee.TempEmp = false;
             }
         }
 

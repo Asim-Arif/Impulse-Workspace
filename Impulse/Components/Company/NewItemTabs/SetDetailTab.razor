@@ -1,0 +1,312 @@
+@using DataAccessLibrary.Models.ViewModels.Company
+@using Impulse.Services.Company
+@using Blazored.Typeahead
+@inject IItemService ItemService
+@inject Radzen.NotificationService NotificationService
+
+<div class="set-detail-container">
+
+    <fieldset class="border rounded p-3 mb-3" style="background: rgba(255, 255, 255, 0.6); border-color: #dee2e6 !important;">
+        <legend class="float-none w-auto px-2 fw-bold text-secondary mb-2" style="font-size: 0.92rem;">
+            <i class="fas fa-boxes-stacked me-1 text-primary"></i> Set Detail
+        </legend>
+
+        @* ── Top Entry Row (Item selector, Qty, Add button) ── *@
+        <div class="row g-2 mb-3 align-items-end" style="position: relative !important; z-index: 9999 !important;">
+            
+            @* 1. Item Selector *@
+            <div class="col-12 col-md-8">
+                <label class="form-label mb-1 fw-semibold text-secondary" style="font-size: 0.85rem;">
+                    Item <span class="text-danger">*</span>
+                </label>
+                <BlazoredTypeahead SearchMethod="SearchItems"
+                                   EnableDropDown="true"
+                                   Data="AllItems"
+                                   TValue="ItemSetLookupModel"
+                                   TItem="ItemSetLookupModel"
+                                   Value="SelectedSetItem"
+                                   ValueChanged="OnSetItemSelected"
+                                   ValueExpression="@(() => SelectedSetItem)"
+                                   Placeholder="Search item by code or description..."
+                                   MaximumSuggestions="1000">
+                    <SelectedTemplate Context="item">
+                        <strong>[@item.ItemID]</strong> @item.ItemName
+                        @if (!string.IsNullOrEmpty(item.ItemSize))
+                        {
+                            <span class="text-muted ms-1">(@item.ItemSize)</span>
+                        }
+                    </SelectedTemplate>
+                    <ResultTemplate Context="item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>[@item.ItemID]</strong> @item.ItemName
+                                @if (!string.IsNullOrEmpty(item.ItemSize))
+                                {
+                                    <span class="text-muted ms-1">(@item.ItemSize)</span>
+                                }
+                            </div>
+                            @if (item.ExWorks.HasValue && item.ExWorks.Value > 0)
+                            {
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle ms-2" style="font-size: 0.72rem;">
+                                    Rate: @item.ExWorks.Value.ToString("N2")
+                                </span>
+                            }
+                        </div>
+                    </ResultTemplate>
+                </BlazoredTypeahead>
+            </div>
+
+            @* 2. Qty Input *@
+            <div class="col-6 col-md-2">
+                <label class="form-label mb-1 fw-semibold text-secondary" style="font-size: 0.85rem;">
+                    Qty <span class="text-danger">*</span>
+                </label>
+                <input type="number" min="1" step="1" class="form-control form-control-sm text-end fw-bold"
+                       style="height: 35px;"
+                       @bind="QtyInput"
+                       @bind:event="oninput"
+                       @onkeydown="OnQtyKeyDown"
+                       placeholder="Qty" />
+            </div>
+
+            @* 3. Add Button *@
+            <div class="col-6 col-md-2">
+                <button type="button" class="btn btn-primary btn-sm w-100 d-flex align-items-center justify-content-center"
+                        style="height: 35px;"
+                        @onclick="AddSetItem"
+                        title="Add Item to Set">
+                    <i class="fas fa-plus me-1"></i> Add
+                </button>
+            </div>
+
+        </div>
+
+        @* ── Set Items Grid (LVSet) ── *@
+        <div class="table-responsive border rounded bg-white" style="position: relative !important; z-index: 1 !important; min-height: 280px; max-height: 480px; overflow-y: auto;">
+            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                    <tr>
+                        <th style="width: 6%;" class="text-center">S. #</th>
+                        <th style="width: 18%;">Item Code</th>
+                        <th style="width: 32%;">Item Name</th>
+                        <th style="width: 12%;">Size</th>
+                        <th style="width: 10%;" class="text-end">Qty</th>
+                        <th style="width: 10%;" class="text-end">Price</th>
+                        <th style="width: 12%;" class="text-end">Amount</th>
+                        <th style="width: 5%;" class="text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Item.SetDetails == null || !Item.SetDetails.Any())
+                    {
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-5">
+                                <i class="fas fa-boxes-stacked fa-2x text-black-50 d-block mb-2"></i>
+                                <em>No items added to this set. Search and select items above to add.</em>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @for (int i = 0; i < Item.SetDetails.Count; i++)
+                        {
+                            var s = Item.SetDetails[i];
+                            var index = i + 1;
+                            <tr>
+                                <td class="text-center text-secondary font-monospace">@index</td>
+                                <td>
+                                    <span class="fw-bold text-dark">@s.Set_ItemID</span>
+                                </td>
+                                <td>
+                                    <span class="text-dark">@s.SetItemName</span>
+                                </td>
+                                <td>
+                                    <span class="text-secondary">@s.ItemSize</span>
+                                </td>
+                                <td class="text-end font-monospace fw-semibold">
+                                    @s.Qty
+                                </td>
+                                <td class="text-end font-monospace">
+                                    @(s.Price?.ToString("N2") ?? "0.00")
+                                </td>
+                                <td class="text-end font-monospace fw-bold text-dark">
+                                    @s.Amount.ToString("N2")
+                                </td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-link text-danger p-0"
+                                            @onclick="() => RemoveSetItem(s)"
+                                            title="Remove item from set">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @* ── Total Amount Summary Footer (Matches txtTotalSetAmt) ── *@
+        <div class="d-flex justify-content-end align-items-center mt-3 gap-2">
+            <label class="fw-bold text-secondary mb-0" style="font-size: 0.88rem;">Total Amount:</label>
+            <div class="input-group input-group-sm" style="width: 180px;">
+                <span class="input-group-text bg-light text-muted fw-bold">@Item.ItemCurr</span>
+                <input type="text" class="form-control form-control-sm text-end fw-bold bg-light"
+                       readonly
+                       value="@(Item.SetDetails?.Sum(s => s.Amount).ToString("N2") ?? "0.00")" />
+            </div>
+        </div>
+
+    </fieldset>
+
+</div>
+
+<style>
+    .set-detail-container .blazored-typeahead {
+        height: 35px !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public ItemDto Item { get; set; } = default!;
+
+    private List<ItemSetLookupModel> AllItems { get; set; } = new();
+    private ItemSetLookupModel? SelectedSetItem { get; set; }
+    private int QtyInput { get; set; } = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            AllItems = await ItemService.GetItemSetLookupsAsync();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"Failed to load items: {ex.Message}",
+                Duration = 4000
+            });
+        }
+    }
+
+    private Task<IEnumerable<ItemSetLookupModel>> SearchItems(string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return Task.FromResult(AllItems.AsEnumerable());
+
+        var filtered = AllItems.Where(m =>
+            (!string.IsNullOrEmpty(m.ItemID) && m.ItemID.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
+            (!string.IsNullOrEmpty(m.ItemName) && m.ItemName.Contains(searchText, StringComparison.OrdinalIgnoreCase)));
+
+        return Task.FromResult(filtered);
+    }
+
+    private void OnSetItemSelected(ItemSetLookupModel? item)
+    {
+        SelectedSetItem = item;
+    }
+
+    private async Task OnQtyKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await AddSetItem();
+        }
+    }
+
+    private Task AddSetItem()
+    {
+        if (SelectedSetItem == null || string.IsNullOrWhiteSpace(SelectedSetItem.ItemID))
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Warning,
+                Summary = "Item Required",
+                Detail = "Please search and select an item.",
+                Duration = 3000
+            });
+            return Task.CompletedTask;
+        }
+
+        if (QtyInput <= 0)
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Warning,
+                Summary = "Invalid Quantity",
+                Detail = "Please enter a valid quantity of 1 or more.",
+                Duration = 3000
+            });
+            return Task.CompletedTask;
+        }
+
+        // Self check
+        if (!string.IsNullOrEmpty(Item.ItemID) && string.Equals(SelectedSetItem.ItemID, Item.ItemID, StringComparison.OrdinalIgnoreCase))
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Warning,
+                Summary = "Invalid Item",
+                Detail = "A set item cannot be added as a component of itself.",
+                Duration = 3000
+            });
+            return Task.CompletedTask;
+        }
+
+        // Duplicate check
+        if (Item.SetDetails.Any(s => string.Equals(s.Set_ItemID, SelectedSetItem.ItemID, StringComparison.OrdinalIgnoreCase)))
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Warning,
+                Summary = "Duplicate Item",
+                Detail = $"Item '{SelectedSetItem.ItemID}' is already added to this set.",
+                Duration = 3000
+            });
+            return Task.CompletedTask;
+        }
+
+        var newEntry = new ItemSetDetailModel
+        {
+            ItemID = Item.ItemID,
+            Set_ItemID = SelectedSetItem.ItemID,
+            SetItemName = SelectedSetItem.ItemName,
+            ItemSize = SelectedSetItem.ItemSize,
+            Qty = QtyInput,
+            Price = SelectedSetItem.ExWorks
+        };
+
+        Item.SetDetails.Add(newEntry);
+
+        // Reset input fields
+        SelectedSetItem = null;
+        QtyInput = 1;
+
+        NotificationService.Notify(new Radzen.NotificationMessage
+        {
+            Severity = Radzen.NotificationSeverity.Success,
+            Summary = "Added",
+            Detail = $"Item '{newEntry.Set_ItemID}' added to set.",
+            Duration = 2000
+        });
+
+        return Task.CompletedTask;
+    }
+
+    private void RemoveSetItem(ItemSetDetailModel setItem)
+    {
+        Item.SetDetails.Remove(setItem);
+        NotificationService.Notify(new Radzen.NotificationMessage
+        {
+            Severity = Radzen.NotificationSeverity.Info,
+            Summary = "Removed",
+            Detail = $"Item '{setItem.Set_ItemID}' removed from set.",
+            Duration = 2000
+        });
+    }
+}

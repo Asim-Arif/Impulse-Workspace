@@ -175,7 +175,7 @@ namespace DataAccessLibrary.Models.ViewModels.Payroll
         public string StrEmail { get; set; } = string.Empty;
         public string StrFax { get; set; } = string.Empty;
         public string StrCast { get; set; } = string.Empty;
-        public bool? TempEmp { get; set; }
+        public bool? TempEmp { get; set; } = false;
         public bool Pay_Full_Salary { get; set; }
         public byte[]? CNIC_PDF { get; set; }
         public string CNIC_PDF_FileName { get; set; } = string.Empty;

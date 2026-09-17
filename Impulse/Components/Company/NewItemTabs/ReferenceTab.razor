@@ -1,53 +1,159 @@
 @using DataAccessLibrary.Models.ViewModels.Company
+@inject Radzen.NotificationService NotificationService
 
-<div class="row g-2 mb-3">
-    <div class="col-auto">
-        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddRef">
-            <i class="bi bi-plus-circle me-1"></i> Add Reference
-        </button>
+<div class="reference-container">
+
+    @* ── Top Entry Form: Catalog Name & Reference ── *@
+    <div class="row g-2 mb-3 align-items-end">
+        <div class="col-8 col-md-9">
+            <label class="form-label mb-1 text-primary fw-semibold" style="font-size: 0.85rem; text-decoration: underline; cursor: default;">
+                Catalog Name
+            </label>
+            <select class="form-select form-select-sm" style="height: 31px;" @bind="SelectedCatalogName">
+                <option value="">&lt;Select Catalog&gt;</option>
+                @foreach (var c in ForeignCatalogs)
+                {
+                    <option value="@c.CatalogName">@c.CatalogName</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-4 col-md-3">
+            <label class="form-label mb-1 fw-semibold text-secondary" style="font-size: 0.85rem;">
+                Reference
+            </label>
+            <div class="d-flex align-items-center gap-1">
+                <input type="text" class="form-control form-control-sm"
+                       style="height: 31px;"
+                       @bind="ReferenceInput"
+                       @bind:event="oninput"
+                       @onkeydown="OnReferenceKeyDown"
+                       placeholder="Enter reference..." />
+                <button type="button" class="btn btn-primary btn-sm px-2 d-flex align-items-center"
+                        style="height: 31px;"
+                        @onclick="AddReference"
+                        title="Add Reference">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+        </div>
     </div>
-</div>
 
-<div class="table-responsive">
-    <table class="table table-sm table-bordered table-hover align-middle">
-        <thead class="table-light">
-            <tr>
-                <th>#</th>
-                <th>Catalog Name</th>
-                <th>Reference</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var (refRow, idx) in CatalogRefs.Select((r, i) => (r, i)))
-            {
+    @* ── References Grid (LVRef) ── *@
+    <div class="table-responsive border rounded bg-white" style="min-height: 280px; max-height: 480px; overflow-y: auto;">
+        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
                 <tr>
-                    <td>@(idx + 1)</td>
-                    <td>
-                        <input type="text" class="form-control form-control-sm"
-                               @bind="refRow.CatalogName"
-                               placeholder="Catalog name" />
-                    </td>
-                    <td>
-                        <input type="text" class="form-control form-control-sm"
-                               @bind="refRow.Reference"
-                               placeholder="Reference no." />
-                    </td>
-                    <td>
-                        <button type="button" class="btn btn-sm btn-outline-danger"
-                                @onclick="() => RemoveRef(refRow)">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </td>
+                    <th style="width: 80px;" class="text-center">S No.</th>
+                    <th>Catalog Name</th>
+                    <th>Reference</th>
+                    <th style="width: 60px;" class="text-center"></th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @if (CatalogRefs == null || !CatalogRefs.Any())
+                {
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-4">
+                            <em>No catalog references added. Select a catalog name and enter a reference to add.</em>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var (refRow, idx) in CatalogRefs.Select((r, i) => (r, i)))
+                    {
+                        <tr>
+                            <td class="text-center text-muted fw-semibold">@(idx + 1)</td>
+                            <td class="fw-semibold text-dark">@refRow.CatalogName</td>
+                            <td>@refRow.Reference</td>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+                                        style="font-size: 0.75rem;"
+                                        @onclick="() => RemoveReference(refRow)"
+                                        title="Remove Reference">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
 </div>
 
 @code {
     [Parameter, EditorRequired] public List<ItemCatalogRefModel> CatalogRefs { get; set; } = default!;
+    [Parameter] public List<ForeignCatalogLookupModel> ForeignCatalogs { get; set; } = new();
 
-    private void AddRef() => CatalogRefs.Add(new ItemCatalogRefModel());
-    private void RemoveRef(ItemCatalogRefModel r) => CatalogRefs.Remove(r);
+    private string SelectedCatalogName { get; set; } = string.Empty;
+    private string ReferenceInput { get; set; } = string.Empty;
+
+    private void OnReferenceKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            AddReference();
+        }
+    }
+
+    private void AddReference()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedCatalogName))
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Warning,
+                Summary = "Warning",
+                Detail = "Please Select Catalog.",
+                Duration = 3000
+            });
+            return;
+        }
+
+        var refText = ReferenceInput?.Trim();
+        if (string.IsNullOrWhiteSpace(refText))
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Warning,
+                Summary = "Warning",
+                Detail = "Please enter Reference.",
+                Duration = 3000
+            });
+            return;
+        }
+
+        // Check for Duplicate
+        bool exists = CatalogRefs.Any(r =>
+            string.Equals(r.CatalogName, SelectedCatalogName, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(r.Reference, refText, StringComparison.OrdinalIgnoreCase));
+
+        if (exists)
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Info,
+                Summary = "Information",
+                Detail = "Already Exists.",
+                Duration = 3000
+            });
+            return;
+        }
+
+        CatalogRefs.Add(new ItemCatalogRefModel
+        {
+            CatalogName = SelectedCatalogName,
+            Reference = refText
+        });
+
+        ReferenceInput = string.Empty;
+    }
+
+    private void RemoveReference(ItemCatalogRefModel refItem)
+    {
+        CatalogRefs.Remove(refItem);
+    }
 }

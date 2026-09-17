@@ -33,8 +33,20 @@
     </div>
 
     <div class="col-md-3">
-        <label class="form-label fw-bold text-secondary mb-1">Type (free text)</label>
-        <input type="text" class="form-control" @bind="Item.Type" placeholder="Item type" />
+        <label class="form-label fw-bold text-secondary mb-1">Type</label>
+        <BlazoredTypeahead SearchMethod="SearchItemTypes"
+                           EnableDropDown="true"
+                           TValue="string"
+                           TItem="DataAccessLibrary.Models.ViewModels.Company.ItemTypeModel"
+                           Value="Item.Type"
+                           ValueChanged="@(val => Item.Type = val)"
+                           ValueExpression="@(() => Item.Type)"
+                           ConvertMethod="@(t => t?.Description)"
+                           Placeholder="Select type"
+                           MaximumSuggestions="1000">
+            <SelectedTemplate Context="t">@t</SelectedTemplate>
+            <ResultTemplate Context="t">@t.Description</ResultTemplate>
+        </BlazoredTypeahead>
     </div>
 
     @* ── Row 3: Size + Size Unit + Tip Size ── *@
@@ -172,34 +184,24 @@
         <h6 class="fw-bold text-secondary border-bottom pb-1 mt-2">Stock Levels</h6>
     </div>
 
-    <div class="col-md-2">
+    <div class="col-md-3">
         <label class="form-label fw-bold text-secondary mb-1">Min Level</label>
         <input type="number" class="form-control" @bind="Item.MinLevel" />
     </div>
 
-    <div class="col-md-2">
+    <div class="col-md-3">
         <label class="form-label fw-bold text-secondary mb-1">Max Level</label>
         <input type="number" class="form-control" @bind="Item.MaxLevel" />
     </div>
 
-    <div class="col-md-2">
+    <div class="col-md-3">
         <label class="form-label fw-bold text-secondary mb-1">Reorder Level</label>
         <input type="number" class="form-control" @bind="Item.ReOrderLevel" />
     </div>
 
-    <div class="col-md-2">
+    <div class="col-md-3">
         <label class="form-label fw-bold text-secondary mb-1">Reorder Point</label>
         <input type="number" class="form-control" @bind="Item.ReorderPoint" />
-    </div>
-
-    <div class="col-md-2">
-        <label class="form-label fw-bold text-secondary mb-1">Max Lot Size</label>
-        <input type="number" class="form-control" @bind="Item.ItemMaxLotSize" />
-    </div>
-
-    <div class="col-md-2">
-        <label class="form-label fw-bold text-secondary mb-1">Lot Size Buffer</label>
-        <input type="number" class="form-control" @bind="Item.ItemLotSizeBuffer" />
     </div>
 
     @* ── Row 11: Descriptions ── *@
@@ -247,8 +249,13 @@
 @code {
     [Parameter, EditorRequired] public ItemDto Item { get; set; } = default!;
     [Parameter, EditorRequired] public List<UnitModel> Units { get; set; } = default!;
+    [Parameter] public List<ItemTypeModel> ItemTypes { get; set; } = new();
 
     private Task<IEnumerable<UnitModel>> SearchUnits(string searchText) =>
         Task.FromResult(Units.Where(u =>
             u.UnitName.Contains(searchText, StringComparison.OrdinalIgnoreCase)));
+
+    private Task<IEnumerable<ItemTypeModel>> SearchItemTypes(string searchText) =>
+        Task.FromResult(ItemTypes.Where(t =>
+            t.Description.Contains(searchText, StringComparison.OrdinalIgnoreCase)));
 }

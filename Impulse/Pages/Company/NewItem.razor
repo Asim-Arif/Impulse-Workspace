@@ -86,13 +86,11 @@
                             </div>
 
                             <div class="col-md-3">
-                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Item Type</label>
-                                <select class="form-select form-select-sm" @bind="ItemTypeHelper">
-                                    <option value="">— Select —</option>
-                                    @foreach (var t in ItemTypes)
-                                    {
-                                        <option value="@t.ID">@t.Description</option>
-                                    }
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Type</label>
+                                <select class="form-select form-select-sm" value="@Item.ItemType" @onchange="OnItemTypeChanged">
+                                    <option value="0">Finished</option>
+                                    <option value="1">Semi Finished</option>
+                                    <option value="2">Set</option>
                                 </select>
                             </div>
 
@@ -132,6 +130,11 @@
                                 type="button" role="tab">General Info</button>
                     </li>
                     <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "Processes" ? "active" : "")"
+                                @onclick='() => ChangeTab("Processes")'
+                                type="button" role="tab">Processes</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
                         <button class="nav-link @(ActiveTab == "Weight" ? "active" : "")"
                                 @onclick='() => ChangeTab("Weight")'
                                 type="button" role="tab">Weight</button>
@@ -139,29 +142,50 @@
                     <li class="nav-item" role="presentation">
                         <button class="nav-link @(ActiveTab == "Pricing" ? "active" : "")"
                                 @onclick='() => ChangeTab("Pricing")'
-                                type="button" role="tab">Pricing</button>
+                                type="button" role="tab">Price/Costing</button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link @(ActiveTab == "Processes" ? "active" : "")"
-                                @onclick='() => ChangeTab("Processes")'
-                                type="button" role="tab">Processes</button>
+                        <button class="nav-link @(ActiveTab == "References" ? "active" : "")"
+                                @onclick='() => ChangeTab("References")'
+                                type="button" role="tab">Reference</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "Picture" ? "active" : "")"
+                                @onclick='() => ChangeTab("Picture")'
+                                type="button" role="tab">Picture</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "RMComponents" ? "active" : "")"
+                                @onclick='() => ChangeTab("RMComponents")'
+                                type="button" role="tab">RM Components</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "LookAlike" ? "active" : "")"
+                                @onclick='() => ChangeTab("LookAlike")'
+                                type="button" role="tab">Look alike</button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link @(ActiveTab == "Shipping" ? "active" : "")"
                                 @onclick='() => ChangeTab("Shipping")'
                                 type="button" role="tab">Shipping</button>
                     </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link @(ActiveTab == "References" ? "active" : "")"
-                                @onclick='() => ChangeTab("References")'
-                                type="button" role="tab">References</button>
-                    </li>
+                    @if (Item.ItemType == 2)
+                    {
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link @(ActiveTab == "SetDetail" ? "active" : "")"
+                                    @onclick='() => ChangeTab("SetDetail")'
+                                    type="button" role="tab">Set Detail</button>
+                        </li>
+                    }
                 </ul>
 
                 @* ── Tab Content ── *@
                 <div class="tab-content pt-4" id="itemTabsContent">
                     <div class="tab-pane fade @(ActiveTab == "GeneralInfo" ? "show active" : "")" role="tabpanel">
-                        <GeneralInfoTab Item="Item" Units="Units" />
+                        <GeneralInfoTab Item="Item" Units="Units" ItemTypes="ItemTypes" />
+                    </div>
+                    <div class="tab-pane fade @(ActiveTab == "Processes" ? "show active" : "")" role="tabpanel">
+                        <ProcessesTab Item="Item" />
                     </div>
                     <div class="tab-pane fade @(ActiveTab == "Weight" ? "show active" : "")" role="tabpanel">
                         <WeightTab Item="Item" />
@@ -169,15 +193,27 @@
                     <div class="tab-pane fade @(ActiveTab == "Pricing" ? "show active" : "")" role="tabpanel">
                         <PricingTab Item="Item" />
                     </div>
-                    <div class="tab-pane fade @(ActiveTab == "Processes" ? "show active" : "")" role="tabpanel">
-                        <ProcessesTab Processes="Item.Processes" />
+                    <div class="tab-pane fade @(ActiveTab == "References" ? "show active" : "")" role="tabpanel">
+                        <ReferenceTab CatalogRefs="Item.CatalogRefs" ForeignCatalogs="ForeignCatalogs" />
+                    </div>
+                    <div class="tab-pane fade @(ActiveTab == "Picture" ? "show active" : "")" role="tabpanel">
+                        <PictureTab Item="Item" />
+                    </div>
+                    <div class="tab-pane fade @(ActiveTab == "RMComponents" ? "show active" : "")" role="tabpanel">
+                        <RMComponentsTab Item="Item" />
+                    </div>
+                    <div class="tab-pane fade @(ActiveTab == "LookAlike" ? "show active" : "")" role="tabpanel">
+                        <LookAlikeTab Item="Item" />
                     </div>
                     <div class="tab-pane fade @(ActiveTab == "Shipping" ? "show active" : "")" role="tabpanel">
                         <ShippingTab Item="Item" />
                     </div>
-                    <div class="tab-pane fade @(ActiveTab == "References" ? "show active" : "")" role="tabpanel">
-                        <ReferenceTab CatalogRefs="Item.CatalogRefs" />
-                    </div>
+                    @if (Item.ItemType == 2)
+                    {
+                        <div class="tab-pane fade @(ActiveTab == "SetDetail" ? "show active" : "")" role="tabpanel">
+                            <SetDetailTab Item="Item" />
+                        </div>
+                    }
                 </div>
 
                 @* ── Footer Action Bar ── *@

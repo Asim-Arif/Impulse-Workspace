@@ -246,7 +246,7 @@ namespace Impulse.Pages.Stock.RMPO
         {
             string selectionFormula = $"{{VVendOrders.DT}} in Date({Filter.DateFrom?.Year ?? 1900}, {Filter.DateFrom?.Month ?? 1}, {Filter.DateFrom?.Day ?? 1}) to Date({Filter.DateTo?.Year ?? 2099}, {Filter.DateTo?.Month ?? 1}, {Filter.DateTo?.Day ?? 1})";
             
-            await ReportNavigation.PrintReportAsync(new ReportRequest { ReportName = "rptVendPOListDateWise.rpt", SelectionFormula = selectionFormula });
+            await ReportNavigation.PrintReportAsync(new ReportRequest { ReportName = "rptVendPOList.rpt", SelectionFormula = selectionFormula });
         }
         
         // --- PDF Attachment ---

@@ -79,7 +79,9 @@ namespace Impulse.Pages.Accounts
             var formulaValues = new Dictionary<string, object>
             {
                 { "Company", "'CurrentCompany'" },
-                { "FromTo", $"'{DTFrom:dd-MMM-yyyy} To {DTTo:dd-MMM-yyyy}'" }
+                { "FromTo", $"'{DTFrom:dd-MMM-yyyy} To {DTTo:dd-MMM-yyyy}'" },
+                { "DTFrom", $"#{DTFrom:yyyy-MM-dd}#" },
+                { "DTTo", $"#{DTTo:yyyy-MM-dd}#" }
             };
 
             var request = new ReportRequest

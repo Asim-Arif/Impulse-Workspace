@@ -125,7 +125,11 @@ namespace Impulse.Pages.Accounts.MakerShortTermLoanLedger
                 var req = new ReportRequest
                 {
                     ReportName = "MakerAdvancesLedger_Short.rpt",
-                    SelectionFormula = selectionFormula
+                    SelectionFormula = selectionFormula,
+                    FormulaValues = new Dictionary<string, object>
+                    {
+                        { "OpeningBalance", LedgerData.OpeningBalance.ToString() }
+                    }
                 };
 
                 await ReportNavigation.PrintReportAsync(req);

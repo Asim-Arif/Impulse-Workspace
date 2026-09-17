@@ -1,95 +1,381 @@
 @using DataAccessLibrary.Models.ViewModels.Company
+@using Impulse.Services.Company
+@inject IItemService ItemService
+@inject Radzen.NotificationService NotificationService
 
-<div class="row g-2 mb-3">
-    <div class="col-auto">
-        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddProcess">
-            <i class="bi bi-plus-circle me-1"></i> Add Process
-        </button>
+<div class="card border shadow-sm p-3" style="background: #fafbfc; border-radius: 8px;">
+
+    @* ── Top Row: Process Group, Process, Seq. No. ── *@
+    <div class="row g-2 mb-3 align-items-end flex-nowrap">
+        <div class="col-5" style="max-width: 40%;">
+            <label class="form-label fw-bold text-dark mb-1" style="font-size: 0.82rem;">Process Group :</label>
+            <select class="form-select form-select-sm" style="height: 31px;" value="@SelectedGroupId" @onchange="OnGroupChanged">
+                <option value="0">&lt;All Groups&gt;</option>
+                @foreach (var g in ProcessGroups)
+                {
+                    <option value="@g.EntryID">@g.GroupName</option>
+                }
+            </select>
+        </div>
+
+        <div class="col">
+            <label class="form-label fw-bold text-dark mb-1" style="font-size: 0.82rem;">Process :</label>
+            <select class="form-select form-select-sm" style="height: 31px;" @bind="SelectedProcessId">
+                <option value="0">&lt;All Processes&gt;</option>
+                @foreach (var p in ProcessesLookup)
+                {
+                    <option value="@p.ProcessID">@p.Description @(!string.IsNullOrEmpty(p.Code) ? $"({p.Code})" : "")</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-auto">
+            <label class="form-label fw-bold text-dark mb-1 text-center d-block" style="font-size: 0.82rem;">Seq. No.</label>
+            <div class="d-flex align-items-center gap-1">
+                <input type="number" class="form-control form-control-sm text-center fw-bold px-1"
+                       style="width: 55px; height: 31px; line-height: 1.5;"
+                       @bind="SeqNo"
+                       @onclick="OnSeqNoBoxClick"
+                       @onkeydown="OnSeqNoKeyDown"
+                       title="Click or press Enter to add selected process(es)" />
+                <button type="button" class="btn btn-primary btn-sm px-2 d-flex align-items-center"
+                        style="height: 31px;"
+                        @onclick="TriggerAddProcesses"
+                        title="Add Process(es)">
+                    <i class="fas fa-plus me-1"></i> Add
+                </button>
+            </div>
+        </div>
     </div>
-</div>
 
-<div class="table-responsive">
-    <table class="table table-sm table-bordered table-hover align-middle">
-        <thead class="table-light">
-            <tr>
-                <th>#</th>
-                <th>Process</th>
-                <th>Code</th>
-                <th>Scanning</th>
-                <th>Sort No.</th>
-                <th>Rate</th>
-                <th>Min Lvl</th>
-                <th>Max Lvl</th>
-                <th>Reorder Lvl</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var (proc, idx) in Processes.Select((p, i) => (p, i)))
-            {
+    @* ── Center: Process List View ── *@
+    <div class="table-responsive border rounded bg-white" style="height: 380px; overflow-y: auto;">
+        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
                 <tr>
-                    <td>@(idx + 1)</td>
-                    <td>
-                        <input type="number" class="form-control form-control-sm"
-                               style="width:90px"
-                               @bind="proc.ProcessID"
-                               placeholder="ID" />
-                    </td>
-                    <td>
-                        <input type="text" class="form-control form-control-sm"
-                               style="width:80px"
-                               @bind="proc.Code" />
-                    </td>
-                    <td class="text-center">
-                        <input type="checkbox" class="form-check-input" @bind="proc.Scanning" />
-                    </td>
-                    <td>
-                        <input type="number" step="0.01" class="form-control form-control-sm"
-                               style="width:80px"
-                               @bind="proc.SNO" />
-                    </td>
-                    <td>
-                        <input type="number" step="0.0001" class="form-control form-control-sm"
-                               style="width:90px"
-                               @bind="proc.Rate" />
-                    </td>
-                    <td>
-                        <input type="number" class="form-control form-control-sm"
-                               style="width:80px"
-                               @bind="proc.MinLevel" />
-                    </td>
-                    <td>
-                        <input type="number" class="form-control form-control-sm"
-                               style="width:80px"
-                               @bind="proc.MaxLevel" />
-                    </td>
-                    <td>
-                        <input type="number" class="form-control form-control-sm"
-                               style="width:80px"
-                               @bind="proc.ReOrderLevel" />
-                    </td>
-                    <td>
-                        <button type="button" class="btn btn-sm btn-outline-danger"
-                                @onclick="() => RemoveProcess(proc)">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </td>
+                    <th>Process</th>
+                    <th style="width: 80px;" class="text-center">Sort No.</th>
+                    <th style="width: 45px;" class="text-center">Action</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @if (Item.Processes == null || !Item.Processes.Any())
+                {
+                    <tr>
+                        <td colspan="3" class="text-center text-muted py-5" style="font-style: italic;">
+                            No production processes assigned. Select a Process Group or Process above and click Seq. No. to add.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var proc in Item.Processes.OrderBy(p => p.SNO))
+                    {
+                        <tr>
+                            <td class="fw-semibold text-dark">
+                                @proc.Description
+                                @if (!string.IsNullOrEmpty(proc.Code))
+                                {
+                                    <span class="text-muted fw-normal ms-1">(@proc.Code)</span>
+                                }
+                            </td>
+                            <td class="text-center fw-bold text-secondary">
+                                @proc.SNO
+                            </td>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-link text-danger p-0"
+                                        disabled="@IsFamilyAttached"
+                                        title="@(IsFamilyAttached ? "Cannot remove: Process Family is attached" : "Remove process")"
+                                        @onclick="() => RemoveProcess(proc)">
+                                    <i class="fas fa-trash-alt" style="@(IsFamilyAttached ? "opacity: 0.4;" : "")"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @* ── Bottom Action Bar: Delete All, Process Family, Break Link ── *@
+    <div class="row g-2 align-items-center mt-3 pt-2 border-top">
+        <div class="col-auto">
+            <button type="button" class="btn btn-outline-danger btn-sm px-3"
+                    disabled="@IsFamilyAttached"
+                    @onclick="OnDeleteAllClick">
+                <i class="fas fa-trash me-1"></i> Delete All
+            </button>
+        </div>
+
+        <div class="col d-flex align-items-center justify-content-center gap-2">
+            <span style="color: #c00000; font-weight: bold; font-size: 0.88rem; white-space: nowrap;">
+                Process Family :
+            </span>
+            <input type="text" class="form-control form-control-sm"
+                   style="max-width: 450px; background: #f8f9fa; font-weight: 500;"
+                   readonly
+                   value="@Item.ProcessFamily"
+                   placeholder="None" />
+        </div>
+
+        <div class="col-auto">
+            <button type="button" class="btn btn-outline-secondary btn-sm px-3"
+                    disabled="@(!IsFamilyAttached)"
+                    @onclick="OnBreakLinkClick">
+                <i class="fas fa-unlink me-1"></i> Break Link
+            </button>
+        </div>
+    </div>
+
 </div>
 
 @code {
-    [Parameter, EditorRequired] public List<ItemProcessModel> Processes { get; set; } = default!;
+    [Parameter, EditorRequired] public ItemDto Item { get; set; } = default!;
 
-    private void AddProcess()
+    private List<ProcessGroupLookupModel> ProcessGroups { get; set; } = new();
+    private List<ProcessItemLookupModel> ProcessesLookup { get; set; } = new();
+
+    private int SelectedGroupId { get; set; } = 0;
+    private int SelectedProcessId { get; set; } = 0;
+    private int SeqNo { get; set; } = 1;
+
+    private bool IsFamilyAttached => !string.IsNullOrEmpty(Item.ProcessFamily);
+
+    protected override async Task OnInitializedAsync()
     {
-        Processes.Add(new ItemProcessModel());
+        await LoadLookups();
+        UpdateNextSeqNo();
+    }
+
+    private async Task LoadLookups()
+    {
+        try
+        {
+            ProcessGroups = await ItemService.GetProcessGroupsLookupAsync();
+            await LoadProcessesForGroup(SelectedGroupId);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"Failed to load process data: {ex.Message}",
+                Duration = 4000
+            });
+        }
+    }
+
+    private async Task OnGroupChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var gId))
+        {
+            SelectedGroupId = gId;
+            SelectedProcessId = 0;
+            await LoadProcessesForGroup(SelectedGroupId);
+        }
+    }
+
+    private async Task LoadProcessesForGroup(int groupId)
+    {
+        ProcessesLookup = await ItemService.GetProcessesLookupAsync(groupId > 0 ? groupId : null);
+    }
+
+    private async Task OnSeqNoKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await TriggerAddProcesses();
+        }
+    }
+
+    private async Task OnSeqNoBoxClick()
+    {
+        // Matches legacy VB6 behavior: clicking into the Seq. No. box adds process(es)
+        await TriggerAddProcesses();
+    }
+
+    private async Task TriggerAddProcesses()
+    {
+        if (IsFamilyAttached)
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Warning,
+                Summary = "Notice",
+                Detail = "Can't Add/Edit Processes, Process Family is attached.",
+                Duration = 4000
+            });
+            return;
+        }
+
+        if (SelectedProcessId != 0)
+        {
+            // Adding a single process
+            if (Item.Processes.Any(p => p.ProcessID == SelectedProcessId))
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Already Assigned",
+                    Detail = "This Process is already assigned.",
+                    Duration = 3500
+                });
+                return;
+            }
+
+            var proc = ProcessesLookup.FirstOrDefault(p => p.ProcessID == SelectedProcessId);
+            if (proc != null)
+            {
+                Item.Processes.Add(new ItemProcessModel
+                {
+                    ProcessID = proc.ProcessID,
+                    Description = proc.Description,
+                    Code = proc.Code,
+                    Scanning = proc.Scanning,
+                    SNO = SeqNo
+                });
+
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Success,
+                    Summary = "Process Added",
+                    Detail = $"Added '{proc.Description}' at Seq #{SeqNo}.",
+                    Duration = 2500
+                });
+
+                UpdateNextSeqNo();
+                SelectedProcessId = 0;
+            }
+        }
+        else
+        {
+            // Adding group (All Processes)
+            if (SelectedGroupId == 0)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Info,
+                    Summary = "Selection Required",
+                    Detail = "Please select a Process Group first to add all group processes.",
+                    Duration = 3500
+                });
+                return;
+            }
+
+            var grp = ProcessGroups.FirstOrDefault(g => g.EntryID == SelectedGroupId);
+
+            // If no family attached and list empty, attach process family link
+            if (string.IsNullOrEmpty(Item.ProcessFamily) && !Item.Processes.Any())
+            {
+                if (grp != null)
+                {
+                    Item.ProcessFamily = grp.GroupName;
+                    Item.ProcessGroupID = grp.EntryID;
+                    Item.BreakProcessGroupLink = false;
+                }
+            }
+
+            int addedCount = 0;
+            int curSeq = SeqNo;
+
+            foreach (var p in ProcessesLookup)
+            {
+                if (!Item.Processes.Any(existing => existing.ProcessID == p.ProcessID))
+                {
+                    Item.Processes.Add(new ItemProcessModel
+                    {
+                        ProcessID = p.ProcessID,
+                        Description = p.Description,
+                        Code = p.Code,
+                        Scanning = p.Scanning,
+                        SNO = curSeq++
+                    });
+                    addedCount++;
+                }
+            }
+
+            UpdateNextSeqNo();
+            SelectedProcessId = 0;
+
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Success,
+                Summary = "Processes Added",
+                Detail = $"{addedCount} processes added from '{grp?.GroupName}'.",
+                Duration = 3500
+            });
+        }
+    }
+
+    private void OnBreakLinkClick()
+    {
+        Item.ProcessFamily = string.Empty;
+        Item.ProcessGroupID = null;
+        Item.BreakProcessGroupLink = true;
+
+        NotificationService.Notify(new Radzen.NotificationMessage
+        {
+            Severity = Radzen.NotificationSeverity.Info,
+            Summary = "Link Broken",
+            Detail = "Process Family link broken. You may now modify processes individually.",
+            Duration = 3500
+        });
+    }
+
+    private void OnDeleteAllClick()
+    {
+        if (IsFamilyAttached)
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Warning,
+                Summary = "Notice",
+                Detail = "Can't Delete, Process Family is attached.",
+                Duration = 3500
+            });
+            return;
+        }
+
+        Item.Processes.Clear();
+        SeqNo = 1;
+
+        NotificationService.Notify(new Radzen.NotificationMessage
+        {
+            Severity = Radzen.NotificationSeverity.Info,
+            Summary = "Cleared",
+            Detail = "All processes removed.",
+            Duration = 2500
+        });
     }
 
     private void RemoveProcess(ItemProcessModel proc)
     {
-        Processes.Remove(proc);
+        if (IsFamilyAttached)
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Warning,
+                Summary = "Notice",
+                Detail = "Can't Delete, Process Family is attached.",
+                Duration = 3500
+            });
+            return;
+        }
+
+        Item.Processes.Remove(proc);
+        UpdateNextSeqNo();
+    }
+
+    private void UpdateNextSeqNo()
+    {
+        if (Item.Processes != null && Item.Processes.Any())
+        {
+            SeqNo = (int)Item.Processes.Max(p => p.SNO) + 1;
+        }
+        else
+        {
+            SeqNo = 1;
+        }
     }
 }

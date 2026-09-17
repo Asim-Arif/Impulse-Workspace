@@ -1,0 +1,249 @@
+@using DataAccessLibrary.Models.ViewModels.Company
+@using Impulse.Services.Company
+@using Blazored.Typeahead
+@inject IItemService ItemService
+@inject Radzen.NotificationService NotificationService
+
+<div class="look-alike-container">
+
+    <fieldset class="border rounded p-3 mb-3" style="background: rgba(255, 255, 255, 0.6); border-color: #dee2e6 !important;">
+        <legend class="float-none w-auto px-2 fw-bold text-secondary mb-2" style="font-size: 0.92rem;">
+            <i class="fas fa-clone me-1 text-primary"></i> Look alike Items
+        </legend>
+
+        @* ── Top Entry Row (Item selector, Stock, Add button) ── *@
+        <div class="row g-2 mb-3 align-items-end" style="position: relative !important; z-index: 9999 !important;">
+            
+            @* 1. Item Selector *@
+            <div class="col-12 col-md-8">
+                <label class="form-label mb-1 fw-semibold text-secondary" style="font-size: 0.85rem;">
+                    Item <span class="text-danger">*</span>
+                </label>
+                <BlazoredTypeahead SearchMethod="SearchItems"
+                                   EnableDropDown="true"
+                                   Data="AllItems"
+                                   TValue="ItemSearchLookupModel"
+                                   TItem="ItemSearchLookupModel"
+                                   Value="SelectedLookAlike"
+                                   ValueChanged="OnLookAlikeSelected"
+                                   ValueExpression="@(() => SelectedLookAlike)"
+                                   Placeholder="Search item by code or description..."
+                                   MaximumSuggestions="1000">
+                    <SelectedTemplate Context="item">
+                        <strong>[@item.ItemID]</strong> @item.ItemName
+                    </SelectedTemplate>
+                    <ResultTemplate Context="item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>[@item.ItemID]</strong> @item.ItemName
+                            </div>
+                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle ms-2" style="font-size: 0.72rem;">
+                                Stock: @(item.InHand?.ToString("G29") ?? "0")
+                            </span>
+                        </div>
+                    </ResultTemplate>
+                </BlazoredTypeahead>
+            </div>
+
+            @* 2. Stock (Live finished stock of selected item) *@
+            <div class="col-6 col-md-2">
+                <label class="form-label mb-1 fw-semibold text-secondary" style="font-size: 0.85rem;">
+                    Stock
+                </label>
+                <input type="text" class="form-control form-control-sm text-end fw-bold bg-light"
+                       style="height: 35px;"
+                       readonly
+                       value="@(SelectedLookAlike?.InHand?.ToString("G29") ?? "0")" />
+            </div>
+
+            @* 3. Add Button *@
+            <div class="col-6 col-md-2">
+                <button type="button" class="btn btn-primary btn-sm w-100 d-flex align-items-center justify-content-center"
+                        style="height: 35px;"
+                        @onclick="AddLookAlike"
+                        title="Add Look alike Item">
+                    <i class="fas fa-plus me-1"></i> Add
+                </button>
+            </div>
+
+        </div>
+
+        @* ── Look alike Grid (LVLookalike) ── *@
+        <div class="table-responsive border rounded bg-white" style="position: relative !important; z-index: 1 !important; min-height: 280px; max-height: 480px; overflow-y: auto;">
+            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                    <tr>
+                        <th style="width: 10%;" class="text-center">S No.</th>
+                        <th style="width: 65%;">Item</th>
+                        <th style="width: 15%;" class="text-end">Stock</th>
+                        <th style="width: 10%;" class="text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Item.LookAlikes == null || !Item.LookAlikes.Any())
+                    {
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-5">
+                                <i class="fas fa-clone fa-2x text-black-50 d-block mb-2"></i>
+                                <em>No look alike items added. Search and select an item above to add.</em>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @for (int i = 0; i < Item.LookAlikes.Count; i++)
+                        {
+                            var lookalike = Item.LookAlikes[i];
+                            var index = i + 1;
+                            <tr>
+                                <td class="text-center text-secondary font-monospace">@index</td>
+                                <td>
+                                    <span class="fw-bold text-dark">[@lookalike.ItemID_LookAlike]</span>
+                                    <span class="text-secondary ms-1">@lookalike.ItemName</span>
+                                </td>
+                                <td class="text-end font-monospace fw-semibold">
+                                    @(lookalike.InHand?.ToString("G29") ?? "0")
+                                </td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-link text-danger p-0"
+                                            @onclick="() => RemoveLookAlike(lookalike)"
+                                            title="Remove look alike item">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+    </fieldset>
+
+</div>
+
+<style>
+    .look-alike-container .blazored-typeahead {
+        height: 35px !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public ItemDto Item { get; set; } = default!;
+
+    private List<ItemSearchLookupModel> AllItems { get; set; } = new();
+    private ItemSearchLookupModel? SelectedLookAlike { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            AllItems = await ItemService.GetItemSearchLookupsAsync();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"Failed to load items: {ex.Message}",
+                Duration = 4000
+            });
+        }
+    }
+
+    private Task<IEnumerable<ItemSearchLookupModel>> SearchItems(string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return Task.FromResult(AllItems.AsEnumerable());
+
+        var filtered = AllItems.Where(m =>
+            (!string.IsNullOrEmpty(m.ItemID) && m.ItemID.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
+            (!string.IsNullOrEmpty(m.ItemName) && m.ItemName.Contains(searchText, StringComparison.OrdinalIgnoreCase)));
+
+        return Task.FromResult(filtered);
+    }
+
+    private void OnLookAlikeSelected(ItemSearchLookupModel? item)
+    {
+        SelectedLookAlike = item;
+    }
+
+    private Task AddLookAlike()
+    {
+        if (SelectedLookAlike == null || string.IsNullOrWhiteSpace(SelectedLookAlike.ItemID))
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Warning,
+                Summary = "Item Required",
+                Detail = "Please search and select a look alike item.",
+                Duration = 3000
+            });
+            return Task.CompletedTask;
+        }
+
+        // Self check
+        if (!string.IsNullOrEmpty(Item.ItemID) && string.Equals(SelectedLookAlike.ItemID, Item.ItemID, StringComparison.OrdinalIgnoreCase))
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Warning,
+                Summary = "Invalid Item",
+                Detail = "An item cannot be added as a look alike of itself.",
+                Duration = 3000
+            });
+            return Task.CompletedTask;
+        }
+
+        // Duplicate check
+        if (Item.LookAlikes.Any(l => string.Equals(l.ItemID_LookAlike, SelectedLookAlike.ItemID, StringComparison.OrdinalIgnoreCase)))
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Warning,
+                Summary = "Duplicate Item",
+                Detail = $"Item '{SelectedLookAlike.ItemID}' is already added as a look alike.",
+                Duration = 3000
+            });
+            return Task.CompletedTask;
+        }
+
+        var newEntry = new ItemLookAlikeModel
+        {
+            ItemID = Item.ItemID,
+            ItemID_LookAlike = SelectedLookAlike.ItemID,
+            ItemName = SelectedLookAlike.ItemName,
+            InHand = SelectedLookAlike.InHand
+        };
+
+        Item.LookAlikes.Add(newEntry);
+
+        // Reset selector
+        SelectedLookAlike = null;
+
+        NotificationService.Notify(new Radzen.NotificationMessage
+        {
+            Severity = Radzen.NotificationSeverity.Success,
+            Summary = "Added",
+            Detail = $"Look alike item '{newEntry.ItemID_LookAlike}' added successfully.",
+            Duration = 2000
+        });
+
+        return Task.CompletedTask;
+    }
+
+    private void RemoveLookAlike(ItemLookAlikeModel lookalike)
+    {
+        Item.LookAlikes.Remove(lookalike);
+        NotificationService.Notify(new Radzen.NotificationMessage
+        {
+            Severity = Radzen.NotificationSeverity.Info,
+            Summary = "Removed",
+            Detail = $"Look alike item '{lookalike.ItemID_LookAlike}' removed.",
+            Duration = 2000
+        });
+    }
+}
