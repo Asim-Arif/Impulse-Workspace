@@ -1,0 +1,640 @@
+@page "/office/minutes-workflow"
+@page "/office/minutes-workflow/{Id:int}"
+@page "/minutes-workflow"
+@page "/minutes-workflow/{Id:int}"
+@layout IntraOfficeLayout
+@using DataAccessLibrary.Models.IntraOffice
+@using Impulse.Services.IntraOffice
+@using System.Text.Json
+@using QuestPDF.Fluent
+@using QuestPDF.Helpers
+@using QuestPDF.Infrastructure
+@inject NavigationManager Navigation
+@inject IMinuteApprovalService MinuteApprovalService
+@inject IMessageService MessageService
+@inject IMinuteTypeService MinuteTypeService
+@inject IIntraOfficeService IntraOfficeService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IWhatsAppService WhatsAppService
+@inject IJSRuntime JS
+@inject IAiService AiService
+
+<style>
+    @@media print {
+        .no-print, .topbar, .btn, .sidebar, nav, header {
+            display: none !important;
+        }
+        body {
+            background: white !important;
+            color: black !important;
+        }
+        .card {
+            border: none !important;
+            box-shadow: none !important;
+        }
+    }
+</style>
+
+<div class="topbar">
+    <h1 class="topbar-title"><i class="bi bi-check2-square"></i> Minutes Approval</h1>
+    <div class="topbar-actions">
+        <button class="btn btn-secondary btn-sm" @onclick="Close">
+            <i class="bi bi-x-lg"></i> Close
+        </button>
+    </div>
+</div>
+
+<div class="content-area">
+    @if (Id == null)
+    {
+        <div class="card p-20 text-center">
+            <h3>No Minute Selected</h3>
+            <p class="text-muted">Please select a minute from the Minutes List or your notifications to view the approval workflow.</p>
+            <a href="/minutes-list" class="btn btn-primary mt-3">Go to Minutes List</a>
+        </div>
+    }
+    else if (!isLoaded)
+    {
+        <div class="card p-20 text-center">
+            <div class="spinner-border text-info" role="status" style="width: 2rem; height: 2rem; margin-bottom: 8px;"></div>
+            <p class="text-muted">Loading workflow details...</p>
+        </div>
+    }
+    else if (minute == null)
+    {
+        <div class="card p-32 text-center" style="border: 1px solid var(--danger);">
+            <i class="bi bi-exclamation-triangle text-danger" style="font-size: 3rem; display: block; margin-bottom: 12px;"></i>
+            <h3>Document Not Found</h3>
+            <p class="text-muted">The requested minute approval document could not be found or has been deleted.</p>
+            <a href="/minutes-list" class="btn btn-primary mt-3">Return to Minutes List</a>
+        </div>
+    }
+    else
+    {
+        <!-- 1. Top Action Bar & Remarks -->
+        @if (minute.Status == "Pending" || minute.Status == "Referred")
+        {
+            <div class="card mb-20" style="padding: 16px; border: 1px solid var(--border-color);">
+                <div style="display: flex; gap: 12px; margin-bottom: 16px; align-items: flex-end;">
+                    <div class="form-group mb-0" style="width: 250px;">
+                        <label class="form-label" style="font-size: 0.85rem; color: var(--info); font-weight: bold;">Next Level</label>
+                        <select class="form-control" style="height: 38px;" @bind="nextForwardToUserId">
+                            <option value="">-- Select User --</option>
+                            @foreach (var u in allUsers)
+                            {
+                                <option value="@u.Id">@u.FullName</option>
+                            }
+                        </select>
+                    </div>
+                    <button class="btn btn-outline-danger" style="height: 38px; min-width: 100px;" @onclick='() => ProcessAction("Reject")' disabled="@isSaving">Reject</button>
+                    <button class="btn btn-outline-warning" style="height: 38px; min-width: 100px;" @onclick='() => ProcessAction("Refer")' disabled="@isSaving">Refer</button>
+                    <button class="btn btn-outline-success" style="height: 38px; min-width: 100px;" @onclick='() => ProcessAction("Approve")' disabled="@isSaving">Approve</button>
+                    <button class="btn btn-outline-secondary" style="height: 38px; min-width: 100px;" @onclick='() => ProcessAction("Case Close")' disabled="@isSaving">Case Close</button>
+                </div>
+                
+                <div style="display: flex; gap: 20px;">
+                    <div class="form-group mb-0" style="flex: 2;">
+                        <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 4px;">
+                            <label class="form-label mb-0" style="font-size: 0.85rem; color: var(--info); font-weight: bold;">Remarks</label>
+                        </div>
+                        <textarea class="form-control" rows="4" style="width: 100%;" @bind="remarks"></textarea>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- 2. Document View Area -->
+        <div class="card mb-20" style="background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 20px; display: flex; justify-content: center;">
+            <div class="document-page" style="background: var(--bg-card); width: 100%; max-width: 900px; min-height: 500px; padding: 40px; border: 1px solid var(--border-light); box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                
+                <div style="display: flex; gap: 32px; margin-bottom: 30px; font-size: 0.95rem; border-bottom: 1px solid var(--border-light); padding-bottom: 16px;">
+                    <div><strong>Minutes Type:</strong> @minute.Type</div>
+                    <div><strong>Minutes No.:</strong> @minute.No</div>
+                    <div><strong>Department:</strong> @(minute.CreatedByUser?.Department?.Name ?? "")</div>
+                    <div><strong>Budget Available:</strong> Yes</div>
+                </div>
+
+                @if (minute.Type == "Purchase")
+                {
+                    <div style="display: flex; gap: 32px; margin-bottom: 20px; font-size: 0.95rem; background: var(--bg-tertiary); padding: 12px; border-radius: 4px;">
+                        <div><strong>Total PO Value:</strong> @minute.PurchaseOrderValue</div>
+                        <div><strong>Advance Recommend:</strong> @minute.PurchaseAdvanceRecommend</div>
+                        <div><strong>Approved Amount:</strong> @minute.PurchaseApprovedAmount</div>
+                    </div>
+                }
+                else if (minute.Type == "Stocks Requsition")
+                {
+                    <div style="display: flex; gap: 32px; margin-bottom: 20px; font-size: 0.95rem; background: var(--bg-tertiary); padding: 12px; border-radius: 4px;">
+                        <div><strong>Requested Qty:</strong> @minute.RequestedStockQty</div>
+                        <div><strong>Current Qty:</strong> @minute.CurrentStockQty</div>
+                        <div><strong>Approved Qty:</strong> @minute.ApprovedStockQty</div>
+                    </div>
+                }
+                else if (minute.Type == "HR")
+                {
+                    <div style="margin-bottom: 20px; font-size: 0.95rem; background: var(--bg-tertiary); padding: 12px; border-radius: 4px;">
+                        <strong>Leave Type:</strong> @minute.HRLeaveType
+                    </div>
+                }
+                else if (minute.Type == "Financial")
+                {
+                    <div style="margin-bottom: 20px; font-size: 0.95rem; background: var(--bg-tertiary); padding: 12px; border-radius: 4px;">
+                        <strong>Financial Action:</strong> @minute.FinancialType
+                    </div>
+                }
+
+                <div style="text-align: center; margin-bottom: 24px;">
+                    <h2 style="font-size: 1.1rem; font-weight: bold; text-decoration: underline; margin: 0;">SUBJECT : @minute.Subject</h2>
+                    <div class="no-print mt-2">
+                        <button type="button" class="btn btn-sm btn-ghost" @onclick="GenerateAiSummary" disabled="@isAiLoading">
+                            <i class="bi bi-magic"></i> Generate AI Summary
+                        </button>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(aiSummary))
+                {
+                    <div style="background: var(--bg-info); padding: 16px; border-radius: 8px; margin-bottom: 24px; border: 1px solid var(--info); position: relative;">
+                        <button type="button" class="btn btn-sm btn-ghost no-print" style="position: absolute; top: 8px; right: 8px;" @onclick='() => aiSummary = ""'><i class="bi bi-x"></i></button>
+                        <h5 style="color: var(--info); font-size: 0.95rem; margin-bottom: 8px; font-weight: bold;"><i class="bi bi-robot"></i> AI Summary</h5>
+                        <div style="font-size: 0.9rem; white-space: pre-wrap;">@aiSummary</div>
+                    </div>
+                }
+
+                <div style="font-size: 0.95rem; line-height: 1.6;">
+                    <div style="margin-bottom: 12px;">
+                        <strong>@(minute.CreatedByUser?.FullName ?? "Initiator"):</strong>
+                    </div>
+                    <div style="padding-left: 20px; margin-bottom: 24px;">
+                        <ol style="margin-top: 0;">
+                            @foreach (var pt in GetPointsList())
+                            {
+                                <li style="margin-bottom: 12px;">@pt</li>
+                            }
+                        </ol>
+                        @if (!string.IsNullOrEmpty(minute.CreatedByUser?.SignaturePath))
+                        {
+                            <div style="margin-top: 16px;">
+                                <img src="@minute.CreatedByUser.SignaturePath" alt="Signature" style="max-height: 60px; max-width: 200px; border-bottom: 1px solid var(--text-muted);" />
+                            </div>
+                        }
+                    </div>
+
+                    @if (history != null && history.Any())
+                    {
+                        @foreach (var h in history.OrderBy(x => x.CreatedAt))
+                        {
+                            @if (!string.IsNullOrEmpty(h.Remarks))
+                            {
+                                <div style="margin-bottom: 8px;">
+                                    <strong>@h.User?.FullName:</strong>
+                                </div>
+                                <div style="padding-left: 20px; margin-bottom: 24px; white-space: pre-wrap;">
+                                    @h.Remarks
+                                    @if (!string.IsNullOrEmpty(h.User?.SignaturePath))
+                                    {
+                                        <div style="margin-top: 16px;">
+                                            <img src="@h.User.SignaturePath" alt="Signature" style="max-height: 60px; max-width: 200px; border-bottom: 1px solid var(--text-muted);" />
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Attachment & Footer Section -->
+        <div class="card mb-20" style="padding: 20px; border: 1px solid var(--border-color);">
+            
+            <div class="@(printAttachments ? "" : "no-print")" style="margin-bottom: 24px;">
+                <h5 style="font-size: 0.95rem; font-weight: bold; margin-bottom: 12px;"><i class="bi bi-paperclip"></i> Attachments</h5>
+                
+                @if (minute.Attachments != null && minute.Attachments.Any())
+                {
+                    <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+                        @foreach (var att in minute.Attachments)
+                        {
+                            <a href="/uploads/@att.FilePath" target="_blank" style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; text-decoration: none; color: var(--info);">
+                                <i class="bi bi-file-earmark-text"></i>
+                                <span>@att.FileName</span>
+                                <span style="color: var(--text-muted); font-size: 0.8rem;">(@((att.FileSize / 1024.0).ToString("N1")) KB)</span>
+                            </a>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px;">No attachments uploaded yet.</div>
+                }
+
+                <div class="no-print" style="padding: 16px; background: var(--bg-input); border: 1px dashed var(--border-color); border-radius: 4px;">
+                    <label class="form-label mb-2" style="font-size: 0.85rem; font-weight: bold;">Attach Files for this Action:</label>
+                    <InputFile OnChange="HandleFileSelection" multiple class="form-control" />
+                    @if (newAttachments != null && newAttachments.Any())
+                    {
+                        <div style="font-size: 0.85rem; color: var(--success); margin-top: 8px;">
+                            <i class="bi bi-check-circle"></i> @newAttachments.Count files ready to attach.
+                        </div>
+                    }
+                </div>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 1px solid var(--border-light);">
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary" style="font-weight: bold;">Update Attachments</button>
+                    @if (isAdmin)
+                    {
+                        <button class="btn btn-secondary">Edit</button>
+                    }
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-success" @onclick="SendWhatsapp" disabled="@isSaving"><i class="bi bi-whatsapp"></i> Send Whatsapp</button>
+                    <button class="btn btn-secondary" @onclick="PrintForm">Print</button>
+                    <button class="btn btn-secondary" @onclick="Close">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Workflow History (Optional Display) -->
+        @if (history != null && history.Any())
+        {
+            <div class="card p-20 mt-3">
+                <h4 style="font-size: 1rem; margin-bottom: 16px;">Workflow History</h4>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    @foreach (var h in history)
+                    {
+                        <div style="padding: 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.85rem; color: var(--text-muted);">
+                                <span><strong>@h.User?.FullName</strong></span>
+                                <span>@h.CreatedAt.ToLocalTime().ToString("g")</span>
+                            </div>
+                            <div style="font-weight: bold; margin-bottom: 4px; color: var(--primary);">Action: @h.ActionTaken</div>
+                            @if (!string.IsNullOrEmpty(h.Remarks))
+                            {
+                                <div style="font-size: 0.9rem; white-space: pre-wrap;">@h.Remarks</div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int? Id { get; set; }
+
+    private MinuteApproval? minute;
+    private System.Security.Claims.ClaimsPrincipal? currentUser;
+    private List<IntraUserProfile> allUsers = new();
+    private List<IntraDepartment> allDepartments = new();
+    private List<MinuteType> minuteTypes = new();
+    private List<MinuteWorkflowHistory> history = new();
+    
+    private string nextForwardToUserId = "";
+    private string remarks = "";
+    private string? currentUserId;
+    private bool isSaving = false;
+    private bool isAdmin = false;
+    private bool printAttachments = true;
+    private bool isAiLoading = false;
+    private string aiSummary = "";
+    private List<Microsoft.AspNetCore.Components.Forms.IBrowserFile> newAttachments = new();
+
+    private async Task PrintForm()
+    {
+        printAttachments = await JS.InvokeAsync<bool>("confirm", "Do you want to print attachments as well?");
+        StateHasChanged();
+        await Task.Delay(100);
+        await JS.InvokeVoidAsync("window.print");
+    }
+
+    private async Task SendWhatsapp()
+    {
+        if (minute?.CreatedByUser == null || string.IsNullOrEmpty(minute.CreatedByUser.PhoneNumber))
+        {
+            await JS.InvokeVoidAsync("alert", "Originator does not have a valid WhatsApp number on their profile.");
+            return;
+        }
+
+        isSaving = true;
+        StateHasChanged();
+
+        try
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"*Minute No:* {minute.No}");
+            sb.AppendLine($"*Date:* {minute.Date.ToString("dd-MMM-yyyy")}");
+            sb.AppendLine($"*Subject:* {minute.Subject}");
+            sb.AppendLine($"*Type:* {minute.Type}");
+            
+            if (minute.Type == "Purchase")
+            {
+                sb.AppendLine($"*Total PO Value:* {minute.PurchaseOrderValue}");
+                sb.AppendLine($"*Advance Recommend:* {minute.PurchaseAdvanceRecommend}");
+                sb.AppendLine($"*Approved Amount:* {minute.PurchaseApprovedAmount}");
+            }
+            else if (minute.Type == "Stocks Requsition")
+            {
+                sb.AppendLine($"*Requested Qty:* {minute.RequestedStockQty}");
+                sb.AppendLine($"*Current Qty:* {minute.CurrentStockQty}");
+                sb.AppendLine($"*Approved Qty:* {minute.ApprovedStockQty}");
+            }
+            else if (minute.Type == "HR")
+            {
+                sb.AppendLine($"*Leave Type:* {minute.HRLeaveType}");
+            }
+            else if (minute.Type == "Financial")
+            {
+                sb.AppendLine($"*Financial Action:* {minute.FinancialType}");
+            }
+            else
+            {
+                sb.AppendLine($"*Total Amount:* Rs. {minute.TotalAmount:N2}");
+            }
+            
+            sb.AppendLine();
+            sb.AppendLine($"*Initiated By:* {minute.CreatedByUser.FullName}");
+            sb.AppendLine();
+            
+            var points = GetPointsList();
+            if (points.Any())
+            {
+                sb.AppendLine("*Points:*");
+                for (int i = 0; i < points.Count; i++)
+                {
+                    sb.AppendLine($"{i+1}. {points[i]}");
+                }
+                sb.AppendLine();
+            }
+
+            sb.AppendLine($"*Status:* {minute.Status}");
+
+            // Generate PDF
+            QuestPDF.Settings.License = LicenseType.Community;
+            var document = Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4);
+                    page.Margin(2, QuestPDF.Infrastructure.Unit.Centimetre);
+                    page.PageColor(QuestPDF.Helpers.Colors.White);
+                    page.DefaultTextStyle(x => x.FontSize(12));
+
+                    page.Header().Text("Minute Approval Form").SemiBold().FontSize(20).FontColor(QuestPDF.Helpers.Colors.Blue.Darken2);
+
+                    page.Content().PaddingVertical(1, QuestPDF.Infrastructure.Unit.Centimetre).Column(x =>
+                    {
+                        x.Spacing(10);
+                        
+                        // Top info block
+                        x.Item().Row(r =>
+                        {
+                            r.RelativeItem().Text($"Minutes Type: {minute.Type}").FontSize(10);
+                            r.RelativeItem().Text($"Minutes No.: {minute.No}").FontSize(10);
+                            r.RelativeItem().Text($"Department: {minute.CreatedByUser?.Department?.Name ?? ""}").FontSize(10);
+                            r.RelativeItem().Text("Budget Available: Yes").FontSize(10);
+                        });
+
+                        x.Item().LineHorizontal(1).LineColor(QuestPDF.Helpers.Colors.Grey.Lighten2);
+
+                        if (minute.Type == "Purchase")
+                        {
+                            x.Item().PaddingTop(5).Row(r =>
+                            {
+                                r.RelativeItem().Text($"Total PO Value: {minute.PurchaseOrderValue}").FontSize(10);
+                                r.RelativeItem().Text($"Advance Recommend: {minute.PurchaseAdvanceRecommend}").FontSize(10);
+                                r.RelativeItem().Text($"Approved Amount: {minute.PurchaseApprovedAmount}").FontSize(10);
+                            });
+                        }
+                        else if (minute.Type == "Stocks Requsition")
+                        {
+                            x.Item().PaddingTop(5).Row(r =>
+                            {
+                                r.RelativeItem().Text($"Requested Qty: {minute.RequestedStockQty}").FontSize(10);
+                                r.RelativeItem().Text($"Current Qty: {minute.CurrentStockQty}").FontSize(10);
+                                r.RelativeItem().Text($"Approved Qty: {minute.ApprovedStockQty}").FontSize(10);
+                            });
+                        }
+                        else if (minute.Type == "HR")
+                        {
+                            x.Item().PaddingTop(5).Text($"Leave Type: {minute.HRLeaveType}").FontSize(10);
+                        }
+                        else if (minute.Type == "Financial")
+                        {
+                            x.Item().PaddingTop(5).Text($"Financial Action: {minute.FinancialType}").FontSize(10);
+                        }
+
+                        // Subject
+                        x.Item().PaddingTop(10).AlignCenter().Text($"SUBJECT : {minute.Subject}").SemiBold().Underline().FontSize(14);
+
+                        // Initiator
+                        x.Item().PaddingTop(10).Text($"{minute.CreatedByUser?.FullName ?? "Initiator"}:").SemiBold();
+                        
+                        var pointsList = GetPointsList();
+                        if (pointsList.Any())
+                        {
+                            x.Item().PaddingLeft(20).Column(p =>
+                            {
+                                for (int i = 0; i < pointsList.Count; i++)
+                                {
+                                    p.Item().Text($"{i + 1}. {pointsList[i]}");
+                                }
+                            });
+                        }
+
+                        // Initiator Signature
+                        if (!string.IsNullOrEmpty(minute.CreatedByUser?.SignaturePath))
+                        {
+                            var sigPath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "wwwroot", minute.CreatedByUser.SignaturePath.TrimStart('/'));
+                            if (System.IO.File.Exists(sigPath))
+                            {
+                                x.Item().PaddingLeft(20).PaddingTop(10).Width(150).Height(50).Image(sigPath);
+                            }
+                        }
+
+                        // History / Remarks
+                        if (history != null && history.Any())
+                        {
+                            foreach (var h in history.OrderBy(hist => hist.CreatedAt))
+                            {
+                                if (!string.IsNullOrEmpty(h.Remarks))
+                                {
+                                    x.Item().PaddingTop(15).Text($"{h.User?.FullName}:").SemiBold();
+                                    x.Item().PaddingLeft(20).Text(h.Remarks);
+                                    
+                                    if (!string.IsNullOrEmpty(h.User?.SignaturePath))
+                                    {
+                                        var hSigPath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "wwwroot", h.User.SignaturePath.TrimStart('/'));
+                                        if (System.IO.File.Exists(hSigPath))
+                                        {
+                                            x.Item().PaddingLeft(20).PaddingTop(5).Width(150).Height(50).Image(hSigPath);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                });
+            });
+
+            var safeNo = minute.No.Replace("/", "_").Replace("\\", "_");
+            var tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"Minute_{safeNo}.pdf");
+            document.GeneratePdf(tempPath);
+
+            var attachments = new List<string> { tempPath };
+            bool result = await WhatsAppService.SendDirectMessageAsync(minute.CreatedByUser.PhoneNumber, sb.ToString(), attachments);
+            
+            if (result)
+            {
+                await JS.InvokeVoidAsync("alert", "WhatsApp message and PDF sent successfully!");
+            }
+            else
+            {
+                await JS.InvokeVoidAsync("alert", "Failed to send WhatsApp message. Please check the WhatsApp node service logs.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error generating PDF or sending message: {ex.Message}");
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private void HandleFileSelection(Microsoft.AspNetCore.Components.Forms.InputFileChangeEventArgs e)
+    {
+        newAttachments = e.GetMultipleFiles().ToList();
+    }
+
+    private async Task GenerateAiSummary()
+    {
+        var pointsList = GetPointsList();
+        if (!pointsList.Any())
+        {
+            await JS.InvokeVoidAsync("alert", "There are no points to summarize.");
+            return;
+        }
+
+        isAiLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var textToSummarize = $"Subject: {minute?.Subject}\nPoints:\n" + string.Join("\n", pointsList.Select((p, i) => $"{i + 1}. {p}"));
+            aiSummary = await AiService.SummarizeTextAsync(textToSummarize);
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", "AI Error: " + ex.Message);
+        }
+
+        isAiLoading = false;
+        StateHasChanged();
+    }
+
+    private bool isLoaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        currentUser = authState.User;
+        currentUserId = currentUser.Identity?.Name
+            ?? currentUser.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value 
+            ?? "";
+        isAdmin = currentUser.IsInRole("Admin") || currentUser.IsInRole("Administrator") || string.Equals(currentUser.Identity?.Name, "admin", StringComparison.OrdinalIgnoreCase);
+        
+        var rawUsers = await IntraOfficeService.GetActiveUsersAsync();
+        allUsers = rawUsers.OrderBy(u => u.FullName).ToList();
+        var rawDepts = await IntraOfficeService.GetDepartmentsAsync();
+        allDepartments = rawDepts.Select(d => new IntraDepartment { Id = d.DeptId, Name = d.DeptName }).ToList();
+        minuteTypes = await MinuteTypeService.GetActiveAsync();
+
+        if (Id.HasValue)
+        {
+            minute = await MinuteApprovalService.GetMinuteByIdAsync(Id.Value);
+            history = await MinuteApprovalService.GetMinuteHistoryAsync(Id.Value);
+            await MinuteApprovalService.MarkAsReadAsync(Id.Value);
+        }
+        
+        isLoaded = true;
+    }
+
+    private List<string> GetPointsList()
+    {
+        if (string.IsNullOrEmpty(minute?.Points)) return new List<string>();
+        try
+        {
+            var points = JsonSerializer.Deserialize<List<string>>(minute.Points);
+            return points ?? new List<string>();
+        }
+        catch
+        {
+            return new List<string> { minute.Points }; // Fallback to raw text if not JSON
+        }
+    }
+
+    private async Task ProcessAction(string action)
+    {
+        if (string.IsNullOrEmpty(currentUserId) || !Id.HasValue || isSaving) return;
+
+        if ((action == "Approve" || action == "Refer") && string.IsNullOrEmpty(nextForwardToUserId))
+        {
+            // Simple validation: Need a user to forward to
+            // In a real app we'd use a toast notification
+            Console.WriteLine("Must select Next Level user to Approve or Refer.");
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            // Process the action in DB
+            await MinuteApprovalService.ProcessWorkflowActionAsync(Id.Value, currentUserId, action, remarks, nextForwardToUserId, newAttachments, null);
+            
+            // Send Alert Message
+            if (!string.IsNullOrEmpty(nextForwardToUserId))
+            {
+                var content = $"Minute ({minute?.No}) has been {action} and forwarded to you.\n\n[Click here to view Minute Approval](/minutes-workflow/{Id.Value})";
+                await MessageService.SendMessageAsync(new Message
+                {
+                    SenderId = currentUserId,
+                    ReceiverId = nextForwardToUserId,
+                    Content = content,
+                    SentAt = DateTime.UtcNow
+                });
+
+                // Send WhatsApp Notification
+                var targetUser = allUsers.FirstOrDefault(u => u.Id == nextForwardToUserId);
+                if (targetUser != null && !string.IsNullOrEmpty(targetUser.PhoneNumber))
+                {
+                    var submitter = allUsers.FirstOrDefault(u => u.Id == currentUserId);
+                    string submitterName = submitter?.FullName ?? "Someone";
+                    string link = Navigation.BaseUri + $"minutes-workflow/{Id.Value}";
+                    _ = WhatsAppService.SendMinuteApprovalRequestAsync(targetUser.PhoneNumber, minute?.Subject ?? "Minute Approval", targetUser.FullName, submitterName, link);
+                }
+            }
+
+            Navigation.NavigateTo("/minutes-list");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error processing workflow: {ex.Message}");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void Close()
+    {
+        Navigation.NavigateTo("/minutes-list");
+    }
+}

@@ -14,9 +14,11 @@ namespace DataAccessLibrary.Models.IntraOffice
         public DateTime? ScheduledEndTime { get; set; }
         public MeetingStatus Status { get; set; } = MeetingStatus.Scheduled;
         public string? MeetingMinutes { get; set; }
+        public string? VoiceNotePath { get; set; }
         public bool IsReminderSent { get; set; } = false;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        public IntraUserProfile? Organizer => !string.IsNullOrEmpty(OrganizerId) ? new IntraUserProfile { UserName = OrganizerId, FullUserName = OrganizerName } : null;
         public List<MeetingParticipant> Participants { get; set; } = new List<MeetingParticipant>();
     }
 
@@ -28,5 +30,6 @@ namespace DataAccessLibrary.Models.IntraOffice
         public string? FullName { get; set; }
         public string? Designation { get; set; }
         public bool HasAttended { get; set; } = false;
+        public IntraUserProfile? User => !string.IsNullOrEmpty(UserId) ? new IntraUserProfile { UserName = UserId, FullUserName = FullName, Designation = Designation } : null;
     }
 }

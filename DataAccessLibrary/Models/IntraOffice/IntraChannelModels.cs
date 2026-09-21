@@ -31,5 +31,7 @@ namespace DataAccessLibrary.Models.IntraOffice
         public string? Designation { get; set; }
         public bool IsAdmin { get; set; } = false;
         public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
+
+        public IntraUserProfile? User => !string.IsNullOrEmpty(UserId) ? new IntraUserProfile { UserName = UserId, FullUserName = FullName ?? UserName ?? UserId } : null;
     }
 }

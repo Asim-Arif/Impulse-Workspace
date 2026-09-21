@@ -1,0 +1,806 @@
+@page "/office/meetings/create"
+@page "/meetings/create"
+@layout IntraOfficeLayout
+@attribute [Authorize]
+@using DataAccessLibrary.Models.IntraOffice
+@using Impulse.Services.IntraOffice
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IIntraOfficeService IntraOfficeService
+@inject IMeetingService MeetingService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject IAiService AiService
+
+<PageTitle>IntraCom-CRM | Schedule Corporate Video Meeting</PageTitle>
+
+<div class="create-meeting-wrapper">
+
+    <!-- 1. GLASSMORPHIC TOP BANNER -->
+    <div class="meeting-create-banner">
+        <div class="banner-glow-1"></div>
+        <div class="banner-glow-2"></div>
+
+        <div class="banner-content d-flex flex-wrap align-items-center justify-content-between gap-3 position-relative">
+            <div class="d-flex align-items-center gap-3">
+                <a href="/meetings" class="btn btn-banner-back" title="Back to Meetings">
+                    <i class="bi bi-arrow-left"></i>
+                </a>
+                <div class="banner-icon-orb">
+                    <i class="bi bi-calendar-plus-fill"></i>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <h3 class="banner-title mb-0">Schedule Executive Video Conference</h3>
+                        <span class="badge bg-primary bg-opacity-20 text-info border border-info border-opacity-25 rounded-pill px-3 py-1 text-xs">
+                            WebRTC 1080p P2P
+                        </span>
+                    </div>
+                    <p class="banner-sub mb-0 mt-1">
+                        Configure participants, broadcast multi-channel WhatsApp & Email calendar invites, and prepare automated minutes recording.
+                    </p>
+                </div>
+            </div>
+
+            <a href="/meetings" class="btn btn-outline-light rounded-pill px-4 py-2 text-xs fw-bold">
+                <i class="bi bi-calendar3 me-1"></i> View Calendar
+            </a>
+        </div>
+    </div>
+
+    @if (isSubmitting)
+    {
+        <div class="alert alert-submitting d-flex align-items-center gap-3 mb-4 p-3 rounded-3 shadow-sm border">
+            <div class="spinner-border text-primary" role="status"></div>
+            <div>
+                <div class="fw-bold text-dark">Scheduling conference & distributing invitations...</div>
+                <small class="text-muted">Generating encrypted WebRTC room, dispatching WhatsApp alerts, and emailing calendar invitations.</small>
+            </div>
+        </div>
+    }
+
+    <!-- 2. MAIN FORM GRID -->
+    <div class="row g-4">
+        <!-- Form Left Column (8 cols) -->
+        <div class="col-xl-8 col-lg-7 col-12">
+            <div class="meeting-form-card p-4">
+                <EditForm Model="meetingModel" OnValidSubmit="HandleValidSubmit" FormName="createMeetingForm">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="text-danger mb-3" />
+
+                    <!-- Meeting Subject -->
+                    <div class="form-section mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label fw-bold text-dark small mb-0">
+                                <i class="bi bi-chat-left-quote-fill text-primary me-1"></i>
+                                Meeting Subject / Agenda <span class="text-danger">*</span>
+                            </label>
+                            <button type="button" class="btn btn-ai-fix btn-xs" @onclick="CheckSubjectSpelling" disabled="@isAiLoading">
+                                <i class="bi bi-magic text-warning me-1"></i> AI Polish Subject
+                            </button>
+                        </div>
+                        <InputText @bind-Value="meetingModel.Title" class="form-control form-control-lg form-input-styled" 
+                                   placeholder="e.g. Q4 Financial Review & Export Strategy Sync" disabled="@isAiLoading" />
+                        <ValidationMessage For="@(() => meetingModel.Title)" class="text-danger small mt-1" />
+                    </div>
+
+                    <!-- Date & Time Row -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-sm-6">
+                            <div class="form-section">
+                                <label class="form-label fw-bold text-dark small mb-2">
+                                    <i class="bi bi-calendar-event text-primary me-1"></i>
+                                    Meeting Date <span class="text-danger">*</span>
+                                </label>
+                                <InputDate @bind-Value="meetingModel.MeetingDate" class="form-control form-input-styled" />
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="form-section">
+                                <label class="form-label fw-bold text-dark small mb-2">
+                                    <i class="bi bi-clock text-primary me-1"></i>
+                                    Scheduled Time <span class="text-danger">*</span>
+                                </label>
+                                <input type="time" @bind="meetingModel.MeetingTime" class="form-control form-input-styled" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Participants Selection -->
+                    <div class="form-section mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                            <label class="form-label fw-bold text-dark small mb-0">
+                                <i class="bi bi-people-fill text-primary me-1"></i>
+                                Select Attendees / Participants <span class="text-danger">*</span>
+                            </label>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2 py-1 text-xs">
+                                    @selectedUserIds.Count selected
+                                </span>
+                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-primary" @onclick="SelectAllUsers">
+                                    Select All
+                                </button>
+                                <span class="text-muted text-xs">•</span>
+                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-danger" @onclick="ClearAllUsers">
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- User search filter -->
+                        <div class="participant-search-wrap mb-2">
+                            <i class="bi bi-search p-search-icon"></i>
+                            <input type="text" class="form-control form-control-sm participant-search-input" 
+                                   placeholder="Filter colleagues by name, role, or email..." 
+                                   @bind="userSearchQuery" @bind:event="oninput" />
+                        </div>
+
+                        <!-- Users Scroll Box -->
+                        <div class="participants-scroll-box rounded-3 border">
+                            @if (FilteredUsers != null && FilteredUsers.Any())
+                            {
+                                @foreach (var user in FilteredUsers)
+                                {
+                                    var isChecked = selectedUserIds.Contains(user.Id);
+                                    <div class="participant-select-row @(isChecked ? "selected" : "")" 
+                                         @onclick="@(() => ToggleUser(user.Id))">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <input class="form-check-input mt-0" type="checkbox" 
+                                                   checked="@isChecked" 
+                                                   @onclick:stopPropagation />
+                                            <div class="user-avatar-orb">
+                                                @(user.FullName?.Length > 0 ? user.FullName[0].ToString().ToUpper() : "?")
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-dark small">@user.FullName</div>
+                                                <div class="text-muted text-xs">@(user.JobTitle ?? user.Email)</div>
+                                            </div>
+                                        </div>
+                                        @if (isChecked)
+                                        {
+                                            <span class="badge bg-success bg-opacity-15 text-success border border-success border-opacity-25 text-xs">
+                                                Invited
+                                            </span>
+                                        }
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="text-center p-4 text-muted small">
+                                    No colleagues match the search filter.
+                                </div>
+                            }
+                        </div>
+
+                        @if (showSelectionError)
+                        {
+                            <div class="text-danger mt-2 small fw-semibold">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i> Please select at least one participant to invite.
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Submit Actions -->
+                    <div class="d-flex justify-content-end align-items-center gap-3 pt-3 border-top">
+                        <a href="/meetings" class="btn btn-outline-secondary rounded-pill px-4">Cancel</a>
+                        <button type="submit" class="btn btn-submit-meeting rounded-pill px-4 py-2 fw-bold shadow-sm" disabled="@isSubmitting">
+                            <i class="bi bi-calendar-check-fill me-1"></i> Confirm & Schedule Conference
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+
+        <!-- Right Side: Conference Perks & Protocol (4 cols) -->
+        <div class="col-xl-4 col-lg-5 col-12">
+            
+            <div class="meeting-feature-card mb-4 p-4">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="feature-icon-orb bg-success text-white">
+                            <i class="bi bi-broadcast"></i>
+                        </div>
+                        <div>
+                            <h5 class="fw-bold text-dark mb-0">Multi-Channel Broadcast</h5>
+                            <small class="text-muted" style="font-size: 0.75rem;">Select active delivery channels</small>
+                        </div>
+                    </div>
+                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2 py-1" style="font-size: 0.72rem;">
+                        @(GetActiveChannelCount()) Channels Active
+                    </span>
+                </div>
+
+                <div class="channel-toggle-list d-flex flex-column gap-2">
+                    <!-- WhatsApp Channel Toggle -->
+                    <div class="channel-toggle-item p-3 @(broadcastOptions.SendWhatsApp ? "active" : "")" 
+                         @onclick="() => broadcastOptions.SendWhatsApp = !broadcastOptions.SendWhatsApp">
+                        <div class="d-flex align-items-start justify-content-between gap-2">
+                            <div class="d-flex align-items-start gap-3">
+                                <div class="channel-icon-orb whatsapp-orb">
+                                    <i class="bi bi-whatsapp"></i>
+                                </div>
+                                <div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="fw-bold text-dark small">Instant WhatsApp Invites</span>
+                                        @if (broadcastOptions.SendWhatsApp)
+                                        {
+                                            <span class="badge bg-success text-white text-xxs">ON</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary text-white text-xxs">MUTED</span>
+                                        }
+                                    </div>
+                                    <small class="text-muted d-block mt-1" style="font-size: 0.75rem; line-height: 1.3;">
+                                        Direct WhatsApp notification with meeting time, topic, and 1-click room link.
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="form-check form-switch m-0 pt-1" @onclick:stopPropagation>
+                                <input class="form-check-input" type="checkbox" role="switch" id="toggleWhatsApp"
+                                       @bind="broadcastOptions.SendWhatsApp" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Email Calendar Channel Toggle -->
+                    <div class="channel-toggle-item p-3 @(broadcastOptions.SendEmail ? "active" : "")" 
+                         @onclick="() => broadcastOptions.SendEmail = !broadcastOptions.SendEmail">
+                        <div class="d-flex align-items-start justify-content-between gap-2">
+                            <div class="d-flex align-items-start gap-3">
+                                <div class="channel-icon-orb email-orb">
+                                    <i class="bi bi-envelope-paper-fill"></i>
+                                </div>
+                                <div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="fw-bold text-dark small">Email Calendar Invitations</span>
+                                        @if (broadcastOptions.SendEmail)
+                                        {
+                                            <span class="badge bg-primary text-white text-xxs">ON</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary text-white text-xxs">MUTED</span>
+                                        }
+                                    </div>
+                                    <small class="text-muted d-block mt-1" style="font-size: 0.75rem; line-height: 1.3;">
+                                        Rich HTML invitation sent to attendee inboxes with calendar join details.
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="form-check form-switch m-0 pt-1" @onclick:stopPropagation>
+                                <input class="form-check-input" type="checkbox" role="switch" id="toggleEmail"
+                                       @bind="broadcastOptions.SendEmail" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- In-App Notification Channel Toggle -->
+                    <div class="channel-toggle-item p-3 @(broadcastOptions.SendInAppNotification ? "active" : "")" 
+                         @onclick="() => broadcastOptions.SendInAppNotification = !broadcastOptions.SendInAppNotification">
+                        <div class="d-flex align-items-start justify-content-between gap-2">
+                            <div class="d-flex align-items-start gap-3">
+                                <div class="channel-icon-orb inapp-orb">
+                                    <i class="bi bi-bell-fill"></i>
+                                </div>
+                                <div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="fw-bold text-dark small">In-App Notification Alerts</span>
+                                        @if (broadcastOptions.SendInAppNotification)
+                                        {
+                                            <span class="badge bg-info text-white text-xxs">ON</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary text-white text-xxs">MUTED</span>
+                                        }
+                                    </div>
+                                    <small class="text-muted d-block mt-1" style="font-size: 0.75rem; line-height: 1.3;">
+                                        Immediate bell alerts pushed to attendees' web session header in real-time.
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="form-check form-switch m-0 pt-1" @onclick:stopPropagation>
+                                <input class="form-check-input" type="checkbox" role="switch" id="toggleInApp"
+                                       @bind="broadcastOptions.SendInAppNotification" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- WebRTC Video Room (Always Active Protocol) -->
+                    <div class="channel-toggle-item p-3 locked">
+                        <div class="d-flex align-items-start justify-content-between gap-2">
+                            <div class="d-flex align-items-start gap-3">
+                                <div class="channel-icon-orb webrtc-orb">
+                                    <i class="bi bi-camera-video-fill"></i>
+                                </div>
+                                <div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="fw-bold text-dark small">P2P Encrypted WebRTC Room</span>
+                                        <span class="badge bg-dark text-white text-xxs">REQUIRED</span>
+                                    </div>
+                                    <small class="text-muted d-block mt-1" style="font-size: 0.75rem; line-height: 1.3;">
+                                        Secure Jitsi video room created automatically with screen-sharing and voice.
+                                    </small>
+                                </div>
+                            </div>
+                            <span class="text-muted small pt-1" title="Core conference infrastructure">
+                                <i class="bi bi-lock-fill text-muted"></i>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Auto-Generated Word Minutes Toggle -->
+                    <div class="channel-toggle-item p-3 @(broadcastOptions.EnableAutoMinutesDocx ? "active" : "")" 
+                         @onclick="() => broadcastOptions.EnableAutoMinutesDocx = !broadcastOptions.EnableAutoMinutesDocx">
+                        <div class="d-flex align-items-start justify-content-between gap-2">
+                            <div class="d-flex align-items-start gap-3">
+                                <div class="channel-icon-orb minutes-orb">
+                                    <i class="bi bi-file-earmark-word-fill"></i>
+                                </div>
+                                <div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="fw-bold text-dark small">Auto-Generated Word Minutes</span>
+                                        @if (broadcastOptions.EnableAutoMinutesDocx)
+                                        {
+                                            <span class="badge bg-primary text-white text-xxs">ENABLED</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary text-white text-xxs">DISABLED</span>
+                                        }
+                                    </div>
+                                    <small class="text-muted d-block mt-1" style="font-size: 0.75rem; line-height: 1.3;">
+                                        Live notepad with instant Word (.docx) document distribution upon call conclusion.
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="form-check form-switch m-0 pt-1" @onclick:stopPropagation>
+                                <input class="form-check-input" type="checkbox" role="switch" id="toggleMinutes"
+                                       @bind="broadcastOptions.EnableAutoMinutesDocx" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="instant-shortcut-card p-4 text-center">
+                <div class="shortcut-orb mx-auto mb-2">
+                    <i class="bi bi-lightning-charge-fill"></i>
+                </div>
+                <h6 class="fw-bold text-white mb-1">Need a Quick Ad-hoc Call?</h6>
+                <p class="text-light text-opacity-75 small mb-3">
+                    Skip scheduling and launch a disposable WebRTC conference link immediately.
+                </p>
+                <a href="/meetings" class="btn btn-light rounded-pill px-4 py-2 w-100 fw-bold text-dark small shadow-sm">
+                    ⚡ Open Instant Video Room
+                </a>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<style>
+    .create-meeting-wrapper {
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        padding: 0 4px 24px 4px;
+        box-sizing: border-box;
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .meeting-create-banner {
+        background: linear-gradient(135deg, #090d16 0%, #111827 45%, #1e1b4b 100%);
+        border-radius: 16px;
+        padding: 1.4rem 1.8rem;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 15px 30px -10px rgba(15, 23, 42, 0.4), 0 0 25px rgba(99, 102, 241, 0.15);
+        margin-bottom: 1.25rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .banner-glow-1 {
+        position: absolute;
+        top: -80px;
+        left: -80px;
+        width: 260px;
+        height: 260px;
+        background: radial-gradient(circle, rgba(99, 102, 241, 0.4) 0%, transparent 70%);
+        border-radius: 50%;
+        pointer-events: none;
+    }
+    .banner-glow-2 {
+        position: absolute;
+        bottom: -80px;
+        right: 10%;
+        width: 280px;
+        height: 280px;
+        background: radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, transparent 70%);
+        border-radius: 50%;
+        pointer-events: none;
+    }
+
+    .btn-banner-back {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+    }
+    .btn-banner-back:hover {
+        background: rgba(255, 255, 255, 0.25);
+        color: #ffffff;
+        transform: translateX(-2px);
+    }
+
+    .banner-icon-orb {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #4f46e5, #818cf8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        font-size: 1.4rem;
+        box-shadow: 0 0 15px rgba(99, 102, 241, 0.5);
+    }
+
+    .banner-title {
+        color: #ffffff;
+        font-weight: 800;
+        font-size: 1.35rem;
+    }
+    .banner-sub {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 0.86rem;
+    }
+
+    .meeting-form-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.03);
+    }
+
+    .form-input-styled {
+        border-radius: 10px;
+        border: 1px solid #cbd5e1;
+        transition: all 0.2s;
+    }
+    .form-input-styled:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    }
+
+    .btn-ai-fix {
+        background: rgba(245, 158, 11, 0.12);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        color: #b45309;
+        font-weight: 700;
+        border-radius: 9999px;
+        padding: 3px 10px;
+        transition: all 0.15s;
+    }
+    .btn-ai-fix:hover {
+        background: rgba(245, 158, 11, 0.22);
+    }
+
+    .participant-search-wrap {
+        position: relative;
+    }
+    .p-search-icon {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+        font-size: 0.8rem;
+    }
+    .participant-search-input {
+        padding-left: 28px;
+        border-radius: 20px;
+    }
+
+    .participants-scroll-box {
+        max-height: 260px;
+        overflow-y: auto;
+        background: #f8fafc;
+    }
+
+    .participant-select-row {
+        padding: 9px 12px;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .participant-select-row:hover {
+        background: #f1f5f9;
+    }
+    .participant-select-row.selected {
+        background: #eef2ff;
+    }
+
+    .user-avatar-orb {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #e0e7ff;
+        color: #4338ca;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.82rem;
+    }
+
+    .btn-submit-meeting {
+        background: linear-gradient(135deg, #4f46e5, #6366f1);
+        color: #ffffff;
+        border: none;
+        box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
+        transition: all 0.2s;
+    }
+    .btn-submit-meeting:hover {
+        background: linear-gradient(135deg, #4338ca, #4f46e5);
+        color: #ffffff;
+        transform: translateY(-1px);
+        box-shadow: 0 6px 18px rgba(79, 70, 229, 0.45);
+    }
+
+    .meeting-feature-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.03);
+    }
+
+    .channel-toggle-item {
+        background: #f8fafc;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+    }
+    .channel-toggle-item:hover:not(.locked) {
+        border-color: #cbd5e1;
+        background: #f1f5f9;
+        transform: translateY(-1px);
+    }
+    .channel-toggle-item.active {
+        background: #ffffff;
+        border-color: #6366f1;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.08);
+    }
+    .channel-toggle-item.locked {
+        cursor: default;
+        background: #f8fafc;
+        opacity: 0.9;
+    }
+
+    .channel-icon-orb {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.15rem;
+        flex-shrink: 0;
+    }
+    .whatsapp-orb { background: #dcfce7; color: #16a34a; }
+    .email-orb { background: #dbeafe; color: #2563eb; }
+    .inapp-orb { background: #e0e7ff; color: #4f46e5; }
+    .webrtc-orb { background: #f1f5f9; color: #334155; }
+    .minutes-orb { background: #eff6ff; color: #0284c7; }
+
+    .text-xxs {
+        font-size: 0.65rem;
+        padding: 2px 6px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+
+    .feature-icon-orb {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+    }
+
+    .instant-shortcut-card {
+        background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        box-shadow: 0 8px 24px rgba(30, 27, 75, 0.3);
+    }
+    .shortcut-orb {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.15);
+        color: #facc15;
+        font-size: 1.3rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>
+
+@code {
+    [SupplyParameterFromQuery] public string? Date { get; set; }
+
+    private IntraUserProfile? currentUser;
+    private List<IntraUserProfile>? allUsers;
+    private HashSet<string> selectedUserIds = new();
+    private string userSearchQuery = "";
+    
+    private MeetingFormModel meetingModel = new();
+    private MeetingBroadcastOptions broadcastOptions = new();
+    private bool isSubmitting = false;
+    private bool showSelectionError = false;
+    private bool isAiLoading = false;
+
+    private int GetActiveChannelCount()
+    {
+        int count = 1; // WebRTC room is always active
+        if (broadcastOptions.SendWhatsApp) count++;
+        if (broadcastOptions.SendEmail) count++;
+        if (broadcastOptions.SendInAppNotification) count++;
+        if (broadcastOptions.EnableAutoMinutesDocx) count++;
+        return count;
+    }
+
+    private IEnumerable<IntraUserProfile> FilteredUsers
+    {
+        get
+        {
+            if (allUsers == null) return Enumerable.Empty<IntraUserProfile>();
+            if (string.IsNullOrWhiteSpace(userSearchQuery)) return allUsers;
+
+            return allUsers.Where(u =>
+                u.FullName.Contains(userSearchQuery, StringComparison.OrdinalIgnoreCase) ||
+                (u.JobTitle != null && u.JobTitle.Contains(userSearchQuery, StringComparison.OrdinalIgnoreCase)) ||
+                (u.Email != null && u.Email.Contains(userSearchQuery, StringComparison.OrdinalIgnoreCase))
+            );
+        }
+    }
+
+    public class MeetingFormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Subject is required")]
+        [System.ComponentModel.DataAnnotations.StringLength(200, ErrorMessage = "Subject cannot exceed 200 characters")]
+        public string Title { get; set; } = string.Empty;
+
+        public DateTime MeetingDate { get; set; } = DateTime.Today;
+        public TimeOnly MeetingTime { get; set; } = TimeOnly.FromDateTime(DateTime.Now.AddHours(1));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var userId = user.Identity?.Name
+                ?? user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? user.FindFirst("sub")?.Value;
+
+            if (!string.IsNullOrEmpty(userId))
+            {
+                currentUser = await IntraOfficeService.GetUserProfileAsync(userId);
+                currentUser ??= new IntraUserProfile { UserName = userId, FullUserName = userId };
+            }
+
+            if (currentUser != null)
+            {
+                var users = await IntraOfficeService.GetActiveUsersAsync();
+                allUsers = users.Where(u => u.Id != currentUser.Id && u.IsActive).OrderBy(u => u.FullName).ToList();
+            }
+        }
+
+        if (!string.IsNullOrEmpty(Date) && DateTime.TryParse(Date, out var parsedDate))
+        {
+            meetingModel.MeetingDate = parsedDate;
+        }
+    }
+
+    private void ToggleUser(string userId)
+    {
+        showSelectionError = false;
+        if (selectedUserIds.Contains(userId))
+        {
+            selectedUserIds.Remove(userId);
+        }
+        else
+        {
+            selectedUserIds.Add(userId);
+        }
+    }
+
+    private void SelectAllUsers()
+    {
+        showSelectionError = false;
+        if (allUsers != null)
+        {
+            foreach (var u in allUsers)
+            {
+                selectedUserIds.Add(u.Id);
+            }
+        }
+    }
+
+    private void ClearAllUsers()
+    {
+        selectedUserIds.Clear();
+    }
+
+    private async Task CheckSubjectSpelling()
+    {
+        if (string.IsNullOrWhiteSpace(meetingModel.Title)) return;
+        isAiLoading = true;
+        StateHasChanged();
+        try
+        {
+            meetingModel.Title = await AiService.CheckSpellingAndGrammarAsync(meetingModel.Title);
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", "AI Error: " + ex.Message);
+        }
+        isAiLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (!selectedUserIds.Any())
+        {
+            showSelectionError = true;
+            return;
+        }
+
+        if (currentUser == null) return;
+
+        isSubmitting = true;
+        StateHasChanged();
+
+        try
+        {
+            var scheduledDateTime = meetingModel.MeetingDate.Add(meetingModel.MeetingTime.ToTimeSpan());
+            
+            var newMeeting = new Meeting
+            {
+                Title = meetingModel.Title.Trim(),
+                OrganizerId = currentUser.Id,
+                ScheduledStartTime = DateTime.SpecifyKind(scheduledDateTime, DateTimeKind.Local).ToUniversalTime(),
+                Status = MeetingStatus.Scheduled
+            };
+
+            await MeetingService.CreateMeetingAsync(newMeeting, selectedUserIds.ToList(), broadcastOptions);
+            Navigation.NavigateTo("/meetings");
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", "Error creating meeting: " + ex.Message);
+            isSubmitting = false;
+            StateHasChanged();
+        }
+    }
+}

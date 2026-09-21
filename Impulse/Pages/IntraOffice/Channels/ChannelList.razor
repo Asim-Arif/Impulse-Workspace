@@ -1,0 +1,144 @@
+@page "/office/channels"
+@page "/channels"
+@layout IntraOfficeLayout
+@attribute [Authorize]
+@using DataAccessLibrary.Models.IntraOffice
+@using Impulse.Services.IntraOffice
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IChannelService ChannelService
+@inject IIntraOfficeService IntraOfficeService
+@inject NavigationManager Navigation
+
+<div class="topbar">
+    <h1 class="topbar-title"><i class="bi bi-hash"></i> Channel Directory</h1>
+    <div class="topbar-actions">
+        <a href="/office/chat" class="btn btn-secondary btn-sm" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+            <i class="bi bi-chat-left-text"></i> Open Discussion
+        </a>
+        <button class="btn btn-primary btn-sm" @onclick="() => showCreateModal = true">
+            <i class="bi bi-plus-lg"></i> New Channel
+        </button>
+    </div>
+</div>
+
+<div class="content-area">
+    <div class="input-group input-group-sm mb-4" style="max-width: 400px;">
+        <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
+        <input type="text" class="form-control border-start-0" placeholder="Search channels..." @bind="searchQuery" @bind:event="oninput" />
+    </div>
+
+    <div class="directory-grid">
+        @if (channels != null)
+        {
+            @foreach (var channel in FilteredChannels)
+            {
+                <div class="card" style="cursor: pointer;" @onclick='() => Navigation.NavigateTo($"/office/chat/{channel.Id}")'>
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="avatar" style="background: @(channel.IsPrivate ? "linear-gradient(135deg, #e17055, #fdcb6e)" : "var(--accent-gradient)");">
+                            <i class="bi @(channel.IsPrivate ? "bi-lock-fill" : "bi-hash")"></i>
+                        </div>
+                        <div>
+                            <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-heading);">@channel.Name</div>
+                            <div class="text-muted" style="font-size: 0.8rem;">@(channel.MemberCount > 0 ? channel.MemberCount : (channel.Members?.Count ?? 0)) members</div>
+                        </div>
+                    </div>
+                    <p class="text-muted" style="font-size: 0.88rem;">@(channel.Description ?? "Official corporate communication and discussion channel.")</p>
+                    @if (!string.IsNullOrEmpty(channel.DepartmentName))
+                    {
+                        <div class="mt-3">
+                            <span class="badge bg-light text-dark border"><i class="bi bi-building me-1"></i> @channel.DepartmentName</span>
+                        </div>
+                    }
+                </div>
+            }
+        }
+        else
+        {
+            <div class="text-center p-5 text-muted">
+                <div class="spinner-border spinner-border-sm text-primary me-2"></div> Loading channels...
+            </div>
+        }
+    </div>
+</div>
+
+@if (showCreateModal)
+{
+    <div class="modal-backdrop fade show"></div>
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+                <div class="modal-header border-bottom">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-hash me-1 text-primary"></i> Create New Channel</h5>
+                    <button type="button" class="btn-close" @onclick="() => showCreateModal = false"></button>
+                </div>
+
+                <div class="modal-body p-4">
+                    <div class="form-group mb-3">
+                        <label class="form-label">Channel Name</label>
+                        <input type="text" class="form-control" @bind="newChannelName" placeholder="e.g. project-alpha" />
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" @bind="newChannelDesc" placeholder="What is this channel about?" rows="3"></textarea>
+                    </div>
+                    <div class="form-group mb-0 d-flex align-items-center gap-2">
+                        <input type="checkbox" id="privateChCheck" @bind="newChannelPrivate" />
+                        <label class="form-label mb-0" for="privateChCheck" style="cursor: pointer;">Private Channel</label>
+                    </div>
+                </div>
+
+                <div class="modal-footer border-top bg-light">
+                    <button type="button" class="btn btn-secondary" @onclick="() => showCreateModal = false">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="CreateChannel">Create Channel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private IntraUserProfile? currentUser;
+    private List<Channel>? channels;
+    private string searchQuery = "";
+    private bool showCreateModal;
+    private string newChannelName = "";
+    private string newChannelDesc = "";
+    private bool newChannelPrivate;
+
+    private IEnumerable<Channel> FilteredChannels =>
+        channels?.Where(c => string.IsNullOrEmpty(searchQuery) ||
+            c.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)) ?? Enumerable.Empty<Channel>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userId = user.Identity?.Name ?? "";
+        if (!string.IsNullOrEmpty(userId))
+        {
+            currentUser = await IntraOfficeService.GetUserProfileAsync(userId);
+        }
+        channels = await ChannelService.GetAllChannelsAsync();
+    }
+
+    private async Task CreateChannel()
+    {
+        if (string.IsNullOrWhiteSpace(newChannelName) || currentUser == null) return;
+
+        var channel = new Channel
+        {
+            Name = newChannelName.Trim(),
+            Description = newChannelDesc,
+            IsPrivate = newChannelPrivate,
+            CreatedBy = currentUser.Id
+        };
+
+        var created = await ChannelService.CreateChannelAsync(channel);
+        await ChannelService.AddMemberAsync(created.Id, currentUser.Id, true);
+        showCreateModal = false;
+        newChannelName = "";
+        newChannelDesc = "";
+        newChannelPrivate = false;
+        channels = await ChannelService.GetAllChannelsAsync();
+    }
+}

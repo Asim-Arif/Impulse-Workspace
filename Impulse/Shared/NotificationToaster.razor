@@ -1,0 +1,365 @@
+@using Impulse.Services.IntraOffice
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IAppNotificationService NotificationService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+
+<div class="notification-toaster-container" aria-live="polite">
+    @foreach (var toast in activeToasts)
+    {
+        <div class="notification-toast @(toast.Notification.IsReadReceipt ? "toast-read-receipt" : GetToastClass(toast.Notification.Category))" @key="toast.Id">
+            <div class="toast-header-row">
+                <div class="toast-category-badge">
+                    @if (toast.Notification.IsReadReceipt)
+                    {
+                        <i class="bi bi-check2-all" style="color: #0ea5e9;"></i>
+                        <span style="color: #0ea5e9; font-weight: 600;">Seen</span>
+                    }
+                    else
+                    {
+                        <i class="bi @GetCategoryIcon(toast.Notification.Category)"></i>
+                        <span>@GetCategoryLabel(toast.Notification.Category)</span>
+                    }
+                </div>
+                <button type="button" class="toast-close-btn" @onclick="() => DismissToast(toast.Id)" title="Dismiss">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+            
+            <div class="toast-body-content" @onclick="() => NavigateTo(toast.Notification)">
+                <div class="toast-title">@toast.Notification.Title</div>
+                <div class="toast-message">@toast.Notification.Message</div>
+            </div>
+
+            <div class="toast-footer-row">
+                <span class="toast-time">
+                    <i class="bi bi-clock me-1"></i>Just now
+                </span>
+                @if (!toast.Notification.IsReadReceipt)
+                {
+                    <button class="toast-action-btn" @onclick="() => NavigateTo(toast.Notification)">
+                        @if (toast.Notification.Category == NotificationCategory.Meeting)
+                        {
+                            <span style="color: #7c3aed; font-weight: 700;"><i class="bi bi-camera-video me-1"></i>Join Now</span>
+                        }
+                        else
+                        {
+                            <span>Open</span>
+                        }
+                        <i class="bi bi-arrow-right-short"></i>
+                    </button>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .notification-toaster-container {
+        position: fixed;
+        top: 72px;
+        right: 20px;
+        z-index: 999999;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        pointer-events: none;
+        max-width: 380px;
+        width: calc(100vw - 40px);
+    }
+
+    .notification-toast {
+        pointer-events: auto;
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 12px 28px -4px rgba(15, 23, 42, 0.15), 0 4px 10px -2px rgba(15, 23, 42, 0.08);
+        border: 1px solid #e2e8f0;
+        border-left: 5px solid #64748b;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        animation: toastSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.3s ease;
+    }
+
+    .notification-toast:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 16px 32px -4px rgba(15, 23, 42, 0.2);
+    }
+
+    .notification-toast.toast-message { border-left-color: #3b82f6; }
+    .notification-toast.toast-announcement { border-left-color: #ef4444; }
+    .notification-toast.toast-minute { border-left-color: #f59e0b; }
+    .notification-toast.toast-meeting { border-left-color: #8b5cf6; }
+    .notification-toast.toast-task { border-left-color: #10b981; }
+    .notification-toast.toast-read-receipt {
+        border-left-color: #0ea5e9;
+        background: #f0f9ff;
+        opacity: 0.95;
+    }
+
+    .toast-header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .toast-category-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        padding: 2px 8px;
+        border-radius: 6px;
+    }
+
+    .toast-message .toast-category-badge { background: #eff6ff; color: #2563eb; }
+    .toast-announcement .toast-category-badge { background: #fef2f2; color: #dc2626; }
+    .toast-minute .toast-category-badge { background: #fffbeb; color: #d97706; }
+    .toast-meeting .toast-category-badge { background: #f5f3ff; color: #7c3aed; }
+    .toast-task .toast-category-badge { background: #ecfdf5; color: #059669; }
+    .toast-read-receipt .toast-category-badge { background: #e0f2fe; color: #0284c7; }
+
+    .toast-close-btn {
+        background: transparent;
+        border: none;
+        color: #94a3b8;
+        font-size: 1.1rem;
+        line-height: 1;
+        cursor: pointer;
+        padding: 2px;
+        border-radius: 4px;
+        transition: color 0.15s, background 0.15s;
+    }
+
+    .toast-close-btn:hover {
+        color: #0f172a;
+        background: #f1f5f9;
+    }
+
+    .toast-body-content {
+        cursor: pointer;
+    }
+
+    .toast-title {
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: #0f172a;
+        line-height: 1.3;
+        margin-bottom: 3px;
+    }
+
+    .toast-message {
+        font-size: 0.82rem;
+        color: #475569;
+        line-height: 1.4;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .toast-footer-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 4px;
+        padding-top: 6px;
+        border-top: 1px solid #f1f5f9;
+    }
+
+    .toast-time {
+        font-size: 0.72rem;
+        color: #94a3b8;
+    }
+
+    .toast-action-btn {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 2px 10px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #334155;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        transition: all 0.15s;
+    }
+
+    .toast-action-btn:hover {
+        background: #4f46e5;
+        color: #ffffff;
+        border-color: #4f46e5;
+    }
+
+    @@keyframes toastSlideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+</style>
+
+@code {
+    private class ActiveToast
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public AppNotification Notification { get; set; } = new();
+        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    }
+
+    private readonly List<ActiveToast> activeToasts = new();
+    private string? currentUserId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            currentUserId = authState.User.Identity.Name;
+        }
+
+        NotificationService.OnNotificationReceived += HandleNotificationReceived;
+    }
+
+    private async Task HandleNotificationReceived(AppNotification notification)
+    {
+        // Check if notification is meant for this user
+        if (!string.IsNullOrEmpty(notification.TargetUserId) && notification.TargetUserId != currentUserId)
+        {
+            return;
+        }
+
+        // Skip internal READ_SYNC signals
+        if (notification.Message == "READ_SYNC") return;
+
+        // Add toast
+        var toast = new ActiveToast
+        {
+            Notification = notification
+        };
+
+        await InvokeAsync(() =>
+        {
+            activeToasts.Insert(0, toast);
+            if (activeToasts.Count > 5)
+            {
+                activeToasts.RemoveAt(activeToasts.Count - 1);
+            }
+            StateHasChanged();
+        });
+
+        // Read-receipt toasts: no sound, dismiss after 3 seconds
+        if (notification.IsReadReceipt)
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(3000);
+                await InvokeAsync(() => DismissToast(toast.Id));
+            });
+            return;
+        }
+
+        // Play audio chime for notifications (with dedicated meeting alert sound)
+        try
+        {
+            if (notification.Category == NotificationCategory.Meeting)
+            {
+                await JSRuntime.InvokeVoidAsync("playMeetingAlertSound");
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("playNotificationSound");
+            }
+        }
+        catch { }
+
+        // Also trigger browser notification if allowed
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("showNotification", notification.Title, notification.Message);
+        }
+        catch { }
+
+        // Auto dismiss: 14 seconds for meeting alerts, 7 seconds for regular
+        var dismissMs = notification.Category == NotificationCategory.Meeting ? 14000 : 7000;
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(dismissMs);
+            await InvokeAsync(() =>
+            {
+                DismissToast(toast.Id);
+            });
+        });
+    }
+
+    private void DismissToast(string id)
+    {
+        var toast = activeToasts.FirstOrDefault(t => t.Id == id);
+        if (toast != null)
+        {
+            activeToasts.Remove(toast);
+            StateHasChanged();
+        }
+    }
+
+    private void NavigateTo(AppNotification notification)
+    {
+        if (!string.IsNullOrEmpty(currentUserId))
+        {
+            NotificationService.MarkAsRead(notification.Id, currentUserId);
+        }
+        DismissToast(notification.Id);
+        if (!string.IsNullOrEmpty(notification.ActionUrl))
+        {
+            Navigation.NavigateTo(notification.ActionUrl);
+        }
+    }
+
+    private string GetToastClass(NotificationCategory category) => category switch
+    {
+        NotificationCategory.Message => "toast-message",
+        NotificationCategory.Announcement => "toast-announcement",
+        NotificationCategory.Minute => "toast-minute",
+        NotificationCategory.Meeting => "toast-meeting",
+        NotificationCategory.Task => "toast-task",
+        _ => ""
+    };
+
+    private string GetCategoryIcon(NotificationCategory category) => category switch
+    {
+        NotificationCategory.Message => "bi-chat-dots-fill",
+        NotificationCategory.Announcement => "bi-megaphone-fill",
+        NotificationCategory.Minute => "bi-file-earmark-check-fill",
+        NotificationCategory.Meeting => "bi-camera-video-fill",
+        NotificationCategory.Task => "bi-check2-square",
+        _ => "bi-bell-fill"
+    };
+
+    private string GetCategoryLabel(NotificationCategory category) => category switch
+    {
+        NotificationCategory.Message => "Message",
+        NotificationCategory.Announcement => "Announcement",
+        NotificationCategory.Minute => "Minute Approval",
+        NotificationCategory.Meeting => "Meeting",
+        NotificationCategory.Task => "Task",
+        _ => "Notification"
+    };
+
+    public void Dispose()
+    {
+        NotificationService.OnNotificationReceived -= HandleNotificationReceived;
+    }
+}

@@ -1,0 +1,780 @@
+@page "/office/ai-assistant"
+@page "/ai-assistant"
+@layout IntraOfficeLayout
+@using DataAccessLibrary.Models.IntraOffice
+@using Impulse.Services.IntraOffice
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IAiAssistantService AiAssistantService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<PageTitle>IntraBot Enterprise AI Assistant</PageTitle>
+
+<div class="ai-page-container">
+    <!-- Left Sidebar: Capabilities & Quick Starters -->
+    <aside class="ai-page-sidebar">
+        <div class="ai-sidebar-card">
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <div class="ai-badge-icon">
+                    <i class="bi bi-robot"></i>
+                </div>
+                <div>
+                    <h6 class="mb-0 fw-bold">IntraBot Copilot</h6>
+                    <small class="text-success"><i class="bi bi-circle-fill" style="font-size: 0.55rem;"></i> Online (GPT-4o)</small>
+                </div>
+            </div>
+            <p class="text-muted small mb-3">
+                IntraBot is your intelligent enterprise partner. It answers any general inquiry, analyzes business data, and accesses live company records.
+            </p>
+
+            <button class="btn btn-primary btn-sm w-100 mb-3 d-flex align-items-center justify-content-center gap-2" @onclick="ClearChat">
+                <i class="bi bi-plus-lg"></i> New Conversation
+            </button>
+        </div>
+
+        <div class="ai-sidebar-section">
+            <div class="ai-section-label">RECOMMENDED PROMPTS</div>
+            
+            <div class="prompt-group">
+                <div class="prompt-group-title"><i class="bi bi-kanban text-primary me-1"></i> Tasks & Workload</div>
+                <button class="prompt-btn" @onclick='() => SendPrompt("What are my pending tasks and what is highest priority?")'>
+                    "What are my pending tasks and priorities?"
+                </button>
+                <button class="prompt-btn" @onclick='() => SendPrompt("Do I have any overdue tasks or items due this week?")'>
+                    "Any overdue tasks or items due this week?"
+                </button>
+            </div>
+
+            <div class="prompt-group">
+                <div class="prompt-group-title"><i class="bi bi-file-earmark-check text-warning me-1"></i> Minutes & Approvals</div>
+                <button class="prompt-btn" @onclick='() => SendPrompt("List all pending minutes waiting for my approval.")'>
+                    "List pending minutes waiting for my approval."
+                </button>
+                <button class="prompt-btn" @onclick='() => SendPrompt("Are there any urgent minutes that require immediate sign-off?")'>
+                    "Are there any urgent minutes needing sign-off?"
+                </button>
+            </div>
+
+            <div class="prompt-group">
+                <div class="prompt-group-title"><i class="bi bi-megaphone text-info me-1"></i> Company News</div>
+                <button class="prompt-btn" @onclick='() => SendPrompt("Summarize recent company announcements.")'>
+                    "Summarize recent company announcements."
+                </button>
+            </div>
+
+            <div class="prompt-group">
+                <div class="prompt-group-title"><i class="bi bi-briefcase text-success me-1"></i> Business & CRM</div>
+                <button class="prompt-btn" @onclick='() => SendPrompt("What is our current CRM pipeline and customer count?")'>
+                    "What is our current CRM customer count?"
+                </button>
+                <button class="prompt-btn" @onclick='() => SendPrompt("Draft a professional follow-up email to a prospective international client for manufacturing export.")'>
+                    "Draft client follow-up email for export."
+                </button>
+                <button class="prompt-btn" @onclick='() => SendPrompt("Explain the difference between FOB and CIF Incoterms in international trade.")'>
+                    "Explain FOB vs CIF Incoterms."
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Chat Workstation -->
+    <main class="ai-page-main">
+        <!-- Top Toolbar -->
+        <header class="ai-main-header">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-stars text-primary fs-5"></i>
+                <span class="fw-bold fs-6">Enterprise AI Assistant</span>
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-2">Real-Time Database Connected</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-outline-secondary btn-sm" @onclick="ExportChat" title="Export Conversation">
+                    <i class="bi bi-download me-1"></i> Export
+                </button>
+                <button class="btn btn-outline-danger btn-sm" @onclick="ClearChat" title="Clear Chat">
+                    <i class="bi bi-trash3 me-1"></i> Clear
+                </button>
+            </div>
+        </header>
+
+        <!-- Message Thread -->
+        <div class="ai-page-messages" id="ai-fullpage-scroll">
+            @foreach (var msg in messages)
+            {
+                <div class="ai-full-msg @(msg.Role == "user" ? "user-side" : "bot-side")">
+                    <div class="ai-msg-avatar">
+                        @if (msg.Role == "user")
+                        {
+                            <i class="bi bi-person-circle"></i>
+                        }
+                        else
+                        {
+                            <i class="bi bi-stars"></i>
+                        }
+                    </div>
+                    <div class="ai-full-bubble">
+                        <div class="ai-bubble-header d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold font-monospace" style="font-size: 0.75rem;">@(msg.Role == "user" ? "You" : "IntraBot Enterprise")</span>
+                            <div class="d-flex align-items-center gap-2">
+                                <small class="text-muted" style="font-size: 0.7rem;">@msg.Timestamp.ToString("hh:mm tt")</small>
+                                @if (msg.Role != "user")
+                                {
+                                    <button class="btn btn-link btn-sm text-secondary p-0 ms-1" @onclick="() => SpeakMessage(msg.Content)" title="Read Aloud">
+                                        <i class="bi bi-volume-up"></i>
+                                    </button>
+                                    <button class="btn btn-link btn-sm text-secondary p-0 ms-1" @onclick="() => CopyMessage(msg.Content)" title="Copy text">
+                                        <i class="bi bi-clipboard"></i>
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                        <div class="ai-full-content">
+                            @((MarkupString)FormatMarkdown(msg.Content))
+                        </div>
+                        @if (msg.Role != "user")
+                        {
+                            var followUps = ExtractSuggestions(msg.Content);
+                            if (followUps.Any())
+                            {
+                                <div class="ai-followup-wrap mt-2 pt-2 border-top">
+                                    <small class="text-muted d-block mb-1" style="font-size: 0.72rem;"><i class="bi bi-lightning-charge text-warning me-1"></i>Suggested Next Steps:</small>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        @foreach (var f in followUps)
+                                        {
+                                            <button type="button" class="ai-followup-btn" @onclick="() => SendPrompt(f)">
+                                                @f
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (isThinking)
+            {
+                <div class="ai-full-msg bot-side">
+                    <div class="ai-msg-avatar">
+                        <i class="bi bi-stars"></i>
+                    </div>
+                    <div class="ai-full-bubble thinking">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                            <span class="text-muted small">IntraBot is analyzing context and formulating response...</span>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Voice Active Warning -->
+        @if (isListeningVoice)
+        {
+            <div class="alert alert-danger mb-0 py-2 px-3 d-flex align-items-center justify-content-between rounded-0">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="spinner-grow spinner-grow-sm text-danger" role="status"></span>
+                    <strong>Voice Dictation Active:</strong> Speak clearly into your microphone...
+                </div>
+                <button class="btn btn-outline-danger btn-sm py-0" @onclick="StopVoice">Stop</button>
+            </div>
+        }
+
+        <!-- Input Bar -->
+        <footer class="ai-main-footer">
+            <div class="ai-page-input-wrap">
+                <textarea class="ai-page-input" 
+                          rows="2"
+                          placeholder="Type your question or instruction here... (e.g. 'What are my tasks?', 'Draft an email', 'Write a function'). Press Enter to send, Shift+Enter for new line."
+                          @bind="userInput"
+                          @bind:event="oninput"
+                          @onkeydown="HandleKeyDown"
+                          disabled="@isThinking"></textarea>
+
+                <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-outline-secondary btn-sm @(isListeningVoice ? "btn-danger text-white" : "")" 
+                                @onclick="ToggleVoiceInput" 
+                                type="button">
+                            <i class="bi @(isListeningVoice ? "bi-mic-fill" : "bi-mic") me-1"></i>
+                            @(isListeningVoice ? "Listening..." : "Voice Input")
+                        </button>
+                        <small class="text-muted" style="font-size: 0.72rem;">Press Enter ↵ to Send</small>
+                    </div>
+
+                    <button class="btn btn-primary px-4 d-flex align-items-center gap-2" 
+                            @onclick="SendMessageAsync" 
+                            disabled="@(string.IsNullOrWhiteSpace(userInput) || isThinking)">
+                        <span>Send</span>
+                        <i class="bi bi-send-fill"></i>
+                    </button>
+                </div>
+            </div>
+        </footer>
+    </main>
+</div>
+
+<style>
+    .ai-page-container {
+        display: flex;
+        height: calc(100vh - 60px);
+        background: #f8fafc;
+        overflow: hidden;
+    }
+
+    /* Sidebar */
+    .ai-page-sidebar {
+        width: 320px;
+        background: #ffffff;
+        border-right: 1px solid #e2e8f0;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        padding: 16px;
+        gap: 16px;
+        flex-shrink: 0;
+    }
+
+    .ai-sidebar-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 14px;
+    }
+
+    .ai-badge-icon {
+        width: 36px;
+        height: 36px;
+        background: linear-gradient(135deg, #4f46e5, #7c3aed);
+        color: white;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.15rem;
+    }
+
+    .ai-sidebar-section {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .ai-section-label {
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: #94a3b8;
+        letter-spacing: 0.5px;
+    }
+
+    .prompt-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .prompt-group-title {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #475569;
+        display: flex;
+        align-items: center;
+    }
+
+    .prompt-btn {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 0.75rem;
+        text-align: left;
+        color: #334155;
+        cursor: pointer;
+        transition: all 0.15s ease-in-out;
+        line-height: 1.35;
+    }
+
+    .prompt-btn:hover {
+        background: #eef2ff;
+        border-color: #6366f1;
+        color: #4338ca;
+        transform: translateX(2px);
+    }
+
+    /* Main Area */
+    .ai-page-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        background: #fdfdfd;
+    }
+
+    .ai-main-header {
+        padding: 12px 20px;
+        background: #ffffff;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .ai-page-messages {
+        flex: 1;
+        padding: 24px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .ai-full-msg {
+        display: flex;
+        gap: 12px;
+        max-width: 85%;
+    }
+
+    .bot-side {
+        align-self: flex-start;
+    }
+
+    .user-side {
+        align-self: flex-end;
+        flex-direction: row-reverse;
+    }
+
+    .ai-msg-avatar {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    .bot-side .ai-msg-avatar {
+        background: #e0e7ff;
+        color: #4f46e5;
+    }
+
+    .user-side .ai-msg-avatar {
+        background: #e2e8f0;
+        color: #475569;
+    }
+
+    .ai-full-bubble {
+        padding: 12px 16px;
+        border-radius: 12px;
+        font-size: 0.84rem;
+        line-height: 1.5;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    .bot-side .ai-full-bubble {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        color: #1e293b;
+    }
+
+    .user-side .ai-full-bubble {
+        background: #4f46e5;
+        color: #ffffff;
+    }
+
+    .user-side .ai-full-bubble .ai-bubble-header span,
+    .user-side .ai-full-bubble .ai-bubble-header small {
+        color: #e0e7ff !important;
+    }
+
+    .ai-full-content p {
+        margin-bottom: 8px;
+    }
+
+    .ai-full-content p:last-child {
+        margin-bottom: 0;
+    }
+
+    .ai-full-content pre {
+        background: #0f172a;
+        color: #f8fafc;
+        padding: 10px;
+        border-radius: 8px;
+        overflow-x: auto;
+        margin: 8px 0;
+    }
+
+    .ai-full-content code {
+        background: rgba(0, 0, 0, 0.06);
+        padding: 1px 4px;
+        border-radius: 4px;
+        font-size: 0.78rem;
+    }
+
+    .user-side .ai-full-content code {
+        background: rgba(255, 255, 255, 0.2);
+        color: #ffffff;
+    }
+
+    /* Footer */
+    .ai-main-footer {
+        padding: 16px 20px;
+        background: #ffffff;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .ai-page-input-wrap {
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        padding: 10px 14px;
+        transition: border-color 0.15s;
+    }
+
+    .ai-page-input-wrap:focus-within {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    }
+
+    .ai-page-input {
+        width: 100%;
+        border: none;
+        background: transparent;
+        font-size: 0.85rem;
+        outline: none;
+        resize: vertical;
+        color: #1e293b;
+    }
+
+    /* Follow-up Action Pills */
+    .ai-followup-wrap {
+        border-color: rgba(0, 0, 0, 0.08) !important;
+    }
+
+    .ai-followup-btn {
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        padding: 4px 10px;
+        font-size: 0.74rem;
+        color: #334155;
+        cursor: pointer;
+        text-align: left;
+        transition: all 0.15s ease;
+        line-height: 1.2;
+    }
+
+    .ai-followup-btn:hover {
+        background: #e0e7ff;
+        border-color: #6366f1;
+        color: #4338ca;
+    }
+
+    .ai-table {
+        font-size: 0.8rem;
+    }
+</style>
+
+@code {
+    private bool isThinking = false;
+    private bool isListeningVoice = false;
+    private string userInput = "";
+    private string currentUserId = "";
+    private List<ChatMessageDto> messages = new();
+    private DotNetObjectReference<AiAssistantPage>? dotNetRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            currentUserId = user.Identity?.Name
+                         ?? user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                         ?? user.FindFirst("sub")?.Value
+                         ?? "";
+        }
+
+        messages.Add(new ChatMessageDto
+        {
+            Role = "assistant",
+            Content = "Welcome to **IntraBot Enterprise Copilot**!\n\nI am equipped with high-level intelligence and full integration into your live IntraCom-CRM database. You can ask me:\n- Real-time status of your **Tasks**, **Pending Minutes**, and **Announcements**\n- **CRM Analytics**, sales performance, and pipeline summaries\n- Drafting client communications, business proposals, and minutes summaries\n- General queries, coding help, mathematical analysis, and translations.\n\nHow can I help you excel today?",
+            Timestamp = DateTime.Now
+        });
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            dotNetRef = DotNetObjectReference.Create(this);
+        }
+
+        await JSRuntime.InvokeVoidAsync("scrollChatToBottom", "ai-fullpage-scroll");
+    }
+
+    private void ClearChat()
+    {
+        messages.Clear();
+        messages.Add(new ChatMessageDto
+        {
+            Role = "assistant",
+            Content = "Conversation cleared. Ready for your next inquiry!",
+            Timestamp = DateTime.Now
+        });
+    }
+
+    private async Task SendPrompt(string prompt)
+    {
+        userInput = prompt;
+        await SendMessageAsync();
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SendMessageAsync();
+        }
+    }
+
+    private async Task SendMessageAsync()
+    {
+        if (string.IsNullOrWhiteSpace(userInput) || isThinking) return;
+
+        var text = userInput.Trim();
+        userInput = "";
+
+        messages.Add(new ChatMessageDto
+        {
+            Role = "user",
+            Content = text,
+            Timestamp = DateTime.Now
+        });
+
+        isThinking = true;
+        StateHasChanged();
+        await JSRuntime.InvokeVoidAsync("scrollChatToBottom", "ai-fullpage-scroll");
+
+        try
+        {
+            var reply = await AiAssistantService.GetEnterpriseChatResponseAsync(text, currentUserId, messages);
+            messages.Add(new ChatMessageDto
+            {
+                Role = "assistant",
+                Content = reply,
+                Timestamp = DateTime.Now
+            });
+        }
+        catch (Exception ex)
+        {
+            messages.Add(new ChatMessageDto
+            {
+                Role = "assistant",
+                Content = $"Error: {ex.Message}",
+                Timestamp = DateTime.Now
+            });
+        }
+        finally
+        {
+            isThinking = false;
+            StateHasChanged();
+            await JSRuntime.InvokeVoidAsync("scrollChatToBottom", "ai-fullpage-scroll");
+        }
+    }
+
+    private async Task ToggleVoiceInput()
+    {
+        if (isListeningVoice)
+        {
+            await JSRuntime.InvokeVoidAsync("stopVoiceDictation");
+            isListeningVoice = false;
+        }
+        else
+        {
+            if (dotNetRef != null)
+            {
+                isListeningVoice = true;
+                await JSRuntime.InvokeVoidAsync("startVoiceDictation", dotNetRef, "OnVoiceTranscript");
+            }
+        }
+    }
+
+    private async Task StopVoice()
+    {
+        await JSRuntime.InvokeVoidAsync("stopVoiceDictation");
+        isListeningVoice = false;
+    }
+
+    [JSInvokable]
+    public void OnVoiceTranscript(string transcript)
+    {
+        isListeningVoice = false;
+        if (!string.IsNullOrWhiteSpace(transcript))
+        {
+            userInput = transcript;
+            _ = SendMessageAsync();
+        }
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnVoiceError(string error)
+    {
+        isListeningVoice = false;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnVoiceEnd()
+    {
+        isListeningVoice = false;
+        StateHasChanged();
+    }
+
+    private async Task SpeakMessage(string content)
+    {
+        await JSRuntime.InvokeVoidAsync("speakText", content);
+    }
+
+    private async Task CopyMessage(string content)
+    {
+        await JSRuntime.InvokeVoidAsync("copyToClipboard", content);
+    }
+
+    private async Task ExportChat()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"# IntraBot AI Chat Log - {DateTime.Now:yyyy-MM-dd HH:mm}");
+        sb.AppendLine();
+        foreach (var m in messages)
+        {
+            sb.AppendLine($"### [{m.Timestamp:HH:mm}] {(m.Role == "user" ? "User" : "IntraBot")}:");
+            sb.AppendLine(m.Content);
+            sb.AppendLine();
+        }
+
+        var fileName = $"ai-chat-{DateTime.Now:yyyyMMdd-HHmmss}.md";
+        var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+        var base64 = Convert.ToBase64String(bytes);
+        var url = $"data:text/markdown;base64,{base64}";
+        await JSRuntime.InvokeVoidAsync("downloadFile", url, fileName);
+    }
+
+    private List<string> ExtractSuggestions(string content)
+    {
+        var result = new List<string>();
+        if (string.IsNullOrWhiteSpace(content)) return result;
+
+        var markerIndex = content.IndexOf("Suggested Next Steps:", StringComparison.OrdinalIgnoreCase);
+        if (markerIndex >= 0)
+        {
+            var textAfter = content.Substring(markerIndex);
+            var lines = textAfter.Split('\n');
+            foreach (var line in lines)
+            {
+                var trimmed = line.Trim();
+                if (trimmed.StartsWith("- ") || trimmed.StartsWith("* "))
+                {
+                    var suggestion = trimmed.Substring(2).Trim();
+                    suggestion = suggestion.Trim('*', '`', '"', ' ');
+                    if (!string.IsNullOrWhiteSpace(suggestion) && suggestion.Length < 100)
+                    {
+                        result.Add(suggestion);
+                    }
+                }
+            }
+        }
+        return result.Take(4).ToList();
+    }
+
+    private string FormatMarkdown(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return "";
+
+        var html = System.Net.WebUtility.HtmlEncode(text);
+
+        // Pre-formatted code blocks
+        html = System.Text.RegularExpressions.Regex.Replace(html, @"```(.*?)```", "<pre><code>$1</code></pre>", System.Text.RegularExpressions.RegexOptions.Singleline);
+
+        // Inline code
+        html = System.Text.RegularExpressions.Regex.Replace(html, @"`([^`]+)`", "<code>$1</code>");
+
+        // Bold
+        html = System.Text.RegularExpressions.Regex.Replace(html, @"\*\*(.*?)\*\*", "<strong>$1</strong>");
+
+        // Italics
+        html = System.Text.RegularExpressions.Regex.Replace(html, @"\*(.*?)\*", "<em>$1</em>");
+
+        // Markdown Links: [text](url) -> Clickable Links
+        html = System.Text.RegularExpressions.Regex.Replace(html, @"\[([^\]]+)\]\(([^)]+)\)", "<a href='$2' class='text-primary fw-bold text-decoration-underline'>$1</a>");
+
+        // Markdown Tables
+        if (html.Contains("|"))
+        {
+            html = System.Text.RegularExpressions.Regex.Replace(
+                html,
+                @"(?:\|[^\n\r]+\|\r?\n?)+",
+                match =>
+                {
+                    var tableLines = match.Value.Trim().Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+                    if (tableLines.Length < 2) return match.Value;
+
+                    var sb = new System.Text.StringBuilder();
+                    sb.Append("<div class='table-responsive my-2'><table class='table table-sm table-bordered table-striped ai-table mb-0'>");
+
+                    bool isHeader = true;
+                    for (int i = 0; i < tableLines.Length; i++)
+                    {
+                        var line = tableLines[i].Trim();
+                        if (line.Contains("---")) continue; // separator row
+
+                        var cells = line.Trim('|').Split('|');
+                        sb.Append("<tr>");
+                        foreach (var cell in cells)
+                        {
+                            if (isHeader)
+                                sb.Append($"<th class='bg-light text-dark px-2 py-1 small fw-bold'>{cell.Trim()}</th>");
+                            else
+                                sb.Append($"<td class='px-2 py-1 small'>{cell.Trim()}</td>");
+                        }
+                        sb.Append("</tr>");
+                        if (isHeader) isHeader = false;
+                    }
+                    sb.Append("</table></div>");
+                    return sb.ToString();
+                });
+        }
+
+        // Headers
+        html = System.Text.RegularExpressions.Regex.Replace(html, @"(?m)^### (.*?)$", "<h6 class='fw-bold mt-2 mb-1'>$1</h6>");
+        html = System.Text.RegularExpressions.Regex.Replace(html, @"(?m)^## (.*?)$", "<h5 class='fw-bold mt-2 mb-1'>$1</h5>");
+        html = System.Text.RegularExpressions.Regex.Replace(html, @"(?m)^# (.*?)$", "<h5 class='fw-bold mt-2 mb-1'>$1</h5>");
+
+        // Bullet lists
+        html = System.Text.RegularExpressions.Regex.Replace(html, @"(?m)^- (.*?)$", "<li>$1</li>");
+        html = System.Text.RegularExpressions.Regex.Replace(html, @"(<li>.*<\/li>)", "<ul class='mb-1 ps-3'>$1</ul>", System.Text.RegularExpressions.RegexOptions.Singleline);
+
+        // Line breaks
+        html = html.Replace("\n", "<br/>");
+
+        return html;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        dotNetRef?.Dispose();
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("stopSpeaking");
+        }
+        catch
+        {
+            // Ignore JS errors during prerendering teardown or disconnection
+        }
+    }
+}

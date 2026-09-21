@@ -8,11 +8,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Impulse.Services.IntraOffice
 {
+    public class ChatMessageDto
+    {
+        public string Role { get; set; } = "user"; // "user" or "assistant"
+        public string Content { get; set; } = "";
+        public DateTime Timestamp { get; set; } = DateTime.Now;
+    }
+
     public interface IAiAssistantService
     {
         string GetAiUserId();
         bool IsAiUser(string userId);
         Task<string> GenerateResponseAsync(string userMessage, string userId);
+        Task<string> GetEnterpriseChatResponseAsync(string userMessage, string userId, System.Collections.Generic.List<ChatMessageDto>? history = null);
     }
 
     public class AiAssistantService : IAiAssistantService
@@ -29,6 +37,11 @@ namespace Impulse.Services.IntraOffice
 
         public string GetAiUserId() => AiUserId;
         public bool IsAiUser(string userId) => string.Equals(userId, AiUserId, StringComparison.OrdinalIgnoreCase);
+
+        public Task<string> GetEnterpriseChatResponseAsync(string userMessage, string userId, System.Collections.Generic.List<ChatMessageDto>? history = null)
+        {
+            return GenerateResponseAsync(userMessage, userId);
+        }
 
         public async Task<string> GenerateResponseAsync(string userMessage, string userId)
         {

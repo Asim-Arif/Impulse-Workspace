@@ -1,0 +1,275 @@
+@using DataAccessLibrary.Models.IntraOffice
+@using Impulse.Services.IntraOffice
+@using Microsoft.AspNetCore.Components.Authorization
+@implements IAsyncDisposable
+@inject IIntraOfficeService IntraOfficeService
+@inject ILogger<StickyNotesWidget> Logger
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@inject StickyNoteNotificationService NotificationService
+
+@foreach (var note in notes)
+{
+    <div class="sticky-note" style="left:@(note.XPos)px; top:@(note.YPos)px; background-color: @GetColorHex(note.Color);" 
+         id="note-@note.Id" data-id="@note.Id">
+        
+        <div class="sticky-header" onmousedown="beginDragJS(event, @note.Id)">
+            <select onchange="saveNoteJS(@note.Id)" id="note-color-@note.Id" class="note-color-picker">
+                <option value="yellow" selected="@(note.Color == "yellow")">Yellow</option>
+                <option value="blue" selected="@(note.Color == "blue")">Blue</option>
+                <option value="pink" selected="@(note.Color == "pink")">Pink</option>
+                <option value="green" selected="@(note.Color == "green")">Green</option>
+            </select>
+            <div>
+                <button class="btn-minimize-note" onclick="toggleMinimizeJS(@note.Id)"><i class="bi bi-dash" id="minimize-icon-@note.Id"></i></button>
+                <button class="btn-close-note" onclick="deleteNoteJS(@note.Id)"><i class="bi bi-x"></i></button>
+            </div>
+        </div>
+        
+        <div id="note-content-@note.Id" class="note-content-wrapper">
+            <textarea class="sticky-content" onchange="saveNoteJS(@note.Id)" id="note-text-@note.Id" placeholder="Type your note here...">@note.Content</textarea>
+            
+            <div class="sticky-footer">
+                <small><i class="bi bi-clock"></i> Reminder:</small>
+                <input type="datetime-local" class="reminder-input" onchange="saveNoteJS(@note.Id)" id="note-reminder-@note.Id" value="@(note.ReminderTime?.ToString("yyyy-MM-ddTHH:mm"))" />
+            </div>
+        </div>
+    </div>
+}
+
+<button class="btn-add-note" id="btn-add-sticky-note" onclick="triggerAddNewNote()" title="Add Sticky Note • Drag to move">
+    <i class="bi bi-grip-vertical opacity-50" style="pointer-events: none; margin-right: 2px;"></i>
+    <i class="bi bi-sticky" style="pointer-events: none;"></i>
+    <span style="margin-left: 6px; pointer-events: none;">New Sticky Note</span>
+</button>
+
+<style>
+    .sticky-note {
+        position: absolute;
+        width: 300px;
+        min-height: 300px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        padding: 10px;
+        border-radius: 8px;
+        pointer-events: auto;
+        display: flex;
+        flex-direction: column;
+        color: #333;
+        transition: transform 0.1s;
+    }
+    
+    .sticky-note:hover {
+        transform: scale(1.02);
+    }
+    
+    .sticky-note.minimized {
+        min-height: unset;
+        height: auto;
+    }
+    
+    .sticky-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        cursor: grab;
+    }
+    
+    .note-color-picker {
+        background: rgba(255,255,255,0.5);
+        border: none;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        padding: 2px 4px;
+        color: #333;
+    }
+    
+    .btn-close-note, .btn-minimize-note {
+        background: transparent;
+        border: none;
+        color: #333;
+        cursor: pointer;
+        opacity: 0.6;
+        padding: 0 4px;
+    }
+    .btn-close-note:hover, .btn-minimize-note:hover { opacity: 1; }
+    
+    .sticky-content {
+        flex: 1;
+        width: 100%;
+        background: transparent;
+        border: none;
+        resize: none;
+        font-family: inherit;
+        font-size: 0.75rem;
+        color: #333;
+        outline: none;
+    }
+    
+    .sticky-footer {
+        margin-top: 10px;
+        font-size: 0.75rem;
+        border-top: 1px solid rgba(0,0,0,0.1);
+        padding-top: 8px;
+    }
+    
+    .reminder-input {
+        width: 100%;
+        margin-top: 4px;
+        font-size: 0.75rem;
+        padding: 4px;
+        border: 1px solid rgba(0,0,0,0.2);
+        border-radius: 4px;
+        background: rgba(255,255,255,0.7);
+        color: #333;
+    }
+    
+    .note-content-wrapper {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+    }
+    .note-content-wrapper.hidden {
+        display: none !important;
+    }
+    .btn-add-note {
+        display: none !important;
+    }
+    
+    .btn-add-note:hover {
+        transform: scale(1.05);
+        box-shadow: 0 6px 14px rgba(0,0,0,0.25);
+    }
+
+    .btn-add-note.is-dragging {
+        cursor: grabbing !important;
+        transform: scale(1.08) !important;
+        box-shadow: 0 10px 24px rgba(0,0,0,0.35) !important;
+        transition: none !important;
+    }
+    
+    .drag-overlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        z-index: 1049;
+        cursor: grabbing;
+    }
+</style>
+
+@code {
+    public static event Action? OnAddStickyNote;
+    public static void TriggerAddNote() => OnAddStickyNote?.Invoke();
+
+    private List<StickyNote> notes = new();
+    private DotNetObjectReference<StickyNotesWidget>? objRef;
+    private string? UserId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        OnAddStickyNote += HandleExternalAddNote;
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            UserId = user.Identity.Name;
+        }
+
+        if (!string.IsNullOrEmpty(UserId))
+        {
+            notes = await IntraOfficeService.GetStickyNotesAsync(UserId);
+            NotificationService.OnReminderReceived += HandleReminder;
+        }
+    }
+
+    private void HandleExternalAddNote()
+    {
+        InvokeAsync(async () => await AddNewNote());
+    }
+
+    private void HandleReminder(string targetUserId, int noteId, string content, string color)
+    {
+        if (targetUserId == UserId)
+        {
+            InvokeAsync(async () => 
+            {
+                try { 
+                    await JSRuntime.InvokeVoidAsync("playReminderSound"); 
+                } 
+                catch (Exception ex) { 
+                    Logger.LogError(ex, "Failed to invoke playReminderSound JS.");
+                }
+                
+                try {
+                    await JSRuntime.InvokeVoidAsync("alert", $"STICKY NOTE REMINDER!\n\n{content}");
+                } catch { }
+                
+                var existingNote = notes.FirstOrDefault(n => n.Id == noteId);
+                if (existingNote != null)
+                {
+                    existingNote.IsReminderSent = true;
+                    StateHasChanged();
+                }
+            });
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("registerStickyNotesWidget", objRef);
+        }
+        await JSRuntime.InvokeVoidAsync("initStickyNoteButtonDrag");
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        OnAddStickyNote -= HandleExternalAddNote;
+        NotificationService.OnReminderReceived -= HandleReminder;
+        objRef?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+
+    [JSInvokable]
+    public async Task AddNewNoteJS()
+    {
+        await AddNewNote();
+    }
+
+    private async Task AddNewNote()
+    {
+        if (string.IsNullOrEmpty(UserId))
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Error: UserId is missing.");
+            return;
+        }
+
+        var newNote = new StickyNote
+        {
+            UserId = UserId,
+            Content = "",
+            Color = "yellow",
+            XPos = 900,
+            YPos = 150,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        newNote.Id = await IntraOfficeService.SaveStickyNoteAsync(newNote);
+        notes.Add(newNote);
+        StateHasChanged();
+    }
+
+    private string GetColorHex(string color)
+    {
+        return color switch
+        {
+            "yellow" => "#fff9c4",
+            "blue" => "#bbdefb",
+            "pink" => "#f8bbd0",
+            "green" => "#c8e6c9",
+            _ => "#fff9c4"
+        };
+    }
+}

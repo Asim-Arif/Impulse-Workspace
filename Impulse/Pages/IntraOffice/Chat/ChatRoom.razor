@@ -1,0 +1,1299 @@
+@page "/office/chat"
+@page "/office/chat/{ChannelId:int}"
+@page "/chat"
+@page "/chat/{ChannelId:int}"
+@layout IntraOfficeLayout
+@attribute [Authorize]
+@using DataAccessLibrary.Models.IntraOffice
+@using Impulse.Services.IntraOffice
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IIntraOfficeService IntraOfficeService
+@inject IChannelService ChannelService
+@inject IMessageService MessageService
+@inject IAppNotificationService NotificationService
+@inject IFileService FileService
+@inject IWhatsAppService WhatsAppService
+@inject IEmailService EmailService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject ILogger<ChatRoom> Logger
+@implements IAsyncDisposable
+
+<PageTitle>IntraCom-CRM | Group Discussion @(currentChannel != null ? $"— #{currentChannel.Name}" : "")</PageTitle>
+
+<div class="group-chat-wrapper">
+
+    <!-- 1. GLASSMORPHIC TOPBAR / CHANNEL BANNER -->
+    <div class="chat-header-banner">
+        <div class="chat-hero-glow-1"></div>
+        <div class="chat-hero-glow-2"></div>
+
+        <div class="chat-header-content position-relative d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="channel-header-orb">
+                    <i class="bi @(currentChannel?.IsPrivate == true ? "bi-lock-fill" : "bi-hash")"></i>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <h4 class="chat-channel-title mb-0">
+                            @(currentChannel?.Name ?? "Corporate Group Discussions")
+                        </h4>
+                        @if (currentChannel != null)
+                        {
+                            <span class="badge @(currentChannel.IsPrivate ? "bg-warning text-dark" : "bg-info text-dark") fw-semibold text-xs">
+                                @(currentChannel.IsPrivate ? "Private Room" : "Public Workspace")
+                            </span>
+                        }
+                    </div>
+                    <div class="d-flex align-items-center gap-2 mt-1">
+                        <span class="chat-live-beacon">
+                            <span class="chat-beacon-dot"></span>
+                            DISCUSSIONS LIVE • ENCRYPTED CHANNEL
+                        </span>
+                        <span class="text-light text-opacity-75 small text-truncate d-none d-md-inline-block" style="max-width: 450px;">
+                            @(currentChannel?.Description ?? "Select a channel or open a team discussion from the sidebar.")
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                @if (currentChannel != null)
+                {
+                    <span class="chat-member-pill">
+                        <i class="bi bi-people-fill text-info me-1"></i>
+                        <span>@memberCount members</span>
+                    </span>
+
+                    <button class="btn btn-chat-video" @onclick="StartVideoCall" title="Start WebRTC Video Conference">
+                        <i class="bi bi-camera-video-fill"></i>
+                        <span>Start Video Call</span>
+                    </button>
+                }
+
+                <a href="/office/channels" class="btn btn-chat-directory" title="Manage & Browse Group Channels">
+                    <i class="bi bi-grid-fill"></i>
+                    <span class="d-none d-sm-inline">Group Directory</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. MAIN CHAT WORKSPACE (SIDEBAR + STREAM) -->
+    <div class="chat-layout-card">
+        <!-- Left Column: Channel Directory & Search Sidebar -->
+        <div class="chat-channels-sidebar">
+            <div class="sidebar-search-box">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white border-end-0 text-muted">
+                        <i class="bi bi-search"></i>
+                    </span>
+                    <input type="text" class="form-control border-start-0 ps-0" placeholder="Search channels..." 
+                           @bind="searchQuery" @bind:event="oninput" />
+                </div>
+            </div>
+
+            <div class="channel-filter-pills d-flex gap-1 px-3 py-2 border-bottom">
+                <button type="button" class="channel-pill-btn @(channelFilter == "all" ? "active" : "")" 
+                        @onclick='() => channelFilter = "all"'>All</button>
+                <button type="button" class="channel-pill-btn @(channelFilter == "public" ? "active" : "")" 
+                        @onclick='() => channelFilter = "public"'>Public</button>
+                <button type="button" class="channel-pill-btn @(channelFilter == "private" ? "active" : "")" 
+                        @onclick='() => channelFilter = "private"'>Private</button>
+            </div>
+
+            <div class="channels-list-container">
+                @if (allChannels == null)
+                {
+                    <div class="p-4 text-center text-muted">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                        <div class="small mt-1">Loading channels...</div>
+                    </div>
+                }
+                else if (!FilteredChannels.Any())
+                {
+                    <div class="p-4 text-center text-muted small">
+                        <i class="bi bi-search fs-3 text-secondary d-block mb-1"></i>
+                        No matching channels found.
+                    </div>
+                }
+                else
+                {
+                    @foreach (var ch in FilteredChannels)
+                    {
+                        var isActive = ChannelId == ch.Id;
+                        <div class="channel-nav-item @(isActive ? "active" : "")" @onclick="() => SelectChannel(ch.Id)">
+                            <div class="channel-item-orb @(ch.IsPrivate ? "orb-private" : "orb-public")">
+                                <i class="bi @(ch.IsPrivate ? "bi-lock-fill" : "bi-hash")"></i>
+                            </div>
+                            <div class="channel-item-info">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <span class="channel-item-name">@ch.Name</span>
+                                    @if (ch.IsPrivate)
+                                    {
+                                        <i class="bi bi-shield-lock-fill text-warning text-xs"></i>
+                                    }
+                                </div>
+                                <div class="channel-item-desc text-truncate">
+                                    @(string.IsNullOrEmpty(ch.Description) ? "Corporate discussion room" : ch.Description)
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+        <!-- Right Column: Live Message Feed & Composer -->
+        <div class="chat-messages-container">
+            @if (currentChannel == null)
+            {
+                <!-- Flashy Channel Collaboration Welcome Deck -->
+                <div class="chat-welcome-deck p-5 text-center my-auto">
+                    <div class="welcome-badge-icon mx-auto mb-3">
+                        <i class="bi bi-chat-heart-fill"></i>
+                    </div>
+                    <h3 class="fw-bold text-dark mb-2">Corporate Group Discussions</h3>
+                    <p class="text-muted mx-auto mb-4" style="max-width: 680px; font-size: 0.95rem;">
+                        Collaborate with your team across official department channels. Share project updates, initiate real-time video conferences, and brainstorm in synchronized corporate rooms.
+                    </p>
+
+                    <div class="row g-3 justify-content-center text-start" style="max-width: 960px; margin: 0 auto; width: 100%;">
+                        @if (allChannels != null)
+                        {
+                            @foreach (var quickCh in allChannels.Take(6))
+                            {
+                                <div class="col-md-6">
+                                    <div class="quick-channel-card p-3 rounded-3 border d-flex align-items-center justify-content-between" 
+                                         @onclick="() => SelectChannel(quickCh.Id)" style="cursor: pointer;">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="channel-item-orb @(quickCh.IsPrivate ? "orb-private" : "orb-public")">
+                                                <i class="bi @(quickCh.IsPrivate ? "bi-lock-fill" : "bi-hash")"></i>
+                                            </div>
+                                            <div class="min-w-0">
+                                                <div class="fw-bold text-dark" style="font-size: 0.88rem;">#@quickCh.Name</div>
+                                                <div class="text-muted text-xs text-truncate" style="max-width: 220px;">@(quickCh.Description ?? "Open discussion")</div>
+                                            </div>
+                                        </div>
+                                        <span class="btn btn-outline-primary btn-xs rounded-pill px-2 py-1" style="font-size: 0.72rem;">Enter →</span>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <!-- Active Channel Message Stream -->
+                <div class="chat-messages-stream" id="chat-messages-list">
+                    <div class="channel-intro-banner p-3 mb-3 rounded-3 text-center border">
+                        <div class="fw-bold text-dark" style="font-size: 0.95rem;">
+                            <i class="bi @(currentChannel.IsPrivate ? "bi-lock-fill text-warning" : "bi-hash text-primary") me-1"></i>
+                            Welcome to the beginning of the <strong>#@currentChannel.Name</strong> channel!
+                        </div>
+                        <p class="text-muted text-xs mb-0 mt-1">
+                            This room is synchronized across all active participants. Be courteous and adhere to corporate communication guidelines.
+                        </p>
+                    </div>
+
+                    @if (messages != null)
+                    {
+                        @foreach (var msg in messages)
+                        {
+                            var isMine = currentUser != null && msg.SenderId == currentUser.Id;
+                            <div class="message-card-wrapper @(isMine ? "outgoing" : "incoming")">
+                                @if (!isMine)
+                                {
+                                    <div class="msg-avatar-col">
+                                        <div class="chat-user-avatar">
+                                            @if (!string.IsNullOrEmpty(msg.Sender?.Avatar))
+                                            {
+                                                <img src="@msg.Sender.Avatar" alt="@msg.Sender.FullName" />
+                                            }
+                                            else
+                                            {
+                                                @(msg.Sender?.FullName?.Length > 0 ? msg.Sender.FullName[0].ToString().ToUpper() : "?")
+                                            }
+                                        </div>
+                                    </div>
+                                }
+
+                                <div class="msg-body-col">
+                                    <div class="msg-meta-header @(isMine ? "justify-content-end" : "")">
+                                        <span class="msg-sender-name">@(msg.Sender?.FullName ?? "Team Member")</span>
+                                        @if (!string.IsNullOrEmpty(msg.Sender?.JobTitle))
+                                        {
+                                            <span class="badge bg-light text-secondary border text-xs" style="font-size: 0.65rem;">@msg.Sender.JobTitle</span>
+                                        }
+                                        <span class="msg-time-pill">@msg.SentAt.ToLocalTime().ToString("hh:mm tt")</span>
+                                    </div>
+
+                                    @if (msg.Content.StartsWith("📞 [VIDEO CALL STARTED]"))
+                                    {
+                                        var parts = msg.Content.Split('|');
+                                        var link = parts.Length > 1 ? parts[1].Trim() : "";
+                                        <div class="chat-video-callout-card">
+                                            <div class="d-flex align-items-center gap-3">
+                                                <div class="video-pulse-orb">
+                                                    <i class="bi bi-camera-video-fill"></i>
+                                                </div>
+                                                <div>
+                                                    <h6 class="fw-bold text-dark mb-1" style="font-size: 0.92rem;">WebRTC Video Conference Room Active</h6>
+                                                    <p class="text-muted text-xs mb-2">A live face-to-face video conference room was opened for this channel.</p>
+                                                    <a href="@link" target="_blank" class="btn btn-success btn-sm rounded-pill px-3 py-1 fw-bold shadow-sm" style="font-size: 0.8rem;">
+                                                        <i class="bi bi-box-arrow-in-right me-1"></i>Join Video Call
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="message-bubble-content @(isMine ? "bubble-mine" : "bubble-theirs")">
+                                            <div class="msg-text-content">@ParseMessageContent(msg.Content)</div>
+
+                                            @if (msg.Attachments?.Any() == true)
+                                            {
+                                                <div class="msg-attachments-wrap mt-2 pt-2 border-top">
+                                                    @foreach (var att in msg.Attachments)
+                                                    {
+                                                        @if (att.ContentType?.StartsWith("audio/") == true || att.FileName.EndsWith(".webm") || att.FileName.EndsWith(".mp3"))
+                                                        {
+                                                            <div class="chat-audio-card my-1 @(isMine ? "audio-mine" : "audio-theirs")">
+                                                                <div class="chat-audio-icon">
+                                                                    <i class="bi bi-mic-fill"></i>
+                                                                </div>
+                                                                <div class="chat-audio-player-wrap">
+                                                                    <audio controls src="@att.FilePath" class="chat-audio-player"></audio>
+                                                                </div>
+                                                                <span class="chat-audio-size">@FormatFileSize(att.FileSize)</span>
+                                                            </div>
+                                                        }
+                                                        else
+                                                        {
+                                                            <a href="@att.FilePath" class="chat-attachment-pill" target="_blank" download>
+                                                                <i class="bi bi-paperclip"></i>
+                                                                <span class="text-truncate" style="max-width: 200px;">@att.FileName</span>
+                                                                <span class="text-muted small">(@FormatFileSize(att.FileSize))</span>
+                                                            </a>
+                                                        }
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+
+                <!-- Live Typing Indicator -->
+                <div class="chat-typing-bar px-3 py-1">
+                    @if (!string.IsNullOrEmpty(typingUser))
+                    {
+                        <div class="d-flex align-items-center gap-2 text-primary small">
+                            <span class="typing-dot"></span>
+                            <span class="typing-dot"></span>
+                            <span class="typing-dot"></span>
+                            <span>@typingUser is typing...</span>
+                        </div>
+                    }
+                </div>
+
+                <!-- Pending Attachments Strip -->
+                @if (pendingAttachments.Any())
+                {
+                    <div class="pending-attachments-strip px-3 py-2 border-top bg-light d-flex flex-wrap gap-2">
+                        @foreach (var att in pendingAttachments)
+                        {
+                            <div class="pending-att-chip d-flex align-items-center gap-2 px-2 py-1 rounded bg-white border">
+                                <i class="bi @(att.ContentType?.StartsWith("audio/") == true || att.FileName.EndsWith(".webm") ? "bi-mic-fill text-danger" : "bi-file-earmark-arrow-up text-primary")"></i>
+                                <span class="small text-truncate" style="max-width: 180px;">@att.FileName</span>
+                                <button type="button" class="btn btn-link p-0 text-danger" @onclick="() => RemoveAttachment(att)">
+                                    <i class="bi bi-x-circle-fill"></i>
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <!-- Quick Discussion Starters Pill Bar -->
+                <div class="discussion-starters-bar px-3 py-2 border-top d-flex align-items-center gap-2 overflow-x-auto">
+                    <span class="text-xs text-muted fw-bold text-uppercase me-1" style="font-size: 0.65rem; white-space: nowrap;">
+                        <i class="bi bi-lightning-charge-fill text-warning me-1"></i>QUICK POST:
+                    </span>
+                    <button type="button" class="starter-chip" @onclick='() => InsertStarter("📋 Status Update: ")'>
+                        📋 Status Update
+                    </button>
+                    <button type="button" class="starter-chip" @onclick='() => InsertStarter("🚀 Milestone Achieved: ")'>
+                        🚀 Milestone
+                    </button>
+                    <button type="button" class="starter-chip" @onclick='() => InsertStarter("📢 Team Notice: ")'>
+                        📢 Notice
+                    </button>
+                    <button type="button" class="starter-chip" @onclick='() => InsertStarter("💡 Idea / Suggestion: ")'>
+                        💡 Suggestion
+                    </button>
+                    <button type="button" class="starter-chip ai-chip" @onclick="TriggerAiDiscussionAssist">
+                        <i class="bi bi-stars text-warning me-1"></i>IntraBot Assist
+                    </button>
+                </div>
+
+                <!-- Message Composer Area -->
+                <div class="chat-input-container p-3 border-top">
+                    <div class="chat-input-wrapper d-flex align-items-center gap-2 bg-white rounded-3 border p-2 shadow-sm">
+                        <button type="button" class="btn btn-icon-round text-secondary" title="Attach Document" 
+                                onclick="document.getElementById('chat-file-input').click()">
+                            <i class="bi bi-paperclip fs-5"></i>
+                        </button>
+                        <InputFile id="chat-file-input" @ref="fileInput" OnChange="HandleFileSelected" style="display: none;" multiple />
+
+                        <button type="button" class="btn btn-icon-round @(isRecording ? "icon-recording text-danger" : "text-secondary")" 
+                                title="@(isRecording ? "Stop Recording & Send" : "Record Voice Note")" 
+                                @onclick="ToggleRecording">
+                            <i class="bi @(isRecording ? "bi-stop-fill" : "bi-mic-fill") fs-5"></i>
+                        </button>
+
+                        @if (isRecording)
+                        {
+                            <div class="chat-recording-live-bar d-flex align-items-center gap-2 flex-grow-1 px-3 py-1">
+                                <div class="chat-recording-ripple"></div>
+                                <span class="chat-recording-text fw-bold text-danger small">
+                                    <i class="bi bi-record-circle-fill me-1"></i>Recording audio note... Click mic or stop to finish & send.
+                                </span>
+                            </div>
+                        }
+                        else
+                        {
+                            <textarea class="form-control border-0 chat-textarea" placeholder="Type a message into #@currentChannel.Name... (Enter to send, Shift+Enter for newline)"
+                                      @bind="newMessage" @bind:event="oninput" @onkeydown="HandleKeyDown" rows="1" id="chat-input"></textarea>
+                        }
+
+                        <button type="button" class="btn btn-send-message" @onclick="SendMessage" title="Send Message">
+                            <i class="bi bi-send-fill me-1"></i>
+                            <span class="d-none d-sm-inline">Send</span>
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+</div>
+
+<style>
+    .group-chat-wrapper {
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        padding: 0 4px 12px 4px;
+        box-sizing: border-box;
+        height: calc(100vh - 95px);
+        min-height: 600px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* 1. GLASSMORPHIC TOPBAR BANNER */
+    .chat-header-banner {
+        background: linear-gradient(135deg, #1e1b4b 0%, #312e81 45%, #0f172a 100%);
+        border-radius: 16px;
+        padding: 1.25rem 1.6rem;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 15px 30px -10px rgba(30, 27, 75, 0.4);
+        margin-bottom: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        flex-shrink: 0;
+    }
+
+    .chat-hero-glow-1 {
+        position: absolute;
+        top: -70px;
+        left: -70px;
+        width: 250px;
+        height: 250px;
+        background: radial-gradient(circle, rgba(99, 102, 241, 0.4) 0%, transparent 70%);
+        border-radius: 50%;
+        pointer-events: none;
+    }
+
+    .chat-hero-glow-2 {
+        position: absolute;
+        bottom: -70px;
+        right: -70px;
+        width: 280px;
+        height: 280px;
+        background: radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, transparent 70%);
+        border-radius: 50%;
+        pointer-events: none;
+    }
+
+    .channel-header-orb {
+        width: 46px;
+        height: 46px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #4f46e5, #818cf8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        font-size: 1.4rem;
+        box-shadow: 0 0 15px rgba(99, 102, 241, 0.5);
+        flex-shrink: 0;
+    }
+
+    .chat-channel-title {
+        color: #ffffff;
+        font-weight: 800;
+        font-size: 1.35rem;
+        letter-spacing: -0.3px;
+    }
+
+    .chat-live-beacon {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(16, 185, 129, 0.2);
+        border: 1px solid rgba(52, 211, 153, 0.4);
+        color: #6ee7b7;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.6px;
+        padding: 3px 10px;
+        border-radius: 9999px;
+    }
+
+    .chat-beacon-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #10b981;
+        box-shadow: 0 0 6px #10b981;
+        animation: pulseChatBeacon 2s infinite;
+    }
+
+    @@keyframes pulseChatBeacon {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.35; transform: scale(0.85); }
+    }
+
+    .chat-member-pill {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: #cbd5e1;
+        padding: 5px 12px;
+        border-radius: 9999px;
+        font-size: 0.76rem;
+        font-weight: 600;
+    }
+
+    .btn-chat-video {
+        background: linear-gradient(135deg, #f43f5e, #e11d48);
+        color: #ffffff;
+        border: none;
+        border-radius: 9999px;
+        padding: 6px 14px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        box-shadow: 0 4px 12px rgba(244, 63, 94, 0.35);
+        transition: all 0.2s;
+    }
+    .btn-chat-video:hover {
+        background: linear-gradient(135deg, #e11d48, #be123c);
+        color: #ffffff;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(244, 63, 94, 0.5);
+    }
+
+    .btn-chat-directory {
+        background: rgba(255, 255, 255, 0.1);
+        color: #ffffff;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 9999px;
+        padding: 6px 14px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+    .btn-chat-directory:hover {
+        background: rgba(255, 255, 255, 0.2);
+        color: #ffffff;
+    }
+
+    /* 2. CHAT LAYOUT */
+    .chat-layout-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+        display: flex;
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    /* 3. CHANNEL SIDEBAR */
+    .chat-channels-sidebar {
+        width: 340px;
+        border-right: 1px solid #e2e8f0;
+        background: #f8fafc;
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+    }
+
+    .sidebar-search-box {
+        padding: 0.9rem;
+        border-bottom: 1px solid #e2e8f0;
+        background: #ffffff;
+    }
+
+    .channel-pill-btn {
+        background: transparent;
+        border: 1px solid transparent;
+        padding: 3px 10px;
+        border-radius: 9999px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #64748b;
+        transition: all 0.15s;
+    }
+    .channel-pill-btn:hover {
+        color: #0f172a;
+        background: #e2e8f0;
+    }
+    .channel-pill-btn.active {
+        background: #4f46e5;
+        color: #ffffff;
+    }
+
+    .channels-list-container {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0.5rem;
+    }
+
+    .channel-nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 12px;
+        border-radius: 10px;
+        margin-bottom: 4px;
+        cursor: pointer;
+        transition: all 0.15s;
+        border: 1px solid transparent;
+    }
+    .channel-nav-item:hover {
+        background: #f1f5f9;
+        border-color: #e2e8f0;
+    }
+    .channel-nav-item.active {
+        background: #ffffff;
+        border-color: #cbd5e1;
+        box-shadow: 0 2px 8px rgba(79, 70, 229, 0.08);
+    }
+
+    .channel-item-orb {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.95rem;
+        flex-shrink: 0;
+    }
+    .orb-public { background: rgba(79, 70, 229, 0.12); color: #4f46e5; }
+    .orb-private { background: rgba(245, 158, 11, 0.15); color: #d97706; }
+
+    .channel-item-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .channel-item-name {
+        font-size: 0.84rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .channel-item-desc {
+        font-size: 0.72rem;
+        color: #64748b;
+    }
+
+    /* 4. CHAT MESSAGES CONTAINER */
+    .chat-messages-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        height: 100%;
+        background: #ffffff;
+    }
+
+    .chat-messages-stream {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1.25rem 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .message-card-wrapper {
+        display: flex;
+        gap: 10px;
+        max-width: 75%;
+    }
+    .message-card-wrapper.incoming {
+        align-self: flex-start;
+    }
+    .message-card-wrapper.outgoing {
+        align-self: flex-end;
+        flex-direction: row-reverse;
+    }
+
+    .chat-user-avatar {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #4f46e5, #818cf8);
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 0.8rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        overflow: hidden;
+    }
+    .chat-user-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .msg-body-col {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .msg-meta-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 3px;
+    }
+
+    .msg-sender-name {
+        font-size: 0.76rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .msg-time-pill {
+        font-size: 0.68rem;
+        color: #94a3b8;
+    }
+
+    .message-bubble-content {
+        padding: 10px 14px;
+        border-radius: 14px;
+        font-size: 0.88rem;
+        line-height: 1.45;
+        position: relative;
+        word-break: break-word;
+    }
+
+    .bubble-mine {
+        background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
+        color: #ffffff;
+        border-bottom-right-radius: 4px;
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+    }
+    .bubble-mine a {
+        color: #fef08a !important;
+        text-decoration: underline;
+    }
+
+    .bubble-theirs {
+        background: #f8fafc;
+        color: #1e293b;
+        border: 1px solid #e2e8f0;
+        border-bottom-left-radius: 4px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+    }
+
+    .chat-video-callout-card {
+        background: #fef2f2;
+        border: 1px solid #fecdd3;
+        border-radius: 12px;
+        padding: 1rem;
+        box-shadow: 0 4px 12px rgba(244, 63, 94, 0.1);
+    }
+
+    .video-pulse-orb {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #f43f5e, #e11d48);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        flex-shrink: 0;
+    }
+
+    .chat-attachment-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(255, 255, 255, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        color: inherit;
+        text-decoration: none;
+    }
+
+    /* 5. TYPING & STARTERS */
+    .typing-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #4f46e5;
+        display: inline-block;
+        animation: pulseChatBeacon 1.2s infinite;
+    }
+
+    .discussion-starters-bar {
+        background: #fafafa;
+    }
+
+    .starter-chip {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 9999px;
+        padding: 3px 10px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #475569;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+    .starter-chip:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+        border-color: #cbd5e1;
+    }
+    .starter-chip.ai-chip {
+        background: rgba(245, 158, 11, 0.1);
+        border-color: rgba(245, 158, 11, 0.3);
+        color: #b45309;
+    }
+    .starter-chip.ai-chip:hover {
+        background: rgba(245, 158, 11, 0.2);
+    }
+
+    /* 6. COMPOSER */
+    .chat-input-wrapper {
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .chat-input-wrapper:focus-within {
+        border-color: #6366f1 !important;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
+    }
+
+    .chat-textarea {
+        resize: none;
+        box-shadow: none !important;
+        font-size: 0.88rem;
+    }
+
+    .btn-icon-round {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        background: transparent;
+        transition: background 0.15s;
+    }
+    .btn-icon-round:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
+
+    .btn-send-message {
+        background: linear-gradient(135deg, #4f46e5, #6366f1);
+        color: #ffffff;
+        border: none;
+        border-radius: 8px;
+        padding: 7px 16px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+        box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+    }
+    .btn-send-message:hover {
+        background: linear-gradient(135deg, #4338ca, #4f46e5);
+        color: #ffffff;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+    }
+
+    .welcome-badge-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #4f46e5, #818cf8);
+        color: #ffffff;
+        font-size: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3);
+    }
+
+    .quick-channel-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 12px !important;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+    }
+    .quick-channel-card:hover {
+        background: #f8fafc;
+        border-color: #6366f1 !important;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(99, 102, 241, 0.12);
+    }
+
+    /* Voice Notes & Audio Cards */
+    .icon-recording {
+        background: #fee2e2 !important;
+        color: #ef4444 !important;
+        animation: recordingPulse 1.2s infinite;
+    }
+    @@keyframes recordingPulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.15); }
+        100% { transform: scale(1); }
+    }
+
+    .chat-recording-live-bar {
+        background: #fff1f2;
+        border-radius: 8px;
+        padding: 6px 12px;
+        border: 1px dashed #f43f5e;
+    }
+    .chat-recording-ripple {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #ef4444;
+        box-shadow: 0 0 10px #ef4444;
+        animation: pulseChatBeacon 1s infinite;
+        flex-shrink: 0;
+    }
+    .chat-recording-text {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #e11d48;
+    }
+
+    .chat-audio-card {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+        max-width: 360px;
+    }
+    .chat-audio-card.audio-mine {
+        background: rgba(255, 255, 255, 0.18);
+        border-color: rgba(255, 255, 255, 0.3);
+        color: #ffffff;
+    }
+    .chat-audio-card.audio-theirs {
+        background: #ffffff;
+        border-color: #e2e8f0;
+        color: #1e293b;
+    }
+
+    .chat-audio-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #e0e7ff;
+        color: #4f46e5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.95rem;
+        flex-shrink: 0;
+    }
+    .audio-mine .chat-audio-icon {
+        background: rgba(255, 255, 255, 0.25);
+        color: #ffffff;
+    }
+
+    .chat-audio-player-wrap {
+        flex: 1;
+        min-width: 0;
+    }
+    .chat-audio-player {
+        height: 34px;
+        width: 100%;
+        max-width: 240px;
+    }
+    .chat-audio-size {
+        font-size: 0.72rem;
+        opacity: 0.8;
+        white-space: nowrap;
+    }
+</style>
+
+@code {
+    [Parameter] public int ChannelId { get; set; }
+
+    public class AudioRecordingResult
+    {
+        public string Base64 { get; set; } = "";
+        public string MimeType { get; set; } = "";
+    }
+
+    private IntraUserProfile? currentUser;
+    private Channel? currentChannel;
+    private List<Channel>? allChannels;
+    private List<Message>? messages;
+    private string newMessage = "";
+    private string searchQuery = "";
+    private string channelFilter = "all";
+    private string? typingUser;
+    private int memberCount;
+    private bool isRecording = false;
+    private InputFile? fileInput;
+    private List<MessageAttachment> pendingAttachments = new();
+
+    private IEnumerable<Channel> FilteredChannels =>
+        allChannels?.Where(c => 
+            (string.IsNullOrEmpty(searchQuery) || c.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) || (c.Description != null && c.Description.Contains(searchQuery, StringComparison.OrdinalIgnoreCase))) &&
+            (channelFilter == "all" || (channelFilter == "public" && !c.IsPrivate) || (channelFilter == "private" && c.IsPrivate))
+        ) ?? Enumerable.Empty<Channel>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var userPrincipal = authState.User;
+            string? userId = userPrincipal.Identity?.Name;
+
+            if (!string.IsNullOrEmpty(userId))
+            {
+                currentUser = await IntraOfficeService.GetUserProfileAsync(userId);
+                if (currentUser == null)
+                {
+                    currentUser = new IntraUserProfile { UserName = userId, FullUserName = userId };
+                }
+            }
+
+            allChannels = await ChannelService.GetAllChannelsAsync();
+            NotificationService.OnNotificationReceived += HandleLiveNotification;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error initializing Group Discussion");
+        }
+    }
+
+    private async Task HandleLiveNotification(AppNotification notif)
+    {
+        if (currentChannel != null && notif.Category == NotificationCategory.Message)
+        {
+            if (notif.ActionUrl == $"/chat/{currentChannel.Id}" || notif.ActionUrl?.StartsWith($"/chat/{currentChannel.Id}") == true)
+            {
+                await InvokeAsync(async () =>
+                {
+                    messages = await MessageService.GetChannelMessagesAsync(currentChannel.Id);
+                    StateHasChanged();
+                    await ScrollToBottom();
+                });
+            }
+        }
+    }
+
+    private void SelectChannel(int channelId)
+    {
+        Navigation.NavigateTo($"/chat/{channelId}");
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ChannelId > 0)
+        {
+            currentChannel = await ChannelService.GetChannelByIdAsync(ChannelId);
+            if (currentChannel != null)
+            {
+                messages = await MessageService.GetChannelMessagesAsync(ChannelId);
+                memberCount = currentChannel.Members?.Count ?? 0;
+            }
+        }
+        else
+        {
+            currentChannel = null;
+            messages = null;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (messages?.Count > 0)
+        {
+            await ScrollToBottom();
+        }
+    }
+
+    private async Task SendMessage()
+    {
+        try
+        {
+            if ((string.IsNullOrWhiteSpace(newMessage) && !pendingAttachments.Any()) || currentUser == null || currentChannel == null)
+            {
+                return;
+            }
+
+            var message = new Message
+            {
+                ChannelId = currentChannel.Id,
+                SenderId = currentUser.Id,
+                Content = newMessage.Trim(),
+                MessageType = MessageType.Text,
+                Attachments = pendingAttachments.ToList()
+            };
+
+            var sent = await MessageService.SendMessageAsync(message);
+
+            messages ??= new();
+            messages.Add(sent);
+            newMessage = "";
+            pendingAttachments.Clear();
+            StateHasChanged();
+            await ScrollToBottom();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error sending channel message");
+        }
+    }
+
+    private void InsertStarter(string prefix)
+    {
+        newMessage = prefix + newMessage;
+    }
+
+    private void TriggerAiDiscussionAssist()
+    {
+        var channelName = currentChannel?.Name ?? "team";
+        Navigation.NavigateTo($"/ai-assistant?prompt={Uri.EscapeDataString($"Draft a concise, professional team announcement or discussion update for our #{channelName} channel summarizing active project milestones and next steps.")}");
+    }
+
+    private async Task StartVideoCall()
+    {
+        if (currentChannel == null || currentUser == null) return;
+        var roomId = $"IntraOffice_Call_{Guid.NewGuid().ToString("N").Substring(0, 10)}";
+        var meetLink = $"https://meet.jit.si/{roomId}";
+        
+        var message = new Message
+        {
+            ChannelId = currentChannel.Id,
+            SenderId = currentUser.Id,
+            Content = $"📞 [VIDEO CALL STARTED] | {meetLink}",
+            MessageType = MessageType.Text
+        };
+        
+        var sent = await MessageService.SendMessageAsync(message);
+        
+        messages ??= new();
+        messages.Add(sent);
+        StateHasChanged();
+        await ScrollToBottom();
+
+        // Send invitation to members if private
+        if (currentChannel.IsPrivate && currentChannel.Members != null)
+        {
+            var otherMember = currentChannel.Members.FirstOrDefault(m => m.UserId != currentUser.Id);
+            if (otherMember?.User != null)
+            {
+                var otherUser = otherMember.User;
+                var inviteMsg = $"*Video Call Invitation*\n\nHello {otherUser.FullName},\n\n{currentUser.FullName} is calling you on Intra Office!\n\nJoin the video call here: {meetLink}";
+                
+                if (!string.IsNullOrEmpty(otherUser.PhoneNumber))
+                {
+                    _ = WhatsAppService.SendDirectMessageAsync(otherUser.PhoneNumber, inviteMsg);
+                }
+                if (!string.IsNullOrEmpty(otherUser.Email))
+                {
+                    var emailBody = $"<p>Hello {otherUser.FullName},</p><p><strong>{currentUser.FullName}</strong> is calling you on Intra Office!</p><p><a href=\"{meetLink}\">Click here to join the video call</a></p>";
+                    _ = EmailService.SendEmailAsync(otherUser.Email, "Video Call Invitation", emailBody);
+                }
+            }
+        }
+
+        await JS.InvokeVoidAsync("window.open", meetLink, "_blank");
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        foreach (var file in e.GetMultipleFiles(5))
+        {
+            try
+            {
+                var relativePath = await FileService.SaveFileToDiskAsync(file);
+                pendingAttachments.Add(new MessageAttachment
+                {
+                    FileName = file.Name,
+                    FilePath = relativePath,
+                    FileSize = file.Size,
+                    ContentType = file.ContentType,
+                    UploadedAt = DateTime.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error uploading file");
+            }
+        }
+    }
+
+    private void RemoveAttachment(MessageAttachment attachment)
+    {
+        pendingAttachments.Remove(attachment);
+    }
+
+    private async Task ToggleRecording()
+    {
+        try
+        {
+            if (!isRecording)
+            {
+                var success = await JS.InvokeAsync<bool>("window.audioRecorder.startRecording");
+                if (success)
+                {
+                    isRecording = true;
+                    StateHasChanged();
+                }
+                else
+                {
+                    Logger.LogWarning("Failed to start audio recording. Check microphone permissions.");
+                    isRecording = false;
+                    StateHasChanged();
+                }
+            }
+            else
+            {
+                isRecording = false;
+                StateHasChanged();
+
+                var result = await JS.InvokeAsync<AudioRecordingResult>("window.audioRecorder.stopRecording");
+                if (result != null && !string.IsNullOrEmpty(result.Base64))
+                {
+                    var fileName = $"VoiceNote_{DateTime.Now:yyyyMMdd_HHmmss}.webm";
+                    var relativePath = await FileService.SaveBase64FileToDiskAsync(result.Base64, fileName);
+
+                    pendingAttachments.Add(new MessageAttachment
+                    {
+                        FileName = fileName,
+                        FilePath = relativePath,
+                        FileSize = (long)(result.Base64.Length * 0.75),
+                        ContentType = result.MimeType,
+                        UploadedAt = DateTime.UtcNow
+                    });
+
+                    // Automatically send the voice note to the channel
+                    await SendMessage();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error toggling audio recording in Group Discussion");
+            isRecording = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SendMessage();
+        }
+    }
+
+    private async Task ScrollToBottom()
+    {
+        try
+        {
+            await Task.Delay(50);
+            await JS.InvokeVoidAsync("scrollToBottom", "chat-messages-list");
+        }
+        catch
+        {
+            // Ignore during prerender
+        }
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        if (bytes < 1024L * 1024 * 1024) return $"{bytes / (1024.0 * 1024.0):F1} MB";
+        return $"{bytes / (1024.0 * 1024.0 * 1024.0):F2} GB";
+    }
+
+    private MarkupString ParseMessageContent(string content)
+    {
+        if (string.IsNullOrEmpty(content)) return new MarkupString("");
+        
+        var safeContent = System.Net.WebUtility.HtmlEncode(content);
+        var linkRegex = new System.Text.RegularExpressions.Regex(@"\[([^\]]+)\]\(([^)]+)\)");
+        safeContent = linkRegex.Replace(safeContent, m => 
+            $"<a href=\"{m.Groups[2].Value}\" style=\"color: #6366f1; font-weight: 600; text-decoration: underline;\">{m.Groups[1].Value}</a>"
+        );
+        safeContent = safeContent.Replace("\n", "<br/>");
+        return new MarkupString(safeContent);
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        NotificationService.OnNotificationReceived -= HandleLiveNotification;
+        return ValueTask.CompletedTask;
+    }
+}

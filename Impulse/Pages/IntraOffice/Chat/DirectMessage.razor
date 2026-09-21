@@ -1,0 +1,2306 @@
+@page "/office/messages"
+@page "/office/messages/{OtherUserId}"
+@page "/messages"
+@page "/messages/{OtherUserId}"
+@layout IntraOfficeLayout
+@attribute [Authorize]
+@using System.Security.Claims
+@using DataAccessLibrary.Models.IntraOffice
+@using Impulse.Services.IntraOffice
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IIntraOfficeService IntraOfficeService
+@inject IMessageService MessageService
+@inject IAppNotificationService NotificationService
+@inject IFileService FileService
+@inject IWhatsAppService WhatsAppService
+@inject IEmailService EmailService
+@inject IAiAssistantService AiAssistantService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>IntraCom-CRM | Direct Messages @(otherUser != null ? $"— {otherUser.FullName}" : "")</PageTitle>
+
+<div class="dm-page-wrapper">
+
+    <!-- 1. GLASSMORPHIC TOPBAR / RECIPIENT HERO BANNER -->
+    <div class="dm-header-banner">
+        <div class="dm-hero-glow-1"></div>
+        <div class="dm-hero-glow-2"></div>
+
+        <div class="dm-header-content position-relative d-flex flex-wrap align-items-center justify-content-between gap-3">
+            @if (otherUser != null)
+            {
+                <div class="d-flex align-items-center gap-3">
+                    <div class="dm-avatar-ring">
+                        @if (!string.IsNullOrEmpty(otherUser.Avatar))
+                        {
+                            <img src="@otherUser.Avatar" alt="@otherUser.FullName" class="dm-avatar-img" />
+                        }
+                        else
+                        {
+                            <div class="dm-avatar-fallback">
+                                @(otherUser.FullName.Length > 0 ? otherUser.FullName[0].ToString().ToUpper() : "?")
+                            </div>
+                        }
+                        <span class="dm-beacon-indicator" title="Live status active"></span>
+                    </div>
+
+                    <div>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <h4 class="dm-recipient-name mb-0">@otherUser.FullName</h4>
+                            @if (otherUser.Id == AiAssistantService.GetAiUserId())
+                            {
+                                <span class="dm-chip-ai">
+                                    <i class="bi bi-robot me-1"></i> IntraBot AI
+                                </span>
+                            }
+                            else if (otherUser.Department != null)
+                            {
+                                <span class="dm-chip-dept">
+                                    <i class="bi bi-building me-1"></i> @otherUser.Department.Name
+                                </span>
+                            }
+                            <span class="dm-chip-role">@(otherUser.JobTitle ?? "Colleague")</span>
+                        </div>
+
+                        <div class="d-flex align-items-center gap-3 mt-1 text-xs">
+                            <span class="dm-live-badge">
+                                <span class="dm-live-dot"></span>
+                                DIRECT COMMS ENCRYPTED • ACTIVE SYNC
+                            </span>
+                            @if (!string.IsNullOrEmpty(otherUser.Email))
+                            {
+                                <span class="text-white-50 d-none d-md-inline-flex align-items-center gap-1">
+                                    <i class="bi bi-envelope"></i> @otherUser.Email
+                                </span>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <button class="btn btn-dm-action btn-dm-video" @onclick="StartVideoCall" title="Start WebRTC Video Conference">
+                        <i class="bi bi-camera-video-fill"></i>
+                        <span>Start Video Call</span>
+                    </button>
+
+                    @if (!string.IsNullOrEmpty(otherUser.PhoneNumber))
+                    {
+                        <button class="btn btn-dm-action btn-dm-whatsapp" @onclick="OpenWhatsAppDirect" title="Direct WhatsApp Ping">
+                            <i class="bi bi-whatsapp"></i>
+                            <span class="d-none d-sm-inline">WhatsApp</span>
+                        </button>
+                    }
+
+                    @if (!string.IsNullOrEmpty(otherUser.Email))
+                    {
+                        <a href="mailto:@otherUser.Email" class="btn btn-dm-action btn-dm-mail" title="Send Direct Email">
+                            <i class="bi bi-envelope-at-fill"></i>
+                            <span class="d-none d-sm-inline">Email</span>
+                        </a>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="d-flex align-items-center gap-3">
+                    <div class="dm-brand-icon">
+                        <i class="bi bi-chat-heart-fill"></i>
+                    </div>
+                    <div>
+                        <div class="d-flex align-items-center gap-2">
+                            <h4 class="dm-recipient-name mb-0">Executive Direct Messenger</h4>
+                            <span class="dm-chip-secure">
+                                <i class="bi bi-shield-check me-1"></i> P2P Encrypted
+                            </span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mt-1">
+                            <span class="dm-live-badge">
+                                <span class="dm-live-dot"></span>
+                                LIVE COLLABORATION NETWORK • @(allUsers?.Count ?? 0) ACTIVE CONTACTS
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-dm-action btn-dm-ai" @onclick="() => LaunchAiWithPrompt(null)" title="Consult IntraBot AI">
+                        <i class="bi bi-robot"></i>
+                        <span>Ask IntraBot AI</span>
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- 2. MAIN MESSENGER CARD (SIDEBAR + CONVERSATION AREA) -->
+    <div class="dm-messenger-card">
+
+        <!-- Left Sidebar: Directory & Contacts -->
+        <div class="dm-sidebar">
+            <div class="dm-sidebar-header">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="dm-sidebar-title">
+                        <i class="bi bi-person-lines-fill me-1 text-primary"></i> Direct Channels
+                    </span>
+                    <span class="dm-count-pill">@(FilteredUsers.Count()) contacts</span>
+                </div>
+
+                <!-- Search Input -->
+                <div class="dm-search-wrapper">
+                    <i class="bi bi-search dm-search-icon"></i>
+                    <input type="text" class="dm-search-input" placeholder="Search colleagues or role..."
+                           @bind="searchQuery" @bind:event="oninput" />
+                    @if (!string.IsNullOrEmpty(searchQuery))
+                    {
+                        <button class="dm-search-clear" @onclick="() => searchQuery = string.Empty" title="Clear">
+                            <i class="bi bi-x-circle-fill"></i>
+                        </button>
+                    }
+                </div>
+
+                <!-- Filter Pills -->
+                <div class="dm-filter-tabs">
+                    <button class="dm-filter-tab @(activeFilterTab == "all" ? "active" : "")" @onclick='@(() => activeFilterTab = "all")'>
+                        All
+                    </button>
+                    <button class="dm-filter-tab @(activeFilterTab == "unread" ? "active" : "")" @onclick='@(() => activeFilterTab = "unread")'>
+                        Unread @(TotalUnreadCount > 0 ? $"({TotalUnreadCount})" : "")
+                    </button>
+                    <button class="dm-filter-tab @(activeFilterTab == "ai" ? "active" : "")" @onclick='@(() => activeFilterTab = "ai")'>
+                        <i class="bi bi-robot"></i> IntraBot
+                    </button>
+                </div>
+            </div>
+
+            <!-- Colleague Items List -->
+            <div class="dm-contacts-list">
+                @if (FilteredUsers.Any())
+                {
+                    @foreach (var user in FilteredUsers)
+                    {
+                        var isSelected = OtherUserId == user.Id;
+                        var hasUnread = unreadCounts.TryGetValue(user.Id, out int count) && count > 0;
+                        var isAi = user.Id == AiAssistantService.GetAiUserId();
+
+                        <a href="/messages/@user.Id" class="dm-contact-item @(isSelected ? "active" : "") @(hasUnread ? "has-unread" : "")">
+                            <div class="dm-contact-avatar-box">
+                                @if (!string.IsNullOrEmpty(user.Avatar))
+                                {
+                                    <img src="@user.Avatar" alt="@user.FullName" class="dm-contact-avatar" />
+                                }
+                                else
+                                {
+                                    <div class="dm-contact-avatar-fallback @(isAi ? "ai-bg" : "")">
+                                        @if (isAi)
+                                        {
+                                            <i class="bi bi-robot"></i>
+                                        }
+                                        else
+                                        {
+                                            @(user.FullName.Length > 0 ? user.FullName[0].ToString().ToUpper() : "?")
+                                        }
+                                    </div>
+                                }
+                                @if (hasUnread)
+                                {
+                                    <span class="avatar-unread-dot" title="@count unread message(s)"></span>
+                                }
+                                else
+                                {
+                                    <span class="avatar-status-dot"></span>
+                                }
+                            </div>
+
+                            <div class="dm-contact-meta">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <span class="dm-contact-name @(isSelected ? "fw-bold text-primary" : "")">
+                                        @user.FullName
+                                    </span>
+                                    @if (hasUnread)
+                                    {
+                                        <span class="user-unread-badge">@(count > 99 ? "99+" : count.ToString())</span>
+                                    }
+                                </div>
+                                <div class="dm-contact-sub">
+                                    @if (isAi)
+                                    {
+                                        <span class="text-purple fw-semibold"><i class="bi bi-stars"></i> Intelligent Assistant</span>
+                                    }
+                                    else if (hasUnread)
+                                    {
+                                        <span class="text-danger fw-semibold">@count new message@(count > 1 ? "s" : "")</span>
+                                    }
+                                    else
+                                    {
+                                        <span>@(user.JobTitle ?? user.Department?.Name ?? user.Email)</span>
+                                    }
+                                </div>
+                            </div>
+                        </a>
+                    }
+                }
+                else
+                {
+                    <div class="dm-no-contacts text-center p-4">
+                        <i class="bi bi-people text-muted" style="font-size: 2rem;"></i>
+                        <p class="text-muted small mt-2 mb-0">No contacts match your query.</p>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Right Pane: Active Chat OR Welcome Deck -->
+        <div class="dm-chat-pane">
+            @if (string.IsNullOrEmpty(OtherUserId))
+            {
+                <!-- WELCOME DECK (WHEN NO CONVERSATION SELECTED) -->
+                <div class="dm-welcome-deck">
+                    <div class="dm-welcome-hero-card">
+                        <div class="dm-welcome-icon-halo">
+                            <i class="bi bi-chat-square-dots-fill"></i>
+                        </div>
+                        <h2 class="dm-welcome-title">Executive 1-on-1 Workspace</h2>
+                        <p class="dm-welcome-subtitle">
+                            Connect directly with colleagues across engineering, sales, and management.
+                            Launch instant encrypted video meetings, send crystal-clear voice notes, or get real-time CRM intelligence from IntraBot AI.
+                        </p>
+
+                        <!-- Fast-Connect Colleagues Grid -->
+                        <div class="dm-fast-connect-section mt-4">
+                            <div class="dm-section-heading">
+                                <i class="bi bi-lightning-charge-fill text-warning me-1"></i> Fast Connect
+                            </div>
+                            <div class="dm-fast-colleagues-grid">
+                                @if (allUsers != null)
+                                {
+                                    @foreach (var colleague in allUsers.Take(4))
+                                    {
+                                        var isAiColleague = colleague.Id == AiAssistantService.GetAiUserId();
+                                        <div class="dm-fast-colleague-card">
+                                            <div class="dm-fast-avatar-wrap">
+                                                @if (!string.IsNullOrEmpty(colleague.Avatar))
+                                                {
+                                                    <img src="@colleague.Avatar" alt="@colleague.FullName" class="dm-fast-avatar" />
+                                                }
+                                                else
+                                                {
+                                                    <div class="dm-fast-avatar-fallback @(isAiColleague ? "ai-bg" : "")">
+                                                        @if (isAiColleague)
+                                                        {
+                                                            <i class="bi bi-robot"></i>
+                                                        }
+                                                        else
+                                                        {
+                                                            @(colleague.FullName.Length > 0 ? colleague.FullName[0].ToString().ToUpper() : "?")
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+                                            <div class="dm-fast-name text-truncate">@colleague.FullName</div>
+                                            <div class="dm-fast-role text-truncate">@(colleague.JobTitle ?? colleague.Department?.Name ?? "Colleague")</div>
+                                            <a href="/messages/@colleague.Id" class="btn btn-sm btn-dm-connect">
+                                                <i class="bi bi-chat-fill me-1"></i> Message
+                                            </a>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        </div>
+
+                        <!-- IntraBot AI Quick Assistant Deck -->
+                        <div class="dm-ai-quick-deck mt-4">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="dm-ai-deck-icon">
+                                    <i class="bi bi-robot"></i>
+                                </div>
+                                <div class="text-start flex-grow-1">
+                                    <h5 class="mb-1 text-white fw-bold">IntraBot Neural Assistant Ready</h5>
+                                    <p class="mb-0 text-white-50 small">Ask anything about CRM deals, inventory status, active tasks, or executive overview KPIs.</p>
+                                </div>
+                            </div>
+                            <div class="dm-ai-prompt-chips mt-3">
+                                <button class="dm-ai-prompt-chip" @onclick='() => LaunchAiWithPrompt("Summarize our current CRM Pipeline status and key leads.")'>
+                                    📊 Summarize CRM Pipeline
+                                </button>
+                                <button class="dm-ai-prompt-chip" @onclick='() => LaunchAiWithPrompt("What high-priority tasks are currently assigned to me?")'>
+                                    🚀 My Priority Tasks
+                                </button>
+                                <button class="dm-ai-prompt-chip" @onclick='() => LaunchAiWithPrompt("Give me a brief executive overview of active office operations.")'>
+                                    🏢 Executive Briefing
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <!-- ACTIVE CONVERSATION STREAM -->
+                <div class="dm-conversation-stream" id="dm-messages-list">
+                    <div class="dm-stream-notice">
+                        <i class="bi bi-lock-fill text-success me-1"></i>
+                        <span>Messages in this thread are private and securely synchronized in real time.</span>
+                    </div>
+
+                    @if (messages != null && messages.Any())
+                    {
+                        @foreach (var msg in messages)
+                        {
+                            var isMine = currentUser != null && msg.SenderId == currentUser.Id;
+
+                            <div class="dm-message-row @(isMine ? "dm-row-mine" : "dm-row-theirs")">
+                                @if (!isMine)
+                                {
+                                    <div class="dm-bubble-avatar">
+                                        @if (!string.IsNullOrEmpty(msg.Sender?.Avatar))
+                                        {
+                                            <img src="@msg.Sender.Avatar" alt="@msg.Sender.FullName" class="dm-bubble-avatar-img" />
+                                        }
+                                        else
+                                        {
+                                            <div class="dm-bubble-avatar-fallback">
+                                                @(msg.Sender?.FullName?.Length > 0 ? msg.Sender.FullName[0].ToString().ToUpper() : "?")
+                                            </div>
+                                        }
+                                    </div>
+                                }
+
+                                <div class="dm-bubble-container">
+                                    <div class="dm-bubble-meta @(isMine ? "text-end" : "text-start")">
+                                        <span class="dm-bubble-sender">@(isMine ? "You" : (msg.Sender?.FullName ?? "Colleague"))</span>
+                                        <span class="dm-bubble-time">@msg.SentAt.ToLocalTime().ToString("hh:mm tt")</span>
+                                    </div>
+
+                                    @if (msg.Content.StartsWith("📞 [VIDEO CALL STARTED]"))
+                                    {
+                                        var parts = msg.Content.Split('|');
+                                        var link = parts.Length > 1 ? parts[1].Trim() : "";
+                                        <div class="dm-call-card">
+                                            <div class="dm-call-glow"></div>
+                                            <div class="dm-call-header">
+                                                <div class="dm-call-pulse-icon">
+                                                    <i class="bi bi-camera-video-fill"></i>
+                                                </div>
+                                                <div>
+                                                    <div class="dm-call-title">Secure Video Meeting Started</div>
+                                                    <div class="dm-call-sub">WebRTC P2P Conference Room</div>
+                                                </div>
+                                            </div>
+                                            <p class="dm-call-text">Click below to connect camera & microphone in high-definition video conference.</p>
+                                            <a href="@link" target="_blank" class="btn btn-dm-join-call">
+                                                <i class="bi bi-telephone-inbound-fill me-1"></i> Join Video Call
+                                            </a>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="dm-bubble @(isMine ? (msg.IsRead ? "dm-bubble-mine dm-bubble-mine-read" : "dm-bubble-mine") : "dm-bubble-theirs")">
+                                            @ParseMessageContent(msg.Content)
+                                        </div>
+                                        @if (isMine)
+                                        {
+                                            <div class="dm-read-tick @(msg.IsRead ? "dm-tick-read" : "dm-tick-sent")">
+                                                @if (msg.IsRead)
+                                                {
+                                                    <i class="bi bi-check2-all"></i>
+                                                }
+                                                else
+                                                {
+                                                    <i class="bi bi-check2"></i>
+                                                }
+                                            </div>
+                                        }
+                                    }
+
+                                    @if (msg.Attachments?.Any() == true)
+                                    {
+                                        <div class="dm-attachments-cluster @(isMine ? "justify-content-end" : "justify-content-start")">
+                                            @foreach (var att in msg.Attachments)
+                                            {
+                                                @if (att.ContentType?.StartsWith("audio/") == true || att.FileName.EndsWith(".webm") || att.FileName.EndsWith(".mp3"))
+                                                {
+                                                    <div class="dm-audio-card">
+                                                        <div class="dm-audio-icon">
+                                                            <i class="bi bi-mic-fill"></i>
+                                                        </div>
+                                                        <div class="dm-audio-player-wrap">
+                                                            <audio controls src="@att.FilePath" class="dm-audio-player"></audio>
+                                                        </div>
+                                                        <span class="dm-audio-size">@FormatFileSize(att.FileSize)</span>
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <a href="@att.FilePath" class="dm-file-chip" target="_blank" download>
+                                                        <i class="bi bi-paperclip dm-file-icon"></i>
+                                                        <div class="dm-file-info">
+                                                            <span class="dm-file-name">@att.FileName</span>
+                                                            <span class="dm-file-meta">@FormatFileSize(att.FileSize)</span>
+                                                        </div>
+                                                        <i class="bi bi-download dm-file-download"></i>
+                                                    </a>
+                                                }
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="dm-empty-chat text-center p-5">
+                            <div class="dm-empty-chat-icon">
+                                <i class="bi bi-chat-text"></i>
+                            </div>
+                            <h5 class="fw-bold mt-3 mb-1">Start a Conversation</h5>
+                            <p class="text-muted small">No previous messages in this direct channel. Say hello to @(otherUser?.FullName ?? "your colleague")!</p>
+                        </div>
+                    }
+
+                    @if (isAiTyping && otherUser?.Id == AiAssistantService.GetAiUserId())
+                    {
+                        <div class="dm-message-row dm-row-theirs">
+                            <div class="dm-bubble-avatar">
+                                <div class="dm-bubble-avatar-fallback ai-bg">
+                                    <i class="bi bi-robot"></i>
+                                </div>
+                            </div>
+                            <div class="dm-bubble-container">
+                                <div class="dm-ai-typing-card">
+                                    <span class="dm-ai-typing-text"><i class="bi bi-stars me-1"></i> IntraBot is thinking</span>
+                                    <span class="dm-typing-dots">
+                                        <span></span><span></span><span></span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <!-- ATTACHMENT UPLOAD STATUS / ERROR -->
+                @if (isUploadingAttachment)
+                {
+                    <div class="alert alert-info py-2 px-3 d-flex align-items-center gap-2 mb-2 mx-3 shadow-sm rounded-3">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                        <span class="small fw-semibold">@(uploadProgressStatus ?? "Processing attachment...")</span>
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(uploadError))
+                {
+                    <div class="alert alert-danger py-2 px-3 d-flex align-items-center justify-content-between mb-2 mx-3 shadow-sm rounded-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+                            <span class="small">@uploadError</span>
+                        </div>
+                        <button type="button" class="btn-close btn-close-sm" @onclick="() => uploadError = null"></button>
+                    </div>
+                }
+
+                <!-- PENDING ATTACHMENTS TRAY -->
+                @if (pendingAttachments.Any())
+                {
+                    <div class="dm-pending-attachments">
+                        <span class="dm-pending-label"><i class="bi bi-paperclip me-1"></i> Ready to send:</span>
+                        @foreach (var att in pendingAttachments)
+                        {
+                            <div class="dm-pending-chip">
+                                <i class="bi bi-file-earmark-text text-primary me-1"></i>
+                                <span class="dm-pending-name">@att.FileName (@FormatFileSize(att.FileSize))</span>
+                                <button type="button" class="dm-pending-remove" @onclick="() => RemoveAttachment(att)" title="Remove">
+                                    <i class="bi bi-x-circle-fill"></i>
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <!-- QUICK STARTERS BAR -->
+                <div class="dm-quick-starters">
+                    <span class="dm-starters-label"><i class="bi bi-magic me-1"></i> Starters:</span>
+                    @if (otherUser?.Id == AiAssistantService.GetAiUserId())
+                    {
+                        <button class="dm-starter-pill" @onclick='() => SetQuickStarter("Summarize our current active CRM deals and sales performance.")'>
+                            📊 Summarize Deals
+                        </button>
+                        <button class="dm-starter-pill" @onclick='() => SetQuickStarter("What are my open and high-priority tasks?")'>
+                            🚀 My Tasks
+                        </button>
+                        <button class="dm-starter-pill" @onclick='() => SetQuickStarter("Provide an executive briefing on company operations.")'>
+                            🏢 Executive Brief
+                        </button>
+                        <button class="dm-starter-pill" @onclick='() => SetQuickStarter("What tools and features can you assist me with?")'>
+                            💡 Capabilities
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="dm-starter-pill" @onclick='() => SetQuickStarter("Hi! Do you have 5 minutes for a quick status sync?")'>
+                            🤝 Quick Sync?
+                        </button>
+                        <button class="dm-starter-pill" @onclick='() => SetQuickStarter("Sharing a quick status update on our current project milestones.")'>
+                            📋 Status Update
+                        </button>
+                        <button class="dm-starter-pill" @onclick='() => SetQuickStarter("Can we hop on a quick video call to review the details?")'>
+                            📞 Quick Call?
+                        </button>
+                        <button class="dm-starter-pill" @onclick='() => SetQuickStarter("Sounds great! Approved and moving forward.")'>
+                            👍 Approved!
+                        </button>
+                    }
+                </div>
+
+                <!-- FLOATING COMPOSER DOCK -->
+                <div class="dm-composer-dock">
+                    <div class="dm-composer-inner">
+                        <button class="btn btn-dm-icon" title="Attach Files" onclick="document.getElementById('dm-file-input').click()">
+                            <i class="bi bi-paperclip"></i>
+                        </button>
+                        <InputFile id="dm-file-input" @ref="fileInput" OnChange="HandleFileSelected" style="display: none;" multiple />
+
+                        <button class="btn btn-dm-icon @(isRecording ? "dm-icon-recording" : "")" title="@(isRecording ? "Stop Recording & Send" : "Record Voice Note")" @onclick="ToggleRecording">
+                            <i class="bi @(isRecording ? "bi-stop-fill" : "bi-mic-fill")"></i>
+                        </button>
+
+                        @if (isRecording)
+                        {
+                            <div class="dm-recording-live-bar">
+                                <div class="dm-recording-ripple"></div>
+                                <span class="dm-recording-text">Recording audio note... Click mic or stop to finish.</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <textarea class="dm-input-textarea"
+                                      @bind="newMessage"
+                                      @bind:event="oninput"
+                                      @onkeydown="HandleKeyDown"
+                                      placeholder="Type a message to @(otherUser?.FullName ?? "colleague")... (Enter to send, Shift+Enter for new line)"
+                                      rows="1"
+                                      id="chat-input"></textarea>
+                        }
+
+                        <button id="send-message-button" type="button" class="btn btn-dm-send" @onclick="SendMessage" title="Send Message">
+                            <i class="bi bi-send-fill"></i>
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+</div>
+
+@code {
+    [Parameter] public string? OtherUserId { get; set; }
+    [SupplyParameterFromQuery] public string? Prefill { get; set; }
+
+    private IntraUserProfile? currentUser;
+    private IntraUserProfile? otherUser;
+    private List<IntraUserProfile>? allUsers;
+    private List<Message>? messages;
+    private string newMessage = "";
+    private string searchQuery = "";
+    private string activeFilterTab = "all";
+    private Dictionary<string, int> unreadCounts = new();
+    private bool isAiTyping = false;
+    private bool isRecording = false;
+    private InputFile? fileInput;
+    private List<MessageAttachment> pendingAttachments = new();
+    private bool isUploadingAttachment = false;
+    private string? uploadProgressStatus;
+    private string? uploadError;
+
+    private int TotalUnreadCount => unreadCounts.Values.Sum();
+
+    private IEnumerable<IntraUserProfile> FilteredUsers
+    {
+        get
+        {
+            if (allUsers == null) return Enumerable.Empty<IntraUserProfile>();
+            var aiId = AiAssistantService.GetAiUserId();
+            var query = allUsers.AsEnumerable();
+
+            if (activeFilterTab == "unread")
+            {
+                query = query.Where(u => unreadCounts.TryGetValue(u.Id, out int c) && c > 0);
+            }
+            else if (activeFilterTab == "ai")
+            {
+                query = query.Where(u => u.Id == aiId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchQuery))
+            {
+                query = query.Where(u =>
+                    u.FullName.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                    (u.Email?.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (u.JobTitle?.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (u.Department?.Name?.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ?? false));
+            }
+
+            return query
+                .OrderByDescending(u => u.Id == aiId)
+                .ThenByDescending(u => unreadCounts.TryGetValue(u.Id, out int c) && c > 0)
+                .ThenBy(u => u.FullName);
+        }
+    }
+
+    public class AudioRecordingResult
+    {
+        public string Base64 { get; set; } = "";
+        public string MimeType { get; set; } = "";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userClaims = authState.User;
+        var userId = userClaims.Identity?.Name
+            ?? userClaims.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? userClaims.FindFirst("sub")?.Value;
+
+        if (!string.IsNullOrEmpty(userId))
+        {
+            currentUser = await IntraOfficeService.GetUserProfileAsync(userId);
+            currentUser ??= new IntraUserProfile { UserName = userId, FullUserName = userId };
+        }
+
+        if (currentUser != null)
+        {
+            unreadCounts = await MessageService.GetUnreadDirectMessageCountsAsync(currentUser.Id);
+            var users = await IntraOfficeService.GetActiveUsersAsync();
+            allUsers = users.Where(u => u.IsActive && u.Id != currentUser.Id).OrderBy(u => u.FullName).ToList();
+
+            var aiId = AiAssistantService.GetAiUserId();
+            if (!allUsers.Any(u => u.Id == aiId))
+            {
+                allUsers.Insert(0, new IntraUserProfile {
+                    UserName = aiId,
+                    FullUserName = "IntraBot AI",
+                    Designation = "AI Assistant",
+                    DepartmentName = "Intra AI"
+                });
+            }
+        }
+
+        NotificationService.OnNotificationReceived += HandleLiveNotification;
+    }
+
+    private async Task HandleLiveNotification(AppNotification notif)
+    {
+        if (currentUser == null) return;
+
+        if (notif.Category == NotificationCategory.Message)
+        {
+            if (string.IsNullOrEmpty(notif.TargetUserId) || notif.TargetUserId == currentUser.Id)
+            {
+                unreadCounts = await MessageService.GetUnreadDirectMessageCountsAsync(currentUser.Id);
+
+                if (!string.IsNullOrEmpty(OtherUserId) && notif.ActionUrl != null && notif.ActionUrl.Contains(OtherUserId))
+                {
+                    messages = await MessageService.GetDirectMessagesAsync(currentUser.Id, OtherUserId);
+                    if (!notif.IsReadReceipt)
+                    {
+                        await MessageService.MarkAllAsReadAsync(currentUser.Id, senderId: OtherUserId);
+                    }
+                    unreadCounts.Remove(OtherUserId);
+                    await ScrollToBottom();
+                }
+                else if (notif.IsReadReceipt && !string.IsNullOrEmpty(OtherUserId))
+                {
+                    // Recipient read our messages — refresh so bubbles turn green
+                    messages = await MessageService.GetDirectMessagesAsync(currentUser.Id, OtherUserId);
+                }
+
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(OtherUserId) && currentUser != null)
+        {
+            if (OtherUserId == AiAssistantService.GetAiUserId())
+            {
+                otherUser = new IntraUserProfile {
+                    UserName = OtherUserId,
+                    FullUserName = "IntraBot AI",
+                    Designation = "AI Assistant",
+                    DepartmentName = "Intra AI"
+                };
+            }
+            else
+            {
+                otherUser = await IntraOfficeService.GetUserProfileAsync(OtherUserId);
+            }
+
+            messages = await MessageService.GetDirectMessagesAsync(currentUser.Id, OtherUserId);
+            await MessageService.MarkAllAsReadAsync(currentUser.Id, senderId: OtherUserId);
+
+            if (unreadCounts.ContainsKey(OtherUserId))
+            {
+                unreadCounts.Remove(OtherUserId);
+            }
+
+            if (!string.IsNullOrEmpty(Prefill))
+            {
+                newMessage = Prefill;
+                Prefill = null;
+            }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (messages?.Count > 0)
+        {
+            await JS.InvokeVoidAsync("scrollToBottom", "dm-messages-list");
+        }
+    }
+
+    private void SetQuickStarter(string text)
+    {
+        newMessage = text;
+        StateHasChanged();
+    }
+
+    private void LaunchAiWithPrompt(string? prompt)
+    {
+        var aiId = AiAssistantService.GetAiUserId();
+        if (!string.IsNullOrEmpty(prompt))
+        {
+            Navigation.NavigateTo($"/messages/{aiId}?Prefill={Uri.EscapeDataString(prompt)}");
+        }
+        else
+        {
+            Navigation.NavigateTo($"/messages/{aiId}");
+        }
+    }
+
+    private void OpenWhatsAppDirect()
+    {
+        if (otherUser != null && !string.IsNullOrEmpty(otherUser.PhoneNumber))
+        {
+            var cleanPhone = new string(otherUser.PhoneNumber.Where(char.IsDigit).ToArray());
+            var url = $"https://wa.me/{cleanPhone}";
+            _ = JS.InvokeVoidAsync("window.open", url, "_blank");
+        }
+    }
+
+    private async Task SendMessage()
+    {
+        try
+        {
+            if ((string.IsNullOrWhiteSpace(newMessage) && !pendingAttachments.Any()) || currentUser == null || otherUser == null)
+            {
+                return;
+            }
+
+            var message = new Message
+            {
+                SenderId = currentUser.Id,
+                ReceiverId = otherUser.Id,
+                Content = newMessage.Trim(),
+                MessageType = MessageType.Text,
+                Attachments = pendingAttachments.ToList()
+            };
+
+            var sent = await MessageService.SendMessageAsync(message);
+
+            messages ??= new();
+            messages.Add(sent);
+            newMessage = "";
+            pendingAttachments.Clear();
+            StateHasChanged();
+            await ScrollToBottom();
+
+            // AI Bot direct chat check
+            if (otherUser.Id == AiAssistantService.GetAiUserId())
+            {
+                isAiTyping = true;
+                StateHasChanged();
+                await ScrollToBottom();
+
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var responseContent = await AiAssistantService.GenerateResponseAsync(sent.Content, currentUser.Id);
+                        var aiMsg = new Message
+                        {
+                            SenderId = otherUser.Id,
+                            ReceiverId = currentUser.Id,
+                            Content = responseContent,
+                            MessageType = MessageType.Text
+                        };
+
+                        var savedAiMsg = await MessageService.SendMessageAsync(aiMsg);
+
+                        await InvokeAsync(() =>
+                        {
+                            messages.Add(savedAiMsg);
+                            isAiTyping = false;
+                            StateHasChanged();
+                            _ = ScrollToBottom();
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[ERROR] AI DirectMessage response failed: {ex.Message}");
+                        await InvokeAsync(() =>
+                        {
+                            isAiTyping = false;
+                            StateHasChanged();
+                        });
+                    }
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] SendMessage exception: {ex.Message}");
+        }
+    }
+
+    private async Task StartVideoCall()
+    {
+        if (currentUser == null || otherUser == null) return;
+        var roomId = $"IntraOffice_Call_{Guid.NewGuid().ToString("N").Substring(0, 10)}";
+        var meetLink = $"https://meet.jit.si/{roomId}";
+
+        var message = new Message
+        {
+            SenderId = currentUser.Id,
+            ReceiverId = otherUser.Id,
+            Content = $"📞 [VIDEO CALL STARTED] | {meetLink}",
+            MessageType = MessageType.Text
+        };
+
+        var sent = await MessageService.SendMessageAsync(message);
+        messages ??= new();
+        messages.Add(sent);
+        StateHasChanged();
+        await ScrollToBottom();
+
+        // Send multi-channel invite notifications
+        var inviteMsg = $"*Video Call Invitation*\n\nHello {otherUser.FullName},\n\n{currentUser.FullName} is calling you on Intra Office!\n\nJoin the video call here: {meetLink}";
+        if (!string.IsNullOrEmpty(otherUser.PhoneNumber))
+        {
+            _ = WhatsAppService.SendDirectMessageAsync(otherUser.PhoneNumber, inviteMsg);
+        }
+        if (!string.IsNullOrEmpty(otherUser.Email))
+        {
+            var emailBody = $"<p>Hello {otherUser.FullName},</p><p><strong>{currentUser.FullName}</strong> is calling you on Intra Office!</p><p><a href=\"{meetLink}\">Click here to join the video call</a></p>";
+            _ = EmailService.SendEmailAsync(otherUser.Email, "Video Call Invitation", emailBody);
+        }
+
+        await JS.InvokeVoidAsync("window.open", meetLink, "_blank");
+    }
+
+    private async Task ToggleRecording()
+    {
+        try
+        {
+            if (!isRecording)
+            {
+                var success = await JS.InvokeAsync<bool>("window.audioRecorder.startRecording");
+                if (success)
+                {
+                    isRecording = true;
+                    StateHasChanged();
+                }
+                else
+                {
+                    Console.WriteLine("Failed to start audio recording. Check microphone permissions.");
+                    isRecording = false;
+                    StateHasChanged();
+                }
+            }
+            else
+            {
+                isRecording = false;
+                StateHasChanged();
+
+                var result = await JS.InvokeAsync<AudioRecordingResult>("window.audioRecorder.stopRecording");
+                if (result != null && !string.IsNullOrEmpty(result.Base64))
+                {
+                    var fileName = $"VoiceMessage_{DateTime.Now:yyyyMMdd_HHmmss}.webm";
+                    var relativePath = await FileService.SaveBase64FileToDiskAsync(result.Base64, fileName);
+
+                    pendingAttachments.Add(new MessageAttachment
+                    {
+                        FileName = fileName,
+                        FilePath = relativePath,
+                        FileSize = (long)(result.Base64.Length * 0.75),
+                        ContentType = result.MimeType,
+                        UploadedAt = DateTime.UtcNow
+                    });
+
+                    await SendMessage();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error toggling recording: {ex.Message}");
+            isRecording = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        uploadError = null;
+        var files = e.GetMultipleFiles(10);
+        if (!files.Any()) return;
+
+        isUploadingAttachment = true;
+        StateHasChanged();
+
+        try
+        {
+            foreach (var file in files)
+            {
+                uploadProgressStatus = $"Attaching {file.Name} ({FormatFileSize(file.Size)})...";
+                StateHasChanged();
+
+                var relativePath = await FileService.SaveFileToDiskAsync(file);
+                pendingAttachments.Add(new MessageAttachment
+                {
+                    FileName = file.Name,
+                    FilePath = relativePath,
+                    FileSize = file.Size,
+                    ContentType = string.IsNullOrEmpty(file.ContentType) ? "application/octet-stream" : file.ContentType,
+                    UploadedAt = DateTime.UtcNow
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] Upload failed: {ex.Message}");
+            uploadError = $"File upload failed: {ex.Message}";
+        }
+        finally
+        {
+            isUploadingAttachment = false;
+            uploadProgressStatus = null;
+            StateHasChanged();
+        }
+    }
+
+    private void RemoveAttachment(MessageAttachment attachment)
+    {
+        pendingAttachments.Remove(attachment);
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SendMessage();
+        }
+    }
+
+    private async Task ScrollToBottom()
+    {
+        await Task.Delay(50);
+        await JS.InvokeVoidAsync("scrollToBottom", "dm-messages-list");
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        if (bytes < 1024L * 1024 * 1024) return $"{bytes / (1024.0 * 1024.0):F1} MB";
+        return $"{bytes / (1024.0 * 1024.0 * 1024.0):F2} GB";
+    }
+
+    private MarkupString ParseMessageContent(string content)
+    {
+        if (string.IsNullOrEmpty(content)) return new MarkupString("");
+
+        var safeContent = System.Net.WebUtility.HtmlEncode(content);
+        var linkRegex = new System.Text.RegularExpressions.Regex(@"\[([^\]]+)\]\(([^)]+)\)");
+        safeContent = linkRegex.Replace(safeContent, m =>
+            $"<a href=\"{m.Groups[2].Value}\" style=\"color: #6366f1; font-weight: 600; text-decoration: underline;\" target=\"_blank\">{m.Groups[1].Value}</a>"
+        );
+        safeContent = safeContent.Replace("\n", "<br/>");
+        return new MarkupString(safeContent);
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        NotificationService.OnNotificationReceived -= HandleLiveNotification;
+        return ValueTask.CompletedTask;
+    }
+}
+
+<style>
+    /* ================================================================
+       DIRECT MESSAGES - ULTRA ATTRACTIVE & FLASHY MODERN SUITE
+       ================================================================ */
+    .dm-page-wrapper {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 95px);
+        min-height: 550px;
+        gap: 12px;
+        margin: 0;
+        padding: 0 0 8px 0;
+        box-sizing: border-box;
+        overflow: hidden;
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    /* 1. Header Banner */
+    .dm-header-banner {
+        position: relative;
+        overflow: hidden;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #090d16 0%, #111827 50%, #1e1b4b 100%);
+        padding: 16px 20px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 0 20px rgba(99, 102, 241, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        flex-shrink: 0;
+    }
+
+    .dm-hero-glow-1 {
+        position: absolute;
+        top: -60px;
+        right: 10%;
+        width: 260px;
+        height: 260px;
+        background: radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, rgba(99, 102, 241, 0) 70%);
+        border-radius: 50%;
+        pointer-events: none;
+    }
+
+    .dm-hero-glow-2 {
+        position: absolute;
+        bottom: -50px;
+        left: 20%;
+        width: 220px;
+        height: 220px;
+        background: radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0) 70%);
+        border-radius: 50%;
+        pointer-events: none;
+    }
+
+    .dm-avatar-ring {
+        position: relative;
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        padding: 2px;
+        background: linear-gradient(135deg, #6366f1, #a855f7);
+        box-shadow: 0 0 14px rgba(99, 102, 241, 0.4);
+        flex-shrink: 0;
+    }
+
+    .dm-avatar-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 50%;
+        background: #1e293b;
+    }
+
+    .dm-avatar-fallback {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: #1e1b4b;
+        color: #ffffff;
+        font-weight: 800;
+        font-size: 1.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .dm-beacon-indicator {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #10b981;
+        border: 2.5px solid #090d16;
+        box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
+    }
+
+    .dm-brand-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        color: #ffffff;
+        font-size: 1.4rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+    }
+
+    .dm-recipient-name {
+        color: #ffffff;
+        font-size: 1.35rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+    }
+
+    .dm-chip-ai {
+        background: linear-gradient(135deg, rgba(168, 85, 247, 0.3), rgba(99, 102, 241, 0.3));
+        border: 1px solid rgba(168, 85, 247, 0.5);
+        color: #e9d5ff;
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 2px 10px;
+        border-radius: 20px;
+    }
+
+    .dm-chip-dept {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: #cbd5e1;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 2px 10px;
+        border-radius: 20px;
+    }
+
+    .dm-chip-role {
+        color: #94a3b8;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .dm-chip-secure {
+        background: rgba(16, 185, 129, 0.15);
+        border: 1px solid rgba(16, 185, 129, 0.35);
+        color: #6ee7b7;
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 2px 10px;
+        border-radius: 20px;
+    }
+
+    .dm-live-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: #38bdf8;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+    }
+
+    .dm-live-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #38bdf8;
+        box-shadow: 0 0 8px #38bdf8;
+        animation: pulseDmBeacon 2s infinite;
+    }
+
+    @@keyframes pulseDmBeacon {
+        0% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.3); opacity: 0.5; }
+        100% { transform: scale(1); opacity: 1; }
+    }
+
+    /* Topbar action buttons */
+    .btn-dm-action {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border-radius: 10px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        border: none;
+    }
+
+    .btn-dm-video {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        color: #ffffff;
+        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+    }
+    .btn-dm-video:hover {
+        background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
+        color: #ffffff;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+    }
+
+    .btn-dm-whatsapp {
+        background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+        color: #ffffff;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+    .btn-dm-whatsapp:hover {
+        background: linear-gradient(135deg, #047857 0%, #059669 100%);
+        color: #ffffff;
+        transform: translateY(-2px);
+    }
+
+    .btn-dm-mail {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        color: #ffffff;
+    }
+    .btn-dm-mail:hover {
+        background: rgba(255, 255, 255, 0.16);
+        color: #ffffff;
+        transform: translateY(-2px);
+    }
+
+    .btn-dm-ai {
+        background: linear-gradient(135deg, #7c3aed 0%, #c026d3 100%);
+        color: #ffffff;
+        box-shadow: 0 4px 14px rgba(192, 38, 211, 0.35);
+    }
+    .btn-dm-ai:hover {
+        transform: translateY(-2px);
+        color: #ffffff;
+    }
+
+    /* 2. Main Messenger Card Container */
+    .dm-messenger-card {
+        display: flex;
+        flex: 1 1 0;
+        min-height: 0;
+        background: #ffffff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
+    }
+
+    /* 3. Left Sidebar */
+    .dm-sidebar {
+        width: 320px;
+        flex-shrink: 0;
+        border-right: 1px solid #e2e8f0;
+        display: flex;
+        flex-direction: column;
+        background: #f8fafc;
+    }
+
+    .dm-sidebar-header {
+        padding: 16px;
+        border-bottom: 1px solid #e2e8f0;
+        background: #ffffff;
+    }
+
+    .dm-sidebar-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .dm-count-pill {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #64748b;
+        background: #f1f5f9;
+        padding: 2px 8px;
+        border-radius: 12px;
+    }
+
+    .dm-search-wrapper {
+        position: relative;
+        margin-top: 8px;
+    }
+
+    .dm-search-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+        font-size: 0.85rem;
+    }
+
+    .dm-search-input {
+        width: 100%;
+        padding: 8px 32px 8px 34px;
+        border-radius: 10px;
+        border: 1px solid #cbd5e1;
+        font-size: 0.85rem;
+        background: #f8fafc;
+        transition: all 0.2s ease;
+        outline: none;
+    }
+
+    .dm-search-input:focus {
+        background: #ffffff;
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    }
+
+    .dm-search-clear {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #94a3b8;
+        cursor: pointer;
+        padding: 0;
+        font-size: 0.85rem;
+    }
+
+    .dm-filter-tabs {
+        display: flex;
+        gap: 6px;
+        margin-top: 12px;
+    }
+
+    .dm-filter-tab {
+        flex: 1;
+        padding: 5px 0;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        background: #f1f5f9;
+        color: #64748b;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+    }
+
+    .dm-filter-tab:hover {
+        background: #e2e8f0;
+        color: #0f172a;
+    }
+
+    .dm-filter-tab.active {
+        background: #6366f1;
+        color: #ffffff;
+        border-color: #6366f1;
+        box-shadow: 0 2px 6px rgba(99, 102, 241, 0.3);
+    }
+
+    .dm-contacts-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+    }
+
+    .dm-contact-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        text-decoration: none;
+        color: inherit;
+        position: relative;
+        margin-bottom: 4px;
+        transition: all 0.15s ease;
+        border-left: 3px solid transparent;
+    }
+
+    .dm-contact-item:hover {
+        background: #e2e8f0;
+        transform: translateX(2px);
+    }
+
+    .dm-contact-item.active {
+        background: linear-gradient(90deg, rgba(99, 102, 241, 0.12) 0%, rgba(168, 85, 247, 0.05) 100%);
+        border-left: 3px solid #6366f1;
+    }
+
+    .dm-contact-item.has-unread {
+        background: #fff8f8;
+        border-left: 3px solid #ef4444;
+    }
+
+    .dm-contact-avatar-box {
+        position: relative;
+        width: 40px;
+        height: 40px;
+        flex-shrink: 0;
+    }
+
+    .dm-contact-avatar {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 50%;
+    }
+
+    .dm-contact-avatar-fallback {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .dm-contact-avatar-fallback.ai-bg {
+        background: linear-gradient(135deg, #7c3aed, #d946ef);
+    }
+
+    .avatar-status-dot {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #10b981;
+        border: 2px solid #ffffff;
+    }
+
+    .avatar-unread-dot {
+        position: absolute;
+        top: -2px;
+        right: -2px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #ef4444;
+        border: 2px solid #ffffff;
+        box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+        animation: unreadPulse 2s infinite;
+        z-index: 2;
+    }
+
+    .user-unread-badge {
+        background: #ef4444 !important;
+        color: #ffffff !important;
+        font-size: 0.7rem;
+        font-weight: 700;
+        min-width: 20px;
+        height: 20px;
+        border-radius: 10px;
+        padding: 0 6px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
+        animation: unreadPulse 2s infinite;
+    }
+
+    @@keyframes unreadPulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+        100% { transform: scale(1); }
+    }
+
+    .dm-contact-meta {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .dm-contact-name {
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #0f172a;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .dm-contact-sub {
+        font-size: 0.75rem;
+        color: #64748b;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        margin-top: 1px;
+    }
+
+    /* 4. Right Pane: Active Chat Area */
+    .dm-chat-pane {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        background: #fdfdfd;
+        position: relative;
+    }
+
+    /* Welcome Deck */
+    .dm-welcome-deck {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 32px;
+        background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+    }
+
+    .dm-welcome-hero-card {
+        max-width: 680px;
+        width: 100%;
+        text-align: center;
+    }
+
+    .dm-welcome-icon-halo {
+        width: 80px;
+        height: 80px;
+        border-radius: 24px;
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        color: #ffffff;
+        font-size: 2.2rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 12px 30px rgba(99, 102, 241, 0.35);
+        margin-bottom: 20px;
+    }
+
+    .dm-welcome-title {
+        font-size: 1.8rem;
+        font-weight: 800;
+        color: #0f172a;
+        letter-spacing: -0.02em;
+        margin-bottom: 8px;
+    }
+
+    .dm-welcome-subtitle {
+        font-size: 0.95rem;
+        color: #64748b;
+        line-height: 1.6;
+        margin-bottom: 24px;
+    }
+
+    .dm-section-heading {
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #475569;
+        margin-bottom: 12px;
+        text-align: left;
+    }
+
+    .dm-fast-colleagues-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+    }
+
+    .dm-fast-colleague-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 14px 10px;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+        transition: all 0.2s ease;
+    }
+
+    .dm-fast-colleague-card:hover {
+        transform: translateY(-3px);
+        border-color: #6366f1;
+        box-shadow: 0 8px 20px rgba(99, 102, 241, 0.12);
+    }
+
+    .dm-fast-avatar-wrap {
+        width: 44px;
+        height: 44px;
+        margin: 0 auto 8px;
+    }
+
+    .dm-fast-avatar {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .dm-fast-avatar-fallback {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        color: #ffffff;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .dm-fast-avatar-fallback.ai-bg {
+        background: linear-gradient(135deg, #7c3aed, #d946ef);
+    }
+
+    .dm-fast-name {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .dm-fast-role {
+        font-size: 0.72rem;
+        color: #64748b;
+        margin-bottom: 10px;
+    }
+
+    .btn-dm-connect {
+        background: #f1f5f9;
+        color: #4f46e5;
+        font-weight: 600;
+        font-size: 0.75rem;
+        border-radius: 8px;
+        width: 100%;
+        padding: 4px 8px;
+        text-decoration: none;
+        transition: all 0.15s ease;
+    }
+
+    .btn-dm-connect:hover {
+        background: #4f46e5;
+        color: #ffffff;
+    }
+
+    /* AI Quick Deck */
+    .dm-ai-quick-deck {
+        background: linear-gradient(135deg, #1e1b4b 0%, #31104b 100%);
+        border: 1px solid rgba(168, 85, 247, 0.3);
+        border-radius: 16px;
+        padding: 18px 20px;
+        box-shadow: 0 8px 24px rgba(49, 16, 75, 0.3);
+    }
+
+    .dm-ai-deck-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #8b5cf6, #d946ef);
+        color: #ffffff;
+        font-size: 1.4rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .dm-ai-prompt-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .dm-ai-prompt-chip {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #ffffff;
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 6px 14px;
+        border-radius: 20px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .dm-ai-prompt-chip:hover {
+        background: rgba(255, 255, 255, 0.25);
+        border-color: #a855f7;
+        transform: translateY(-1px);
+    }
+
+    /* 5. Message Stream */
+    .dm-conversation-stream {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .dm-stream-notice {
+        text-align: center;
+        font-size: 0.75rem;
+        color: #64748b;
+        background: #f1f5f9;
+        padding: 6px 16px;
+        border-radius: 20px;
+        margin: 0 auto 10px;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .dm-message-row {
+        display: flex;
+        gap: 12px;
+        max-width: 80%;
+    }
+
+    .dm-row-mine {
+        align-self: flex-end;
+        flex-direction: row-reverse;
+    }
+
+    .dm-row-theirs {
+        align-self: flex-start;
+    }
+
+    .dm-bubble-avatar {
+        width: 36px;
+        height: 36px;
+        flex-shrink: 0;
+    }
+
+    .dm-bubble-avatar-img {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .dm-bubble-avatar-fallback {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: #e2e8f0;
+        color: #475569;
+        font-weight: 700;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .dm-bubble-avatar-fallback.ai-bg {
+        background: linear-gradient(135deg, #7c3aed, #d946ef);
+        color: #ffffff;
+    }
+
+    .dm-bubble-container {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .dm-bubble-meta {
+        font-size: 0.72rem;
+        color: #94a3b8;
+        display: flex;
+        gap: 8px;
+    }
+
+    .dm-row-mine .dm-bubble-meta {
+        justify-content: flex-end;
+    }
+
+    .dm-bubble-sender {
+        font-weight: 600;
+        color: #64748b;
+    }
+
+    .dm-bubble {
+        padding: 12px 16px;
+        border-radius: 16px;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        word-break: break-word;
+    }
+
+    .dm-bubble-mine {
+        background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+        color: #ffffff;
+        border-bottom-right-radius: 4px;
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+        transition: background 0.4s ease, box-shadow 0.4s ease;
+    }
+
+    /* Green bubble — recipient has read the message */
+    .dm-bubble-mine.dm-bubble-mine-read {
+        background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+        box-shadow: 0 4px 12px rgba(22, 163, 74, 0.30);
+    }
+
+    .dm-bubble-mine a {
+        color: #ffffff !important;
+        text-decoration: underline;
+    }
+
+    /* Read / sent tick indicators */
+    .dm-read-tick {
+        font-size: 0.75rem;
+        text-align: right;
+        margin-top: 2px;
+        margin-right: 2px;
+        line-height: 1;
+    }
+
+    .dm-tick-sent {
+        color: #94a3b8;
+    }
+
+    .dm-tick-read {
+        color: #22c55e;
+    }
+
+    .dm-bubble-theirs {
+        background: #ffffff;
+        color: #0f172a;
+        border: 1px solid #e2e8f0;
+        border-bottom-left-radius: 4px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+    }
+
+    /* Video Call Card */
+    .dm-call-card {
+        position: relative;
+        background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+        border: 1px solid rgba(99, 102, 241, 0.4);
+        border-radius: 16px;
+        padding: 16px;
+        color: #ffffff;
+        max-width: 360px;
+        box-shadow: 0 8px 24px rgba(49, 46, 129, 0.3);
+        overflow: hidden;
+    }
+
+    .dm-call-glow {
+        position: absolute;
+        top: -40px;
+        right: -40px;
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(168, 85, 247, 0.4) 0%, rgba(0, 0, 0, 0) 70%);
+        pointer-events: none;
+    }
+
+    .dm-call-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 10px;
+    }
+
+    .dm-call-pulse-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #6366f1, #a855f7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        box-shadow: 0 0 12px rgba(168, 85, 247, 0.6);
+        animation: pulseDmBeacon 2s infinite;
+    }
+
+    .dm-call-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #ffffff;
+    }
+
+    .dm-call-sub {
+        font-size: 0.72rem;
+        color: #a5b4fc;
+    }
+
+    .dm-call-text {
+        font-size: 0.8rem;
+        color: #cbd5e1;
+        margin-bottom: 12px;
+        line-height: 1.4;
+    }
+
+    .btn-dm-join-call {
+        display: block;
+        text-align: center;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: #ffffff;
+        font-size: 0.85rem;
+        font-weight: 700;
+        padding: 8px 16px;
+        border-radius: 10px;
+        text-decoration: none;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        transition: all 0.2s ease;
+    }
+
+    .btn-dm-join-call:hover {
+        background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        color: #ffffff;
+        transform: translateY(-2px);
+    }
+
+    /* Attachments */
+    .dm-attachments-cluster {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 4px;
+    }
+
+    .dm-audio-card {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        padding: 8px 12px;
+        border-radius: 12px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+    }
+
+    .dm-audio-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #e0e7ff;
+        color: #4f46e5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.9rem;
+    }
+
+    .dm-audio-player {
+        height: 32px;
+        width: 220px;
+    }
+
+    .dm-audio-size {
+        font-size: 0.72rem;
+        color: #94a3b8;
+    }
+
+    .dm-file-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 8px 12px;
+        text-decoration: none;
+        color: #0f172a;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+        transition: all 0.15s ease;
+    }
+
+    .dm-file-chip:hover {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+        transform: translateY(-1px);
+    }
+
+    .dm-file-icon {
+        color: #6366f1;
+        font-size: 1.1rem;
+    }
+
+    .dm-file-info {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .dm-file-name {
+        font-size: 0.8rem;
+        font-weight: 600;
+        max-width: 180px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .dm-file-meta {
+        font-size: 0.7rem;
+        color: #94a3b8;
+    }
+
+    .dm-file-download {
+        color: #94a3b8;
+        font-size: 0.85rem;
+    }
+
+    /* AI Typing Card */
+    .dm-ai-typing-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 8px 14px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+    }
+
+    .dm-ai-typing-text {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #7c3aed;
+    }
+
+    .dm-typing-dots span {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #7c3aed;
+        margin: 0 2px;
+        animation: typingBlink 1.4s infinite ease-in-out both;
+    }
+
+    .dm-typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+    .dm-typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+    @@keyframes typingBlink {
+        0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+        40% { transform: scale(1); opacity: 1; }
+    }
+
+    /* Empty Chat */
+    .dm-empty-chat-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 18px;
+        background: #f1f5f9;
+        color: #94a3b8;
+        font-size: 1.8rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Pending Attachments Tray */
+    .dm-pending-attachments {
+        padding: 8px 24px;
+        background: #f8fafc;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .dm-pending-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #64748b;
+    }
+
+    .dm-pending-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        padding: 4px 10px;
+        border-radius: 8px;
+        font-size: 0.78rem;
+    }
+
+    .dm-pending-name {
+        max-width: 140px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .dm-pending-remove {
+        background: none;
+        border: none;
+        color: #ef4444;
+        cursor: pointer;
+        padding: 0;
+        font-size: 0.85rem;
+    }
+
+    /* Quick Starters Bar */
+    .dm-quick-starters {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 24px;
+        background: #f8fafc;
+        border-top: 1px solid #eef2f6;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    .dm-starters-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .dm-starter-pill {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        color: #475569;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 14px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .dm-starter-pill:hover {
+        background: #eef2ff;
+        color: #4f46e5;
+        border-color: #c7d2fe;
+    }
+
+    /* 6. Composer Dock */
+    .dm-composer-dock {
+        padding: 12px 24px 18px;
+        background: #ffffff;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .dm-composer-inner {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        border-radius: 14px;
+        padding: 6px 10px;
+        transition: all 0.2s ease;
+    }
+
+    .dm-composer-inner:focus-within {
+        background: #ffffff;
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    }
+
+    .btn-dm-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: none;
+        border: none;
+        color: #64748b;
+        font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+    }
+
+    .btn-dm-icon:hover {
+        background: #e2e8f0;
+        color: #0f172a;
+    }
+
+    .dm-icon-recording {
+        background: #fee2e2 !important;
+        color: #ef4444 !important;
+        animation: recordingPulse 1.2s infinite;
+    }
+
+    @@keyframes recordingPulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+        100% { transform: scale(1); }
+    }
+
+    .dm-recording-live-bar {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding-left: 8px;
+    }
+
+    .dm-recording-ripple {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #ef4444;
+        box-shadow: 0 0 10px #ef4444;
+        animation: pulseDmBeacon 1s infinite;
+    }
+
+    .dm-recording-text {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #ef4444;
+    }
+
+    .dm-input-textarea {
+        flex: 1;
+        border: none;
+        background: transparent;
+        font-size: 0.9rem;
+        color: #0f172a;
+        resize: none;
+        outline: none;
+        padding: 6px 8px;
+        max-height: 120px;
+    }
+
+    .btn-dm-send {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+        border: none;
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+    }
+
+    .btn-dm-send:hover {
+        background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(79, 70, 229, 0.45);
+    }
+
+    /* Responsive adjustments */
+    @@media (max-width: 768px) {
+        .dm-messenger-card {
+            flex-direction: column;
+            height: auto;
+            min-height: calc(100vh - 160px);
+        }
+
+        .dm-sidebar {
+            width: 100%;
+            height: 280px;
+            border-right: none;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .dm-message-row {
+            max-width: 92%;
+        }
+    }
+</style>

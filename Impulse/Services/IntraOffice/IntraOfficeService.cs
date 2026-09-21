@@ -58,5 +58,15 @@ namespace Impulse.Services.IntraOffice
         public Task<List<StickyNote>> GetStickyNotesAsync(string userId) => _dataAccess.GetStickyNotesAsync(userId);
         public Task<int> SaveStickyNoteAsync(StickyNote note) => _dataAccess.SaveStickyNoteAsync(note);
         public Task<bool> DeleteStickyNoteAsync(int id, string userId) => _dataAccess.DeleteStickyNoteAsync(id, userId);
+
+        // Leads & CRM Integration
+        public Task<List<LeadModel>> GetLeadsAsync(string? status = null, string? source = null, string? search = null) => _dataAccess.GetLeadsAsync(status, source, search);
+        public Task<LeadModel?> GetLeadByIdAsync(int id) => _dataAccess.GetLeadByIdAsync(id);
+        public Task<int> SaveLeadAsync(LeadModel lead) => _dataAccess.SaveLeadAsync(lead);
+        public Task<bool> DeleteLeadAsync(int id) => _dataAccess.DeleteLeadAsync(id);
+        public Task<List<LeadActivityModel>> GetLeadActivitiesAsync(int leadId) => _dataAccess.GetLeadActivitiesAsync(leadId);
+        public Task<int> AddLeadActivityAsync(LeadActivityModel activity) => _dataAccess.AddLeadActivityAsync(activity);
+        public Task<bool> CheckCustCodeExistsAsync(string custCode) => _dataAccess.CheckCustCodeExistsAsync(custCode);
+        public Task<bool> ConvertLeadToForeignCustomerAsync(ConvertLeadToCustomerModel model) => _dataAccess.ConvertLeadToForeignCustomerAsync(model);
     }
 }

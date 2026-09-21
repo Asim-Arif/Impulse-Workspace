@@ -21,6 +21,9 @@ namespace DataAccessLibrary.Models.IntraOffice
         public DateTime? UpdatedAt { get; set; }
         public DateTime? ExpiresAt { get; set; }
 
+        public IntraUserProfile? Author => !string.IsNullOrEmpty(CreatedBy) ? new IntraUserProfile { UserName = CreatedBy, FullUserName = CreatorName ?? CreatedBy, Designation = CreatorDesignation } : null;
+        public IntraDepartmentInfo? Department => !string.IsNullOrEmpty(DepartmentName) ? new IntraDepartmentInfo { Name = DepartmentName } : null;
+
         public int AcknowledgmentCount { get; set; }
         public bool IsAcknowledgedByCurrentUser { get; set; }
         public List<AnnouncementAttachment> Attachments { get; set; } = new List<AnnouncementAttachment>();
@@ -45,6 +48,7 @@ namespace DataAccessLibrary.Models.IntraOffice
         public string UserId { get; set; } = string.Empty;
         public string? UserName { get; set; }
         public string? FullName { get; set; }
+        public IntraUserProfile? User => !string.IsNullOrEmpty(UserId) ? new IntraUserProfile { UserName = UserId, FullUserName = FullName ?? UserName ?? UserId } : null;
         public DateTime AcknowledgedAt { get; set; } = DateTime.UtcNow;
     }
 }

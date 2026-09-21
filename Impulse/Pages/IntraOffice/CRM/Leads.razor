@@ -1,0 +1,622 @@
+@page "/office/leads"
+@page "/office/crm"
+@page "/crm"
+@page "/leads"
+@layout IntraOfficeLayout
+@using DataAccessLibrary.Models.IntraOffice
+@using Impulse.Services.IntraOffice
+@inject IIntraOfficeService IntraOfficeService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
+@inject Radzen.NotificationService RadzenNotify
+
+<PageTitle>Lead Management & Pipeline - IntraOffice CRM</PageTitle>
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">Lead Management & Sales Pipeline</h4>
+        <p class="text-muted text-xs mb-0" style="font-size: 0.85rem;">Capture inquiries, qualify prospects, track stages, and convert leads directly into Impulse Foreign Customers</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <div class="btn-group btn-group-sm" role="group">
+            <button class="btn @(viewMode == "kanban" ? "btn-primary" : "btn-outline-secondary")" @onclick='() => viewMode = "kanban"'>
+                <i class="bi bi-kanban me-1"></i> Pipeline
+            </button>
+            <button class="btn @(viewMode == "table" ? "btn-primary" : "btn-outline-secondary")" @onclick='() => viewMode = "table"'>
+                <i class="bi bi-table me-1"></i> List View
+            </button>
+        </div>
+        <button class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm" @onclick="OpenCreateLeadModal">
+            <i class="bi bi-plus-lg me-1"></i> + New Lead
+        </button>
+    </div>
+</div>
+
+<!-- Filters Bar -->
+<div class="crm-card p-3 mb-4">
+    <div class="row g-2 align-items-center">
+        <div class="col-md-4">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" class="form-control border-start-0" placeholder="Search company, contact, country, lead ID..." 
+                       @bind="searchQuery" @bind:event="oninput" @onkeyup="FilterLeads" />
+            </div>
+        </div>
+        <div class="col-md-3">
+            <select class="form-select form-select-sm" @bind="selectedStage" @bind:after="FilterLeads">
+                <option value="All">All Lead Stages</option>
+                <option value="New">New</option>
+                <option value="Contacted">Contacted</option>
+                <option value="Qualified">Qualified</option>
+                <option value="RequirementReceived">Requirement Received</option>
+                <option value="QuotationSent">Quotation Sent</option>
+                <option value="Negotiation">Negotiation</option>
+                <option value="Won">Won</option>
+                <option value="Lost">Lost</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select class="form-select form-select-sm" @bind="selectedPriority" @bind:after="FilterLeads">
+                <option value="All">All Priorities</option>
+                <option value="Urgent">Urgent</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+            </select>
+        </div>
+        <div class="col-md-2 text-end">
+            <span class="text-muted text-xs">Total: <strong>@filteredLeads.Count</strong> leads</span>
+        </div>
+    </div>
+</div>
+
+@if (viewMode == "kanban")
+{
+    <!-- Kanban Pipeline Board -->
+    <div class="d-flex gap-3 overflow-auto pb-4" style="min-height: 600px;">
+        @foreach (var stage in stages)
+        {
+            var stageLeads = filteredLeads.Where(l => l.Status == stage).ToList();
+            <div class="flex-shrink-0" style="width: 280px;">
+                <div class="p-2 rounded bg-light border d-flex align-items-center justify-content-between mb-2">
+                    <span class="fw-bold fs-7">@FormatStageName(stage)</span>
+                    <span class="badge rounded-pill bg-white text-dark border">@stageLeads.Count</span>
+                </div>
+
+                <div class="d-flex flex-column gap-2">
+                    @foreach (var lead in stageLeads)
+                    {
+                        <div class="crm-card p-3 mb-0 shadow-sm border" style="cursor: pointer;" @onclick="() => ViewLeadDetails(lead)">
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <span class="badge @GetPriorityBadgeClass(lead.Priority) text-xs">@lead.Priority</span>
+                                <span class="text-xs text-muted">@lead.LeadNumber</span>
+                            </div>
+                            <div class="fw-bold fs-6 text-truncate mb-1">@lead.CompanyName</div>
+                            <div class="text-muted text-xs mb-2"><i class="bi bi-person me-1"></i>@lead.ContactPerson (@lead.Country)</div>
+                            
+                            <div class="p-2 bg-light rounded text-xs mb-2">
+                                <div class="text-truncate fw-semibold text-primary">@lead.ProductInterest</div>
+                                <div class="d-flex justify-content-between text-muted mt-1">
+                                    <span>Est Qty: @lead.EstimatedQuantity</span>
+                                    <span class="fw-bold text-dark">@lead.EstimatedValue.ToString("C0") @lead.Currency</span>
+                                </div>
+                            </div>
+
+                            <div class="d-flex align-items-center justify-content-between border-top pt-2 mt-1">
+                                <span class="text-xs text-muted">
+                                    <i class="bi bi-clock me-1"></i>@(lead.NextFollowUpDate?.ToString("MM/dd") ?? "No follow-up")
+                                </span>
+                                @if (lead.Status != "Won" && lead.Status != "Lost")
+                                {
+                                    <button class="btn btn-outline-success btn-sm py-0 px-2 text-xs" title="Convert to Foreign Customer" @onclick:stopPropagation="true" @onclick="() => PromptConvertLead(lead)">
+                                        Convert <i class="bi bi-arrow-right-circle"></i>
+                                    </button>
+                                }
+                                else if (!string.IsNullOrEmpty(lead.ConvertedCustCode))
+                                {
+                                    <span class="badge bg-success text-xs" title="Customer Code: @lead.ConvertedCustCode">
+                                        <i class="bi bi-check-circle me-1"></i>Cust: @lead.ConvertedCustCode
+                                    </span>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <!-- Table View -->
+    <div class="crm-card">
+        <div class="crm-card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Lead ID</th>
+                            <th>Company & Contact</th>
+                            <th>Location</th>
+                            <th>Product Interest</th>
+                            <th>Est Value</th>
+                            <th>Stage</th>
+                            <th>Priority</th>
+                            <th>Follow-up</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var lead in filteredLeads)
+                        {
+                            <tr>
+                                <td class="fw-bold text-primary">@lead.LeadNumber</td>
+                                <td>
+                                    <div class="fw-bold">@lead.CompanyName</div>
+                                    <div class="text-muted text-xs">@lead.ContactPerson (@lead.Email)</div>
+                                </td>
+                                <td>
+                                    <div>@lead.Country</div>
+                                    <div class="text-muted text-xs">@lead.City</div>
+                                </td>
+                                <td>
+                                    <div class="fw-semibold text-truncate" style="max-width: 180px;">@lead.ProductInterest</div>
+                                    <div class="text-muted text-xs">Source: @lead.Source</div>
+                                </td>
+                                <td class="fw-bold">@lead.EstimatedValue.ToString("C0") @lead.Currency</td>
+                                <td>
+                                    <span class="badge @GetStageBadgeClass(lead.Status)">@FormatStageName(lead.Status)</span>
+                                </td>
+                                <td>
+                                    <span class="badge @GetPriorityBadgeClass(lead.Priority)">@lead.Priority</span>
+                                </td>
+                                <td class="text-muted text-xs">
+                                    @(lead.NextFollowUpDate?.ToString("yyyy-MM-dd") ?? "None")
+                                </td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-light" title="View / Edit" @onclick="() => ViewLeadDetails(lead)">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        @if (lead.Status != "Won" && lead.Status != "Lost")
+                                        {
+                                            <button class="btn btn-light text-success" title="Convert to Foreign Customer" @onclick="() => PromptConvertLead(lead)">
+                                                <i class="bi bi-arrow-right-circle"></i>
+                                            </button>
+                                        }
+                                        else if (!string.IsNullOrEmpty(lead.ConvertedCustCode))
+                                        {
+                                            <a href="/customers" class="btn btn-light text-primary" title="View in Customers">
+                                                <i class="bi bi-person-check"></i>
+                                            </a>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Create / Edit Lead Modal -->
+@if (showLeadModal && currentLead != null)
+{
+    <div class="modal-backdrop-custom">
+        <div class="modal-content-custom modal-content-large">
+            <div class="modal-header-custom">
+                <h5 class="fw-bold mb-0">@(currentLead.Id == 0 ? "Create New Manufacturing / Export Lead" : $"Edit Lead: {currentLead.LeadNumber}")</h5>
+                <button type="button" class="btn-close" @onclick="() => showLeadModal = false"></button>
+            </div>
+            <div class="modal-body-custom">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label text-xs fw-bold">Company Name *</label>
+                        <input type="text" class="form-control form-control-sm" @bind="currentLead.CompanyName" placeholder="e.g. Pacific Oceanic Hardware Pty" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-xs fw-bold">Contact Person *</label>
+                        <input type="text" class="form-control form-control-sm" @bind="currentLead.ContactPerson" placeholder="e.g. Liam O'Connor" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-xs fw-bold">Designation</label>
+                        <input type="text" class="form-control form-control-sm" @bind="currentLead.Designation" placeholder="e.g. Procurement Director" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-xs fw-bold">Email</label>
+                        <input type="email" class="form-control form-control-sm" @bind="currentLead.Email" placeholder="contact@company.com" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-xs fw-bold">Phone / WhatsApp</label>
+                        <input type="text" class="form-control form-control-sm" @bind="currentLead.Phone" placeholder="+61 2 9230 4500" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-xs fw-bold">Country *</label>
+                        <input type="text" class="form-control form-control-sm" @bind="currentLead.Country" placeholder="e.g. Australia" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-xs fw-bold">City / Port</label>
+                        <input type="text" class="form-control form-control-sm" @bind="currentLead.City" placeholder="e.g. Sydney" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-xs fw-bold">Website</label>
+                        <input type="text" class="form-control form-control-sm" @bind="currentLead.Website" placeholder="https://..." />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-xs fw-bold">Lead Source</label>
+                        <select class="form-select form-select-sm" @bind="currentLead.Source">
+                            <option value="Trade Show">Trade Show</option>
+                            <option value="Website">Website</option>
+                            <option value="Referral">Referral</option>
+                            <option value="B2B Portal">B2B Portal</option>
+                            <option value="LinkedIn">LinkedIn</option>
+                            <option value="Cold Outreach">Cold Outreach</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-xs fw-bold">Industry</label>
+                        <input type="text" class="form-control form-control-sm" @bind="currentLead.Industry" placeholder="e.g. Oil & Gas, Maritime" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-xs fw-bold">Lead Priority</label>
+                        <select class="form-select form-select-sm" @bind="currentLead.Priority">
+                            <option value="Urgent">Urgent</option>
+                            <option value="High">High</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Low">Low</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-xs fw-bold">Product / Category Interest</label>
+                        <input type="text" class="form-control form-control-sm" @bind="currentLead.ProductInterest" placeholder="e.g. Stainless Ball Valves DN100" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-xs fw-bold">Estimated Quantity</label>
+                        <input type="number" class="form-control form-control-sm" @bind="currentLead.EstimatedQuantity" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-xs fw-bold">Estimated Value ($)</label>
+                        <input type="number" class="form-control form-control-sm" @bind="currentLead.EstimatedValue" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-xs fw-bold">Pipeline Stage</label>
+                        <select class="form-select form-select-sm" @bind="currentLead.Status">
+                            <option value="New">New</option>
+                            <option value="Contacted">Contacted</option>
+                            <option value="Qualified">Qualified</option>
+                            <option value="RequirementReceived">Requirement Received</option>
+                            <option value="QuotationSent">Quotation Sent</option>
+                            <option value="Negotiation">Negotiation</option>
+                            <option value="Won">Won</option>
+                            <option value="Lost">Lost</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-xs fw-bold">Next Follow-up Date</label>
+                        <input type="date" class="form-control form-control-sm" 
+                               value="@(currentLead.NextFollowUpDate?.ToString("yyyy-MM-dd"))" 
+                               @onchange="@(e => currentLead.NextFollowUpDate = DateTime.TryParse(e.Value?.ToString(), out var d) ? d : null)" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-xs fw-bold">Expected Order Date</label>
+                        <input type="date" class="form-control form-control-sm" 
+                               value="@(currentLead.ExpectedOrderDate?.ToString("yyyy-MM-dd"))" 
+                               @onchange="@(e => currentLead.ExpectedOrderDate = DateTime.TryParse(e.Value?.ToString(), out var d) ? d : null)" />
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label text-xs fw-bold">Notes & Requirements Summary</label>
+                        <textarea class="form-control form-control-sm" rows="3" @bind="currentLead.Notes" placeholder="Technical specifications, customer requirements, terms..."></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer-custom">
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => showLeadModal = false">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" @onclick="SaveLead">Save Lead</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Convert Lead to ForeignCustomers Modal -->
+@if (leadToConvert != null && convertModel != null)
+{
+    <div class="modal-backdrop-custom">
+        <div class="modal-content-custom" style="max-width: 600px;">
+            <div class="modal-header-custom bg-success text-white">
+                <h5 class="fw-bold mb-0"><i class="bi bi-person-check me-2"></i> Convert Lead to Foreign Customer</h5>
+                <button type="button" class="btn-close btn-close-white" @onclick="() => leadToConvert = null"></button>
+            </div>
+            <div class="modal-body-custom">
+                <p class="mb-3">This will create an official active account in <strong>ForeignCustomers</strong> (SMBI_AWM) and link this lead.</p>
+                
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <label class="form-label text-xs fw-bold">Customer Code (CustCode) *</label>
+                        <input type="text" class="form-control form-control-sm @(custCodeExists ? "is-invalid" : "")" 
+                               @bind="convertModel.CustCode" @bind:after="OnCustCodeChanged" maxlength="50" />
+                        @if (custCodeExists)
+                        {
+                            <div class="invalid-feedback text-xs">Customer code already exists in ForeignCustomers!</div>
+                        }
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-xs fw-bold">Customer Name *</label>
+                        <input type="text" class="form-control form-control-sm" @bind="convertModel.CustomerName" maxlength="255" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-xs fw-bold">Country *</label>
+                        <input type="text" class="form-control form-control-sm" @bind="convertModel.Country" maxlength="100" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-xs fw-bold">City</label>
+                        <input type="text" class="form-control form-control-sm" @bind="convertModel.City" maxlength="100" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-xs fw-bold">Contact Person</label>
+                        <input type="text" class="form-control form-control-sm" @bind="convertModel.ContactPerson" maxlength="100" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-xs fw-bold">Phone / Mobile</label>
+                        <input type="text" class="form-control form-control-sm" @bind="convertModel.Phone" maxlength="50" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-xs fw-bold">Email</label>
+                        <input type="email" class="form-control form-control-sm" @bind="convertModel.Email" maxlength="100" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-xs fw-bold">Customer Source</label>
+                        <input type="text" class="form-control form-control-sm" @bind="convertModel.CustomerSource" maxlength="100" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label text-xs fw-bold">Company Address</label>
+                        <textarea class="form-control form-control-sm" rows="2" @bind="convertModel.Address"></textarea>
+                    </div>
+                </div>
+
+                <div class="alert alert-info text-xs mt-3 mb-0">
+                    <i class="bi bi-info-circle me-1"></i> Once converted, quotations, orders, and commercial invoices can be created immediately for this customer.
+                </div>
+            </div>
+            <div class="modal-footer-custom">
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => leadToConvert = null">Cancel</button>
+                <button type="button" class="btn btn-success btn-sm" disabled="@(custCodeExists || string.IsNullOrWhiteSpace(convertModel.CustCode))" @onclick="ExecuteConvertLead">Confirm & Convert</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<LeadModel> allLeads = new();
+    private List<LeadModel> filteredLeads = new();
+    private string viewMode = "kanban";
+    private string searchQuery = "";
+    private string selectedStage = "All";
+    private string selectedPriority = "All";
+
+    private bool showLeadModal = false;
+    private LeadModel? currentLead;
+    private LeadModel? leadToConvert;
+    private ConvertLeadToCustomerModel? convertModel;
+    private bool custCodeExists = false;
+    private string currentUserName = "";
+
+    private readonly string[] stages = new[]
+    {
+        "New",
+        "Contacted",
+        "Qualified",
+        "RequirementReceived",
+        "QuotationSent",
+        "Negotiation",
+        "Won",
+        "Lost"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        currentUserName = authState.User.Identity?.Name ?? "System";
+        await LoadLeads();
+    }
+
+    private async Task LoadLeads()
+    {
+        allLeads = await IntraOfficeService.GetLeadsAsync();
+        FilterLeads();
+    }
+
+    private void FilterLeads()
+    {
+        filteredLeads = allLeads.Where(l =>
+            (selectedStage == "All" || l.Status == selectedStage) &&
+            (selectedPriority == "All" || l.Priority == selectedPriority) &&
+            (string.IsNullOrWhiteSpace(searchQuery) ||
+             l.CompanyName.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+             l.ContactPerson.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+             l.Country.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+             l.LeadNumber.Contains(searchQuery, StringComparison.OrdinalIgnoreCase))
+        ).ToList();
+    }
+
+    private void OpenCreateLeadModal()
+    {
+        currentLead = new LeadModel
+        {
+            Status = "New",
+            Priority = "Medium",
+            Currency = "USD",
+            EstimatedQuantity = 500,
+            EstimatedValue = 25000,
+            Source = "Website",
+            NextFollowUpDate = DateTime.UtcNow.AddDays(2),
+            AssignedTo = currentUserName
+        };
+        showLeadModal = true;
+    }
+
+    private void ViewLeadDetails(LeadModel lead)
+    {
+        currentLead = lead;
+        showLeadModal = true;
+    }
+
+    private async Task SaveLead()
+    {
+        if (currentLead == null) return;
+        if (string.IsNullOrWhiteSpace(currentLead.CompanyName) || string.IsNullOrWhiteSpace(currentLead.ContactPerson))
+        {
+            RadzenNotify.Notify(Radzen.NotificationSeverity.Warning, "Validation", "Company Name and Contact Person are required.");
+            return;
+        }
+
+        await IntraOfficeService.SaveLeadAsync(currentLead);
+        RadzenNotify.Notify(Radzen.NotificationSeverity.Success, "Saved", "Lead saved successfully.");
+        showLeadModal = false;
+        await LoadLeads();
+    }
+
+    private async Task PromptConvertLead(LeadModel lead)
+    {
+        leadToConvert = lead;
+        var codeSuggestion = new string((lead.CompanyName ?? "CUST").Where(char.IsLetterOrDigit).Take(8).ToArray()).ToUpper();
+        if (string.IsNullOrEmpty(codeSuggestion)) codeSuggestion = "CUST";
+
+        int suffix = 1;
+        var testCode = codeSuggestion;
+        while (await IntraOfficeService.CheckCustCodeExistsAsync(testCode))
+        {
+            testCode = $"{codeSuggestion}{suffix++}";
+        }
+
+        convertModel = new ConvertLeadToCustomerModel
+        {
+            LeadId = lead.Id,
+            CustCode = testCode,
+            CustomerName = lead.CompanyName,
+            Country = lead.Country,
+            City = lead.City,
+            ContactPerson = lead.ContactPerson,
+            Phone = lead.Phone,
+            Email = lead.Email,
+            CustomerSource = lead.Source,
+            ConvertedBy = currentUserName
+        };
+        custCodeExists = false;
+    }
+
+    private async Task OnCustCodeChanged()
+    {
+        if (convertModel != null && !string.IsNullOrWhiteSpace(convertModel.CustCode))
+        {
+            custCodeExists = await IntraOfficeService.CheckCustCodeExistsAsync(convertModel.CustCode.Trim());
+        }
+    }
+
+    private async Task ExecuteConvertLead()
+    {
+        if (leadToConvert == null || convertModel == null) return;
+        if (string.IsNullOrWhiteSpace(convertModel.CustCode))
+        {
+            RadzenNotify.Notify(Radzen.NotificationSeverity.Warning, "Validation", "Customer Code is required.");
+            return;
+        }
+
+        var ok = await IntraOfficeService.ConvertLeadToForeignCustomerAsync(convertModel);
+        if (ok)
+        {
+            RadzenNotify.Notify(Radzen.NotificationSeverity.Success, "Success", $"Lead converted to Foreign Customer '{convertModel.CustCode}' successfully!");
+            leadToConvert = null;
+            convertModel = null;
+            await LoadLeads();
+        }
+        else
+        {
+            RadzenNotify.Notify(Radzen.NotificationSeverity.Error, "Conversion Failed", "Could not convert lead. CustCode may already exist.");
+        }
+    }
+
+    private string FormatStageName(string stage) => stage switch
+    {
+        "RequirementReceived" => "Requirement Recv",
+        "QuotationSent" => "Quotation Sent",
+        _ => stage
+    };
+
+    private string GetPriorityBadgeClass(string priority) => priority switch
+    {
+        "Urgent" => "badge-soft-danger",
+        "High" => "badge-soft-warning",
+        "Medium" => "badge-soft-primary",
+        _ => "badge-soft-secondary"
+    };
+
+    private string GetStageBadgeClass(string stage) => stage switch
+    {
+        "Won" => "badge-soft-success",
+        "Lost" => "badge-soft-danger",
+        "Negotiation" => "badge-soft-warning",
+        "QuotationSent" => "badge-soft-info",
+        "RequirementReceived" => "badge-soft-primary",
+        _ => "badge-soft-secondary"
+    };
+}
+
+<style>
+    .crm-card {
+        background: #ffffff;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+    }
+    .badge-soft-danger { background: #fee2e2; color: #dc2626; }
+    .badge-soft-warning { background: #fef3c7; color: #d97706; }
+    .badge-soft-primary { background: #e0e7ff; color: #4338ca; }
+    .badge-soft-secondary { background: #f1f5f9; color: #64748b; }
+    .badge-soft-success { background: #dcfce7; color: #16a34a; }
+    .badge-soft-info { background: #e0f2fe; color: #0284c7; }
+
+    .modal-backdrop-custom {
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(15, 23, 42, 0.6);
+        z-index: 1050;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+    .modal-content-custom {
+        background: #ffffff;
+        border-radius: 14px;
+        width: 100%;
+        max-width: 500px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        overflow: hidden;
+    }
+    .modal-content-large {
+        max-width: 800px;
+    }
+    .modal-header-custom {
+        padding: 16px 20px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .modal-body-custom {
+        padding: 20px;
+        max-height: 75vh;
+        overflow-y: auto;
+    }
+    .modal-footer-custom {
+        padding: 14px 20px;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        background: #f8fafc;
+    }
+</style>

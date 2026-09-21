@@ -59,5 +59,15 @@ namespace DataAccessLibrary.Interface.IntraOffice
         Task<List<StickyNote>> GetStickyNotesAsync(string userId);
         Task<int> SaveStickyNoteAsync(StickyNote note);
         Task<bool> DeleteStickyNoteAsync(int id, string userId);
+
+        // 9. Leads & Pipeline
+        Task<List<LeadModel>> GetLeadsAsync(string? status = null, string? priority = null, string? search = null);
+        Task<LeadModel?> GetLeadByIdAsync(int id);
+        Task<int> SaveLeadAsync(LeadModel lead);
+        Task<bool> DeleteLeadAsync(int id);
+        Task<List<LeadActivityModel>> GetLeadActivitiesAsync(int leadId);
+        Task<int> AddLeadActivityAsync(LeadActivityModel activity);
+        Task<bool> ConvertLeadToForeignCustomerAsync(ConvertLeadToCustomerModel model);
+        Task<bool> CheckCustCodeExistsAsync(string custCode);
     }
 }

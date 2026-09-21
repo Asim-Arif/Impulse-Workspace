@@ -1,0 +1,1387 @@
+@page "/office"
+@page "/intraoffice"
+@layout IntraOfficeLayout
+@attribute [Authorize]
+@using DataAccessLibrary.Models.IntraOffice
+@using Impulse.Services.IntraOffice
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IIntraOfficeService IntraOfficeService
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject ILogger<OfficeDashboard> Logger
+@implements IDisposable
+
+<PageTitle>IntraCom-CRM | Office Collaboration Hub</PageTitle>
+
+<div class="office-hub-wrapper">
+
+    <!-- 1. HERO OFFICE COLLABORATION DECK -->
+    <div class="office-hero-banner">
+        <div class="office-hero-glow-1"></div>
+        <div class="office-hero-glow-2"></div>
+
+        <div class="office-hero-content position-relative">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="office-live-beacon">
+                        <span class="beacon-dot"></span>
+                        WORKPLACE PULSE • ACTIVE SYNC
+                    </span>
+                    <span class="office-status-pill"><i class="bi bi-chat-dots-fill text-success me-1"></i>Chat & SignalR Live</span>
+                </div>
+                <div class="office-date-badge">
+                    <i class="bi bi-calendar3 me-1 text-info"></i>
+                    <span>@DateTime.Now.ToString("dddd, dd MMM yyyy")</span>
+                    <span class="mx-1 text-secondary">•</span>
+                    <span class="text-light fw-bold">@DateTime.Now.ToString("HH:mm")</span>
+                </div>
+            </div>
+
+            <div class="row align-items-center g-3">
+                <div class="col-lg-7">
+                    <h2 class="office-title">
+                        Office Collaboration Hub
+                    </h2>
+                    <p class="office-subtitle mb-3">
+                        Welcome, <strong class="text-white">@(currentUser?.FullName ?? "Team Member")</strong>. Centralized workplace station for internal corporate communications, departmental channels, project task velocity, meeting rooms, and governance sign-offs.
+                    </p>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span class="office-tag"><i class="bi bi-person-badge text-primary me-1"></i>@(currentUser?.JobTitle ?? "Staff Associate")</span>
+                        <span class="office-tag"><i class="bi bi-building text-info me-1"></i>@(currentUser?.Department?.Name ?? "General Operations")</span>
+                        <span class="office-tag"><i class="bi bi-envelope text-success me-1"></i>@(currentUser?.Email ?? "")</span>
+                    </div>
+                </div>
+
+                <div class="col-lg-5">
+                    <div class="office-quick-actions-card">
+                        <div class="text-xs text-uppercase tracking-wider fw-bold text-muted mb-2" style="font-size: 0.68rem; letter-spacing: 0.8px;">
+                            <i class="bi bi-lightning-charge-fill text-warning me-1"></i>WORKPLACE QUICK ACTIONS
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <a href="/messages" class="office-action-btn btn-indigo">
+                                <i class="bi bi-chat-left-text"></i>
+                                <span>New Message</span>
+                            </a>
+                            <a href="/channels" class="office-action-btn btn-teal">
+                                <i class="bi bi-hash"></i>
+                                <span>Channels</span>
+                            </a>
+                            <a href="/announcements" class="office-action-btn btn-blue">
+                                <i class="bi bi-megaphone"></i>
+                                <span>Post Bulletin</span>
+                            </a>
+                            <a href="/tasks" class="office-action-btn btn-amber">
+                                <i class="bi bi-kanban"></i>
+                                <span>Task Board</span>
+                            </a>
+                            <a href="/meetings" class="office-action-btn btn-rose">
+                                <i class="bi bi-camera-video"></i>
+                                <span>Schedule Meeting</span>
+                            </a>
+                            <a href="/minutes-approval" class="office-action-btn btn-emerald">
+                                <i class="bi bi-file-earmark-check"></i>
+                                <span>Sign Minutes</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. LIVE OFFICE RADAR MARQUEE -->
+    <div class="office-radar-bar mb-4">
+        <div class="office-radar-badge">
+            <i class="bi bi-activity text-success me-1"></i>
+            <span>OFFICE RADAR</span>
+        </div>
+        <div class="office-radar-content">
+            <div class="radar-item">
+                <i class="bi bi-chat-left-dots text-primary me-1"></i>
+                <span><strong>@unreadMessages Unread Messages</strong> awaiting your response in Direct Messages</span>
+            </div>
+            <span class="radar-divider">•</span>
+            <div class="radar-item">
+                <i class="bi bi-kanban text-warning me-1"></i>
+                <span><strong>@pendingTasks Tasks in Queue</strong> across your active project boards</span>
+            </div>
+            <span class="radar-divider">•</span>
+            <div class="radar-item">
+                <i class="bi bi-camera-video text-danger me-1"></i>
+                <span><strong>@upcomingMeetingsCount Meetings Scheduled</strong> for today and this week</span>
+            </div>
+            <span class="radar-divider">•</span>
+            <div class="radar-item">
+                <i class="bi bi-file-earmark-check text-info me-1"></i>
+                <span><strong>@pendingMinutes Minutes Approvals</strong> assigned for your sign-off</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. FLASHY 6-CARD OFFICE KPI GRID -->
+    <div class="row g-3 mb-4">
+        <!-- KPI 1: Unread Messages -->
+        <div class="col-xl-4 col-md-6">
+            <a href="/messages" class="text-decoration-none">
+                <div class="office-kpi-card kpi-purple">
+                    <div class="kpi-top-bar"></div>
+                    <div class="d-flex align-items-start justify-content-between">
+                        <div>
+                            <div class="kpi-tag-label">DIRECT COMMUNICATIONS</div>
+                            <div class="kpi-main-val">@unreadMessages <span class="kpi-unit">Unread DMs</span></div>
+                            <div class="kpi-sub-text">
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle me-1">
+                                    <i class="bi bi-chat-dots-fill me-1"></i>Real-Time Chat
+                                </span>
+                                <span class="text-muted small">Peer & Group Messages</span>
+                            </div>
+                        </div>
+                        <div class="kpi-icon-orb orb-purple">
+                            <i class="bi bi-chat-dots"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-link-arrow mt-3">
+                        <span>Open Messages Inbox</span>
+                        <i class="bi bi-arrow-right"></i>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- KPI 2: Active Channels -->
+        <div class="col-xl-4 col-md-6">
+            <a href="/channels" class="text-decoration-none">
+                <div class="office-kpi-card kpi-emerald">
+                    <div class="kpi-top-bar"></div>
+                    <div class="d-flex align-items-start justify-content-between">
+                        <div>
+                            <div class="kpi-tag-label">TEAM CHANNELS</div>
+                            <div class="kpi-main-val">@channelCount <span class="kpi-unit">Channels</span></div>
+                            <div class="kpi-sub-text">
+                                <span class="badge bg-success-subtle text-success border border-success-subtle me-1">
+                                    <i class="bi bi-people-fill me-1"></i>Collaborative
+                                </span>
+                                <span class="text-muted small">Department Workspaces</span>
+                            </div>
+                        </div>
+                        <div class="kpi-icon-orb orb-emerald">
+                            <i class="bi bi-hash"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-link-arrow mt-3">
+                        <span>Explore Channels</span>
+                        <i class="bi bi-arrow-right"></i>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- KPI 3: Announcements -->
+        <div class="col-xl-4 col-md-6">
+            <a href="/announcements" class="text-decoration-none">
+                <div class="office-kpi-card kpi-blue">
+                    <div class="kpi-top-bar"></div>
+                    <div class="d-flex align-items-start justify-content-between">
+                        <div>
+                            <div class="kpi-tag-label">COMPANY BULLETINS</div>
+                            <div class="kpi-main-val">@announcementCount <span class="kpi-unit">Bulletins</span></div>
+                            <div class="kpi-sub-text">
+                                <span class="badge bg-info-subtle text-info border border-info-subtle me-1">
+                                    <i class="bi bi-megaphone-fill me-1"></i>Official
+                                </span>
+                                <span class="text-muted small">Corporate Directives</span>
+                            </div>
+                        </div>
+                        <div class="kpi-icon-orb orb-blue">
+                            <i class="bi bi-megaphone"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-link-arrow mt-3">
+                        <span>View Announcements</span>
+                        <i class="bi bi-arrow-right"></i>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- KPI 4: Pending Tasks -->
+        <div class="col-xl-4 col-md-6">
+            <a href="/tasks" class="text-decoration-none">
+                <div class="office-kpi-card kpi-amber">
+                    <div class="kpi-top-bar"></div>
+                    <div class="d-flex align-items-start justify-content-between">
+                        <div>
+                            <div class="kpi-tag-label">MY ACTIVE TASKS</div>
+                            <div class="kpi-main-val">@pendingTasks <span class="kpi-unit">In Queue</span></div>
+                            <div class="kpi-sub-text">
+                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle me-1">
+                                    <i class="bi bi-clock-history me-1"></i>Action Required
+                                </span>
+                                <span class="text-muted small">Assigned To Me</span>
+                            </div>
+                        </div>
+                        <div class="kpi-icon-orb orb-amber">
+                            <i class="bi bi-kanban"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-link-arrow mt-3">
+                        <span>Go to Kanban Board</span>
+                        <i class="bi bi-arrow-right"></i>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- KPI 5: Upcoming Meetings -->
+        <div class="col-xl-4 col-md-6">
+            <a href="/meetings" class="text-decoration-none">
+                <div class="office-kpi-card kpi-rose">
+                    <div class="kpi-top-bar"></div>
+                    <div class="d-flex align-items-start justify-content-between">
+                        <div>
+                            <div class="kpi-tag-label">CONFERENCE MEETINGS</div>
+                            <div class="kpi-main-val">@upcomingMeetingsCount <span class="kpi-unit">Scheduled</span></div>
+                            <div class="kpi-sub-text">
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle me-1">
+                                    <i class="bi bi-camera-video-fill me-1"></i>Video Rooms
+                                </span>
+                                <span class="text-muted small">WebRTC Live Sessions</span>
+                            </div>
+                        </div>
+                        <div class="kpi-icon-orb orb-rose">
+                            <i class="bi bi-camera-video"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-link-arrow mt-3">
+                        <span>View Schedule</span>
+                        <i class="bi bi-arrow-right"></i>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- KPI 6: Pending Minutes -->
+        <div class="col-xl-4 col-md-6">
+            <a href="/minutes-list" class="text-decoration-none">
+                <div class="office-kpi-card kpi-gold">
+                    <div class="kpi-top-bar"></div>
+                    <div class="d-flex align-items-start justify-content-between">
+                        <div>
+                            <div class="kpi-tag-label">MINUTES APPROVALS</div>
+                            <div class="kpi-main-val">@pendingMinutes <span class="kpi-unit">Awaiting</span></div>
+                            <div class="kpi-sub-text">
+                                <span class="badge bg-warning-subtle text-dark border border-warning-subtle me-1">
+                                    <i class="bi bi-pen-fill me-1"></i>Governance
+                                </span>
+                                <span class="text-muted small">Sign-off Approvals</span>
+                            </div>
+                        </div>
+                        <div class="kpi-icon-orb orb-gold">
+                            <i class="bi bi-file-earmark-text"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-link-arrow mt-3">
+                        <span>Review Minutes List</span>
+                        <i class="bi bi-arrow-right"></i>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- 4. DUAL PRODUCTIVITY & CONFERENCES SUITE -->
+    <div class="row g-4 mb-4">
+        <!-- Left: Task Workload Distribution Donut Chart -->
+        <div class="col-lg-5">
+            <div class="office-panel-card h-100 p-4">
+                <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                    <div>
+                        <h6 class="fw-bold mb-1 text-dark">
+                            <i class="bi bi-pie-chart-fill text-primary me-2"></i>My Task Workload Distribution
+                        </h6>
+                        <span class="text-muted text-xs" style="font-size: 0.78rem;">Status breakdown across assigned projects</span>
+                    </div>
+                    <a href="/tasks" class="btn btn-outline-primary btn-xs rounded-pill px-2 py-1" style="font-size: 0.72rem;">Board →</a>
+                </div>
+
+                <div class="chart-canvas-container position-relative d-flex align-items-center justify-content-center" style="height: 200px;">
+                    <canvas id="officeTaskChart"></canvas>
+                    <div class="position-absolute top-50 start-50 translate-middle text-center" style="pointer-events: none;">
+                        <span class="d-block fw-bold fs-3 text-dark mb-0 lh-1">@(myTasks?.Count ?? 0)</span>
+                        <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.65rem; letter-spacing: 0.5px;">Total Tasks</small>
+                    </div>
+                </div>
+
+                <div class="row g-2 mt-3 pt-2 border-top text-center">
+                    <div class="col-4">
+                        <span class="indicator-dot bg-warning me-1"></span>
+                        <small class="text-muted d-block" style="font-size: 0.7rem;">Pending</small>
+                        <span class="fw-bold text-dark fs-6">@(myTasks?.Count(t => t.Status == TaskItemStatus.Pending) ?? 0)</span>
+                    </div>
+                    <div class="col-4 border-start border-end">
+                        <span class="indicator-dot bg-primary me-1"></span>
+                        <small class="text-muted d-block" style="font-size: 0.7rem;">In Progress</small>
+                        <span class="fw-bold text-primary fs-6">@(myTasks?.Count(t => t.Status == TaskItemStatus.InProgress) ?? 0)</span>
+                    </div>
+                    <div class="col-4">
+                        <span class="indicator-dot bg-success me-1"></span>
+                        <small class="text-muted d-block" style="font-size: 0.7rem;">Completed</small>
+                        <span class="fw-bold text-success fs-6">@(myTasks?.Count(t => t.Status == TaskItemStatus.Completed) ?? 0)</span>
+                    </div>
+                </div>
+
+                @{
+                    int totalTasks = myTasks?.Count ?? 0;
+                    int pCount = myTasks?.Count(t => t.Status == TaskItemStatus.Pending) ?? 0;
+                    int ipCount = myTasks?.Count(t => t.Status == TaskItemStatus.InProgress) ?? 0;
+                    int cCount = myTasks?.Count(t => t.Status == TaskItemStatus.Completed) ?? 0;
+                    double pPct = totalTasks > 0 ? (double)pCount / totalTasks * 100 : 0;
+                    double ipPct = totalTasks > 0 ? (double)ipCount / totalTasks * 100 : 0;
+                    double cPct = totalTasks > 0 ? (double)cCount / totalTasks * 100 : 0;
+                    int urgentCount = myTasks?.Count(t => t.Priority == TaskPriority.Urgent || t.Priority == TaskPriority.High) ?? 0;
+                }
+
+                <div class="mt-3 pt-2 border-top">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small class="text-muted fw-semibold" style="font-size: 0.72rem;">Completion Rate</small>
+                        <span class="badge bg-success-subtle text-success fw-bold" style="font-size: 0.72rem;">
+                            @(totalTasks > 0 ? $"{Math.Round(cPct, 1)}%" : "0%")
+                        </span>
+                    </div>
+                    <div class="progress" style="height: 6px; border-radius: 999px; background: rgba(0,0,0,0.06); overflow: hidden;">
+                        <div class="progress-bar bg-warning" role="progressbar" style="width: @pPct.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)%" title="Pending: @pCount"></div>
+                        <div class="progress-bar bg-primary" role="progressbar" style="width: @ipPct.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)%" title="In Progress: @ipCount"></div>
+                        <div class="progress-bar bg-success" role="progressbar" style="width: @cPct.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)%" title="Completed: @cCount"></div>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between mt-2 pt-1 text-muted" style="font-size: 0.72rem;">
+                        <span><i class="bi bi-fire text-danger me-1"></i>Urgent / High: <strong class="text-dark">@urgentCount</strong></span>
+                        <span><i class="bi bi-clock-history text-primary me-1"></i>Active: <strong class="text-primary">@(pCount + ipCount)</strong></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Upcoming Executive Meetings & Conferences -->
+        <div class="col-lg-7">
+            <div class="office-panel-card h-100 p-4">
+                <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                    <div>
+                        <h6 class="fw-bold mb-1 text-dark">
+                            <i class="bi bi-camera-video-fill text-danger me-2"></i>Upcoming Conferences & Rooms
+                        </h6>
+                        <span class="text-muted text-xs" style="font-size: 0.78rem;">Scheduled live WebRTC conference rooms</span>
+                    </div>
+                    <a href="/meetings" class="btn btn-outline-danger btn-xs rounded-pill px-2 py-1" style="font-size: 0.72rem;">Schedule →</a>
+                </div>
+
+                @if (upcomingMeetings == null || !upcomingMeetings.Any())
+                {
+                    <div class="p-4 text-center text-muted">
+                        <i class="bi bi-calendar-check fs-2 text-secondary d-block mb-1"></i>
+                        <span class="fw-semibold">No upcoming meetings scheduled</span>
+                        <p class="text-xs mb-0">Use "+ Schedule Meeting" to start or book a conference.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex flex-column gap-2">
+                        @foreach (var meeting in upcomingMeetings.Take(3))
+                        {
+                            <div class="office-meeting-card p-3 rounded-3 border d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="meeting-time-block">
+                                        <div class="mt-hour">@meeting.ScheduledStartTime.ToLocalTime().ToString("HH:mm")</div>
+                                        <div class="mt-period">@meeting.ScheduledStartTime.ToLocalTime().ToString("tt")</div>
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold text-dark" style="font-size: 0.88rem;">@meeting.Title</div>
+                                        <div class="text-muted text-xs mt-1" style="font-size: 0.75rem;">
+                                            <i class="bi bi-calendar-event me-1"></i>@meeting.ScheduledStartTime.ToLocalTime().ToString("MMM dd, yyyy")
+                                            <span class="mx-1">•</span>
+                                            <i class="bi bi-person me-1"></i>Host: @(meeting.OrganizerName ?? "Executive Host")
+                                        </div>
+                                    </div>
+                                </div>
+                                <a href="/meetings/live/@meeting.Id" class="btn btn-success btn-sm rounded-pill px-3 py-1 fw-bold" style="font-size: 0.75rem;">
+                                    <i class="bi bi-box-arrow-in-right me-1"></i>Join Room
+                                </a>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. SPLIT OPERATIONAL ACTIVITY CENTERS -->
+    <div class="row g-4 mb-4">
+        <!-- Left Column: Tasks & Announcements -->
+        <div class="col-lg-6">
+            <!-- Active Tasks -->
+            <div class="office-panel-card mb-4">
+                <div class="panel-header d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="panel-icon bg-warning bg-opacity-10 text-warning">
+                            <i class="bi bi-kanban"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0 text-dark">My Active Tasks</h6>
+                            <small class="text-muted" style="font-size: 0.72rem;">Tasks assigned to you awaiting completion</small>
+                        </div>
+                    </div>
+                    <a href="/tasks" class="btn btn-outline-warning btn-sm rounded-pill px-3" style="font-size: 0.75rem;">
+                        View All
+                    </a>
+                </div>
+
+                <div class="panel-body p-3">
+                    @if (myTasks == null || !myTasks.Any())
+                    {
+                        <div class="p-3 text-center text-muted">
+                            <i class="bi bi-check2-circle text-success fs-2 d-block mb-1"></i>
+                            <span>All tasks caught up!</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-column gap-2">
+                            @foreach (var task in myTasks.Take(5))
+                            {
+                                <div class="task-item-card p-2 rounded-3 border d-flex align-items-center justify-content-between">
+                                    <div class="d-flex align-items-center gap-2 flex-grow-1 text-truncate">
+                                        <span class="badge @(task.Priority == TaskPriority.Urgent ? "bg-danger" : task.Priority == TaskPriority.High ? "bg-warning text-dark" : "bg-light text-muted border") text-xs">
+                                            @task.Priority
+                                        </span>
+                                        <span class="fw-semibold text-dark text-truncate" style="font-size: 0.85rem;">@task.Title</span>
+                                    </div>
+                                    <span class="badge @(task.Status == TaskItemStatus.InProgress ? "bg-primary-subtle text-primary border border-primary-subtle" : task.Status == TaskItemStatus.Pending ? "bg-warning-subtle text-warning border border-warning-subtle" : "bg-success-subtle text-success") text-xs ms-2">
+                                        @task.Status
+                                    </span>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Recent Bulletins -->
+            <div class="office-panel-card">
+                <div class="panel-header d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="panel-icon bg-primary bg-opacity-10 text-primary">
+                            <i class="bi bi-megaphone"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0 text-dark">Recent Announcements</h6>
+                            <small class="text-muted" style="font-size: 0.72rem;">Company-wide directives & official communications</small>
+                        </div>
+                    </div>
+                    <a href="/announcements" class="btn btn-outline-primary btn-sm rounded-pill px-3" style="font-size: 0.75rem;">
+                        View All
+                    </a>
+                </div>
+
+                <div class="panel-body p-3">
+                    @if (recentAnnouncements == null || !recentAnnouncements.Any())
+                    {
+                        <div class="p-3 text-center text-muted">No announcements posted.</div>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-column gap-2">
+                            @foreach (var ann in recentAnnouncements.Take(3))
+                            {
+                                <div class="announcement-item-card p-3 rounded-3 border">
+                                    <div class="d-flex align-items-center justify-content-between mb-1">
+                                        <span class="fw-bold text-dark" style="font-size: 0.85rem;">@ann.Title</span>
+                                        <span class="badge @(ann.Priority == AnnouncementPriority.Critical ? "bg-danger" : ann.Priority == AnnouncementPriority.Important ? "bg-warning text-dark" : "bg-light text-muted border") text-xs">
+                                            @ann.Priority
+                                        </span>
+                                    </div>
+                                    <p class="text-muted mb-1 text-truncate" style="font-size: 0.78rem;">@ann.Content</p>
+                                    <div class="d-flex align-items-center justify-content-between text-muted" style="font-size: 0.7rem;">
+                                        <span><i class="bi bi-person me-1"></i>@(ann.CreatorName ?? "Corporate Board")</span>
+                                        <span><i class="bi bi-clock me-1"></i>@ann.CreatedAt.ToString("MMM dd, yyyy")</span>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: WhatsApp & Smart Sticky Reminders -->
+        <div class="col-lg-6">
+            <!-- WhatsApp Enterprise Gateway -->
+            <div class="office-panel-card mb-4" style="border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(18, 24, 38, 0.7); backdrop-filter: blur(16px); border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);">
+                <div class="panel-header d-flex align-items-center justify-content-between p-3" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.02);">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="panel-icon d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; border-radius: 10px; background: rgba(37, 211, 102, 0.15); color: #25D366; font-size: 1.25rem;">
+                            <i class="bi bi-whatsapp"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0 text-white" style="font-size: 0.95rem;">WhatsApp Enterprise Notification Gateway</h6>
+                            <small class="text-white-50" style="font-size: 0.72rem;">Automated mobile alerts for tasks & corporate approvals</small>
+                        </div>
+                    </div>
+                    @if (whatsAppStatus == "CONNECTED")
+                    {
+                        <span class="badge bg-success text-white px-3 py-1 rounded-pill" style="font-size: 0.72rem; letter-spacing: 0.5px; box-shadow: 0 0 10px rgba(37, 211, 102, 0.4);">
+                            <i class="bi bi-check-circle me-1"></i>CONNECTED
+                        </span>
+                    }
+                    else if (whatsAppStatus == "QR_READY")
+                    {
+                        <span class="badge bg-warning text-dark px-3 py-1 rounded-pill fw-bold" style="font-size: 0.72rem; letter-spacing: 0.5px; box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);">
+                            <i class="bi bi-qr-code-scan me-1"></i>QR READY - SCAN NOW
+                        </span>
+                    }
+                    else if (whatsAppStatus == "INITIALIZING")
+                    {
+                        <span class="badge bg-info text-dark px-3 py-1 rounded-pill" style="font-size: 0.72rem; letter-spacing: 0.5px;">
+                            <i class="bi bi-hourglass-split me-1"></i>INITIALIZING...
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-danger text-white px-3 py-1 rounded-pill" style="font-size: 0.72rem; letter-spacing: 0.5px;">
+                            <i class="bi bi-exclamation-triangle me-1"></i>DISCONNECTED
+                        </span>
+                    }
+                </div>
+
+                <div class="panel-body p-3">
+                    @if (whatsAppStatus == "CONNECTED")
+                    {
+                        <div class="d-flex align-items-center gap-3 p-3 rounded-3" style="background: rgba(37, 211, 102, 0.1); border: 1px solid rgba(37, 211, 102, 0.3);">
+                            <i class="bi bi-check-circle-fill fs-1" style="color: #25D366;"></i>
+                            <div>
+                                <h6 class="fw-bold text-white mb-1" style="font-size: 0.92rem;">WhatsApp Gateway Active & Ready</h6>
+                                <p class="text-white-50 text-xs mb-0">Automatic task assignments, minute approvals, and urgent reminders are delivered directly to WhatsApp via 127.0.0.1:3001.</p>
+                            </div>
+                        </div>
+                    }
+                    else if (whatsAppStatus == "QR_READY" && !string.IsNullOrEmpty(whatsAppQrUrl))
+                    {
+                        <div class="d-flex flex-column flex-sm-row align-items-center gap-3 p-3 rounded-3" style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1);">
+                            <div class="p-2 bg-white rounded-3 shadow-sm text-center" style="display: inline-block;">
+                                <img src="@whatsAppQrUrl" alt="WhatsApp QR Code" style="width: 140px; height: 140px; display: block; border-radius: 6px;" />
+                                <small class="text-muted fw-bold d-block mt-1" style="font-size: 0.65rem;">Scan with WhatsApp</small>
+                            </div>
+                            <div>
+                                <h6 class="fw-bold text-white mb-1" style="font-size: 0.95rem;">Scan QR to Link WhatsApp</h6>
+                                <ol class="text-white-50 text-xs mb-2 ps-3" style="font-size: 0.78rem; line-height: 1.5;">
+                                    <li>Open <strong>WhatsApp</strong> on your phone</li>
+                                    <li>Tap <strong>Menu (⋮)</strong> or <strong>Settings</strong> &gt; <strong>Linked Devices</strong></li>
+                                    <li>Tap <strong>Link a Device</strong> and scan this QR code</li>
+                                </ol>
+                                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-50 px-2 py-1 text-xs">
+                                    <i class="bi bi-broadcast me-1"></i>Live auto-detecting scan...
+                                </span>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="d-flex align-items-center justify-content-between p-3 rounded-3" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25);">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="spinner-border spinner-border-sm text-warning" role="status"></div>
+                                <div>
+                                    <div class="text-white fw-bold" style="font-size: 0.82rem;">WhatsApp Service: @whatsAppStatus</div>
+                                    <div class="text-white-50" style="font-size: 0.72rem;">@(string.IsNullOrWhiteSpace(whatsAppErrorMessage) ? "Waiting for gateway on port 3001..." : whatsAppErrorMessage)</div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-light btn-sm rounded-pill px-3 py-1" @onclick="CheckWhatsAppStatus" style="font-size: 0.75rem;">
+                                <i class="bi bi-arrow-clockwise me-1"></i>Retry
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Quick Smart Sticky Reminders -->
+            <div class="office-panel-card">
+                <div class="panel-header d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="panel-icon bg-warning bg-opacity-10 text-warning">
+                            <i class="bi bi-bell-fill"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0 text-dark">Quick Smart Sticky Reminders</h6>
+                            <small class="text-muted" style="font-size: 0.72rem;">Fast reminders with audio alerts & calendar sync</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-body p-3">
+                    @if (!string.IsNullOrEmpty(reminderErrorMessage))
+                    {
+                        <div class="alert alert-danger py-1 px-2 text-xs mb-2">@reminderErrorMessage</div>
+                    }
+
+                    <div class="d-flex gap-2 mb-3">
+                        <input type="text" class="form-control form-control-sm" placeholder="Add quick note or reminder..." @bind="newReminderContent" />
+                        <input type="datetime-local" class="form-control form-control-sm" style="max-width: 175px;" @bind="newReminderTime" />
+                        <button type="button" class="btn btn-primary btn-sm rounded-3 px-3" @onclick="AddReminder" title="Add Reminder">
+                            <i class="bi bi-plus-lg"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm rounded-3" onclick="window.playReminderSound()" title="Test Chime">
+                            <i class="bi bi-volume-up"></i>
+                        </button>
+                    </div>
+
+                    @if (upcomingReminders != null && upcomingReminders.Any())
+                    {
+                        <div class="d-flex flex-column gap-2">
+                            @foreach (var reminder in upcomingReminders)
+                            {
+                                <div class="reminder-item-card p-2 rounded-3 border d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <div class="fw-semibold text-dark" style="font-size: 0.82rem;">@reminder.Content</div>
+                                        <small class="text-muted" style="font-size: 0.7rem;">
+                                            <i class="bi bi-alarm me-1 text-warning"></i>@(reminder.ReminderTime?.ToLocalTime().ToString("g") ?? "")
+                                        </small>
+                                    </div>
+                                    <button class="btn btn-outline-danger btn-xs rounded-circle p-1" @onclick="() => DeleteReminder(reminder)" title="Dismiss">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="p-3 text-center text-muted">
+                            <small>No active reminders. Add one above for automated alerts.</small>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<style>
+    .office-hub-wrapper {
+        max-width: 1600px;
+        margin: 0 auto;
+        padding-bottom: 2rem;
+    }
+
+    /* 1. HERO OFFICE BANNER */
+    .office-hero-banner {
+        background: linear-gradient(135deg, #064e3b 0%, #0f172a 50%, #1e1b4b 100%);
+        border-radius: 20px;
+        padding: 2.25rem;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 20px 40px -15px rgba(6, 78, 59, 0.4);
+        margin-bottom: 1.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .office-hero-glow-1 {
+        position: absolute;
+        top: -90px;
+        left: -90px;
+        width: 320px;
+        height: 320px;
+        background: radial-gradient(circle, rgba(16, 185, 129, 0.35) 0%, transparent 70%);
+        border-radius: 50%;
+        pointer-events: none;
+    }
+
+    .office-hero-glow-2 {
+        position: absolute;
+        bottom: -90px;
+        right: -90px;
+        width: 360px;
+        height: 360px;
+        background: radial-gradient(circle, rgba(99, 102, 241, 0.3) 0%, transparent 70%);
+        border-radius: 50%;
+        pointer-events: none;
+    }
+
+    .office-hero-content {
+        position: relative;
+        z-index: 2;
+    }
+
+    .office-live-beacon {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(16, 185, 129, 0.18);
+        border: 1px solid rgba(52, 211, 153, 0.4);
+        color: #6ee7b7;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.8px;
+        padding: 4px 12px;
+        border-radius: 9999px;
+    }
+
+    .beacon-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #10b981;
+        box-shadow: 0 0 8px #10b981;
+        animation: pulseBeacon 2s infinite;
+    }
+
+    @@keyframes pulseBeacon {
+        0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+        50% {
+            opacity: 0.35;
+            transform: scale(0.85);
+        }
+    }
+
+    .office-status-pill {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #cbd5e1;
+        font-size: 0.75rem;
+        font-weight: 500;
+        padding: 4px 12px;
+        border-radius: 9999px;
+    }
+
+    .office-date-badge {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.25);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 5px 14px;
+        border-radius: 9999px;
+        font-size: 0.78rem;
+        color: #94a3b8;
+    }
+
+    .office-title {
+        font-size: 1.85rem;
+        font-weight: 800;
+        color: #ffffff;
+        letter-spacing: -0.5px;
+        margin-bottom: 0.4rem;
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .office-subtitle {
+        color: #cbd5e1;
+        font-size: 0.92rem;
+        line-height: 1.5;
+    }
+
+    .office-tag {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: #f1f5f9;
+        padding: 4px 12px;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .office-quick-actions-card {
+        background: rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 14px;
+        padding: 1rem 1.2rem;
+    }
+
+    .office-action-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 0.76rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid transparent;
+    }
+
+    .btn-indigo {
+        background: rgba(99, 102, 241, 0.2);
+        color: #c7d2fe;
+        border-color: rgba(99, 102, 241, 0.4);
+    }
+    .btn-indigo:hover {
+        background: #6366f1;
+        color: #fff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    }
+
+    .btn-teal {
+        background: rgba(20, 184, 166, 0.2);
+        color: #99f6e4;
+        border-color: rgba(20, 184, 166, 0.4);
+    }
+    .btn-teal:hover {
+        background: #14b8a6;
+        color: #fff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.4);
+    }
+
+    .btn-blue {
+        background: rgba(59, 130, 246, 0.2);
+        color: #bfdbfe;
+        border-color: rgba(59, 130, 246, 0.4);
+    }
+    .btn-blue:hover {
+        background: #3b82f6;
+        color: #fff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    }
+
+    .btn-amber {
+        background: rgba(245, 158, 11, 0.2);
+        color: #fde68a;
+        border-color: rgba(245, 158, 11, 0.4);
+    }
+    .btn-amber:hover {
+        background: #f59e0b;
+        color: #fff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+    }
+
+    .btn-rose {
+        background: rgba(244, 63, 94, 0.2);
+        color: #fecdd3;
+        border-color: rgba(244, 63, 94, 0.4);
+    }
+    .btn-rose:hover {
+        background: #f43f5e;
+        color: #fff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(244, 63, 94, 0.4);
+    }
+
+    .btn-emerald {
+        background: rgba(16, 185, 129, 0.2);
+        color: #a7f3d0;
+        border-color: rgba(16, 185, 129, 0.4);
+    }
+    .btn-emerald:hover {
+        background: #10b981;
+        color: #fff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+
+    /* 2. OFFICE RADAR TICKER */
+    .office-radar-bar {
+        display: flex;
+        align-items: center;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 0.65rem 1rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+        overflow: hidden;
+    }
+
+    .office-radar-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 700;
+        font-size: 0.72rem;
+        color: #0f172a;
+        white-space: nowrap;
+        padding-right: 1rem;
+        border-right: 2px solid #e2e8f0;
+        letter-spacing: 0.5px;
+    }
+
+    .radar-pulse {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #10b981;
+        box-shadow: 0 0 6px #10b981;
+        animation: pulseBeacon 1.8s infinite;
+    }
+
+    .office-radar-ticker {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        overflow-x: auto;
+        white-space: nowrap;
+        padding-left: 1rem;
+        scrollbar-width: none;
+    }
+
+    .office-radar-ticker::-webkit-scrollbar {
+        display: none;
+    }
+
+    .ticker-item {
+        font-size: 0.75rem;
+        color: #475569;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    /* 3. FLASHY KPI CARDS */
+    .office-kpi-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 1.35rem 1.4rem;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+        transition: all 0.25s ease-in-out;
+    }
+
+    .office-kpi-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08);
+        border-color: #cbd5e1;
+    }
+
+    .kpi-top-bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+    }
+
+    .kpi-purple .kpi-top-bar { background: linear-gradient(90deg, #6366f1, #a855f7); }
+    .kpi-emerald .kpi-top-bar { background: linear-gradient(90deg, #10b981, #14b8a6); }
+    .kpi-blue .kpi-top-bar { background: linear-gradient(90deg, #3b82f6, #06b6d4); }
+    .kpi-amber .kpi-top-bar { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+    .kpi-rose .kpi-top-bar { background: linear-gradient(90deg, #f43f5e, #ec4899); }
+    .kpi-gold .kpi-top-bar { background: linear-gradient(90deg, #d97706, #f59e0b); }
+
+    .kpi-tag-label {
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.8px;
+        color: #64748b;
+        text-transform: uppercase;
+        margin-bottom: 0.35rem;
+    }
+
+    .kpi-main-val {
+        font-size: 1.85rem;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.1;
+        margin-bottom: 0.35rem;
+    }
+
+    .kpi-unit {
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: #94a3b8;
+    }
+
+    .kpi-icon-orb {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.4rem;
+        flex-shrink: 0;
+    }
+
+    .orb-purple { background: rgba(99, 102, 241, 0.12); color: #6366f1; }
+    .orb-emerald { background: rgba(16, 185, 129, 0.12); color: #10b981; }
+    .orb-blue { background: rgba(59, 130, 246, 0.12); color: #3b82f6; }
+    .orb-amber { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
+    .orb-rose { background: rgba(244, 63, 94, 0.12); color: #f43f5e; }
+    .orb-gold { background: rgba(217, 119, 6, 0.12); color: #d97706; }
+
+    .kpi-link-arrow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.76rem;
+        font-weight: 600;
+        color: #64748b;
+        padding-top: 0.6rem;
+        border-top: 1px dashed #f1f5f9;
+        transition: color 0.15s;
+    }
+
+    .office-kpi-card:hover .kpi-link-arrow {
+        color: #0f172a;
+    }
+
+    /* 4. OFFICE PANEL CARDS */
+    .office-panel-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+        overflow: hidden;
+    }
+
+    .panel-header {
+        padding: 1.1rem 1.25rem;
+        border-bottom: 1px solid #f1f5f9;
+        background: #fafafa;
+    }
+
+    .panel-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+    }
+
+    .office-meeting-card {
+        background: #f8fafc;
+        border-color: #e2e8f0;
+        transition: all 0.2s;
+    }
+
+    .office-meeting-card:hover {
+        background: #ffffff;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        border-color: #cbd5e1;
+    }
+
+    .meeting-time-block {
+        text-align: center;
+        padding: 4px 10px;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        min-width: 62px;
+    }
+
+    .mt-hour {
+        font-size: 0.88rem;
+        font-weight: 800;
+        color: #0f172a;
+    }
+
+    .mt-period {
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+    }
+
+    .task-item-card, .announcement-item-card, .reminder-item-card {
+        background: #f8fafc;
+        border-color: #e2e8f0;
+        transition: all 0.15s;
+    }
+
+    .task-item-card:hover, .announcement-item-card:hover, .reminder-item-card:hover {
+        background: #ffffff;
+        border-color: #cbd5e1;
+    }
+
+    .indicator-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+    }
+
+    /* 5. FLASHY INTRABOT COPILOT FAST-DOCK */
+    .office-ai-dock {
+        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #064e3b 100%);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        box-shadow: 0 15px 35px -10px rgba(15, 23, 42, 0.4);
+    }
+
+    .ai-dock-glow {
+        position: absolute;
+        right: -40px;
+        top: -40px;
+        width: 220px;
+        height: 220px;
+        background: radial-gradient(circle, rgba(245, 158, 11, 0.25) 0%, transparent 70%);
+        border-radius: 50%;
+        pointer-events: none;
+    }
+
+    .office-dock-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #f59e0b, #ea580c);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 1.4rem;
+        box-shadow: 0 0 15px rgba(245, 158, 11, 0.5);
+        flex-shrink: 0;
+    }
+
+    .office-dock-chip {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        color: #f1f5f9;
+        padding: 7px 14px;
+        border-radius: 9999px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .office-dock-chip:hover {
+        background: rgba(255, 255, 255, 0.2);
+        border-color: rgba(255, 255, 255, 0.35);
+        transform: translateY(-2px);
+    }
+
+    .office-dock-chip.highlight {
+        background: rgba(245, 158, 11, 0.25);
+        border-color: rgba(245, 158, 11, 0.5);
+        color: #fef08a;
+    }
+
+    .office-dock-chip.highlight:hover {
+        background: rgba(245, 158, 11, 0.4);
+    }
+</style>
+
+@code {
+    private IntraUserProfile? currentUser;
+    private int unreadMessages;
+    private int channelCount;
+    private int announcementCount;
+    private int pendingTasks;
+    private int upcomingMeetingsCount;
+    private int pendingMinutes;
+    private List<Announcement>? recentAnnouncements;
+    private List<TaskItem>? myTasks;
+    private List<Meeting>? upcomingMeetings;
+    private List<StickyNote>? upcomingReminders;
+
+    [SupplyParameterFromForm]
+    private string newReminderContent { get; set; } = "";
+
+    [SupplyParameterFromForm]
+    private DateTime newReminderTime { get; set; } = DateTime.Now.AddHours(1);
+
+    private string whatsAppStatus = "INITIALIZING";
+    private string whatsAppErrorMessage = "this may take a few moments";
+    private string? whatsAppQrUrl;
+    private bool _isDisposed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var userPrincipal = authState.User;
+            string? userId = userPrincipal.Identity?.Name;
+
+            if (!string.IsNullOrEmpty(userId))
+            {
+                currentUser = await IntraOfficeService.GetUserProfileAsync(userId);
+                if (currentUser == null)
+                {
+                    currentUser = new IntraUserProfile { UserName = userId, FullUserName = userId };
+                }
+
+                var channels = await IntraOfficeService.GetChannelsForUserAsync(userId);
+                channelCount = channels.Count;
+                recentAnnouncements = await IntraOfficeService.GetAnnouncementsAsync(userId);
+                announcementCount = recentAnnouncements.Count;
+                myTasks = await IntraOfficeService.GetTasksAsync(assignedTo: userId);
+                pendingTasks = myTasks.Count(t => t.Status == TaskItemStatus.Pending || t.Status == TaskItemStatus.InProgress);
+                upcomingMeetings = await IntraOfficeService.GetMeetingsForUserAsync(userId);
+                upcomingMeetingsCount = upcomingMeetings.Count;
+
+                var minList = await IntraOfficeService.GetMinutesAsync(new MinuteFilter { ForwardToUserId = userId, Status = "Pending" });
+                pendingMinutes = minList.Count;
+
+                var allNotes = await IntraOfficeService.GetStickyNotesAsync(userId);
+                upcomingReminders = allNotes
+                    .Where(s => s.ReminderTime != null && s.ReminderTime > DateTime.UtcNow)
+                    .OrderBy(s => s.ReminderTime)
+                    .Take(5)
+                    .ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error initializing OfficeDashboard data");
+        }
+
+        await CheckWhatsAppStatus();
+        _ = StartWhatsAppPoller();
+    }
+
+    private async Task StartWhatsAppPoller()
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(4));
+            while (!_isDisposed && await timer.WaitForNextTickAsync())
+            {
+                if (whatsAppStatus == "CONNECTED")
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(26));
+                }
+                await CheckWhatsAppStatus();
+            }
+        }
+        catch
+        {
+            // Ignore timer teardown
+        }
+    }
+
+    private bool taskChartRendered = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (myTasks != null && (!taskChartRendered || firstRender))
+        {
+            await RenderOfficeTaskChartAsync();
+        }
+    }
+
+    private async Task RenderOfficeTaskChartAsync()
+    {
+        if (myTasks == null) return;
+        int p = myTasks.Count(t => t.Status == TaskItemStatus.Pending);
+        int ip = myTasks.Count(t => t.Status == TaskItemStatus.InProgress);
+        int c = myTasks.Count(t => t.Status == TaskItemStatus.Completed);
+        try
+        {
+            await JS.InvokeVoidAsync("crmCharts.renderOfficeTaskChart", "officeTaskChart", p, ip, c);
+            taskChartRendered = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Could not render office task doughnut chart");
+        }
+    }
+
+    private void NavigateToAi(string prompt)
+    {
+        Nav.NavigateTo($"/office/ai-assistant?prompt={Uri.EscapeDataString(prompt)}");
+    }
+
+    private async Task CheckWhatsAppStatus()
+    {
+        try
+        {
+            using var http = new HttpClient();
+            http.Timeout = TimeSpan.FromSeconds(2);
+            var response = await http.GetAsync("http://127.0.0.1:3001/qr");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                
+                string? parsedStatus = null;
+                string? parsedQr = null;
+
+                if (doc.RootElement.TryGetProperty("status", out var statusEl))
+                {
+                    parsedStatus = statusEl.GetString();
+                }
+                if (doc.RootElement.TryGetProperty("qr", out var qrEl) && qrEl.ValueKind != System.Text.Json.JsonValueKind.Null)
+                {
+                    parsedQr = qrEl.GetString();
+                }
+
+                whatsAppStatus = parsedStatus ?? "INITIALIZING";
+                whatsAppQrUrl = parsedQr;
+                whatsAppErrorMessage = "";
+                await InvokeAsync(StateHasChanged);
+            }
+            else
+            {
+                whatsAppStatus = "DISCONNECTED";
+                whatsAppErrorMessage = $"HTTP {(int)response.StatusCode}";
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            whatsAppStatus = "DISCONNECTED";
+            whatsAppErrorMessage = ex.Message;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private string? reminderErrorMessage;
+
+    private async Task AddReminder()
+    {
+        reminderErrorMessage = null;
+        try
+        {
+            if (string.IsNullOrWhiteSpace(newReminderContent) || currentUser == null)
+            {
+                reminderErrorMessage = "Please enter a reminder and ensure you are logged in.";
+                StateHasChanged();
+                return;
+            }
+            
+            var note = new StickyNote
+            {
+                UserId = currentUser.UserName,
+                Content = newReminderContent,
+                ReminderTime = newReminderTime.ToUniversalTime(),
+                Color = "yellow",
+                XPos = -1,
+                YPos = -1
+            };
+            note.Id = await IntraOfficeService.SaveStickyNoteAsync(note);
+            
+            if (upcomingReminders == null) upcomingReminders = new();
+            upcomingReminders.Add(note);
+            upcomingReminders = upcomingReminders.OrderBy(r => r.ReminderTime).Take(5).ToList();
+            
+            newReminderContent = "";
+            newReminderTime = DateTime.Now.AddHours(1);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error saving reminder");
+            reminderErrorMessage = $"Error saving reminder: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteReminder(StickyNote note)
+    {
+        await IntraOfficeService.DeleteStickyNoteAsync(note.Id, currentUser?.UserName ?? "");
+        upcomingReminders?.RemoveAll(r => r.Id == note.Id);
+    }
+
+    public void Dispose()
+    {
+        _isDisposed = true;
+    }
+}

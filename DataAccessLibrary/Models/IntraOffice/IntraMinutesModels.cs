@@ -40,6 +40,12 @@ namespace DataAccessLibrary.Models.IntraOffice
         public decimal? ApprovedStockQty { get; set; }
         public string? HRLeaveType { get; set; }
         public string? FinancialType { get; set; }
+        public bool IsRead { get; set; } = false;
+        public DateTime? ReadAt { get; set; }
+        public string Title { get => Subject; set => Subject = value ?? string.Empty; }
+
+        public IntraUserProfile? CreatedByUser => !string.IsNullOrEmpty(CreatedByUserId) ? new IntraUserProfile { UserName = CreatedByUserId, FullUserName = CreatedByUserName } : null;
+        public IntraUserProfile? ForwardToUser => !string.IsNullOrEmpty(ForwardToUserId) ? new IntraUserProfile { UserName = ForwardToUserId, FullUserName = ForwardToUserName } : null;
 
         public List<MinuteAttachment> Attachments { get; set; } = new List<MinuteAttachment>();
         public List<MinuteWorkflowHistory> WorkflowHistory { get; set; } = new List<MinuteWorkflowHistory>();
@@ -68,16 +74,30 @@ namespace DataAccessLibrary.Models.IntraOffice
         public string? Remarks { get; set; }
         public string? SignaturePath { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public IntraUserProfile? User => !string.IsNullOrEmpty(UserId) ? new IntraUserProfile { UserName = UserId, FullUserName = FullName, Designation = Designation, SignaturePath = SignaturePath } : null;
     }
 
     public class MinuteFilter
     {
         public DateTime? FromDate { get; set; }
         public DateTime? ToDate { get; set; }
+        public string? DateRange { get; set; }
         public string? No { get; set; }
         public string? Type { get; set; }
         public string? Status { get; set; }
+        public bool Approved { get; set; }
+        public decimal? AmountFrom { get; set; }
+        public decimal? AmountTo { get; set; }
+        public string? ForwardedTo { get; set; }
+        public string? Sender { get; set; }
+        public string? Subject { get; set; }
+        public string? DepartmentId { get; set; }
+        public string? RelatedUserId { get; set; }
+        public string? SigningAuthority { get; set; }
         public string? UserId { get; set; }
+        public string? InitiatorUserId { get; set; }
+        public string? ForwardToUserId { get; set; }
         public string? SearchTerm { get; set; }
     }
 }

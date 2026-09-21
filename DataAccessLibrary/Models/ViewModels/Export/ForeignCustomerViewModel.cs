@@ -150,5 +150,8 @@ namespace DataAccessLibrary.Models.ViewModels.Export
         public string Country { get; set; } = string.Empty;
         public string Curr { get; set; } = string.Empty;
         public bool Active { get; set; }
+        public string? Phone1 { get; set; }
+        public string? Email1 { get; set; }
+        public string? Cont1name { get; set; }
     }
 }

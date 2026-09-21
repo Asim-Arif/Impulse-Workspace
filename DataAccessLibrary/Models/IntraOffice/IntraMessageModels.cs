@@ -23,6 +23,8 @@ namespace DataAccessLibrary.Models.IntraOffice
 
         public List<MessageAttachment> Attachments { get; set; } = new List<MessageAttachment>();
         public List<Message> Replies { get; set; } = new List<Message>();
+
+        public IntraUserProfile? Sender => !string.IsNullOrEmpty(SenderId) ? new IntraUserProfile { UserName = SenderId, FullUserName = SenderName ?? SenderId } : null;
     }
 
     public class MessageAttachment
@@ -46,6 +48,7 @@ namespace DataAccessLibrary.Models.IntraOffice
         public UserStatus Status { get; set; } = UserStatus.Offline;
         public string? LastMessage { get; set; }
         public DateTime LastMessageTime { get; set; }
+        public DateTime LastMessageAt { get => LastMessageTime; set => LastMessageTime = value; }
         public int UnreadCount { get; set; }
     }
 }

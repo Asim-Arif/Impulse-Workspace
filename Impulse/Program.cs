@@ -102,6 +102,14 @@ builder.Services.AddScoped<IAccountReportingAccess, AccountsReportingDataAccess>
 builder.Services.AddServerSideBlazor(options =>
 {
     options.DetailedErrors = true;
+}).AddHubOptions(options =>
+{
+    options.MaximumReceiveMessageSize = 500 * 1024 * 1024; // 500 MB to prevent voice note disconnects
+});
+builder.Services.AddSignalR(options =>
+{
+    options.MaximumReceiveMessageSize = 500 * 1024 * 1024; // 500 MB
+    options.EnableDetailedErrors = true;
 });
 builder.Services.AddScoped<AuthenticationStateProvider, RevalidatingIdentityAuthenticationStateProvider<IdentityUser>>();
 builder.Services.AddScoped<SignInManager<IdentityUser>>(); 
@@ -465,8 +473,21 @@ builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<AppSettings>>
 // IntraOffice Module Registrations
 builder.Services.AddScoped<DataAccessLibrary.Interface.IntraOffice.IIntraOfficeDataAccess, DataAccessLibrary.DAC.IntraOffice.IntraOfficeDataAccess>();
 builder.Services.AddScoped<Impulse.Services.IntraOffice.IIntraOfficeService, Impulse.Services.IntraOffice.IntraOfficeService>();
+builder.Services.AddSingleton<Impulse.Services.IntraOffice.IAppNotificationService, Impulse.Services.IntraOffice.AppNotificationService>();
+builder.Services.AddSingleton<Impulse.Services.IntraOffice.StickyNoteNotificationService>();
 builder.Services.AddHttpClient<Impulse.Services.IntraOffice.IWhatsAppNotificationService, Impulse.Services.IntraOffice.WhatsAppNotificationService>();
 builder.Services.AddScoped<Impulse.Services.IntraOffice.IAiAssistantService, Impulse.Services.IntraOffice.AiAssistantService>();
+builder.Services.AddScoped<Impulse.Services.IntraOffice.IFileService, Impulse.Services.IntraOffice.FileService>();
+builder.Services.AddScoped<Impulse.Services.IntraOffice.IChannelService, Impulse.Services.IntraOffice.ChannelService>();
+builder.Services.AddScoped<Impulse.Services.IntraOffice.IMessageService, Impulse.Services.IntraOffice.MessageService>();
+builder.Services.AddScoped<Impulse.Services.IntraOffice.IAnnouncementService, Impulse.Services.IntraOffice.AnnouncementService>();
+builder.Services.AddScoped<Impulse.Services.IntraOffice.ITaskService, Impulse.Services.IntraOffice.TaskService>();
+builder.Services.AddScoped<Impulse.Services.IntraOffice.IMeetingService, Impulse.Services.IntraOffice.MeetingService>();
+builder.Services.AddScoped<Impulse.Services.IntraOffice.IMinuteApprovalService, Impulse.Services.IntraOffice.MinuteApprovalService>();
+builder.Services.AddScoped<Impulse.Services.IntraOffice.IMinuteTypeService, Impulse.Services.IntraOffice.MinuteTypeService>();
+builder.Services.AddScoped<Impulse.Services.IntraOffice.IWhatsAppService, Impulse.Services.IntraOffice.WhatsAppService>();
+builder.Services.AddScoped<Impulse.Services.IntraOffice.IEmailService, Impulse.Services.IntraOffice.EmailService>();
+builder.Services.AddHttpClient<Impulse.Services.IntraOffice.IAiService, Impulse.Services.IntraOffice.OpenRouterAiService>();
 
 // Setup & User Management Registrations
 builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IUserDataAccess, DataAccessLibrary.DAC.Setup.UserDataAccess>();
@@ -515,5 +536,14 @@ app.MapControllers();
 app.MapBlazorHub();
 app.MapHub<Impulse.Hubs.ChatHub>("/chathub");
 app.MapFallbackToPage("/_Host");
+
+// Ensure IntraOffice upload directories exist
+var env = app.Services.GetRequiredService<IWebHostEnvironment>();
+var webRoot = env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+foreach (var sub in new[] { "tasks", "announcements", "chat", "meetings", "leads", "minutes" })
+{
+    var dir = Path.Combine(webRoot, "uploads", sub);
+    if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+}
 
 app.Run();

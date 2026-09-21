@@ -1171,5 +1171,271 @@ namespace DataAccessLibrary.DAC.IntraOffice
         }
 
         #endregion
+
+        #region 9. Leads & Pipeline
+
+        public async Task<List<LeadModel>> GetLeadsAsync(string? status = null, string? priority = null, string? search = null)
+        {
+            try
+            {
+                using var db = CreateConnection();
+                var sql = @"
+                    SELECT Id, LeadNumber, CompanyName, ContactPerson, Designation, Email, Phone, WhatsApp,
+                           Country, City, Website, Source, Industry, ProductInterest, EstimatedQuantity,
+                           EstimatedValue, Currency, ExpectedOrderDate, Status, Priority, Notes,
+                           NextFollowUpDate, ConvertedCustCode, AssignedTo, CreatedAt, UpdatedAt
+                    FROM Leads
+                    WHERE (@Status IS NULL OR @Status = 'All' OR Status = @Status)
+                      AND (@Priority IS NULL OR @Priority = 'All' OR Priority = @Priority)
+                      AND (@Search IS NULL OR CompanyName LIKE @SearchParam OR ContactPerson LIKE @SearchParam OR Country LIKE @SearchParam OR LeadNumber LIKE @SearchParam)
+                    ORDER BY UpdatedAt DESC";
+
+                var searchParam = string.IsNullOrWhiteSpace(search) ? null : $"%{search.Trim()}%";
+                var leads = (await db.QueryAsync<LeadModel>(sql, new
+                {
+                    Status = status,
+                    Priority = priority,
+                    Search = search,
+                    SearchParam = searchParam
+                })).ToList();
+
+                return leads;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting leads");
+                return new List<LeadModel>();
+            }
+        }
+
+        public async Task<LeadModel?> GetLeadByIdAsync(int id)
+        {
+            try
+            {
+                using var db = CreateConnection();
+                var sql = @"SELECT * FROM Leads WHERE Id = @Id";
+                var lead = await db.QueryFirstOrDefaultAsync<LeadModel>(sql, new { Id = id });
+                if (lead != null)
+                {
+                    lead.Activities = await GetLeadActivitiesAsync(id);
+                }
+                return lead;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting lead {Id}", id);
+                return null;
+            }
+        }
+
+        public async Task<int> SaveLeadAsync(LeadModel lead)
+        {
+            try
+            {
+                using var db = CreateConnection();
+                if (lead.Id == 0)
+                {
+                    if (string.IsNullOrWhiteSpace(lead.LeadNumber))
+                    {
+                        lead.LeadNumber = $"LD-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..4].ToUpper()}";
+                    }
+
+                    var insertSql = @"
+                        INSERT INTO Leads (
+                            LeadNumber, CompanyName, ContactPerson, Designation, Email, Phone, WhatsApp,
+                            Country, City, Website, Source, Industry, ProductInterest, EstimatedQuantity,
+                            EstimatedValue, Currency, ExpectedOrderDate, Status, Priority, Notes,
+                            NextFollowUpDate, ConvertedCustCode, AssignedTo, CreatedAt, UpdatedAt
+                        ) VALUES (
+                            @LeadNumber, @CompanyName, @ContactPerson, @Designation, @Email, @Phone, @WhatsApp,
+                            @Country, @City, @Website, @Source, @Industry, @ProductInterest, @EstimatedQuantity,
+                            @EstimatedValue, @Currency, @ExpectedOrderDate, @Status, @Priority, @Notes,
+                            @NextFollowUpDate, @ConvertedCustCode, @AssignedTo, GETUTCDATE(), GETUTCDATE()
+                        );
+                        SELECT CAST(SCOPE_IDENTITY() AS INT);";
+
+                    return await db.ExecuteScalarAsync<int>(insertSql, lead);
+                }
+                else
+                {
+                    var updateSql = @"
+                        UPDATE Leads
+                        SET CompanyName = @CompanyName,
+                            ContactPerson = @ContactPerson,
+                            Designation = @Designation,
+                            Email = @Email,
+                            Phone = @Phone,
+                            WhatsApp = @WhatsApp,
+                            Country = @Country,
+                            City = @City,
+                            Website = @Website,
+                            Source = @Source,
+                            Industry = @Industry,
+                            ProductInterest = @ProductInterest,
+                            EstimatedQuantity = @EstimatedQuantity,
+                            EstimatedValue = @EstimatedValue,
+                            Currency = @Currency,
+                            ExpectedOrderDate = @ExpectedOrderDate,
+                            Status = @Status,
+                            Priority = @Priority,
+                            Notes = @Notes,
+                            NextFollowUpDate = @NextFollowUpDate,
+                            AssignedTo = @AssignedTo,
+                            UpdatedAt = GETUTCDATE()
+                        WHERE Id = @Id;";
+
+                    await db.ExecuteAsync(updateSql, lead);
+                    return lead.Id;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error saving lead");
+                return 0;
+            }
+        }
+
+        public async Task<bool> DeleteLeadAsync(int id)
+        {
+            try
+            {
+                using var db = CreateConnection();
+                var sql = "DELETE FROM Leads WHERE Id = @Id";
+                var rows = await db.ExecuteAsync(sql, new { Id = id });
+                return rows > 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting lead {Id}", id);
+                return false;
+            }
+        }
+
+        public async Task<List<LeadActivityModel>> GetLeadActivitiesAsync(int leadId)
+        {
+            try
+            {
+                using var db = CreateConnection();
+                var sql = "SELECT * FROM LeadActivities WHERE LeadId = @LeadId ORDER BY ActivityDate DESC";
+                var list = await db.QueryAsync<LeadActivityModel>(sql, new { LeadId = leadId });
+                return list.ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting activities for lead {LeadId}", leadId);
+                return new List<LeadActivityModel>();
+            }
+        }
+
+        public async Task<int> AddLeadActivityAsync(LeadActivityModel activity)
+        {
+            try
+            {
+                using var db = CreateConnection();
+                var sql = @"
+                    INSERT INTO LeadActivities (LeadId, ActivityType, Description, PerformedBy, ActivityDate, NextFollowUpDate)
+                    VALUES (@LeadId, @ActivityType, @Description, @PerformedBy, GETUTCDATE(), @NextFollowUpDate);
+                    SELECT CAST(SCOPE_IDENTITY() AS INT);";
+
+                var id = await db.ExecuteScalarAsync<int>(sql, activity);
+
+                if (activity.NextFollowUpDate.HasValue)
+                {
+                    await db.ExecuteAsync("UPDATE Leads SET NextFollowUpDate = @NextDate, UpdatedAt = GETUTCDATE() WHERE Id = @LeadId",
+                        new { NextDate = activity.NextFollowUpDate.Value, LeadId = activity.LeadId });
+                }
+
+                return id;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error adding lead activity");
+                return 0;
+            }
+        }
+
+        public async Task<bool> CheckCustCodeExistsAsync(string custCode)
+        {
+            try
+            {
+                using var db = CreateConnection();
+                var count = await db.ExecuteScalarAsync<int>(
+                    "SELECT COUNT(1) FROM ForeignCustomers WHERE CustCode = @CustCode",
+                    new { CustCode = custCode.Trim() });
+                return count > 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking CustCode {CustCode}", custCode);
+                return false;
+            }
+        }
+
+        public async Task<bool> ConvertLeadToForeignCustomerAsync(ConvertLeadToCustomerModel model)
+        {
+            using var db = CreateConnection();
+            db.Open();
+            using var trans = db.BeginTransaction();
+            try
+            {
+                // 1. Insert into ForeignCustomers
+                var insertCustSql = @"
+                    INSERT INTO ForeignCustomers (
+                        CustCode, Country, Name, Address, City, 
+                        Phone1, Email1, Cont1name, cont1Mobile, CustomerSource, Active
+                    ) VALUES (
+                        @CustCode, @Country, @Name, @Address, @City,
+                        @Phone1, @Email1, @Cont1name, @Cont1Mobile, @CustomerSource, 1
+                    );";
+
+                await db.ExecuteAsync(insertCustSql, new
+                {
+                    CustCode = model.CustCode.Trim(),
+                    Country = model.Country.Trim(),
+                    Name = model.Name.Trim(),
+                    Address = model.Address ?? "",
+                    City = model.City ?? "",
+                    Phone1 = model.Phone1 ?? "",
+                    Email1 = model.Email1 ?? "",
+                    Cont1name = model.Cont1name ?? "",
+                    Cont1Mobile = model.Cont1Mobile ?? "",
+                    CustomerSource = model.CustomerSource ?? "Lead Conversion"
+                }, transaction: trans);
+
+                // 2. Update Lead status to 'Converted'
+                var updateLeadSql = @"
+                    UPDATE Leads
+                    SET Status = 'Converted', ConvertedCustCode = @CustCode, UpdatedAt = GETUTCDATE()
+                    WHERE Id = @LeadId;";
+
+                await db.ExecuteAsync(updateLeadSql, new
+                {
+                    LeadId = model.LeadId,
+                    CustCode = model.CustCode.Trim()
+                }, transaction: trans);
+
+                // 3. Add activity log
+                var activitySql = @"
+                    INSERT INTO LeadActivities (LeadId, ActivityType, Description, PerformedBy, ActivityDate)
+                    VALUES (@LeadId, 'Conversion', 'Converted to Foreign Customer [' + @CustCode + ']', 'System', GETUTCDATE());";
+
+                await db.ExecuteAsync(activitySql, new
+                {
+                    LeadId = model.LeadId,
+                    CustCode = model.CustCode.Trim()
+                }, transaction: trans);
+
+                trans.Commit();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                trans.Rollback();
+                _logger.LogError(ex, "Error converting lead {LeadId} to customer {CustCode}", model.LeadId, model.CustCode);
+                throw;
+            }
+        }
+
+        #endregion
     }
 }

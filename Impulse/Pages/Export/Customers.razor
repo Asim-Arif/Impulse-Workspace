@@ -3,111 +3,418 @@
 @attribute [Authorize]
 @using DataAccessLibrary.Models.ViewModels.Export
 @using Impulse.Services
+@using BlazorContextMenu
 
-<PageTitle>Foreign Customers</PageTitle>
+<PageTitle>Foreign Customers - Customer 360° Hub</PageTitle>
 
-<div class="" style="font-family: Calibri, sans-serif;">
-    <div class="card shadow-sm bg-transparent">
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
 
-        <div class="card-header d-flex align-items-center justify-content-between">
-            <h6 class="mb-0 fw-bold">Foreign Customers</h6>
-            <a href="/export/customer" class="btn btn-success btn-sm">
-                <i class="fas fa-plus me-1"></i> New Customer
-            </a>
-        </div>
+        <div class="card-body pt-3">
 
-        <div class="card-body">
-
-            @* Search bar *@
-            <div class="row g-1 mb-3">
-                <div class="col-sm-5">
-                    <input type="text" class="form-control" placeholder="Search by name, code or country…"
-                           @bind="searchText" @bind:event="oninput" />
+            <!-- ── Top Header Toolbar ── -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-globe-americas text-primary me-2"></i>
+                        Foreign Customers
+                    </h5>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2.5 py-1" style="font-size: 0.76rem;">
+                        Customer 360° Hub
+                    </span>
+                    <span class="badge bg-secondary-subtle text-secondary rounded-pill px-2 py-1" style="font-size: 0.74rem;">
+                        @FilteredCustomers.Count() of @TotalCount
+                    </span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="LoadCustomers" title="Refresh List">
+                        <i class="fas fa-sync-alt me-1"></i> Refresh
+                    </button>
+                    <a href="/export/customer?returnUrl=/customers" class="btn btn-success btn-sm">
+                        <i class="fas fa-plus-circle me-1"></i> New Customer
+                    </a>
                 </div>
             </div>
 
-            @if (isLoading)
+            <!-- ── Quick Metrics Deck ── -->
+            <div class="row g-2 mb-3">
+                <div class="col-6 col-md-3">
+                    <div class="p-2.5 border rounded-3 bg-white d-flex align-items-center justify-content-between shadow-xs">
+                        <div>
+                            <div class="text-secondary text-uppercase fw-semibold" style="font-size: 0.72rem; letter-spacing: 0.05em;">Total Customers</div>
+                            <div class="fs-5 fw-bold text-dark lh-1 mt-1">@TotalCount</div>
+                        </div>
+                        <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary-subtle text-primary" style="width: 38px; height: 38px;">
+                            <i class="fas fa-users"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-2.5 border rounded-3 bg-white d-flex align-items-center justify-content-between shadow-xs">
+                        <div>
+                            <div class="text-secondary text-uppercase fw-semibold" style="font-size: 0.72rem; letter-spacing: 0.05em;">Active Accounts</div>
+                            <div class="fs-5 fw-bold text-success lh-1 mt-1">@ActiveCount</div>
+                        </div>
+                        <div class="rounded-circle d-flex align-items-center justify-content-center bg-success-subtle text-success" style="width: 38px; height: 38px;">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-2.5 border rounded-3 bg-white d-flex align-items-center justify-content-between shadow-xs">
+                        <div>
+                            <div class="text-secondary text-uppercase fw-semibold" style="font-size: 0.72rem; letter-spacing: 0.05em;">Inactive Accounts</div>
+                            <div class="fs-5 fw-bold text-secondary lh-1 mt-1">@InactiveCount</div>
+                        </div>
+                        <div class="rounded-circle d-flex align-items-center justify-content-center bg-danger-subtle text-danger" style="width: 38px; height: 38px;">
+                            <i class="fas fa-times-circle"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-2.5 border rounded-3 bg-white d-flex align-items-center justify-content-between shadow-xs">
+                        <div>
+                            <div class="text-secondary text-uppercase fw-semibold" style="font-size: 0.72rem; letter-spacing: 0.05em;">Global Markets</div>
+                            <div class="fs-5 fw-bold text-dark lh-1 mt-1">@CountryCount</div>
+                        </div>
+                        <div class="rounded-circle d-flex align-items-center justify-content-center bg-info-subtle text-info-emphasis" style="width: 38px; height: 38px;">
+                            <i class="fas fa-globe-americas"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Search & Filter Toolbar ── -->
+            <div class="row g-2 mb-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;"><i class="fas fa-search me-1"></i>Search</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light border-end-0 text-muted"><i class="fas fa-search"></i></span>
+                        <input type="text" class="form-control form-control-sm border-start-0" placeholder="Search by name, code, country, contact…"
+                               @bind="searchText" @bind:event="oninput" style="height: 35px;" />
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Country</label>
+                    <select class="form-select form-select-sm" value="@selectedCountryFilter" @onchange="OnCountryFilterChanged" style="height: 35px;">
+                        <option value="All">All Countries (@CountryCount)</option>
+                        @foreach (var c in countries)
+                        {
+                            <option value="@c">@c</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Status</label>
+                    <select class="form-select form-select-sm" value="@selectedStatusFilter" @onchange="OnStatusFilterChanged" style="height: 35px;">
+                        <option value="All">All Statuses</option>
+                        <option value="Active">Active Only</option>
+                        <option value="Inactive">Inactive Only</option>
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Currency</label>
+                    <select class="form-select form-select-sm" value="@selectedCurrencyFilter" @onchange="OnCurrencyFilterChanged" style="height: 35px;">
+                        <option value="All">All Currencies</option>
+                        @foreach (var curr in currencies)
+                        {
+                            <option value="@curr">@curr</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-auto d-flex align-items-end pb-1">
+                    @if (HasActiveFilters)
+                    {
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ClearFilters" title="Clear all filters" style="height: 35px;">
+                            <i class="fas fa-times me-1"></i> Clear
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <!-- ── Highlighted Selected Customer Badge ── -->
+            @if (highlightedCustomer != null)
             {
-                <p class="text-muted">Loading…</p>
+                <div class="mb-3 d-flex flex-wrap align-items-center justify-content-between p-2.5 bg-primary-subtle border border-primary-subtle rounded-3">
+                    <div class="d-flex align-items-center gap-2 mb-1 mb-md-0">
+                        <span class="badge bg-primary text-white font-monospace px-2.5 py-1">@highlightedCustomer.CustCode</span>
+                        <strong class="text-primary-emphasis">@highlightedCustomer.Name</strong>
+                        <span class="text-secondary small">
+                            (@(string.IsNullOrWhiteSpace(highlightedCustomer.City) ? "" : $"{highlightedCustomer.City}, ")@highlightedCustomer.Country)
+                        </span>
+                    </div>
+                    <div class="d-flex align-items-center gap-1.5">
+                        <button type="button" class="btn btn-sm btn-primary py-1 px-2.5" @onclick="() => EditCustomer(highlightedCustomer)">
+                            <i class="fas fa-pencil-alt me-1"></i> Edit Info
+                        </button>
+                        <button type="button" class="btn btn-sm btn-success py-1 px-2.5" @onclick="() => CreateQuotation(highlightedCustomer)">
+                            <i class="fas fa-file-invoice me-1"></i> Quotation
+                        </button>
+                        <button type="button" class="btn btn-sm btn-info text-white py-1 px-2.5" @onclick="() => CreateOrder(highlightedCustomer)">
+                            <i class="fas fa-cart-plus me-1"></i> Sales Order
+                        </button>
+                        <button type="button" class="btn btn-sm btn-link text-secondary p-0 ms-2" @onclick="() => highlightedCustomer = null" title="Deselect">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
             }
-            else
-            {
-                <div class="table-responsive">
-                    <table class="table table-bordered table-striped align-middle">
-                        <thead>
-                            <tr>
-                                <th>Cust. Code</th>
-                                <th>Company Name</th>
-                                <th>City</th>
-                                <th>Country</th>
-                                <th>Currency</th>
-                                <th>Active</th>
-                                <th class="text-center" style="width:130px;">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var c in FilteredCustomers)
-                            {
-                                <tr>
-                                    <td>@c.CustCode</td>
-                                    <td>@c.Name</td>
-                                    <td>@c.City</td>
-                                    <td>@c.Country</td>
-                                    <td>@c.Curr</td>
-                                    <td class="text-center">
-                                        @if (c.Active)
+
+            <!-- ── Main Data Table ── -->
+            <div class="row">
+                <div class="col-12">
+                    @if (isLoading)
+                    {
+                        <div class="d-flex align-items-center justify-content-center py-5">
+                            <div class="spinner-border text-primary me-2" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="text-secondary fw-semibold">Loading customer records...</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="card border border-light-subtle rounded-3 overflow-hidden shadow-xs">
+                            <div class="table-responsive" style="max-height: 65vh; overflow-y: auto;">
+                                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                        <tr>
+                                            <th class="ps-3" style="width: 120px;">Cust. Code</th>
+                                            <th>Company Name</th>
+                                            <th>Location</th>
+                                            <th class="text-center" style="width: 100px;">Currency</th>
+                                            <th>Contact</th>
+                                            <th class="text-center" style="width: 110px;">Status</th>
+                                            <th class="text-center pe-3" style="width: 140px;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (!FilteredCustomers.Any())
                                         {
-                                            <span class="badge bg-success">Yes</span>
+                                            <tr>
+                                                <td colspan="7" class="text-center text-muted py-4">
+                                                    <i class="fas fa-search-minus fa-2x mb-2 d-block opacity-50"></i>
+                                                    No foreign customers found matching your filter criteria.
+                                                </td>
+                                            </tr>
                                         }
                                         else
                                         {
-                                            <span class="badge bg-secondary">No</span>
+                                            @foreach (var c in FilteredCustomers)
+                                            {
+                                                bool isSelected = highlightedCustomer?.CustCode == c.CustCode && highlightedCustomer?.Country == c.Country;
+                                                <ContextMenuTrigger MenuId="customerContextMenu" Data="@c" WrapperTag="tr"
+                                                                    class="@($"clickable-row {(isSelected ? "table-primary" : "")}")"
+                                                                    style="cursor: pointer; transition: background 0.15s ease;"
+                                                                    @onclick="() => HighlightCustomer(c)">
+                                                    <td class="ps-3">
+                                                        <span class="badge bg-light text-primary border border-primary-subtle fw-semibold font-monospace px-2 py-1" style="font-size: 0.82rem;">
+                                                            @c.CustCode
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div class="fw-bold text-dark">@c.Name</div>
+                                                        @if (!string.IsNullOrWhiteSpace(c.Cont1name))
+                                                        {
+                                                            <div class="text-muted" style="font-size: 0.74rem;">
+                                                                <i class="fas fa-user-tie me-1 text-secondary"></i>@c.Cont1name
+                                                            </div>
+                                                        }
+                                                    </td>
+                                                    <td>
+                                                        <div class="d-flex align-items-center">
+                                                            <i class="fas fa-map-marker-alt text-danger me-1.5" style="font-size: 0.78rem;"></i>
+                                                            <span>
+                                                                @if (!string.IsNullOrWhiteSpace(c.City))
+                                                                {
+                                                                    <span class="text-dark fw-medium">@c.City, </span>
+                                                                }
+                                                                <span class="text-secondary">@c.Country</span>
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle px-2 py-0.5 rounded-pill font-monospace fw-bold" style="font-size: 0.76rem;">
+                                                            @c.Curr
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        @if (!string.IsNullOrWhiteSpace(c.Email1))
+                                                        {
+                                                            <div class="text-truncate text-secondary small" style="max-width: 180px;" title="@c.Email1">
+                                                                <i class="fas fa-envelope me-1 text-muted"></i>@c.Email1
+                                                            </div>
+                                                        }
+                                                        @if (!string.IsNullOrWhiteSpace(c.Phone1))
+                                                        {
+                                                            <div class="text-muted small" style="font-size: 0.74rem;">
+                                                                <i class="fas fa-phone-alt me-1 text-muted"></i>@c.Phone1
+                                                            </div>
+                                                        }
+                                                        @if (string.IsNullOrWhiteSpace(c.Email1) && string.IsNullOrWhiteSpace(c.Phone1))
+                                                        {
+                                                            <span class="text-muted fst-italic" style="font-size: 0.76rem;">--</span>
+                                                        }
+                                                    </td>
+                                                    <td class="text-center">
+                                                        @if (c.Active)
+                                                        {
+                                                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">
+                                                                <i class="fas fa-check-circle me-1"></i>Active
+                                                            </span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">
+                                                                <i class="fas fa-times-circle me-1"></i>Inactive
+                                                            </span>
+                                                        }
+                                                    </td>
+                                                    <td class="text-center pe-3" @onclick:stopPropagation="true">
+                                                        <div class="d-flex align-items-center justify-content-center gap-1">
+                                                            <button type="button" class="btn btn-outline-primary btn-sm py-1 px-2.5" @onclick="() => EditCustomer(c)" title="Edit Customer Details">
+                                                                <i class="fas fa-pencil-alt me-1"></i>Edit
+                                                            </button>
+                                                            <button type="button" class="btn btn-outline-danger btn-sm py-1 px-2" @onclick="() => ConfirmDelete(c)" title="Delete Customer">
+                                                                <i class="fas fa-trash-alt"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </ContextMenuTrigger>
+                                            }
                                         }
-                                    </td>
-                                    <td class="text-center">
-                                        <a href="/export/customer/@(c.CustCode + c.Country)"
-                                           class="btn btn-warning btn-sm me-1">Edit</a>
-                                        <button type="button" class="btn btn-danger btn-sm"
-                                                @onclick="() => ConfirmDelete(c)">
-                                            &times;
-                                        </button>
-                                    </td>
-                                </tr>
-                            }
-                            @if (!FilteredCustomers.Any())
-                            {
-                                <tr class="table-light">
-                                    <td colspan="7" class="text-center text-muted py-3">No customers found.</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="card-footer bg-light py-2 px-3 d-flex align-items-center justify-content-between text-secondary" style="font-size: 0.78rem;">
+                                <span>Right-click any row to open quick actions menu</span>
+                                <span>Showing <strong>@FilteredCustomers.Count()</strong> of <strong>@TotalCount</strong> records</span>
+                            </div>
+                        </div>
+                    }
                 </div>
-            }
+            </div>
 
         </div>
     </div>
 </div>
 
-@* Delete confirmation modal *@
+<!-- ── Right-Click Row Context Menu ── -->
+<ContextMenu Id="customerContextMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    @if (context.Data is ForeignCustomerListViewModel cust)
+    {
+        <div class="win11-section-header">@cust.CustCode - @cust.Name</div>
+        <Item class="win11-menu-item" OnClick="@(() => EditCustomer(cust))">
+            <i class="fas fa-pencil-alt fa-fw win11-icon text-primary"></i> Edit Customer Info
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => CreateQuotation(cust))">
+            <i class="fas fa-file-invoice fa-fw win11-icon text-success"></i> Create Quotation
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => CreateOrder(cust))">
+            <i class="fas fa-cart-plus fa-fw win11-icon text-info"></i> Create Sales Order
+        </Item>
+        <div class="win11-divider"></div>
+        <Item class="win11-menu-item" OnClick="@(() => ConfirmDelete(cust))">
+            <i class="fas fa-trash-alt fa-fw win11-icon text-danger"></i> Delete Customer
+        </Item>
+    }
+</ContextMenu>
+
+<!-- ── Delete Confirmation Modal ── -->
 @if (customerToDelete != null)
 {
-    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,0.4);">
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(4px); z-index: 1050;">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Confirm Delete</h5>
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; overflow: hidden;">
+                <div class="modal-header border-bottom py-2.5 px-3 bg-light">
+                    <h6 class="modal-title fw-bold text-danger mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i> Confirm Delete
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="CancelDelete" aria-label="Close"></button>
                 </div>
-                <div class="modal-body">
-                    Are you sure you want to delete customer
-                    <strong>@customerToDelete.Name</strong> (@customerToDelete.CustCode)?
-                    This action cannot be undone.
+                <div class="modal-body p-4 text-center">
+                    <div class="mb-3">
+                        <div class="d-inline-flex align-items-center justify-content-center bg-danger-subtle text-danger rounded-circle" style="width: 52px; height: 52px;">
+                            <i class="fas fa-trash-alt fs-4"></i>
+                        </div>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Are you sure you want to delete this customer?</h6>
+                    <div class="p-2.5 my-3 bg-light border rounded-3 text-start">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="badge bg-primary text-white font-monospace">@customerToDelete.CustCode</span>
+                            <span class="badge bg-secondary-subtle text-secondary">@customerToDelete.Country</span>
+                        </div>
+                        <div class="fw-bold text-dark">@customerToDelete.Name</div>
+                        @if (!string.IsNullOrWhiteSpace(customerToDelete.City))
+                        {
+                            <small class="text-muted"><i class="fas fa-map-marker-alt me-1 text-secondary"></i>@customerToDelete.City</small>
+                        }
+                    </div>
+                    <p class="text-danger small mb-0">
+                        <i class="fas fa-info-circle me-1"></i> This action cannot be undone and will permanently remove this customer record.
+                    </p>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
-                    <button type="button" class="btn btn-danger" @onclick="DeleteCustomer">Delete</button>
+                <div class="modal-footer border-top py-2 px-3 bg-light d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" @onclick="CancelDelete">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-danger btn-sm px-3" @onclick="DeleteCustomer">
+                        <i class="fas fa-trash-alt me-1"></i> Delete Customer
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 }
+
+<style>
+    /* Win11 Context Menu styles per AGENTS.md */
+    .win11-section-header {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #64748b;
+        padding: 6px 12px 2px;
+        letter-spacing: 0.04em;
+    }
+    .win11-menu-item {
+        font-size: 0.85rem;
+        padding: 6px 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 4px;
+        margin: 1px 4px;
+    }
+    .win11-menu-item:hover {
+        background-color: #f1f5f9;
+        color: #0f172a;
+    }
+    .win11-icon {
+        width: 16px;
+        text-align: center;
+    }
+    .win11-divider {
+        height: 1px;
+        background-color: #e2e8f0;
+        margin: 4px 0;
+    }
+    .blazor-context-menu {
+        max-height: 40vh;
+        overflow-y: auto;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+        border: 1px solid #e2e8f0;
+        padding: 4px 0;
+    }
+    .shadow-xs {
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+    .clickable-row:hover {
+        background-color: #f8fafc !important;
+    }
+</style>

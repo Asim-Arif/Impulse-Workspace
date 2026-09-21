@@ -1,305 +1,441 @@
-@page "/intraoffice/announcements"
+@page "/office/announcements"
+@page "/announcements"
+@layout IntraOfficeLayout
 @attribute [Authorize]
+@implements IDisposable
+@using DataAccessLibrary.Models.IntraOffice
+@using Impulse.Services.IntraOffice
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IIntraOfficeService IntraOfficeService
+@inject IAnnouncementService AnnouncementService
+@inject IJSRuntime JS
+@inject IFileService FileService
+@inject IAiService AiService
 
-<PageTitle>Announcements - IntraOffice</PageTitle>
-
-<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
-    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
-        <div class="card-body p-3">
-            <!-- Header -->
-            <div class="d-flex align-items-end justify-content-between pb-2 mb-3 border-bottom">
-                <div class="d-flex align-items-center gap-2">
-                    <div class="d-flex align-items-center justify-content-center bg-primary-subtle text-primary rounded-3 p-2" style="width: 42px; height: 42px;">
-                        <i class="fas fa-bullhorn fa-lg"></i>
-                    </div>
-                    <div>
-                        <h4 class="mb-0 fw-bold text-dark" style="font-size: 1.25rem;">Announcements Board</h4>
-                        <small class="text-secondary">Company-wide &amp; departmental updates, policies, voice notes, and notices</small>
-                    </div>
-                </div>
-                <div class="d-flex align-items-center gap-2">
-                    <button class="btn btn-sm btn-primary d-flex align-items-center gap-1 shadow-sm" @onclick="OpenCreateModal">
-                        <i class="fas fa-plus-circle"></i>
-                        <span>New Announcement</span>
-                    </button>
-                    <a href="/intraoffice" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1">
-                        <i class="fas fa-arrow-left"></i>
-                        <span>Back</span>
-                    </a>
-                </div>
-            </div>
-
-            <!-- Filter Row -->
-            <div class="row g-2 mb-3 align-items-center">
-                <div class="col-md-4">
-                    <div class="input-group input-group-sm">
-                        <span class="input-group-text bg-light text-secondary border-end-0"><i class="fas fa-search"></i></span>
-                        <input type="text" class="form-control form-control-sm border-start-0" placeholder="Search announcements..." @bind="SearchTerm" @bind:event="oninput" />
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <select class="form-select form-select-sm" @bind="SelectedDepartmentId">
-                        <option value="">All Departments (Company-wide)</option>
-                        @foreach (var dept in Departments)
-                        {
-                            <option value="@dept.DeptId">@dept.DeptName</option>
-                        }
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <select class="form-select form-select-sm" @bind="SelectedPriorityFilter">
-                        <option value="-1">All Priorities</option>
-                        <option value="0">Normal</option>
-                        <option value="1">Important</option>
-                        <option value="2">Critical</option>
-                    </select>
-                </div>
-                <div class="col-md-2 text-end">
-                    <span class="badge bg-light text-dark border p-2">Total: @FilteredAnnouncements.Count</span>
-                </div>
-            </div>
-
-            <!-- Announcements Feed -->
-            @if (IsLoading)
-            {
-                <div class="d-flex justify-content-center align-items-center py-5">
-                    <div class="spinner-border text-primary" role="status"></div>
-                    <span class="ms-2 text-secondary">Loading announcements...</span>
-                </div>
-            }
-            else if (!FilteredAnnouncements.Any())
-            {
-                <div class="text-center py-5 border rounded-3 bg-light">
-                    <i class="fas fa-bullhorn fa-3x text-muted mb-2"></i>
-                    <h6 class="text-secondary fw-semibold">No announcements found</h6>
-                    <p class="text-muted small mb-0">No company or departmental updates matching your filter criteria.</p>
-                </div>
-            }
-            else
-            {
-                <div class="d-flex flex-column gap-3">
-                    @foreach (var item in FilteredAnnouncements)
-                    {
-                        var isMine = string.Equals(item.CreatedBy, CurrentUserId, StringComparison.OrdinalIgnoreCase);
-                        <div class="card border @(item.IsPinned ? "border-warning border-2" : GetCardBorderClass(item.Priority)) shadow-sm" style="border-radius: 10px; background: @(item.IsAcknowledgedByCurrentUser ? "#f9fffb" : "#ffffff");">
-                            <div class="card-body p-3">
-                                <div class="d-flex align-items-start justify-content-between mb-2">
-                                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                                        @if (item.IsPinned)
-                                        {
-                                            <span class="badge bg-warning text-dark"><i class="fas fa-thumbtack me-1"></i>Pinned</span>
-                                        }
-                                        <h5 class="mb-0 fw-bold text-dark" style="font-size: 1.05rem;">@item.Title</h5>
-                                        <span class="badge @GetPriorityBadgeClass(item.Priority)">@item.Priority</span>
-                                        @if (item.IsAcknowledgedByCurrentUser)
-                                        {
-                                            <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="fas fa-check-circle me-1"></i>Acknowledged</span>
-                                        }
-                                    </div>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <small class="text-muted"><i class="fas fa-clock me-1"></i>@item.CreatedAt.ToString("MMM dd, yyyy hh:mm tt")</small>
-                                        @if (isMine)
-                                        {
-                                            <button class="btn btn-xs btn-outline-warning" title="@(item.IsPinned ? "Unpin notice" : "Pin notice")" @onclick="() => TogglePinAsync(item.Id)">
-                                                <i class="fas fa-thumbtack"></i>
-                                            </button>
-                                        }
-                                    </div>
-                                </div>
-
-                                <div class="d-flex align-items-center gap-3 text-secondary small mb-2">
-                                    <span><i class="fas fa-user-tie text-primary me-1"></i>@(item.CreatorName ?? item.CreatedBy) @(!string.IsNullOrEmpty(item.CreatorDesignation) ? $"({item.CreatorDesignation})" : "")</span>
-                                    <span><i class="fas fa-building text-info me-1"></i>@(item.DepartmentName ?? "Company-wide")</span>
-                                </div>
-
-                                <div class="text-dark mb-3" style="white-space: pre-wrap; font-size: 0.92rem; line-height: 1.5;">@item.Content</div>
-
-                                @if (item.Attachments.Any())
-                                {
-                                    <div class="d-flex flex-column gap-2 mb-3">
-                                        @foreach (var att in item.Attachments)
-                                        {
-                                            @if (att.ContentType?.StartsWith("audio/") == true || att.FileName.EndsWith(".webm") || att.FileName.EndsWith(".mp3"))
-                                            {
-                                                <div class="p-2 rounded-2 bg-light border d-flex align-items-center gap-3" style="max-width: 480px;">
-                                                    <div class="d-flex align-items-center text-danger">
-                                                        <i class="fas fa-microphone-lines fa-lg me-2"></i>
-                                                        <span class="small fw-semibold">Voice Note</span>
-                                                    </div>
-                                                    <audio controls src="@att.FilePath" style="height: 32px; flex-grow: 1;"></audio>
-                                                </div>
-                                            }
-                                            else
-                                            {
-                                                <a href="@att.FilePath" target="_blank" class="btn btn-xs btn-outline-secondary d-inline-flex align-items-center gap-1 text-decoration-none py-1 px-2" style="font-size: 0.8rem; width: fit-content;">
-                                                    <i class="fas fa-paperclip text-primary"></i>
-                                                    <span>@att.FileName</span>
-                                                </a>
-                                            }
-                                        }
-                                    </div>
-                                }
-
-                                @if (item.Acknowledgments.Any())
-                                {
-                                    <div class="p-2 rounded-2 bg-light border mb-2 small">
-                                        <div class="text-secondary fw-semibold mb-1"><i class="fas fa-users-check text-success me-1"></i>Acknowledged by:</div>
-                                        <div class="d-flex flex-wrap gap-2">
-                                            @foreach (var ak in item.Acknowledgments)
-                                            {
-                                                <span class="badge bg-white text-dark border">
-                                                    <i class="fas fa-check text-success me-1"></i>@(ak.UserName ?? ak.UserId) · @ak.AcknowledgedAt.ToLocalTime().ToString("MMM dd, hh:mm tt")
-                                                </span>
-                                            }
-                                        </div>
-                                    </div>
-                                }
-
-                                <div class="d-flex align-items-center justify-content-between pt-2 border-top">
-                                    <div class="small text-muted">
-                                        <i class="fas fa-users-check me-1"></i>@item.AcknowledgmentCount @(item.AcknowledgmentCount == 1 ? "person has" : "people have") acknowledged
-                                    </div>
-                                    <div>
-                                        @if (!item.IsAcknowledgedByCurrentUser)
-                                        {
-                                            <button class="btn btn-sm btn-success d-flex align-items-center gap-1 shadow-sm" @onclick="() => AcknowledgeAsync(item.Id)">
-                                                <i class="fas fa-check"></i>
-                                                <span>Acknowledge Notice</span>
-                                            </button>
-                                        }
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    }
-                </div>
-            }
-        </div>
+<div class="topbar">
+    <h1 class="topbar-title"><i class="bi bi-megaphone-fill"></i> Announcements</h1>
+    <div class="topbar-actions">
+        @if (canCreate)
+        {
+            <button class="btn btn-primary btn-sm" @onclick="ShowCreateModal">
+                <i class="bi bi-plus-lg"></i> New Announcement
+            </button>
+        }
     </div>
 </div>
 
-<!-- Create Modal -->
-@if (ShowCreateModalState)
-{
-    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content border-0 shadow" style="border-radius: 12px;">
-                <div class="modal-header bg-light border-bottom py-2">
-                    <h5 class="modal-title fw-bold text-dark" style="font-size: 1.1rem;"><i class="fas fa-bullhorn text-primary me-2"></i>Publish New Announcement</h5>
-                    <button type="button" class="btn-close" @onclick="CloseCreateModal"></button>
+<div class="content-area">
+    @if (announcements != null)
+    {
+        @foreach (var ann in announcements)
+        {
+            var isAcknowledgedByMe = currentUser != null && ann.Acknowledgments.Any(ak => ak.UserId == currentUser.Id);
+            <div class="announcement-card @(ann.IsPinned ? "pinned" : "") @GetPriorityClass(ann.Priority)" style="@(isAcknowledgedByMe ? "background-color: rgba(0, 184, 148, 0.1); border-color: var(--success);" : "")">
+                <div class="announcement-title">
+                    @if (ann.IsPinned) { <i class="bi bi-pin-fill text-accent"></i> }
+                    @ann.Title
+                    <span class="priority-badge @GetBadgeClass(ann.Priority)">@ann.Priority</span>
+                    @if(isAcknowledgedByMe) {
+                        <span class="badge bg-success ms-2"><i class="bi bi-check-circle-fill"></i> Acknowledged</span>
+                    }
                 </div>
-                <div class="modal-body p-3">
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold text-secondary">Title *</label>
-                        <input type="text" class="form-control form-control-sm" placeholder="Notice title..." @bind="NewTitle" />
-                    </div>
-                    <div class="row g-2 mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-secondary">Target Department</label>
-                            <select class="form-select form-select-sm" @bind="NewDepartmentId">
-                                <option value="">Company-wide (All Staff)</option>
-                                @foreach (var dept in Departments)
-                                {
-                                    <option value="@dept.DeptId">@dept.DeptName</option>
-                                }
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-secondary">Priority Level</label>
-                            <select class="form-select form-select-sm" @bind="NewPriority">
-                                <option value="0">Normal</option>
-                                <option value="1">Important</option>
-                                <option value="2">Critical</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold text-secondary">Announcement Message *</label>
-                        <textarea class="form-control form-control-sm" rows="4" placeholder="Write full details of the notice..." @bind="NewContent"></textarea>
-                    </div>
-
-                    <!-- Voice Note & File Attachments -->
-                    <div class="p-3 border rounded-2 bg-light mb-3">
-                        <label class="form-label small fw-semibold text-dark mb-2">
-                            <i class="fas fa-microphone text-danger me-1"></i>Voice Note &amp; File Attachments
-                        </label>
-                        <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
-                            <!-- Mic recording button -->
-                            <button type="button" class="btn btn-sm @(IsRecordingVoice ? "btn-danger recording-pulse" : "btn-outline-danger") d-flex align-items-center gap-1 shadow-sm" @onclick="ToggleVoiceRecordingAsync">
-                                <i class="fas @(IsRecordingVoice ? "fa-stop" : "fa-microphone")"></i>
-                                <span>@(IsRecordingVoice ? "Stop Recording Voice" : "Record Voice Note")</span>
-                            </button>
-
-                            <!-- Add regular files -->
-                            <label for="announcement-file-upload" class="btn btn-sm btn-outline-secondary mb-0 cursor-pointer d-flex align-items-center gap-1">
-                                <i class="fas fa-paperclip"></i>
-                                <span>Attach Documents</span>
-                            </label>
-                            <InputFile id="announcement-file-upload" OnChange="HandleFilesSelected" multiple style="display: none;" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webm,.mp3" />
-                        </div>
-
-                        <!-- Attachments Preview List -->
-                        @if (PendingVoiceNotes.Any() || PendingFiles.Any())
+                <div class="announcement-meta">
+                    <span><i class="bi bi-person"></i> @(ann.Author?.FullName ?? "Unknown")</span>
+                    <span><i class="bi bi-clock"></i> @ann.CreatedAt.ToString("MMM dd, yyyy hh:mm tt")</span>
+                    @if (ann.Department != null)
+                    {
+                        <span><i class="bi bi-building"></i> @ann.Department.Name</span>
+                    }
+                    else
+                    {
+                        <span><i class="bi bi-globe"></i> Company-wide</span>
+                    }
+                </div>
+                <div class="announcement-body">@ann.Content</div>
+                
+                @if (ann.Attachments != null && ann.Attachments.Any())
+                {
+                    <div class="announcement-attachments mt-3 d-flex flex-wrap gap-10">
+                        @foreach (var att in ann.Attachments)
                         {
-                            <div class="d-flex flex-wrap gap-2 mt-2 pt-2 border-top">
-                                @foreach (var vn in PendingVoiceNotes)
-                                {
-                                    <div class="p-1 px-2 rounded-2 bg-danger-subtle text-danger border border-danger-subtle d-flex align-items-center gap-2 small">
-                                        <i class="fas fa-microphone"></i>
-                                        <span>@vn.FileName</span>
-                                        <button type="button" class="btn btn-xs btn-link text-danger p-0" @onclick="() => PendingVoiceNotes.Remove(vn)">
-                                            <i class="fas fa-times"></i>
-                                        </button>
+                            if (att.ContentType != null && (att.ContentType.StartsWith("audio/") || att.FileName.EndsWith(".webm")))
+                            {
+                                <div class="audio-player-wrapper p-2 rounded" style="background: var(--bg-secondary); border: 1px solid var(--border-color); width: 100%;">
+                                    <div class="d-flex align-items-center mb-1">
+                                        <i class="bi bi-mic-fill text-danger me-2"></i> 
+                                        <span class="text-muted" style="font-size: 0.85rem;">Voice Note</span>
                                     </div>
-                                }
-                                @foreach (var f in PendingFiles)
-                                {
-                                    <div class="p-1 px-2 rounded-2 bg-white border d-flex align-items-center gap-2 small">
-                                        <i class="fas fa-file text-primary"></i>
-                                        <span>@f.Name</span>
-                                        <button type="button" class="btn btn-xs btn-link text-danger p-0" @onclick="() => PendingFiles.Remove(f)">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                }
+                                    <audio controls style="width: 100%; height: 35px;">
+                                        <source src="@att.FilePath" type="@(att.ContentType ?? "audio/webm")">
+                                        Your browser does not support the audio element.
+                                    </audio>
+                                </div>
+                            }
+                            else
+                            {
+                                <a href="@att.FilePath" target="_blank" class="attachment-badge" style="display: flex; align-items: center; gap: 5px; padding: 5px 10px; background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-color); text-decoration: none; font-size: 0.85rem;">
+                                    <i class="bi bi-file-earmark-text text-primary"></i>
+                                    @att.FileName
+                                </a>
+                            }
+                        }
+                    </div>
+                }
+
+                @if (ann.Acknowledgments.Any())
+                {
+                    <div class="mt-3 p-2 rounded" style="background: var(--bg-body); border: 1px solid var(--border-color); font-size: 0.85rem;">
+                        <div class="text-muted mb-1"><i class="bi bi-check2-all"></i> Acknowledged by:</div>
+                        <ul class="list-unstyled mb-0 ms-2">
+                            @foreach (var ak in ann.Acknowledgments.OrderBy(a => a.AcknowledgedAt))
+                            {
+                                <li>
+                                    <i class="bi bi-person-check text-success"></i> <strong>@(ak.User?.FullName ?? "Unknown")</strong> 
+                                    <span class="text-muted ms-1">at @ak.AcknowledgedAt.ToLocalTime().ToString("MMM dd, yyyy hh:mm tt")</span>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+                
+                <div class="d-flex gap-8 mt-16 justify-content-between">
+                    <div>
+                        @if (!isAcknowledgedByMe)
+                        {
+                            <button class="btn btn-success btn-sm" @onclick="() => AcknowledgeAnnouncement(ann.Id)">
+                                <i class="bi bi-check2-circle"></i> Acknowledge
+                            </button>
+                        }
+                    </div>
+                    @if (canCreate)
+                    {
+                        <div class="d-flex gap-8">
+                            <button class="btn btn-ghost btn-sm" @onclick="() => TogglePin(ann.Id)">
+                                <i class="bi @(ann.IsPinned ? "bi-pin-fill" : "bi-pin")"></i>
+                                @(ann.IsPinned ? "Unpin" : "Pin")
+                            </button>
+                            <button class="btn btn-ghost btn-sm text-danger" @onclick="() => DeleteAnnouncement(ann.Id)">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (!announcements.Any())
+        {
+            <div class="empty-state">
+                <i class="bi bi-megaphone"></i>
+                <h3>No Announcements</h3>
+                <p>There are no announcements at this time.</p>
+            </div>
+        }
+    }
+</div>
+
+@if (showCreateModal)
+{
+    <div class="modal-overlay" @onclick="() => showCreateModal = false">
+        <div class="modal-content" @onclick:stopPropagation>
+            <div class="modal-header">
+                <h3 class="modal-title">Create Announcement</h3>
+                <button class="btn btn-ghost btn-icon" @onclick="() => showCreateModal = false"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Title</label>
+                <input type="text" class="form-control" @bind="newTitle" placeholder="Announcement title" />
+            </div>
+            <div class="form-group">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label class="form-label mb-0">Content</label>
+                    <button type="button" class="btn btn-ghost btn-sm" @onclick="GenerateAiDraft" disabled="@isAiLoading"><i class="bi bi-magic"></i> AI Draft</button>
+                </div>
+                <textarea class="form-control" @bind="newContent" placeholder="Write your announcement..." rows="5" disabled="@isAiLoading"></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Priority</label>
+                <select class="form-control" @bind="newPriority">
+                    <option value="0">Normal</option>
+                    <option value="1">Important</option>
+                    <option value="2">Critical</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Department (leave empty for company-wide)</label>
+                <select class="form-control" @bind="newDeptId">
+                    <option value="">All Departments</option>
+                    @if (departments != null)
+                    {
+                        @foreach (var d in departments)
+                        {
+                            <option value="@d.Id">@d.Name</option>
+                        }
+                    }
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Attachments & Voice Notes <span class="text-danger">*</span></label>
+                <div class="d-flex gap-8 align-items-center mb-2">
+                    <label for="ann-file-input" class="btn btn-outline-secondary btn-sm mb-0" style="cursor: pointer;">
+                        <i class="bi bi-paperclip"></i> Add Files
+                    </label>
+                    <button class="btn btn-sm @(isRecording ? "btn-danger recording-pulse" : "btn-outline-danger")" @onclick="ToggleRecording">
+                        <i class="bi bi-mic-fill"></i> @(isRecording ? "Recording..." : "Record Voice Note")
+                    </button>
+                    <InputFile id="ann-file-input" @ref="fileInput" OnChange="HandleFileSelected" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg" style="display: none;" multiple />
+                </div>
+                <div class="text-muted" style="font-size: 0.8rem;">Required: At least one file or voice note. Allowed files: PDF, Word, Excel, JPEG.</div>
+                
+                @if (pendingAttachments.Any())
+                {
+                    <div class="mt-2 d-flex flex-wrap gap-10">
+                        @foreach (var att in pendingAttachments)
+                        {
+                            <div class="pending-attachment-item" style="background: var(--surface-color); padding: 5px 10px; border-radius: 4px; font-size: 0.85rem; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 5px;">
+                                <i class="bi @(att.FileName.EndsWith(".webm") ? "bi-mic-fill text-danger" : "bi-file-earmark-text text-primary")"></i>
+                                <span style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@att.FileName</span>
+                                <button class="btn btn-sm text-danger" style="padding: 0; line-height: 1;" @onclick="() => pendingAttachments.Remove(att)" title="Remove">
+                                    <i class="bi bi-x"></i>
+                                </button>
                             </div>
                         }
                     </div>
+                }
+            </div>
 
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="pinNoticeCheck" @bind="NewIsPinned" />
-                        <label class="form-check-label small text-dark fw-semibold" for="pinNoticeCheck">
-                            <i class="fas fa-thumbtack text-warning me-1"></i>Pin to top of Announcements Board
-                        </label>
-                    </div>
-                </div>
-                <div class="modal-footer bg-light border-top py-2">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CloseCreateModal">Cancel</button>
-                    <button type="button" class="btn btn-sm btn-primary shadow-sm" @onclick="CreateAnnouncementAsync" disabled="@IsPublishing">
-                        @if (IsPublishing)
-                        {
-                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                            <span>Publishing Notice...</span>
-                        }
-                        else
-                        {
-                            <i class="fas fa-paper-plane me-1"></i>
-                            <span>Publish Notice</span>
-                        }
-                    </button>
-                </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="() => showCreateModal = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="CreateAnnouncement">Publish</button>
             </div>
         </div>
     </div>
 }
 
-<style>
-    .recording-pulse {
-        animation: pulseAnimation 1.2s infinite;
+@code {
+    private IntraUserProfile? currentUser;
+    private List<Announcement>? announcements;
+    private List<IntraDepartment>? departments;
+    private bool canCreate;
+    private bool showCreateModal;
+    private bool isAiLoading;
+    private string newTitle = "", newContent = "";
+    private int newPriority;
+    private string newDeptId = "";
+
+    private bool isRecording = false;
+    private InputFile? fileInput;
+    private List<AnnouncementAttachment> pendingAttachments = new();
+
+    public class AudioRecordingResult
+    {
+        public string Base64 { get; set; } = "";
+        public string MimeType { get; set; } = "";
     }
-    @@keyframes pulseAnimation {
-        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
-        70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
-        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+
+    protected override async Task OnInitializedAsync()
+    {
+        AnnouncementService.OnAnnouncementUpdated += RefreshAnnouncements;
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userId = user.Identity?.Name
+            ?? user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value;
+
+        if (!string.IsNullOrEmpty(userId))
+        {
+            currentUser = await IntraOfficeService.GetUserProfileAsync(userId);
+            currentUser ??= new IntraUserProfile { UserName = userId, FullUserName = userId };
+        }
+
+        canCreate = user.Identity?.IsAuthenticated == true;
+        announcements = await AnnouncementService.GetActiveAnnouncementsAsync();
+        
+        if (currentUser != null)
+        {
+            await AnnouncementService.MarkAnnouncementsAsReadAsync(currentUser.Id);
+        }
+        
+        var depts = await IntraOfficeService.GetDepartmentsAsync();
+        departments = depts.Select(d => new IntraDepartment { Id = d.DeptId, Name = d.DeptName }).ToList();
     }
-</style>
+
+    private async void RefreshAnnouncements()
+    {
+        try
+        {
+            announcements = await AnnouncementService.GetActiveAnnouncementsAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error refreshing announcements: {ex.Message}");
+        }
+    }
+
+    public void Dispose()
+    {
+        AnnouncementService.OnAnnouncementUpdated -= RefreshAnnouncements;
+    }
+
+    private async Task AcknowledgeAnnouncement(int id)
+    {
+        if (currentUser == null) return;
+        await AnnouncementService.AcknowledgeAnnouncementAsync(id, currentUser.Id);
+    }
+
+    private async Task ShowCreateModal()
+    {
+        try
+        {
+            newTitle = "";
+            newContent = "";
+            newPriority = 0;
+            newDeptId = "";
+            pendingAttachments.Clear();
+            showCreateModal = true;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error showing modal: {ex.Message}\n{ex.StackTrace}");
+        }
+    }
+
+    private async Task GenerateAiDraft()
+    {
+        if (string.IsNullOrWhiteSpace(newTitle))
+        {
+            await JS.InvokeVoidAsync("alert", "Please enter a Title first so the AI knows what to write about.");
+            return;
+        }
+
+        isAiLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var context = $"Priority: {(AnnouncementPriority)newPriority}";
+            newContent = await AiService.DraftContentAsync(newTitle, context);
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", "AI Error: " + ex.Message);
+        }
+
+        isAiLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task ToggleRecording()
+    {
+        try
+        {
+            if (!isRecording)
+            {
+                var success = await JS.InvokeAsync<bool>("window.audioRecorder.startRecording");
+                if (success)
+                {
+                    isRecording = true;
+                    StateHasChanged();
+                }
+            }
+            else
+            {
+                isRecording = false;
+                StateHasChanged();
+                
+                var result = await JS.InvokeAsync<AudioRecordingResult>("window.audioRecorder.stopRecording");
+                if (result != null && !string.IsNullOrEmpty(result.Base64))
+                {
+                    var fileName = $"VoiceNote_{DateTime.Now:yyyyMMdd_HHmmss}.webm";
+                    var relativePath = await FileService.SaveBase64FileToDiskAsync(result.Base64, fileName);
+                    
+                    pendingAttachments.Add(new AnnouncementAttachment
+                    {
+                        FileName = fileName,
+                        FilePath = relativePath,
+                        FileSize = (long)(result.Base64.Length * 0.75),
+                        ContentType = result.MimeType,
+                        UploadedAt = DateTime.UtcNow
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error toggling recording: {ex.Message}");
+        }
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        foreach (var file in e.GetMultipleFiles(5)) // Max 5 files
+        {
+            var relativePath = await FileService.SaveFileToDiskAsync(file);
+            pendingAttachments.Add(new AnnouncementAttachment
+            {
+                FileName = file.Name,
+                FilePath = relativePath,
+                FileSize = file.Size,
+                ContentType = file.ContentType,
+                UploadedAt = DateTime.UtcNow
+            });
+        }
+    }
+
+    private async Task CreateAnnouncement()
+    {
+        if (string.IsNullOrWhiteSpace(newTitle) || currentUser == null) return;
+        
+        if (!pendingAttachments.Any())
+        {
+            await JS.InvokeVoidAsync("alert", "At least one attachment or voice note is required.");
+            return;
+        }
+
+        var ann = new Announcement
+        {
+            Title = newTitle.Trim(),
+            Content = newContent,
+            Priority = (AnnouncementPriority)newPriority,
+            CreatedBy = currentUser.Id,
+            DepartmentId = string.IsNullOrEmpty(newDeptId) ? null : newDeptId,
+            IsPinned = false,
+            Attachments = pendingAttachments.ToList()
+        };
+        
+        await AnnouncementService.CreateAnnouncementAsync(ann);
+        showCreateModal = false;
+        pendingAttachments.Clear();
+        announcements = await AnnouncementService.GetActiveAnnouncementsAsync();
+    }
+
+    private async Task TogglePin(int id)
+    {
+        await AnnouncementService.TogglePinAsync(id);
+        announcements = await AnnouncementService.GetActiveAnnouncementsAsync();
+    }
+
+    private async Task DeleteAnnouncement(int id)
+    {
+        await AnnouncementService.DeleteAnnouncementAsync(id);
+        announcements = await AnnouncementService.GetActiveAnnouncementsAsync();
+    }
+
+    private string GetPriorityClass(AnnouncementPriority p) => p switch
+    {
+        AnnouncementPriority.Important => "priority-important",
+        AnnouncementPriority.Critical => "priority-critical",
+        _ => ""
+    };
+
+    private string GetBadgeClass(AnnouncementPriority p) => p switch
+    {
+        AnnouncementPriority.Important => "important",
+        AnnouncementPriority.Critical => "critical",
+        _ => "normal"
+    };
+}

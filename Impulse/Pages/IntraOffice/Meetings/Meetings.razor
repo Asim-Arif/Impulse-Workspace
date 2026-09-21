@@ -1,0 +1,1726 @@
+@page "/office/meetings"
+@page "/meetings"
+@layout IntraOfficeLayout
+@attribute [Authorize]
+@using DataAccessLibrary.Models.IntraOffice
+@using Impulse.Services.IntraOffice
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IIntraOfficeService IntraOfficeService
+@inject IMeetingService MeetingService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject IAiService AiService
+
+<PageTitle>IntraCom-CRM | Executive Meetings & Video Conferences</PageTitle>
+
+<div class="meetings-page-wrapper">
+
+    <!-- 1. GLASSMORPHIC HERO BANNER -->
+    <div class="meetings-hero-banner">
+        <div class="meetings-hero-glow-1"></div>
+        <div class="meetings-hero-glow-2"></div>
+
+        <div class="meetings-hero-content d-flex flex-wrap align-items-center justify-content-between gap-3 position-relative">
+            <div class="d-flex align-items-center gap-3">
+                <div class="meetings-hero-orb">
+                    <i class="bi bi-camera-video-fill"></i>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <h2 class="meetings-hero-title mb-0">Corporate Video Meetings</h2>
+                        <span class="meetings-live-badge">
+                            <span class="meetings-live-dot"></span>
+                            WEBRTC ENCRYPTED • HD P2P SYNCED
+                        </span>
+                    </div>
+                    <p class="meetings-hero-subtitle mb-0 mt-1">
+                        High-definition WebRTC video conferencing, calendar synchronization & automated Word minutes distribution.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Fast Action Matrix -->
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <button type="button" class="btn btn-instant-room" @onclick="OpenInstantMeetingModal">
+                    <i class="bi bi-lightning-charge-fill me-1"></i> Instant Video Room
+                </button>
+                <a href="/meetings/create" class="btn btn-schedule-meeting">
+                    <i class="bi bi-plus-circle-fill me-1"></i> Schedule Meeting
+                </a>
+                <a href="/minutes-list" class="btn btn-minutes-archive">
+                    <i class="bi bi-file-earmark-word-fill me-1"></i> Minutes Archive
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. FLASHY KPI METRICS ROW (4 Cards) -->
+    <div class="row g-3 mb-4">
+        <!-- Total Meetings -->
+        <div class="col-xl-3 col-sm-6">
+            <div class="meeting-kpi-card kpi-blue">
+                <div class="kpi-accent-bar"></div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="kpi-label">TOTAL SESSIONS</div>
+                        <div class="kpi-number">@(allMeetings?.Count ?? 0)</div>
+                        <div class="kpi-subtext text-muted">Scheduled & archived</div>
+                    </div>
+                    <div class="kpi-orb orb-blue">
+                        <i class="bi bi-camera-video"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upcoming Conferences -->
+        <div class="col-xl-3 col-sm-6">
+            <div class="meeting-kpi-card kpi-green">
+                <div class="kpi-accent-bar"></div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="kpi-label">UPCOMING SESSIONS</div>
+                        <div class="kpi-number text-success">@(upcomingMeetings?.Count ?? 0)</div>
+                        <div class="kpi-subtext">
+                            @if (upcomingMeetings?.Any(m => m.ScheduledStartTime.ToLocalTime().Date == DateTime.Today) == true)
+                            {
+                                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-25 px-2 py-0">● Due Today</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">Queued on calendar</span>
+                            }
+                        </div>
+                    </div>
+                    <div class="kpi-orb orb-green">
+                        <i class="bi bi-calendar-check"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Concluded Meetings -->
+        <div class="col-xl-3 col-sm-6">
+            <div class="meeting-kpi-card kpi-purple">
+                <div class="kpi-accent-bar"></div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="kpi-label">PAST / CONCLUDED</div>
+                        <div class="kpi-number">@(pastMeetings?.Count ?? 0)</div>
+                        <div class="kpi-subtext text-muted">Conducted sessions</div>
+                    </div>
+                    <div class="kpi-orb orb-purple">
+                        <i class="bi bi-clock-history"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Distributed Minutes -->
+        <div class="col-xl-3 col-sm-6">
+            <div class="meeting-kpi-card kpi-amber">
+                <div class="kpi-accent-bar"></div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="kpi-label">DISTRIBUTED MINUTES</div>
+                        <div class="kpi-number text-warning">@(allMeetings?.Count(m => !string.IsNullOrEmpty(m.MeetingMinutes)) ?? 0)</div>
+                        <div class="kpi-subtext text-muted">Word documents & AI summaries</div>
+                    </div>
+                    <div class="kpi-orb orb-amber">
+                        <i class="bi bi-file-earmark-text"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. MAIN DASHBOARD CONTENT -->
+    <div class="row g-4">
+        <!-- LEFT COLUMN: Upcoming & Past Meetings (8 cols) -->
+        <div class="col-xl-8 col-lg-7 col-12">
+
+            <!-- UPCOMING SESSIONS CARD -->
+            <div class="meetings-panel-card mb-4">
+                <div class="panel-card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="panel-icon-orb bg-primary text-white">
+                            <i class="bi bi-calendar-event"></i>
+                        </div>
+                        <div>
+                            <h4 class="panel-card-title mb-0">Upcoming Video Meetings</h4>
+                            <span class="text-muted small" style="font-size: 0.78rem;">Synchronized appointments ready for instant WebRTC launch</span>
+                        </div>
+                    </div>
+                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1 fw-bold">
+                        @(upcomingMeetings?.Count ?? 0) Scheduled
+                    </span>
+                </div>
+
+                <div class="panel-card-body p-0">
+                    @if (upcomingMeetings == null)
+                    {
+                        <div class="p-5 text-center">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="mt-3 text-muted small">Synchronizing scheduled meetings...</p>
+                        </div>
+                    }
+                    else if (!upcomingMeetings.Any())
+                    {
+                        <!-- Flashy Empty State -->
+                        <div class="meeting-empty-state text-center p-5">
+                            <div class="empty-state-orb mx-auto mb-3">
+                                <i class="bi bi-calendar2-range"></i>
+                            </div>
+                            <h5 class="fw-bold text-dark mb-1">No Upcoming Meetings Scheduled</h5>
+                            <p class="text-muted mx-auto mb-4" style="max-width: 440px; font-size: 0.88rem;">
+                                Your calendar is clear. Schedule an executive briefing with your team or launch an instant WebRTC room right now.
+                            </p>
+                            <div class="d-flex justify-content-center gap-2 flex-wrap">
+                                <a href="/meetings/create" class="btn btn-primary rounded-pill px-4 py-2 fw-semibold shadow-sm" style="font-size: 0.85rem;">
+                                    <i class="bi bi-plus-circle me-1"></i> Schedule a Meeting
+                                </a>
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-semibold" style="font-size: 0.85rem;" @onclick="OpenInstantMeetingModal">
+                                    <i class="bi bi-lightning-charge me-1"></i> Start Instant Room
+                                </button>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="upcoming-meetings-list p-3">
+                            @foreach (var meeting in upcomingMeetings)
+                            {
+                                var isToday = meeting.ScheduledStartTime.ToLocalTime().Date == DateTime.Today;
+                                var timeUntil = meeting.ScheduledStartTime.ToLocalTime() - DateTime.Now;
+                                var isSoon = isToday && timeUntil.TotalHours <= 2 && timeUntil.TotalHours >= -1;
+
+                                <div class="upcoming-meeting-card @(isSoon ? "border-success shadow-sm" : "") mb-3">
+                                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                                        
+                                        <!-- Date Badge -->
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="meeting-date-badge @(isToday ? "date-today" : "")">
+                                                <div class="date-month">@meeting.ScheduledStartTime.ToLocalTime().ToString("MMM").ToUpper()</div>
+                                                <div class="date-day">@meeting.ScheduledStartTime.ToLocalTime().ToString("dd")</div>
+                                            </div>
+                                            <div>
+                                                <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                                                    <h5 class="meeting-title mb-0">@meeting.Title</h5>
+                                                    @if (isSoon)
+                                                    {
+                                                        <span class="badge bg-danger text-white rounded-pill px-2 py-1 pulse-soon" style="font-size: 0.68rem;">
+                                                            ● Starting Soon
+                                                        </span>
+                                                    }
+                                                    else if (isToday)
+                                                    {
+                                                        <span class="badge bg-success bg-opacity-15 text-success border border-success border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.68rem;">
+                                                            Today
+                                                        </span>
+                                                    }
+                                                </div>
+
+                                                <div class="meeting-meta-strip d-flex align-items-center gap-3 text-muted text-xs flex-wrap">
+                                                    <span>
+                                                        <i class="bi bi-clock me-1 text-primary"></i>
+                                                        <strong>@meeting.ScheduledStartTime.ToLocalTime().ToString("hh:mm tt")</strong>
+                                                    </span>
+                                                    <span>
+                                                        <i class="bi bi-person-circle me-1 text-secondary"></i>
+                                                        @(meeting.Organizer?.FullName ?? "Host")
+                                                    </span>
+                                                    @if (meeting.Participants?.Any() == true)
+                                                    {
+                                                        <span>
+                                                            <i class="bi bi-people me-1 text-info"></i>
+                                                            @meeting.Participants.Count participant@(meeting.Participants.Count > 1 ? "s" : "")
+                                                        </span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Actions -->
+                                        <div class="d-flex align-items-center gap-2">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" 
+                                                    title="Copy Meeting Invite Link" 
+                                                    @onclick="() => CopyToClipboard(meeting.MeetingUrl)">
+                                                <i class="bi bi-share me-1"></i> Share
+                                            </button>
+                                            <a href="/meetings/live/@meeting.Id" class="btn btn-join-call btn-sm rounded-pill px-3 py-2 fw-bold shadow-sm">
+                                                <i class="bi bi-camera-video-fill me-1"></i> Join Call →
+                                            </a>
+                                        </div>
+
+                                    </div>
+
+                                    <!-- Participants preview row if available -->
+                                    @if (meeting.Participants?.Any() == true)
+                                    {
+                                        <div class="participants-preview-row mt-3 pt-2 border-top d-flex align-items-center justify-content-between text-xs">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="text-muted fw-semibold" style="font-size: 0.72rem;">PARTICIPANTS:</span>
+                                                <div class="d-flex align-items-center avatar-cluster">
+                                                    @foreach (var p in meeting.Participants.Take(5))
+                                                    {
+                                                        <div class="cluster-avatar" title="@p.User?.FullName">
+                                                            @(p.User?.FullName?.Length > 0 ? p.User.FullName[0].ToString().ToUpper() : "?")
+                                                        </div>
+                                                    }
+                                                    @if (meeting.Participants.Count > 5)
+                                                    {
+                                                        <div class="cluster-avatar more">
+                                                            +@(meeting.Participants.Count - 5)
+                                                        </div>
+                                                    }
+                                                </div>
+                                            </div>
+                                            <span class="text-muted" style="font-size: 0.72rem;">Room: @(meeting.MeetingUrl.Split('/').LastOrDefault() ?? "Secure P2P")</span>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- PAST MEETINGS & ARCHIVES CARD -->
+            <div class="meetings-panel-card">
+                <div class="panel-card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="panel-icon-orb bg-secondary text-white">
+                            <i class="bi bi-clock-history"></i>
+                        </div>
+                        <div>
+                            <h4 class="panel-card-title mb-0">Past Meetings & Recorded Minutes</h4>
+                            <span class="text-muted small" style="font-size: 0.78rem;">Historical sessions, distributed Word minutes & AI briefings</span>
+                        </div>
+                    </div>
+
+                    <!-- Search Filter -->
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <div class="meeting-search-box">
+                            <i class="bi bi-search search-icon"></i>
+                            <input type="text" class="form-control form-control-sm meeting-search-input" 
+                                   placeholder="Search past meetings..." 
+                                   @bind="pastSearchQuery" @bind:event="oninput" />
+                        </div>
+                        <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn btn-outline-secondary @(pastFilterTab == "all" ? "active" : "")" @onclick='() => pastFilterTab = "all"'>
+                                All (@(pastMeetings?.Count ?? 0))
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary @(pastFilterTab == "minutes" ? "active" : "")" @onclick='() => pastFilterTab = "minutes"'>
+                                Minutes (@(pastMeetings?.Count(m => !string.IsNullOrEmpty(m.MeetingMinutes)) ?? 0))
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-card-body p-0">
+                    @if (FilteredPastMeetings?.Any() == true)
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover meeting-table mb-0 align-middle">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 32%;">Subject / Session</th>
+                                        <th style="width: 20%;">Organizer</th>
+                                        <th style="width: 18%;">Conducted Date</th>
+                                        <th style="width: 15%;">Status</th>
+                                        <th style="width: 15%; text-align: right;">Minutes & Summary</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var meeting in FilteredPastMeetings.Take(pastDisplayLimit))
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <div class="meeting-row-orb">
+                                                        <i class="bi bi-camera-video-off text-muted"></i>
+                                                    </div>
+                                                    <div>
+                                                        <div class="fw-bold text-dark" style="font-size: 0.88rem;">@meeting.Title</div>
+                                                        <div class="text-muted text-xs">ID: #@meeting.Id • WebRTC Room</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <div class="organizer-avatar">
+                                                        @(meeting.Organizer?.FullName?.Length > 0 ? meeting.Organizer.FullName[0].ToString().ToUpper() : "?")
+                                                    </div>
+                                                    <span class="text-dark fw-semibold small">@(meeting.Organizer?.FullName ?? "Unknown")</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="text-dark small fw-semibold">@meeting.ScheduledStartTime.ToLocalTime().ToString("MMM dd, yyyy")</div>
+                                                <div class="text-muted text-xs">@meeting.ScheduledStartTime.ToLocalTime().ToString("hh:mm tt")</div>
+                                            </td>
+                                            <td>
+                                                <span class="badge badge-concluded">
+                                                    ● Concluded
+                                                </span>
+                                            </td>
+                                            <td style="text-align: right;">
+                                                <div class="d-inline-flex align-items-center gap-1 flex-wrap justify-content-end">
+                                                    @if (!string.IsNullOrEmpty(meeting.VoiceNotePath))
+                                                    {
+                                                        <a href="@meeting.VoiceNotePath" target="_blank" class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1 text-decoration-none" style="font-size: 0.72rem;" title="Listen to Voice Recording">
+                                                            <i class="bi bi-mic-fill me-1"></i> Voice Note
+                                                        </a>
+                                                    }
+                                                    @if (!string.IsNullOrEmpty(meeting.MeetingMinutes))
+                                                    {
+                                                        <button type="button" class="btn btn-minutes-view btn-xs" @onclick="() => OpenMinutesModal(meeting)" title="View Minutes & Download Word Document (.docx)">
+                                                            <i class="bi bi-file-earmark-word-fill me-1"></i> Minutes
+                                                        </button>
+                                                        <button type="button" class="btn btn-ai-summary btn-xs" @onclick="() => OpenSummaryModal(meeting)" disabled="@isAiLoading" title="View AI Minutes Summary">
+                                                            <i class="bi bi-stars text-warning me-1"></i> AI Summary
+                                                        </button>
+                                                    }
+                                                    else if (string.IsNullOrEmpty(meeting.VoiceNotePath))
+                                                    {
+                                                        <span class="text-muted small" style="font-size: 0.78rem;">No minutes</span>
+                                                    }
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        @if (FilteredPastMeetings.Count() > pastDisplayLimit)
+                        {
+                            <div class="p-3 text-center border-top bg-light">
+                                <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-4" @onclick="() => pastDisplayLimit += 10">
+                                    Show More Past Meetings (@(FilteredPastMeetings.Count() - pastDisplayLimit) remaining) ↓
+                                </button>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="p-4 text-center text-muted small">
+                            <i class="bi bi-search fs-3 text-secondary d-block mb-1"></i>
+                            No past meetings match the search criteria.
+                        </div>
+                    }
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN: Interactive Calendar & Quick WebRTC Dock (4 cols) -->
+        <div class="col-xl-4 col-lg-5 col-12">
+
+            <!-- INTERACTIVE CALENDAR CARD -->
+            <div class="meetings-calendar-card mb-4">
+                <div class="calendar-card-header d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-calendar3 text-primary fs-5"></i>
+                        <h4 class="mb-0 fw-bold text-dark" style="font-size: 1.05rem;">Meeting Calendar</h4>
+                    </div>
+                    <button type="button" class="btn btn-today-badge" @onclick="GoToToday">
+                        Today
+                    </button>
+                </div>
+
+                <div class="calendar-card-body p-3">
+                    <div class="d-flex align-items-center justify-content-between mb-3 px-1">
+                        <button type="button" class="btn btn-cal-nav" @onclick="PrevMonth" title="Previous Month">
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                        <h6 class="cal-month-title mb-0">@currentMonth.ToString("MMMM yyyy")</h6>
+                        <button type="button" class="btn btn-cal-nav" @onclick="NextMonth" title="Next Month">
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
+                    </div>
+
+                    <!-- Days of Week Header -->
+                    <div class="cal-weekdays-grid mb-2">
+                        <div>Su</div>
+                        <div>Mo</div>
+                        <div>Tu</div>
+                        <div>We</div>
+                        <div>Th</div>
+                        <div>Fr</div>
+                        <div>Sa</div>
+                    </div>
+
+                    <!-- Days Grid -->
+                    <div class="cal-days-grid">
+                        @for (int i = 0; i < emptyDaysAtStart; i++)
+                        {
+                            <div class="cal-day-cell empty"></div>
+                        }
+
+                        @for (int day = 1; day <= daysInMonth; day++)
+                        {
+                            var dDate = new DateTime(currentMonth.Year, currentMonth.Month, day);
+                            var dayMeetingsCount = allMeetings?.Count(m => m.ScheduledStartTime.ToLocalTime().Date == dDate.Date) ?? 0;
+                            var hasMeeting = dayMeetingsCount > 0;
+                            var isToday = dDate.Date == DateTime.Today;
+                            var isSelected = dDate.Date == selectedDate?.Date;
+
+                            <div class="cal-day-cell @(isToday ? "is-today" : "") @(isSelected ? "is-selected" : "") @(hasMeeting ? "has-meeting" : "")"
+                                 @onclick="() => SelectDate(dDate)">
+                                <span class="day-number">@day</span>
+                                @if (hasMeeting)
+                                {
+                                    <span class="meeting-dot" title="@dayMeetingsCount meeting(s)"></span>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Legend -->
+                    <div class="cal-legend-bar mt-3 pt-3 border-top d-flex align-items-center justify-content-center gap-3">
+                        <div class="d-flex align-items-center gap-1 text-xs text-muted">
+                            <span class="legend-indicator dot-green"></span> Scheduled
+                        </div>
+                        <div class="d-flex align-items-center gap-1 text-xs text-muted">
+                            <span class="legend-indicator dot-blue"></span> Today
+                        </div>
+                        <div class="d-flex align-items-center gap-1 text-xs text-muted">
+                            <span class="legend-indicator dot-purple"></span> Selected
+                        </div>
+                    </div>
+
+                    <!-- Selected Day Agenda Drawer -->
+                    @if (selectedDate.HasValue)
+                    {
+                        var dayMeetings = allMeetings?.Where(m => m.ScheduledStartTime.ToLocalTime().Date == selectedDate.Value.Date)
+                                                     .OrderBy(m => m.ScheduledStartTime).ToList() ?? new();
+
+                        <div class="selected-day-agenda mt-3 p-3 rounded-3 border">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <h6 class="fw-bold mb-0 text-dark" style="font-size: 0.85rem;">
+                                    <i class="bi bi-clock-fill text-primary me-1"></i>
+                                    @selectedDate.Value.ToString("dddd, MMM dd, yyyy")
+                                </h6>
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary border text-xs">
+                                    @dayMeetings.Count @(dayMeetings.Count == 1 ? "session" : "sessions")
+                                </span>
+                            </div>
+
+                            @if (!dayMeetings.Any())
+                            {
+                                <div class="text-center py-3 text-muted" style="font-size: 0.82rem;">
+                                    <p class="mb-2">No meetings planned on this date.</p>
+                                    <a href="/meetings/create?date=@selectedDate.Value.ToString("yyyy-MM-dd")" class="btn btn-outline-primary btn-xs rounded-pill px-3">
+                                        + Schedule on this date
+                                    </a>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="agenda-stream" style="max-height: 220px; overflow-y: auto;">
+                                    @foreach (var m in dayMeetings)
+                                    {
+                                        <div class="agenda-item p-2 mb-2 rounded-2 border">
+                                            <div class="d-flex align-items-center justify-content-between">
+                                                <div class="fw-bold text-dark text-truncate" style="font-size: 0.84rem; max-width: 170px;">
+                                                    @m.Title
+                                                </div>
+                                                <a href="/meetings/live/@m.Id" class="btn btn-outline-success btn-xs rounded-pill px-2 py-0" style="font-size: 0.72rem;">
+                                                    Join →
+                                                </a>
+                                            </div>
+                                            <div class="d-flex align-items-center justify-content-between text-muted text-xs mt-1">
+                                                <span><i class="bi bi-clock me-1"></i>@m.ScheduledStartTime.ToLocalTime().ToString("hh:mm tt")</span>
+                                                <span><i class="bi bi-person me-1"></i>@(m.Organizer?.FullName ?? "Host")</span>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- QUICK INSTANT WEBRTC DOCK -->
+            <div class="instant-dock-card p-4 text-center">
+                <div class="instant-dock-icon mx-auto mb-2">
+                    <i class="bi bi-broadcast"></i>
+                </div>
+                <h5 class="fw-bold text-white mb-1">Instant Ad-hoc Conference</h5>
+                <p class="text-light text-opacity-75 small mb-3">
+                    Spin up a private, peer-to-peer encrypted WebRTC room instantly with screen sharing & HD audio.
+                </p>
+                <button type="button" class="btn btn-dock-launch w-100 py-2 fw-bold" @onclick="OpenInstantMeetingModal">
+                    <i class="bi bi-lightning-charge-fill me-1"></i> Launch Instant Room Now
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<!-- INSTANT MEETING MODAL -->
+@if (showInstantModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 1060;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content custom-glass-modal shadow-lg border">
+                <div class="modal-header border-bottom">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="modal-title-orb bg-primary text-white">
+                            <i class="bi bi-lightning-charge-fill"></i>
+                        </div>
+                        <div>
+                            <h5 class="modal-title fw-bold mb-0 text-dark">Instant Video Conference</h5>
+                            <span class="text-muted text-xs">P2P Encrypted WebRTC Room</span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" @onclick="() => showInstantModal = false"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark small">Conference Topic / Subject</label>
+                        <input type="text" class="form-control" @bind="instantMeetingTitle" placeholder="e.g. Ad-hoc Team Sync" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark small">Generated Room URL</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control bg-light" value="@instantMeetingUrl" readonly />
+                            <button class="btn btn-outline-secondary" type="button" @onclick="() => CopyToClipboard(instantMeetingUrl)">
+                                <i class="bi bi-clipboard"></i> Copy
+                            </button>
+                        </div>
+                        <small class="text-muted mt-1 d-block">Share this secure URL with colleagues to connect immediately.</small>
+                    </div>
+
+                    <div class="alert alert-info py-2 px-3 text-xs mb-0 d-flex align-items-center gap-2">
+                        <i class="bi bi-shield-check fs-5 text-info"></i>
+                        <span>No downloads or logins required for guests. Works in any modern desktop or mobile browser.</span>
+                    </div>
+                </div>
+                <div class="modal-footer border-top bg-light">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" @onclick="() => showInstantModal = false">Close</button>
+                    <a href="@instantMeetingUrl" target="_blank" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
+                        <i class="bi bi-box-arrow-in-right me-1"></i> Enter Video Call
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- MEETING MINUTES VIEWER & DOWNLOAD MODAL -->
+@if (showMinutesModal && selectedMinutesMeeting != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 1060;">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content custom-glass-modal shadow-lg border">
+                <div class="modal-header border-bottom">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="modal-title-orb bg-primary text-white">
+                            <i class="bi bi-file-earmark-word-fill"></i>
+                        </div>
+                        <div>
+                            <h5 class="modal-title fw-bold mb-0 text-dark">Official Meeting Minutes</h5>
+                            <span class="text-muted text-xs">Session proceedings, recorded discussion & official Word document (.docx)</span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" @onclick="CloseMinutesModal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <!-- Meeting Meta Bar -->
+                    <div class="summary-session-badge mb-3 d-flex align-items-center justify-content-between p-3 rounded-3 bg-light border flex-wrap gap-2">
+                        <div>
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <i class="bi bi-journal-text text-primary fs-5"></i>
+                                <h6 class="fw-bold text-dark mb-0 fs-6">@selectedMinutesMeeting.Title</h6>
+                            </div>
+                            <div class="text-muted small d-flex flex-wrap gap-3 mt-1">
+                                <span><i class="bi bi-calendar3 me-1 text-primary"></i> @selectedMinutesMeeting.ScheduledStartTime.ToLocalTime().ToString("dddd, MMMM dd, yyyy • hh:mm tt")</span>
+                                <span><i class="bi bi-person-circle me-1 text-secondary"></i> Organizer: @(selectedMinutesMeeting.Organizer?.FullName ?? "System Administrator")</span>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            @if (!string.IsNullOrEmpty(selectedMinutesDocxUrl))
+                            {
+                                <a href="@selectedMinutesDocxUrl" download class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm d-inline-flex align-items-center gap-1" title="Download formatted Microsoft Word Document">
+                                    <i class="bi bi-download"></i> Download Word (.docx)
+                                </a>
+                            }
+                            else if (isMinutesDocxLoading)
+                            {
+                                <button class="btn btn-sm btn-outline-primary rounded-pill px-3" disabled>
+                                    <span class="spinner-border spinner-border-sm me-1"></span> Preparing Word Doc...
+                                </button>
+                            }
+                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" @onclick="() => CopyToClipboard(selectedMinutesMeeting.MeetingMinutes ?? string.Empty)" title="Copy entire text to clipboard">
+                                <i class="bi bi-clipboard me-1"></i> Copy
+                            </button>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(selectedMinutesMeeting.VoiceNotePath))
+                    {
+                        <div class="mb-3 p-2 px-3 bg-success bg-opacity-10 border border-success border-opacity-25 rounded-3 d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-mic-fill text-success fs-5"></i>
+                                <div>
+                                    <span class="fw-bold small text-dark d-block">Attached Voice Recording:</span>
+                                    <audio controls style="height: 32px; max-width: 260px;" src="@selectedMinutesMeeting.VoiceNotePath" class="mt-1"></audio>
+                                </div>
+                            </div>
+                            <a href="@selectedMinutesMeeting.VoiceNotePath" target="_blank" download class="btn btn-sm btn-outline-success rounded-pill px-3">
+                                <i class="bi bi-download me-1"></i> Download Audio
+                            </a>
+                        </div>
+                    }
+
+                    <!-- Minutes Document Text View -->
+                    <div class="minutes-doc-sheet p-3 rounded-3 bg-white border shadow-sm">
+                        <div class="d-flex align-items-center justify-content-between border-bottom pb-2 mb-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
+                                    <i class="bi bi-file-text me-1"></i> Recorded Minutes
+                                </span>
+                                <span class="text-muted text-xs">@(selectedMinutesMeeting.MeetingMinutes?.Split('\n').Length ?? 0) paragraphs</span>
+                            </div>
+                            <span class="badge bg-light text-secondary border">@(selectedMinutesMeeting.MeetingMinutes?.Length ?? 0) characters</span>
+                        </div>
+                        <div class="minutes-doc-text">
+                            @selectedMinutesMeeting.MeetingMinutes
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top bg-light d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-warning btn-sm rounded-pill px-3 text-dark fw-bold d-inline-flex align-items-center gap-1" @onclick="() => { CloseMinutesModal(); OpenSummaryModal(selectedMinutesMeeting); }">
+                        <i class="bi bi-stars text-warning"></i> Open AI Summary
+                    </button>
+                    <div class="d-flex gap-2">
+                        @if (!string.IsNullOrEmpty(selectedMinutesDocxUrl))
+                        {
+                            <a href="@selectedMinutesDocxUrl" download class="btn btn-primary rounded-pill px-4 btn-sm d-inline-flex align-items-center gap-1">
+                                <i class="bi bi-download"></i> Download Word (.docx)
+                            </a>
+                        }
+                        <button type="button" class="btn btn-secondary rounded-pill px-4 btn-sm" @onclick="CloseMinutesModal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- AI MEETING SUMMARY MODAL -->
+@if (showSummaryModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 1060;">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content custom-glass-modal shadow-lg border">
+                <div class="modal-header border-bottom">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="modal-title-orb bg-info text-white">
+                            <i class="bi bi-robot"></i>
+                        </div>
+                        <div>
+                            <h5 class="modal-title fw-bold mb-0 text-dark">IntraBot AI Meeting Executive Brief</h5>
+                            <span class="text-muted text-xs">Automated synthesis of official meeting minutes</span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" @onclick="CloseSummaryModal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    @if (isAiLoading)
+                    {
+                        <div class="text-center p-5">
+                            <div class="spinner-border text-info" role="status" style="width: 3rem; height: 3rem;"></div>
+                            <div class="mt-3 fw-bold text-dark">Analyzing recorded meeting minutes...</div>
+                            <small class="text-muted">Synthesizing key decisions, action items, and executive summaries.</small>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="summary-session-badge mb-3 d-flex align-items-center justify-content-between p-2 rounded-2 bg-light border flex-wrap gap-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-journal-check text-primary"></i>
+                                <span class="fw-bold text-dark">@selectedMeetingTitle</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                @if (!string.IsNullOrEmpty(selectedSummaryDocxUrl))
+                                {
+                                    <a href="@selectedSummaryDocxUrl" download class="btn btn-sm btn-outline-primary rounded-pill px-3" title="Download Word Document (.docx)">
+                                        <i class="bi bi-file-earmark-word me-1"></i> Word (.docx)
+                                    </a>
+                                }
+                                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" @onclick="() => CopyToClipboard(meetingSummary)">
+                                    <i class="bi bi-clipboard me-1"></i> Copy Brief
+                                </button>
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(selectedMeetingVoiceNote))
+                        {
+                            <div class="mb-3 p-2 bg-success bg-opacity-10 border border-success border-opacity-25 rounded-3 d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi bi-mic-fill text-success fs-5"></i>
+                                    <div>
+                                        <span class="fw-bold small text-dark d-block">Attached Voice Note Audio:</span>
+                                        <audio controls style="height: 32px; max-width: 260px;" src="@selectedMeetingVoiceNote" class="mt-1"></audio>
+                                    </div>
+                                </div>
+                                <a href="@selectedMeetingVoiceNote" target="_blank" download class="btn btn-sm btn-outline-success rounded-pill px-3">
+                                    <i class="bi bi-download me-1"></i> Download
+                                </a>
+                            </div>
+                        }
+
+                        <div class="ai-summary-content p-3 rounded-3 bg-white border">
+                            @((MarkupString)FormatSummaryMarkdown(meetingSummary))
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer border-top bg-light d-flex justify-content-between">
+                    @if (selectedSummaryMeeting != null && !string.IsNullOrEmpty(selectedSummaryMeeting.MeetingMinutes))
+                    {
+                        <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-bold d-inline-flex align-items-center gap-1" @onclick="() => { CloseSummaryModal(); OpenMinutesModal(selectedSummaryMeeting); }">
+                            <i class="bi bi-file-earmark-word-fill"></i> View Full Minutes
+                        </button>
+                    }
+                    else
+                    {
+                        <div></div>
+                    }
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" @onclick="CloseSummaryModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    /* ================================================================
+       MEETINGS SUITE - ULTRA ATTRACTIVE & FLASHY DESIGN SYSTEM
+       ================================================================ */
+    .meetings-page-wrapper {
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        padding: 0 4px 24px 4px;
+        box-sizing: border-box;
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    /* 1. HERO BANNER */
+    .meetings-hero-banner {
+        background: linear-gradient(135deg, #090d16 0%, #111827 45%, #1e1b4b 100%);
+        border-radius: 16px;
+        padding: 1.4rem 1.8rem;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 15px 30px -10px rgba(15, 23, 42, 0.4), 0 0 25px rgba(99, 102, 241, 0.15);
+        margin-bottom: 1.25rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .meetings-hero-glow-1 {
+        position: absolute;
+        top: -80px;
+        left: -80px;
+        width: 260px;
+        height: 260px;
+        background: radial-gradient(circle, rgba(99, 102, 241, 0.4) 0%, transparent 70%);
+        border-radius: 50%;
+        pointer-events: none;
+    }
+
+    .meetings-hero-glow-2 {
+        position: absolute;
+        bottom: -80px;
+        right: 10%;
+        width: 280px;
+        height: 280px;
+        background: radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, transparent 70%);
+        border-radius: 50%;
+        pointer-events: none;
+    }
+
+    .meetings-hero-orb {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #4f46e5, #818cf8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        font-size: 1.5rem;
+        box-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+        flex-shrink: 0;
+    }
+
+    .meetings-hero-title {
+        color: #ffffff;
+        font-weight: 800;
+        font-size: 1.45rem;
+        letter-spacing: -0.3px;
+    }
+
+    .meetings-hero-subtitle {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 0.88rem;
+    }
+
+    .meetings-live-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(16, 185, 129, 0.2);
+        border: 1px solid rgba(52, 211, 153, 0.4);
+        color: #6ee7b7;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.6px;
+        padding: 3px 10px;
+        border-radius: 9999px;
+    }
+
+    .meetings-live-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #10b981;
+        box-shadow: 0 0 6px #10b981;
+        animation: pulseMeetingBeacon 2s infinite;
+    }
+
+    @@keyframes pulseMeetingBeacon {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.35; transform: scale(0.85); }
+    }
+
+    .btn-instant-room {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: #ffffff;
+        border: none;
+        border-radius: 9999px;
+        padding: 8px 18px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+        transition: all 0.2s;
+    }
+    .btn-instant-room:hover {
+        background: linear-gradient(135deg, #059669, #047857);
+        color: #ffffff;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgba(16, 185, 129, 0.55);
+    }
+
+    .btn-schedule-meeting {
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        color: #ffffff;
+        border: none;
+        border-radius: 9999px;
+        padding: 8px 18px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        transition: all 0.2s;
+    }
+    .btn-schedule-meeting:hover {
+        background: linear-gradient(135deg, #4f46e5, #4338ca);
+        color: #ffffff;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgba(99, 102, 241, 0.55);
+    }
+
+    .btn-minutes-archive {
+        background: rgba(255, 255, 255, 0.1);
+        color: #ffffff;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 9999px;
+        padding: 8px 18px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        transition: all 0.2s;
+    }
+    .btn-minutes-archive:hover {
+        background: rgba(255, 255, 255, 0.2);
+        color: #ffffff;
+    }
+
+    /* 2. KPI METRICS CARDS */
+    .meeting-kpi-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 1.25rem 1.4rem;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+        transition: all 0.2s;
+    }
+    .meeting-kpi-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+    }
+
+    .kpi-accent-bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+    }
+    .kpi-blue .kpi-accent-bar { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+    .kpi-green .kpi-accent-bar { background: linear-gradient(90deg, #10b981, #34d195); }
+    .kpi-purple .kpi-accent-bar { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+    .kpi-amber .kpi-accent-bar { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+
+    .kpi-label {
+        font-size: 0.72rem;
+        font-weight: 800;
+        color: #64748b;
+        letter-spacing: 0.6px;
+        margin-bottom: 4px;
+    }
+    .kpi-number {
+        font-size: 1.8rem;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.1;
+        margin-bottom: 4px;
+    }
+    .kpi-subtext {
+        font-size: 0.75rem;
+    }
+
+    .kpi-orb {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        flex-shrink: 0;
+    }
+    .orb-blue { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+    .orb-green { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+    .orb-purple { background: rgba(139, 92, 246, 0.1); color: #8b5cf6; }
+    .orb-amber { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+
+    /* 3. PANEL CARDS */
+    .meetings-panel-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.03);
+        overflow: hidden;
+    }
+
+    .panel-card-header {
+        padding: 1rem 1.4rem;
+        background: #ffffff;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .panel-icon-orb {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        flex-shrink: 0;
+    }
+
+    .panel-card-title {
+        font-size: 1rem;
+        font-weight: 800;
+        color: #0f172a;
+    }
+
+    /* UPCOMING MEETING CARD */
+    .upcoming-meeting-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 1.1rem 1.25rem;
+        transition: all 0.2s;
+    }
+    .upcoming-meeting-card:hover {
+        background: #ffffff;
+        border-color: #cbd5e1;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+    }
+
+    .meeting-date-badge {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        width: 54px;
+        height: 54px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        flex-shrink: 0;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+    }
+    .meeting-date-badge.date-today {
+        background: linear-gradient(135deg, #4f46e5, #6366f1);
+        border-color: #4f46e5;
+        color: #ffffff;
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+    }
+    .meeting-date-badge.date-today .date-month,
+    .meeting-date-badge.date-today .date-day {
+        color: #ffffff !important;
+    }
+
+    .date-month {
+        font-size: 0.65rem;
+        font-weight: 800;
+        color: #64748b;
+        letter-spacing: 0.5px;
+    }
+    .date-day {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1;
+    }
+
+    .meeting-title {
+        font-size: 0.96rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .btn-join-call {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: #ffffff;
+        border: none;
+        transition: all 0.2s;
+    }
+    .btn-join-call:hover {
+        background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        color: #ffffff;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+
+    .pulse-soon {
+        animation: pulseSoon 1.8s infinite;
+    }
+    @@keyframes pulseSoon {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.06); opacity: 0.85; }
+    }
+
+    .avatar-cluster {
+        display: flex;
+        align-items: center;
+    }
+    .cluster-avatar {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: #e0e7ff;
+        color: #4338ca;
+        font-size: 0.62rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid #ffffff;
+        margin-left: -6px;
+    }
+    .cluster-avatar:first-child {
+        margin-left: 0;
+    }
+    .cluster-avatar.more {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+
+    /* EMPTY STATE */
+    .empty-state-orb {
+        width: 64px;
+        height: 64px;
+        border-radius: 20px;
+        background: #f1f5f9;
+        color: #64748b;
+        font-size: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* PAST MEETINGS TABLE */
+    .meeting-search-box {
+        position: relative;
+    }
+    .search-icon {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+        font-size: 0.8rem;
+    }
+    .meeting-search-input {
+        padding-left: 28px;
+        border-radius: 20px;
+        width: 210px;
+    }
+
+    .meeting-table thead th {
+        background: #f8fafc;
+        color: #64748b;
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 0.75rem 1rem;
+    }
+    .meeting-table tbody td {
+        padding: 0.85rem 1rem;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .meeting-row-orb {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.9rem;
+        flex-shrink: 0;
+    }
+
+    .organizer-avatar {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: #ede9fe;
+        color: #7c3aed;
+        font-size: 0.72rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .badge-concluded {
+        background: rgba(148, 163, 184, 0.15);
+        color: #475569;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        font-size: 0.72rem;
+        font-weight: 600;
+        border-radius: 9999px;
+        padding: 3px 8px;
+    }
+
+    .btn-minutes-view {
+        background: rgba(37, 99, 235, 0.1);
+        border: 1px solid rgba(37, 99, 235, 0.3);
+        color: #1d4ed8;
+        font-size: 0.72rem;
+        font-weight: 700;
+        border-radius: 9999px;
+        padding: 3px 10px;
+        transition: all 0.15s;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        text-decoration: none;
+    }
+    .btn-minutes-view:hover {
+        background: rgba(37, 99, 235, 0.2);
+        color: #1e40af;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 5px rgba(37, 99, 235, 0.2);
+    }
+
+    .btn-ai-summary {
+        background: rgba(245, 158, 11, 0.1);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        color: #b45309;
+        font-size: 0.72rem;
+        font-weight: 700;
+        border-radius: 9999px;
+        padding: 3px 10px;
+        transition: all 0.15s;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+    }
+    .btn-ai-summary:hover {
+        background: rgba(245, 158, 11, 0.2);
+        color: #92400e;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 5px rgba(245, 158, 11, 0.2);
+    }
+
+    .minutes-doc-sheet {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+    .minutes-doc-text {
+        white-space: pre-wrap;
+        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        font-size: 0.93rem;
+        line-height: 1.7;
+        color: #1e293b;
+        max-height: 420px;
+        overflow-y: auto;
+        padding: 1.1rem;
+        background: #f8fafc;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+    }
+
+    /* 4. CALENDAR STYLES */
+    .meetings-calendar-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.03);
+        overflow: hidden;
+    }
+
+    .calendar-card-header {
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid #e2e8f0;
+        background: #ffffff;
+    }
+
+    .btn-today-badge {
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #475569;
+        padding: 3px 12px;
+        transition: all 0.15s;
+    }
+    .btn-today-badge:hover {
+        background: #4f46e5;
+        color: #ffffff;
+        border-color: #4f46e5;
+    }
+
+    .btn-cal-nav {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        color: #64748b;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+        transition: all 0.15s;
+    }
+    .btn-cal-nav:hover {
+        background: #4f46e5;
+        color: #ffffff;
+        border-color: #4f46e5;
+    }
+
+    .cal-month-title {
+        font-weight: 800;
+        font-size: 0.98rem;
+        color: #0f172a;
+    }
+
+    .cal-weekdays-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        text-align: center;
+        font-size: 0.74rem;
+        font-weight: 800;
+        color: #94a3b8;
+        text-transform: uppercase;
+    }
+
+    .cal-days-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 6px;
+        text-align: center;
+    }
+
+    .cal-day-cell {
+        position: relative;
+        height: 36px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.15s;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #334155;
+    }
+    .cal-day-cell:hover:not(.empty) {
+        background: #f1f5f9;
+        color: #0f172a;
+        transform: scale(1.05);
+    }
+    .cal-day-cell.is-today {
+        background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+        color: #ffffff !important;
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+    }
+    .cal-day-cell.is-selected {
+        outline: 2px solid #8b5cf6;
+        outline-offset: 1px;
+    }
+    .cal-day-cell.has-meeting:not(.is-today) {
+        background: rgba(16, 185, 129, 0.12);
+        color: #065f46;
+        font-weight: 800;
+    }
+
+    .meeting-dot {
+        position: absolute;
+        bottom: 3px;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #10b981;
+    }
+    .is-today .meeting-dot {
+        background: #ffffff;
+    }
+
+    .legend-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .dot-green { background: #10b981; }
+    .dot-blue { background: #3b82f6; }
+    .dot-purple { background: #8b5cf6; }
+
+    .selected-day-agenda {
+        background: #f8fafc;
+        border-color: #e2e8f0;
+    }
+    .agenda-item {
+        background: #ffffff;
+        border-color: #e2e8f0;
+        transition: all 0.15s;
+    }
+    .agenda-item:hover {
+        border-color: #cbd5e1;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+    }
+
+    /* 5. INSTANT DOCK CARD */
+    .instant-dock-card {
+        background: linear-gradient(135deg, #1e1b4b 0%, #312e81 60%, #4338ca 100%);
+        border-radius: 16px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 8px 24px rgba(30, 27, 75, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    .instant-dock-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.4rem;
+    }
+    .btn-dock-launch {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: #ffffff;
+        border: none;
+        border-radius: 10px;
+        box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+        transition: all 0.2s;
+    }
+    .btn-dock-launch:hover {
+        background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgba(16, 185, 129, 0.55);
+        color: #ffffff;
+    }
+
+    /* 6. MODALS */
+    .custom-glass-modal {
+        border-radius: 16px;
+        overflow: hidden;
+    }
+    .modal-title-orb {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+    }
+    .ai-summary-content {
+        line-height: 1.6;
+        font-size: 0.92rem;
+        color: #1e293b;
+        max-height: 380px;
+        overflow-y: auto;
+    }
+</style>
+
+@code {
+    private IntraUserProfile? currentUser;
+    private List<Meeting>? allMeetings;
+    private List<Meeting>? upcomingMeetings;
+    private List<Meeting>? pastMeetings;
+
+    // Calendar State
+    private DateTime currentMonth = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+    private int daysInMonth => DateTime.DaysInMonth(currentMonth.Year, currentMonth.Month);
+    private int emptyDaysAtStart => (int)new DateTime(currentMonth.Year, currentMonth.Month, 1).DayOfWeek;
+    private DateTime? selectedDate = DateTime.Today;
+
+    // Past Meetings Filter & Search
+    private string pastSearchQuery = "";
+    private string pastFilterTab = "all";
+    private int pastDisplayLimit = 8;
+
+    // Instant Room Modal State
+    private bool showInstantModal = false;
+    private string instantMeetingTitle = "Quick Ad-hoc Briefing";
+    private string instantMeetingUrl = "";
+
+    // Minutes Viewer Modal State
+    private bool showMinutesModal = false;
+    private Meeting? selectedMinutesMeeting;
+    private string? selectedMinutesDocxUrl;
+    private bool isMinutesDocxLoading = false;
+
+    // AI Summary Modal State
+    private bool showSummaryModal = false;
+    private bool isAiLoading = false;
+    private string meetingSummary = "";
+    private string selectedMeetingTitle = "";
+    private Meeting? selectedSummaryMeeting;
+    private string? selectedSummaryDocxUrl;
+
+    private IEnumerable<Meeting> FilteredPastMeetings
+    {
+        get
+        {
+            if (pastMeetings == null) return Enumerable.Empty<Meeting>();
+            var query = pastMeetings.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(pastSearchQuery))
+            {
+                query = query.Where(m =>
+                    m.Title.Contains(pastSearchQuery, StringComparison.OrdinalIgnoreCase) ||
+                    (m.Organizer != null && m.Organizer.FullName.Contains(pastSearchQuery, StringComparison.OrdinalIgnoreCase))
+                );
+            }
+
+            if (pastFilterTab == "minutes")
+            {
+                query = query.Where(m => !string.IsNullOrEmpty(m.MeetingMinutes));
+            }
+
+            return query;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var userId = user.Identity?.Name
+                ?? user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? user.FindFirst("sub")?.Value;
+
+            if (!string.IsNullOrEmpty(userId))
+            {
+                currentUser = await IntraOfficeService.GetUserProfileAsync(userId);
+                currentUser ??= new IntraUserProfile { UserName = userId, FullUserName = userId };
+            }
+
+            if (currentUser != null)
+            {
+                await LoadMeetingsData();
+            }
+        }
+    }
+
+    private async Task LoadMeetingsData()
+    {
+        if (currentUser == null) return;
+        allMeetings = await MeetingService.GetAllMeetingsForUserAsync(currentUser.Id);
+        upcomingMeetings = await MeetingService.GetUpcomingMeetingsAsync(currentUser.Id);
+
+        var now = DateTime.UtcNow;
+        pastMeetings = allMeetings?
+            .Where(m => m.ScheduledStartTime < now.AddHours(-1) || m.Status == MeetingStatus.Completed)
+            .OrderByDescending(m => m.ScheduledStartTime)
+            .ToList();
+    }
+
+    private void SelectDate(DateTime date)
+    {
+        selectedDate = date;
+    }
+
+    private void PrevMonth()
+    {
+        currentMonth = currentMonth.AddMonths(-1);
+    }
+
+    private void NextMonth()
+    {
+        currentMonth = currentMonth.AddMonths(1);
+    }
+
+    private void GoToToday()
+    {
+        currentMonth = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+        selectedDate = DateTime.Today;
+    }
+
+    private void OpenInstantMeetingModal()
+    {
+        var roomId = $"IntraOffice_Sync_{Guid.NewGuid().ToString("N").Substring(0, 10)}";
+        instantMeetingUrl = $"https://meet.jit.si/{roomId}";
+        instantMeetingTitle = $"Instant Sync • {DateTime.Now:hh:mm tt}";
+        showInstantModal = true;
+    }
+
+    private async Task CopyToClipboard(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            await JS.InvokeVoidAsync("alert", "Copied meeting link to clipboard:\n" + text);
+        }
+        catch
+        {
+            // fallback
+        }
+    }
+
+    private string? selectedMeetingVoiceNote;
+
+    private async Task OpenMinutesModal(Meeting meeting)
+    {
+        selectedMinutesMeeting = meeting;
+        showMinutesModal = true;
+        isMinutesDocxLoading = true;
+        selectedMinutesDocxUrl = null;
+        StateHasChanged();
+
+        try
+        {
+            selectedMinutesDocxUrl = await MeetingService.GetOrCreateMinutesDocxPathAsync(meeting.Id);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Meetings] Error retrieving docx path: {ex.Message}");
+        }
+        finally
+        {
+            isMinutesDocxLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void CloseMinutesModal()
+    {
+        showMinutesModal = false;
+    }
+
+    private async Task OpenSummaryModal(Meeting meeting)
+    {
+        selectedSummaryMeeting = meeting;
+        selectedMeetingTitle = meeting.Title;
+        selectedMeetingVoiceNote = meeting.VoiceNotePath;
+        selectedSummaryDocxUrl = null;
+        showSummaryModal = true;
+        isAiLoading = true;
+        meetingSummary = "";
+        StateHasChanged();
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                selectedSummaryDocxUrl = await MeetingService.GetOrCreateMinutesDocxPathAsync(meeting.Id);
+                await InvokeAsync(StateHasChanged);
+            }
+            catch { }
+        });
+
+        try
+        {
+            if (!string.IsNullOrEmpty(meeting.MeetingMinutes))
+            {
+                meetingSummary = await AiService.SummarizeTextAsync(meeting.MeetingMinutes);
+            }
+            else
+            {
+                meetingSummary = "No minutes were recorded for this session.";
+            }
+        }
+        catch (Exception ex)
+        {
+            meetingSummary = "AI Summary generation error: " + ex.Message;
+        }
+
+        isAiLoading = false;
+        StateHasChanged();
+    }
+
+    private void CloseSummaryModal()
+    {
+        showSummaryModal = false;
+    }
+
+    private string FormatSummaryMarkdown(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return "<em>No summary available.</em>";
+        var html = System.Net.WebUtility.HtmlEncode(text);
+        html = html.Replace("\n", "<br/>");
+        return html;
+    }
+}
