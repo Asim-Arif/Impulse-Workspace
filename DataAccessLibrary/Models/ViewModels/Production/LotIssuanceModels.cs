@@ -32,6 +32,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
     {
         public bool IsFound { get; set; }
         public bool AlreadyIssued { get; set; }
+        public bool IsLastProcess { get; set; }
         public string Message { get; set; } = string.Empty;
         public List<AvailableLotIssuanceItemModel> Items { get; set; } = new List<AvailableLotIssuanceItemModel>();
     }

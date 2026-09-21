@@ -32,9 +32,10 @@ namespace DataAccessLibrary.DAC.Production
                                   ISNULL(M.VenderName, 'N/A') AS VendorName, ISNULL(M.VendID1, '') AS VendID1,
                                   VI.ProcessID, ISNULL(P.Description, 'N/A') AS ProcessName, ISNULL(VI.ItemID, '') AS ItemID, VI.DT,
                                   VI.Authorized, ISNULL(VI.Closed, 0) AS Closed, ISNULL(VI.IssEmpID, '') AS IssEmpID,
-                                  CASE WHEN M.VenderName LIKE '%FACTORY%' OR M.VendID1 LIKE '%FAC%' OR M.VendID = 79 OR M.VendID = 129 OR M.VendID = (SELECT TOP 1 CAST(DataValue AS BIGINT) FROM GeneralData WHERE DataName = 'FactoryMaker') THEN 1 ELSE 0 END AS IsFactoryMaker,
-                                  CASE WHEN (SELECT COUNT(VRD.EntryID) FROM VendRcvdDetail VRD WHERE VRD.Issue_RefID = VID.EntryID AND VRD.LotNo = VID.LotNo) > 0 THEN 1 ELSE 0 END AS AlreadyReceived
-                           FROM VendIssdDetail VID
+                                   CASE WHEN M.VenderName LIKE '%FACTORY%' OR M.VendID1 LIKE '%FAC%' OR M.VendID = 79 OR M.VendID = 129 OR M.VendID = (SELECT TOP 1 CAST(DataValue AS BIGINT) FROM GeneralData WHERE DataName = 'FactoryMaker') THEN 1 ELSE 0 END AS IsFactoryMaker,
+                                   CASE WHEN (SELECT COUNT(VRD.EntryID) FROM VendRcvdDetail VRD WHERE VRD.Issue_RefID = VID.EntryID AND VRD.LotNo = VID.LotNo) > 0 THEN 1 ELSE 0 END AS AlreadyReceived,
+                                   ISNULL(P.AuthRequired, 0) AS AuthRequired
+                            FROM VendIssdDetail VID
                            INNER JOIN VendIssued VI ON VI.EntryID = VID.RefID
                            LEFT JOIN VMakers M ON VI.VendID = M.VendID
                            LEFT JOIN Processes P ON VI.ProcessID = P.ProcessID
@@ -112,7 +113,8 @@ namespace DataAccessLibrary.DAC.Production
                     nextProcParams.Add("@NextProcID", dbType: DbType.Int32, direction: ParameterDirection.Output);
 
                     await db.ExecuteAsync("SP_GetNextProcID", nextProcParams, trans, commandType: CommandType.StoredProcedure);
-                    int nextProcessId = nextProcParams.Get<int?>("@NextProcID") ?? 0;
+                    int? nextProcIdRaw = nextProcParams.Get<int?>("@NextProcID");
+                    int? nextProcessId = (nextProcIdRaw.HasValue && nextProcIdRaw.Value > 0) ? nextProcIdRaw.Value : (int?)null;
 
                     // Generate LotNo if missing or update MillCertNo on existing lot
                     string lineLotNo = line.LotNo;
@@ -176,7 +178,8 @@ namespace DataAccessLibrary.DAC.Production
                     // Multi-Process Auto Issuance / Receiving check
                     await ProcessMultipleIssueReceiveAsync(db, trans, line.VendIssdDetailEntryID, userName, machineName);
 
-                    // Insert PrintSession record
+                    // Clear and insert PrintSession record (legacy standard)
+                    await db.ExecuteAsync("DELETE FROM PrintSession", transaction: trans);
                     string insertPrintSessionSql = @"INSERT INTO PrintSession (RecieptNo) VALUES (@RecieptNo)";
                     await db.ExecuteAsync(insertPrintSessionSql, new { RecieptNo = receivingReceiptId }, trans);
                 }
@@ -288,7 +291,8 @@ namespace DataAccessLibrary.DAC.Production
                 int snoProc = await db.ExecuteScalarAsync<int?>(snoProcSql, new { ProcessID = processId, ItemID = itemCode }, trans) ?? 0;
 
                 string nextProcSql = @"SELECT TOP 1 ProcessID FROM ItemProcesses WHERE ItemID = @ItemID AND SNo > @SNo ORDER BY SNo";
-                int nextProcId = await db.ExecuteScalarAsync<int?>(nextProcSql, new { ItemID = itemCode, SNo = snoProc }, trans) ?? 0;
+                int? nextProcIdRaw = await db.ExecuteScalarAsync<int?>(nextProcSql, new { ItemID = itemCode, SNo = snoProc }, trans);
+                int? nextProcId = (nextProcIdRaw.HasValue && nextProcIdRaw.Value > 0) ? nextProcIdRaw.Value : (int?)null;
 
                 decimal vrdIssdQty = count == total ? 0 : qty;
 

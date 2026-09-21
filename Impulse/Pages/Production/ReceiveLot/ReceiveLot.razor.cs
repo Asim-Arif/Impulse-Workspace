@@ -331,16 +331,25 @@ namespace Impulse.Pages.Production.ReceiveLot
                     Duration = 5000
                 });
 
+                long issuanceEntryId = LotHeader.EntryID;
+                bool authRequired = LotHeader.AuthRequired;
+
                 if (PrintSlip)
                 {
                     await ReportNavigationService.PrintReportAsync(new ReportRequest
                     {
-                        ReportName = "RcvSlip.rpt",
-                        SelectionFormula = $"{{VendReceived.EntryID}}={rcvHeaderId}"
+                        ReportName = "IssSlipWithRcving.rpt",
+                        SelectionFormula = $"{{VendIssued.EntryID}}={issuanceEntryId}"
                     });
                 }
 
                 ClearForm();
+
+                if (authRequired)
+                {
+                    NavigationManager.NavigateTo($"/production/authorize-received?refId={rcvHeaderId}");
+                    return;
+                }
             }
             catch (Exception ex)
             {

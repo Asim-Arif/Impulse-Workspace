@@ -211,7 +211,7 @@ namespace DataAccessLibrary.DAC.Stock
                             RefID = rcvRefId,
                             ItemID = request.ItemID,
                             Qty = request.Qty,
-                            NextProcessID = nextProcId ?? 0,
+                            NextProcessID = (nextProcId.HasValue && nextProcId.Value > 0) ? nextProcId.Value : (int?)null,
                             ProcessID = request.ProcessID,
                             Opening_RefID = sooEntryId
                         }, trans);

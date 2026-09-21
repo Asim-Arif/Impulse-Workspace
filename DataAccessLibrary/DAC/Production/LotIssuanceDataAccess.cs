@@ -75,6 +75,17 @@ namespace DataAccessLibrary.DAC.Production
 
             if (latestRcvd != null)
             {
+                // Check if lot was received on its final process (NextProcessID is NULL or 0)
+                if (latestRcvd.TargetProcessID <= 0)
+                {
+                    return new LotIssuanceLookupResultModel
+                    {
+                        IsFound = true,
+                        IsLastProcess = true,
+                        Message = $"Lot No [{trimmedLotNo}] has been received on the last process."
+                    };
+                }
+
                 // Check if receiving entry is pending authorization
                 if (latestRcvd.ReqAuth == 1)
                 {
@@ -162,7 +173,7 @@ namespace DataAccessLibrary.DAC.Production
 
             try
             {
-                string receiptId = await _sequenceDataAccess.GetNextMasterPONoAsync(header.DT);
+                string headerReceiptId = await _sequenceDataAccess.GetNextHeaderReceiptIDAsync(header.DT);
 
                 // 1. Insert Header into VendIssued
                 string insertHeaderSql = @"INSERT INTO VendIssued (
@@ -182,7 +193,7 @@ namespace DataAccessLibrary.DAC.Production
                 {
                     header.VendID,
                     header.DT,
-                    RecieptID = receiptId,
+                    RecieptID = headerReceiptId,
                     UserID = userId,
                     header.ProcessID,
                     ItemID = mainItemCode,
@@ -197,6 +208,9 @@ namespace DataAccessLibrary.DAC.Production
                     header.SteelProvided
                 }, trans);
 
+                // Clear PrintSession for clean report generation (legacy standard)
+                await db.ExecuteAsync("DELETE FROM PrintSession", transaction: trans);
+
                 // 2. Process Lines
                 foreach (var line in lines)
                 {
@@ -205,6 +219,8 @@ namespace DataAccessLibrary.DAC.Production
                     {
                         subLotNo = await _sequenceDataAccess.GetNextMainLotNoAsync(header.DT);
                     }
+
+                    string detailReceiptId = await _sequenceDataAccess.GetNextDetailReceiptIDAsync(header.DT);
 
                     string insertLineSql = @"INSERT INTO VendIssdDetail (
                                                 RefID, RecieptID, ItemCode, Rate, IssQty, RcvdQty, ReqAuth, OrderNo, RcvProcessID,
@@ -218,7 +234,7 @@ namespace DataAccessLibrary.DAC.Production
                     long lineEntryId = await db.ExecuteScalarAsync<long>(insertLineSql, new
                     {
                         RefID = headerEntryId,
-                        RecieptID = receiptId,
+                        RecieptID = detailReceiptId,
                         ItemCode = line.ItemCode,
                         Rate = line.Rate,
                         IssQty = line.IssQty,
@@ -256,7 +272,7 @@ namespace DataAccessLibrary.DAC.Production
 
                     // Insert into PrintSession
                     string insertPrintSql = @"INSERT INTO PrintSession (RecieptNo) VALUES (@RecieptNo)";
-                    await db.ExecuteAsync(insertPrintSql, new { RecieptNo = receiptId }, trans);
+                    await db.ExecuteAsync(insertPrintSql, new { RecieptNo = detailReceiptId }, trans);
                 }
 
                 trans.Commit();
@@ -267,6 +283,56 @@ namespace DataAccessLibrary.DAC.Production
                 trans.Rollback();
                 throw;
             }
+        }
+
+        public async Task<List<ProcessPOLookupModel>> GetSubsequentProcessesForSkipAsync(string itemCode, int currentProcessId, bool isReworkLot, int repairType)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+
+            if (isReworkLot && repairType > 0)
+            {
+                string seqSql = @"SELECT ISNULL(SeqNo, 0) FROM RepairTypeProcesses WHERE Repair_RefID = @RepairType AND ProcessID = @ProcessID";
+                int currentSeq = await db.ExecuteScalarAsync<int?>(seqSql, new { RepairType = repairType, ProcessID = currentProcessId }) ?? 0;
+
+                string procSql = @"SELECT ProcessID, Description, SeqNo AS SNO 
+                                   FROM VRepairTypeProcesses 
+                                   WHERE EntryID = @RepairType AND SeqNo > @CurrentSeq 
+                                   ORDER BY SeqNo";
+                return (await db.QueryAsync<ProcessPOLookupModel>(procSql, new { RepairType = repairType, CurrentSeq = currentSeq })).ToList();
+            }
+            else
+            {
+                string snoSql = @"SELECT ISNULL(SNo, 0) FROM ItemProcesses WHERE ItemID = @ItemID AND ProcessID = @ProcessID";
+                int currentSno = await db.ExecuteScalarAsync<int?>(snoSql, new { ItemID = itemCode, ProcessID = currentProcessId }) ?? 0;
+
+                string procSql = @"SELECT ProcessID, Description, ItemSNo AS SNO 
+                                   FROM VItemProcesses 
+                                   WHERE IsExist = @ItemID AND ItemSNo > @CurrentSno 
+                                   ORDER BY ItemSNo";
+                return (await db.QueryAsync<ProcessPOLookupModel>(procSql, new { ItemID = itemCode, CurrentSno = currentSno })).ToList();
+            }
+        }
+
+        public async Task<bool> SkipProcessAsync(string itemCode, int currentProcessId, int newProcessId, string lotNo)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+
+            string updateSql = @"UPDATE VendRcvdDetail 
+                                 SET NextProcessID = @NewProcessID 
+                                 WHERE ItemCode = @ItemCode 
+                                   AND RcvdQty > IssQty 
+                                   AND NextProcessID = @CurrentProcessID 
+                                   AND LotNo = @LotNo";
+
+            int rows = await db.ExecuteAsync(updateSql, new
+            {
+                NewProcessID = newProcessId,
+                ItemCode = itemCode,
+                CurrentProcessID = currentProcessId,
+                LotNo = lotNo.Trim()
+            });
+
+            return rows > 0;
         }
     }
 }

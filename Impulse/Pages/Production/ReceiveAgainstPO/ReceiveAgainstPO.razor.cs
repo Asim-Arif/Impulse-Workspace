@@ -330,12 +330,14 @@ namespace Impulse.Pages.Production.ReceiveAgainstPO
                     Duration = 5000
                 });
 
+                long issuanceEntryId = MasterPO.EntryID;
+
                 if (PrintSlip)
                 {
                     await ReportNavigationService.PrintReportAsync(new ReportRequest
                     {
-                        ReportName = "RcvSlip.rpt",
-                        SelectionFormula = $"{{VendReceived.EntryID}}={rcvHeaderId}"
+                        ReportName = "IssSlipWithRcving.rpt",
+                        SelectionFormula = $"{{VendIssued.EntryID}}={issuanceEntryId}"
                     });
                 }
 

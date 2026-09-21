@@ -39,6 +39,7 @@ namespace DataAccessLibrary.DAC.Production
                                   ISNULL(VR.Unit, 'Pcs') AS Unit, (SELECT ISNULL(Insp_EmpID, '') FROM VendRcvdDetail WHERE EntryID = VR.EntryID) AS Insp_EmpID
                            FROM VVendRcvItemsrpt VR
                            WHERE VR.ReqAuth = 1
+                             AND (@RefId IS NULL OR @RefId = 0 OR VR.RefID = @RefId)
                              AND (@VendID = 0 OR VR.VendID = @VendID)
                              AND (@ProcessID = 0 OR VR.ProcessID = @ProcessID)
                              AND (@LotNo = '' OR VR.LotNo = @LotNo)
@@ -49,6 +50,7 @@ namespace DataAccessLibrary.DAC.Production
 
             var items = (await db.QueryAsync<PendingAuthorizeReceivedItemModel>(sql, new
             {
+                RefId = filter.RefId ?? 0,
                 VendID = filter.VendID,
                 ProcessID = filter.ProcessID,
                 LotNo = filter.LotNo ?? "",

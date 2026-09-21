@@ -88,32 +88,44 @@
                     <div class="row g-3 align-items-center">
                         
                         <!-- 1. Lot No Search Input (First Control) -->
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold text-primary mb-1" style="font-size:0.82rem;">
-                                Enter Lot No. <span class="text-danger">*</span>
-                            </label>
-                            <div class="input-group input-group-sm">
-                                <span class="input-group-text bg-primary text-white"><i class="fas fa-barcode"></i></span>
+                        <div class="col-12 col-sm-auto">
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <label class="form-label fw-bold text-primary mb-0" style="font-size:0.82rem;">
+                                    <i class="fas fa-barcode me-1"></i>Enter Lot No. <span class="text-danger">*</span>
+                                </label>
+                                @if (StagedItems.Any())
+                                {
+                                    <button type="button" 
+                                            class="btn btn-link btn-sm text-primary p-0 ms-2 text-decoration-underline fw-bold shadow-none" 
+                                            style="font-size: 0.78rem;" 
+                                            title="Skip to another process in sequence"
+                                            @onclick="OpenSkipProcessModal">
+                                        <i class="fas fa-forward me-1"></i>Skip Process
+                                    </button>
+                                }
+                            </div>
+                            <div class="input-group input-group-sm flex-nowrap" style="width: auto;">
                                 <input type="text" class="form-control form-control-sm fw-bold text-uppercase border-primary"
-                                       placeholder="Type Lot No &amp; Press Enter..."
+                                       placeholder="Lot No..."
+                                       style="width: 130px;"
                                        @bind="SearchLotNo"
                                        @onkeyup="HandleLotSearchKeyUp"
                                        autofocus />
-                                <button type="button" class="btn btn-primary btn-sm fw-bold" @onclick="LookupLotAsync" disabled="@IsSearching">
+                                <button type="button" class="btn btn-primary btn-sm fw-bold text-nowrap px-2" @onclick="LookupLotAsync" disabled="@IsSearching">
                                     @if (IsSearching)
                                     {
                                         <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                                     }
                                     else
                                     {
-                                        <i class="fas fa-search me-1"></i> <text>Fetch</text>
+                                        <i class="fas fa-search me-1"></i><text>Fetch</text>
                                     }
                                 </button>
                             </div>
                         </div>
 
                         <!-- 2. Target Process (Read-Only / Disabled) -->
-                        <div class="col-md-3">
+                        <div class="col-12 col-sm-auto" style="min-width: 170px;">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
                                 Target Process
                             </label>
@@ -127,7 +139,7 @@
                         </div>
 
                         <!-- 3. Target Maker / Vendor -->
-                        <div class="col-md-4">
+                        <div class="col-12 col-md">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
                                 Target Maker / Vendor <span class="text-danger">*</span>
                             </label>
@@ -147,7 +159,7 @@
                         </div>
 
                         <!-- 4. Batch No (Auto-populated) -->
-                        <div class="col-md-2">
+                        <div class="col-12 col-sm-auto" style="width: 140px;">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
                                 Batch No.
                             </label>
@@ -397,3 +409,68 @@
         </div>
     </div>
 }
+
+<!-- SKIP PROCESS MODAL -->
+@if (ShowSkipProcessModal && SelectedItemForSkip != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0, 0, 0, 0.6); z-index: 1060;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0" style="border-radius: 12px;">
+                <div class="modal-header py-2 bg-light border-bottom">
+                    <h6 class="modal-title fw-bold text-primary mb-0">
+                        <i class="fas fa-forward me-2"></i>Skip Process — Lot [@SelectedItemForSkip.LotNo]
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="CloseSkipProcessModal" disabled="@IsSkippingProcess"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div class="mb-3 p-2 bg-light rounded border">
+                        <div class="row g-2" style="font-size: 0.85rem;">
+                            <div class="col-6">
+                                <span class="text-secondary d-block">Item Name / Code:</span>
+                                <strong class="text-dark">@SelectedItemForSkip.ItemName</strong>
+                                <span class="text-muted d-block" style="font-size: 0.78rem;">(@SelectedItemForSkip.ItemCode)</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-secondary d-block">Current Target Process:</span>
+                                <span class="badge bg-secondary">@SelectedItemForSkip.TargetProcessName</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label fw-bold text-dark mb-1" style="font-size: 0.85rem;">
+                            Select Next Process to Skip To <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select form-select-sm fw-bold border-primary" @bind="SelectedSkipProcessID" disabled="@IsSkippingProcess">
+                            @foreach (var proc in AvailableSkipProcesses)
+                            {
+                                <option value="@proc.ProcessID">@proc.Description</option>
+                            }
+                        </select>
+                        <div class="form-text text-muted" style="font-size: 0.75rem;">
+                            <i class="fas fa-info-circle me-1"></i>Only eligible subsequent processes in this item's sequence are displayed.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer py-2 bg-light border-top d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-3" @onclick="CloseSkipProcessModal" disabled="@IsSkippingProcess">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary px-3 fw-bold" @onclick="ConfirmSkipProcessAsync" disabled="@(SelectedSkipProcessID <= 0 || IsSkippingProcess)">
+                        @if (IsSkippingProcess)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <text>Saving...</text>
+                        }
+                        else
+                        {
+                            <i class="fas fa-check me-1"></i>
+                            <text>Confirm Skip Process</text>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+

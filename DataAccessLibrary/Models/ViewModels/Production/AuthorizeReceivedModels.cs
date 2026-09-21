@@ -78,6 +78,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
 
     public class AuthorizeReceivedFilterModel
     {
+        public long? RefId { get; set; }
         public DateTime? DateFrom { get; set; }
         public DateTime? DateTo { get; set; }
         public long VendID { get; set; } = 0;

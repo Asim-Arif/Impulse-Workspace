@@ -67,6 +67,12 @@ namespace Impulse.Pages.Production.LotIssuance
         public string PreviewImageBase64 { get; set; } = string.Empty;
         public string PreviewItemCode { get; set; } = string.Empty;
 
+        public bool ShowSkipProcessModal { get; set; } = false;
+        public bool IsSkippingProcess { get; set; } = false;
+        public List<ProcessPOLookupModel> AvailableSkipProcesses { get; set; } = new List<ProcessPOLookupModel>();
+        public int SelectedSkipProcessID { get; set; } = 0;
+        public AvailableLotIssuanceItemModel? SelectedItemForSkip { get; set; }
+
         public decimal TotalAvailableQty => StagedItems.Sum(i => i.AvailableQty);
         public decimal TotalIssuanceQty => StagedItems.Sum(i => i.IssuanceQty);
         public decimal TotalIssuanceValue => StagedItems.Sum(i => i.IssuanceQty * i.Rate);
@@ -146,10 +152,29 @@ namespace Impulse.Pages.Production.LotIssuance
             {
                 var result = await LotIssuanceService.LookupLotForIssuanceAsync(SearchLotNo.Trim());
 
+                if (result.IsLastProcess)
+                {
+                    StagedItems.Clear();
+                    SelectedProcessID = 0;
+                    SelectedMaker = null;
+                    AvailableMakers.Clear();
+                    BatchNo = string.Empty;
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Info,
+                        Summary = "Last Process Received",
+                        Detail = result.Message,
+                        Duration = 5000
+                    });
+                    return;
+                }
+
                 if (result.AlreadyIssued)
                 {
                     StagedItems.Clear();
                     SelectedProcessID = 0;
+                    SelectedMaker = null;
+                    AvailableMakers.Clear();
                     BatchNo = string.Empty;
                     NotificationService.Notify(new Radzen.NotificationMessage
                     {
@@ -165,6 +190,8 @@ namespace Impulse.Pages.Production.LotIssuance
                 {
                     StagedItems.Clear();
                     SelectedProcessID = 0;
+                    SelectedMaker = null;
+                    AvailableMakers.Clear();
                     BatchNo = string.Empty;
                     NotificationService.Notify(new Radzen.NotificationMessage
                     {
@@ -175,6 +202,11 @@ namespace Impulse.Pages.Production.LotIssuance
                     });
                     return;
                 }
+
+                // Clear previous lot details so only 1 lot is shown at a time
+                StagedItems.Clear();
+                SelectedMaker = null;
+                AvailableMakers.Clear();
 
                 var lotItems = result.Items;
                 var firstItem = lotItems.First();
@@ -191,11 +223,8 @@ namespace Impulse.Pages.Production.LotIssuance
 
                 foreach (var item in lotItems)
                 {
-                    if (!StagedItems.Any(s => s.VendIssdDetailEntryID == item.VendIssdDetailEntryID))
-                    {
-                        item.IssuanceQty = item.AvailableQty;
-                        StagedItems.Add(item);
-                    }
+                    item.IssuanceQty = item.AvailableQty;
+                    StagedItems.Add(item);
                 }
 
                 NotificationService.Notify(new Radzen.NotificationMessage
@@ -397,6 +426,133 @@ namespace Impulse.Pages.Production.LotIssuance
             finally
             {
                 IsSaving = false;
+            }
+        }
+
+        public async Task OpenSkipProcessModal()
+        {
+            SelectedItemForSkip = StagedItems.FirstOrDefault();
+            if (SelectedItemForSkip == null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "No Lot Loaded",
+                    Detail = "Please enter and fetch a lot number first.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            try
+            {
+                AvailableSkipProcesses = await LotIssuanceService.GetSubsequentProcessesForSkipAsync(
+                    SelectedItemForSkip.ItemCode,
+                    SelectedItemForSkip.TargetProcessID,
+                    SelectedItemForSkip.ReWorkLot == 1,
+                    SelectedItemForSkip.RepairType);
+
+                if (!AvailableSkipProcesses.Any())
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Info,
+                        Summary = "No Subsequent Processes",
+                        Detail = "There are no further processes available to skip to for this item.",
+                        Duration = 4000
+                    });
+                    return;
+                }
+
+                SelectedSkipProcessID = AvailableSkipProcesses.First().ProcessID;
+                ShowSkipProcessModal = true;
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Error",
+                    Detail = ex.Message,
+                    Duration = 5000
+                });
+            }
+        }
+
+        public void CloseSkipProcessModal()
+        {
+            ShowSkipProcessModal = false;
+            AvailableSkipProcesses.Clear();
+            SelectedSkipProcessID = 0;
+            SelectedItemForSkip = null;
+        }
+
+        public async Task ConfirmSkipProcessAsync()
+        {
+            if (SelectedItemForSkip == null || SelectedSkipProcessID <= 0)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Selection Required",
+                    Detail = "Please select a target process to skip to.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            IsSkippingProcess = true;
+            try
+            {
+                var success = await LotIssuanceService.SkipProcessAsync(
+                    SelectedItemForSkip.ItemCode,
+                    SelectedItemForSkip.TargetProcessID,
+                    SelectedSkipProcessID,
+                    SelectedItemForSkip.LotNo);
+
+                if (success)
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Success,
+                        Summary = "Process Skipped",
+                        Detail = $"Lot [{SelectedItemForSkip.LotNo}] skipped to new process successfully.",
+                        Duration = 4000
+                    });
+
+                    CloseSkipProcessModal();
+
+                    // Auto-refresh the page to show the next process details
+                    StagedItems.Clear();
+                    SelectedProcessID = 0;
+                    SelectedMaker = null;
+                    AvailableMakers.Clear();
+                    await LookupLotAsync();
+                }
+                else
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Error,
+                        Summary = "Skip Process Failed",
+                        Detail = "Could not update the next process in database.",
+                        Duration = 4000
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Error",
+                    Detail = ex.Message,
+                    Duration = 5000
+                });
+            }
+            finally
+            {
+                IsSkippingProcess = false;
             }
         }
     }

@@ -112,7 +112,8 @@ namespace DataAccessLibrary.DAC.Production
                     nextProcParams.Add("@NextProcID", dbType: DbType.Int32, direction: ParameterDirection.Output);
 
                     await db.ExecuteAsync("SP_GetNextProcID", nextProcParams, trans, commandType: CommandType.StoredProcedure);
-                    int nextProcessId = nextProcParams.Get<int?>("@NextProcID") ?? 0;
+                    int? nextProcIdRaw = nextProcParams.Get<int?>("@NextProcID");
+                    int? nextProcessId = (nextProcIdRaw.HasValue && nextProcIdRaw.Value > 0) ? nextProcIdRaw.Value : (int?)null;
 
                     // Generate LotNo if not present
                     string lineLotNo = line.LotNo;

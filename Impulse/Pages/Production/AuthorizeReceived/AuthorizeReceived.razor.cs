@@ -28,6 +28,10 @@ namespace Impulse.Pages.Production.AuthorizeReceived
         [Inject]
         public IHttpContextAccessor HttpContextAccessor { get; set; } = default!;
 
+        [Parameter]
+        [SupplyParameterFromQuery(Name = "refId")]
+        public long? RefId { get; set; }
+
         public AuthorizeReceivedFilterModel Filter { get; set; } = new AuthorizeReceivedFilterModel();
         public List<PendingAuthorizeReceivedItemModel> PendingItems { get; set; } = new List<PendingAuthorizeReceivedItemModel>();
 
@@ -56,12 +60,33 @@ namespace Impulse.Pages.Production.AuthorizeReceived
 
         protected override async Task OnInitializedAsync()
         {
+            if (RefId.HasValue && RefId.Value > 0)
+            {
+                Filter.RefId = RefId.Value;
+            }
+
             AvailableMakers = await AuthorizeReceivedService.GetMakersAsync();
             AvailableProcesses = await AuthorizeReceivedService.GetProcessesAsync();
             AvailableWastageTypes = await AuthorizeReceivedService.GetWastageTypesAsync();
             AvailableRepairTypes = await AuthorizeReceivedService.GetRepairTypesAsync();
             AvailableInspectors = await AuthorizeReceivedService.GetInspectorsAsync();
 
+            await LoadPendingItemsAsync();
+        }
+
+        protected override async Task OnParametersSetAsync()
+        {
+            if (RefId.HasValue && RefId.Value > 0 && Filter.RefId != RefId.Value)
+            {
+                Filter.RefId = RefId.Value;
+                await LoadPendingItemsAsync();
+            }
+        }
+
+        public async Task ClearRefIdFilterAsync()
+        {
+            Filter.RefId = null;
+            RefId = null;
             await LoadPendingItemsAsync();
         }
 

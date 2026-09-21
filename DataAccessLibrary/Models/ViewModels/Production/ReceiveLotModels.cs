@@ -20,5 +20,6 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string IssEmpID { get; set; } = string.Empty;
         public bool IsFactoryMaker { get; set; }
         public bool AlreadyReceived { get; set; }
+        public bool AuthRequired { get; set; }
     }
 }

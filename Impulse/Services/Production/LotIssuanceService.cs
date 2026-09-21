@@ -38,5 +38,15 @@ namespace Impulse.Services.Production
         {
             return _dataAccess.SaveLotIssuanceAsync(header, lines, userName, userId, machineName);
         }
+
+        public Task<List<ProcessPOLookupModel>> GetSubsequentProcessesForSkipAsync(string itemCode, int currentProcessId, bool isReworkLot, int repairType)
+        {
+            return _dataAccess.GetSubsequentProcessesForSkipAsync(itemCode, currentProcessId, isReworkLot, repairType);
+        }
+
+        public Task<bool> SkipProcessAsync(string itemCode, int currentProcessId, int newProcessId, string lotNo)
+        {
+            return _dataAccess.SkipProcessAsync(itemCode, currentProcessId, newProcessId, lotNo);
+        }
     }
 }
