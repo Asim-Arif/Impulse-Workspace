@@ -25,6 +25,7 @@ namespace Impulse.Pages.Production.MakerPOList
         [Inject] public IHttpContextAccessor HttpContextAccessor { get; set; } = default!;
         [Inject] public IBlazorContextMenuService BlazorContextMenuService { get; set; } = default!;
         [Inject] public IJSRuntime JSRuntime { get; set; } = default!;
+        [Inject] public SecurityService SecurityService { get; set; } = default!;
 
         public MakerPOListFilter Filter { get; set; } = new MakerPOListFilter();
         public List<MakerPOListItem> AllItems { get; set; } = new List<MakerPOListItem>();
@@ -491,6 +492,15 @@ namespace Impulse.Pages.Production.MakerPOList
                     Detail = "Please select at least one order to delete.",
                     Duration = 3000
                 });
+                return;
+            }
+
+            // Verify Password via Global Security Service
+            bool isAuthorized = await SecurityService.VerifyActionAsync("DeleteProdIss");
+
+            if (!isAuthorized)
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Unauthorized", "Incorrect password or action cancelled.");
                 return;
             }
 

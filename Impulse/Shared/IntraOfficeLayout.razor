@@ -81,27 +81,40 @@
                     <i class="bi bi-robot text-info"></i> AI Assistant
                     <span class="nav-badge" style="background: linear-gradient(135deg, #6366f1, #a855f7); color: white;">GPT-4o</span>
                 </a>
+                <a href="/office/arcade" class="nav-item @(IsActive("/office/arcade"))">
+                    <i class="bi bi-controller"></i> Arcade Games
+                </a>
 
                 <!-- EXPORT CRM & SALES -->
                 <div class="nav-section-title mt-3">EXPORT CRM & SALES</div>
                 <a href="/office/leads" class="nav-item @(IsActive("/office/leads"))">
                     <i class="bi bi-funnel"></i> Leads & Pipeline
                 </a>
-                <a href="/customers" class="nav-item">
+                <a href="/office/customer-360" class="nav-item @(IsActive("/office/customer-360") == "active" || IsActive("/customers") == "active" ? "active" : "")">
                     <i class="bi bi-buildings"></i> Customer 360° Hub
+                </a>
+                <a href="/office/reports" class="nav-item @(IsActive("/office/reports") == "active" || IsActive("/reports") == "active" ? "active" : "")">
+                    <i class="bi bi-bar-chart-line"></i> CRM Reports
+                </a>
+                <a href="/office/templates" class="nav-item @(IsActive("/office/templates") == "active" || IsActive("/templates") == "active" ? "active" : "")">
+                    <i class="bi bi-envelope-paper"></i> Email Templates
                 </a>
 
 
                 <!-- SYSTEM ADMIN -->
-                @if (isAdmin)
-                {
-                    <div class="nav-section-title mt-3">ADMINISTRATION</div>
-                    <a href="/setup/users" class="nav-item">
-                        <i class="bi bi-person-gear"></i> User Management
-                    </a>
-                }
+                <div class="nav-section-title mt-3">ADMINISTRATION</div>
+                <a href="/setup/users" class="nav-item">
+                    <i class="bi bi-person-gear"></i> User Management
+                </a>
+                <a href="/office/admin/minute-types" class="nav-item @(IsActive("/office/admin/minute-types") == "active" || IsActive("/admin/minute-types") == "active" ? "active" : "")">
+                    <i class="bi bi-tags"></i> Minute Types
+                </a>
+                <a href="/office/admin/email-settings" class="nav-item @(IsActive("/office/admin/email-settings") == "active" || IsActive("/admin/email-settings") == "active" || IsActive("/settings/email") == "active" ? "active" : "")">
+                    <i class="bi bi-envelope-at"></i> Email & SMTP Settings
+                </a>
             </div>
         </nav>
+
 
         <div class="sidebar-user">
             <div class="user-avatar">
@@ -282,8 +295,8 @@
             <StickyNotesWidget />
             <AiChatbotWidget />
         }
-        <NotificationToaster />
     </div>
+    <NotificationToaster />
 </div>
 
 @code {
@@ -482,18 +495,23 @@
         100% { transform: scale(1); }
     }
 
+    .notification-bell-container {
+        position: relative !important;
+        z-index: 100000 !important;
+    }
+
     .notification-backdrop {
-        position: fixed;
+        position: fixed !important;
         top: 0;
         left: 0;
         width: 100vw;
         height: 100vh;
-        z-index: 1040;
+        z-index: 99998 !important;
         background: transparent;
     }
 
     .notification-flyout {
-        position: absolute;
+        position: absolute !important;
         top: 46px;
         right: 0;
         width: 380px;
@@ -501,8 +519,8 @@
         background: #ffffff;
         border-radius: 12px;
         border: 1px solid #e2e8f0;
-        box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.08);
-        z-index: 1050;
+        box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.2), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
+        z-index: 99999 !important;
         display: flex;
         flex-direction: column;
         overflow: hidden;

@@ -1,0 +1,405 @@
+@page "/admin/email-settings"
+@page "/office/admin/email-settings"
+@page "/settings/email"
+@layout IntraOfficeLayout
+@using DataAccessLibrary.Models.IntraOffice
+@using Impulse.Services.IntraOffice
+@inject IIntraOfficeService IntraOfficeService
+@inject IEmailEncryptionService EncryptionService
+@inject IEmailService EmailService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
+
+<PageTitle>Email & SMTP Settings - IntraCom CRM</PageTitle>
+
+<div class="container-fluid p-0" style="max-width: 1050px;">
+    <!-- Page Header -->
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1">
+                    <i class="bi bi-shield-lock-fill me-1"></i> AES-256 Encrypted
+                </span>
+                <span class="badge @(isConfigured ? "bg-success" : "bg-warning") bg-opacity-10 @(isConfigured ? "text-success" : "text-warning") border @(isConfigured ? "border-success" : "border-warning") border-opacity-25 rounded-pill px-3 py-1">
+                    <i class="bi @(isConfigured ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") me-1"></i>
+                    @(isConfigured ? "Configured & Active" : "Not Configured")
+                </span>
+            </div>
+            <h3 class="fw-bold mb-1">Email & SMTP Gateway Settings</h3>
+            <p class="text-muted small mb-0">
+                Configure mail credentials used by AWM Systems to dispatch quotations, shipping pre-alerts, customer statements, and workflow approvals.
+            </p>
+        </div>
+        <div>
+            <a href="/office/dashboard" class="btn btn-outline-secondary btn-sm shadow-sm rounded-pill px-3">
+                <i class="bi bi-arrow-left me-1"></i> IntraOffice Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Alert Notifications -->
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show shadow-sm d-flex align-items-center gap-2 mb-4" role="alert">
+            <i class="bi bi-check-circle-fill fs-5"></i>
+            <div>@successMessage</div>
+            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm d-flex align-items-center gap-2 mb-4" role="alert">
+            <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+            <div>@errorMessage</div>
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+
+    <div class="row g-4">
+        <!-- Main Form Column -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0" style="border-radius: 14px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);">
+                <div class="card-body p-4">
+                    <h5 class="fw-bold mb-3 d-flex align-items-center gap-2">
+                        <i class="bi bi-envelope-at text-primary"></i> SMTP Configuration
+                    </h5>
+
+                    <!-- Quick Preset Selectors -->
+                    <div class="mb-4 p-3 bg-light rounded-3 border">
+                        <label class="form-label small fw-bold text-muted text-uppercase mb-2">Quick Provider Presets</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" @onclick='() => ApplyPreset("yahoo")'>
+                                <i class="bi bi-envelope me-1"></i> Yahoo Mail (465 SSL)
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" @onclick='() => ApplyPreset("yahoo587")'>
+                                <i class="bi bi-envelope me-1"></i> Yahoo Mail (587 TLS)
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3" @onclick='() => ApplyPreset("gmail")'>
+                                <i class="bi bi-google me-1"></i> Google Gmail
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-info rounded-pill px-3" @onclick='() => ApplyPreset("outlook")'>
+                                <i class="bi bi-microsoft me-1"></i> Outlook / O365
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" @onclick='() => ApplyPreset("custom")'>
+                                <i class="bi bi-hdd-network me-1"></i> Custom SMTP
+                            </button>
+                        </div>
+                    </div>
+
+                    <form @onsubmit="SaveConfigurationAsync">
+                        <div class="row g-3">
+                            <!-- Sender Email -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">Sender Email Address <span class="text-danger">*</span></label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-white"><i class="bi bi-envelope text-muted"></i></span>
+                                    <input type="email" class="form-control" placeholder="e.g. exports@awmsystems.com" @bind="config.SenderEmail" required />
+                                </div>
+                                <div class="form-text text-xs">Used as authentication username and From address.</div>
+                            </div>
+
+                            <!-- Sender Display Name -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">Sender Display Name</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-white"><i class="bi bi-person text-muted"></i></span>
+                                    <input type="text" class="form-control" placeholder="AWM Systems Notifications" @bind="config.SenderName" />
+                                </div>
+                                <div class="form-text text-xs">The friendly name shown in the recipient's inbox.</div>
+                            </div>
+
+                            <!-- Password (Encrypted) -->
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <label class="form-label fw-semibold small mb-0">
+                                        Password / App-Specific Password <span class="text-danger">*</span>
+                                    </label>
+                                    @if (!string.IsNullOrEmpty(config.EncryptedPassword))
+                                    {
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25" style="font-size: 0.72rem;">
+                                            <i class="bi bi-lock-fill me-1"></i> Saved & Encrypted
+                                        </span>
+                                    }
+                                </div>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-white"><i class="bi bi-key text-muted"></i></span>
+                                    <input type="@(showPassword ? "text" : "password")" 
+                                           class="form-control" 
+                                           placeholder="@(string.IsNullOrEmpty(config.EncryptedPassword) ? "Enter email account password" : "Leave blank to keep existing encrypted password")" 
+                                           @bind="plainPasswordInput" />
+                                    <button type="button" class="btn btn-outline-secondary" @onclick="() => showPassword = !showPassword" title="Toggle visibility">
+                                        <i class="bi @(showPassword ? "bi-eye-slash" : "bi-eye")"></i>
+                                    </button>
+                                </div>
+                                <div class="form-text text-xs mt-1">
+                                    <i class="bi bi-info-circle me-1 text-primary"></i>
+                                    <strong>Yahoo Mail / Gmail notice:</strong> Please generate and use an <strong>App Password</strong> from your Yahoo/Google Account Security settings rather than your primary login password.
+                                </div>
+                            </div>
+
+                            <!-- SMTP Host -->
+                            <div class="col-md-8">
+                                <label class="form-label fw-semibold small">SMTP Server Host <span class="text-danger">*</span></label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-white"><i class="bi bi-server text-muted"></i></span>
+                                    <input type="text" class="form-control" placeholder="e.g. smtp.mail.yahoo.com" @bind="config.SmtpServer" required />
+                                </div>
+                            </div>
+
+                            <!-- SMTP Port -->
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold small">SMTP Port <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control form-control-sm" placeholder="587" @bind="config.SmtpPort" required />
+                            </div>
+
+                            <!-- SSL Checkbox -->
+                            <div class="col-12">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="sslSwitch" @bind="config.EnableSsl" />
+                                    <label class="form-check-label fw-semibold small" for="sslSwitch">
+                                        Enable SSL / TLS Security
+                                    </label>
+                                </div>
+                                <div class="form-text text-xs">Required for almost all modern mail providers (Port 465 SSL or Port 587 STARTTLS).</div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4" />
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="submit" class="btn btn-primary btn-sm rounded-pill px-4 fw-semibold shadow-sm" disabled="@isSaving">
+                                @if (isSaving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                    <span>Encrypting & Saving...</span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-save me-1"></i>
+                                    <span>Save & Encrypt Configuration</span>
+                                }
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Connection Test & Instructions Column -->
+        <div class="col-lg-4">
+            <!-- Connection Test Card -->
+            <div class="card shadow-sm border-0 mb-4" style="border-radius: 14px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);">
+                <div class="card-body p-4">
+                    <h6 class="fw-bold mb-3 d-flex align-items-center gap-2">
+                        <i class="bi bi-send-check text-success"></i> Test Connection
+                    </h6>
+                    <p class="text-muted text-xs mb-3" style="font-size: 0.82rem;">
+                        Send an automated test message to verify that your credentials and firewall permit outbound SMTP traffic.
+                    </p>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Recipient Email Address</label>
+                        <input type="email" class="form-control form-control-sm" 
+                               placeholder="test@example.com (or leave blank to send to sender)" 
+                               @bind="testRecipientEmail" />
+                    </div>
+
+                    <button type="button" class="btn btn-outline-success btn-sm rounded-pill w-100 fw-semibold" 
+                            @onclick="RunConnectionTestAsync" 
+                            disabled="@(isTesting || isSaving)">
+                        @if (isTesting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            <span>Connecting to SMTP...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-broadcast me-1"></i>
+                            <span>Send Test Email</span>
+                        }
+                    </button>
+
+                    @if (testResultMessage != null)
+                    {
+                        <div class="alert @(testResultSuccess ? "alert-success" : "alert-danger") mt-3 mb-0 p-2 text-xs" style="font-size: 0.8rem; border-radius: 8px;">
+                            <i class="bi @(testResultSuccess ? "bi-check-circle-fill" : "bi-x-circle-fill") me-1"></i>
+                            @testResultMessage
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Provider Presets Guide -->
+            <div class="card shadow-sm border-0" style="border-radius: 14px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);">
+                <div class="card-body p-4">
+                    <h6 class="fw-bold mb-3 d-flex align-items-center gap-2">
+                        <i class="bi bi-question-circle text-info"></i> Setup Tips
+                    </h6>
+                    <ul class="text-xs text-muted ps-3 mb-0" style="font-size: 0.82rem; line-height: 1.6;">
+                        <li class="mb-2"><strong>Yahoo Mail:</strong> Host: <code>smtp.mail.yahoo.com</code>, Port: <code>465</code> (SSL) or <code>587</code> (TLS). Generate an App Password in Account Security.</li>
+                        <li class="mb-2"><strong>Gmail:</strong> Host: <code>smtp.gmail.com</code>, Port: <code>587</code> (TLS). Enable 2FA, then generate an <em>App Password</em> under Google Account Security.</li>
+                        <li class="mb-2"><strong>Outlook / O365:</strong> Host: <code>smtp.office365.com</code>, Port: <code>587</code> (STARTTLS).</li>
+                        <li><strong>Passwords:</strong> All passwords are encrypted with AES-256 before database insertion.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private EmailConfiguration config = new();
+    private string plainPasswordInput = "";
+    private bool showPassword = false;
+    private bool isConfigured = false;
+    private bool isSaving = false;
+    private bool isTesting = false;
+    private string? successMessage;
+    private string? errorMessage;
+    private string testRecipientEmail = "";
+    private string? testResultMessage;
+    private bool testResultSuccess = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadConfigurationAsync();
+    }
+
+    private async Task LoadConfigurationAsync()
+    {
+        var existing = await IntraOfficeService.GetEmailConfigurationAsync();
+        if (existing != null)
+        {
+            config = existing;
+            isConfigured = !string.IsNullOrWhiteSpace(config.SenderEmail);
+        }
+    }
+
+    private void ApplyPreset(string provider)
+    {
+        switch (provider.ToLower())
+        {
+            case "yahoo":
+                config.SmtpServer = "smtp.mail.yahoo.com";
+                config.SmtpPort = 465;
+                config.EnableSsl = true;
+                break;
+            case "yahoo587":
+                config.SmtpServer = "smtp.mail.yahoo.com";
+                config.SmtpPort = 587;
+                config.EnableSsl = true;
+                break;
+            case "gmail":
+                config.SmtpServer = "smtp.gmail.com";
+                config.SmtpPort = 587;
+                config.EnableSsl = true;
+                break;
+            case "outlook":
+                config.SmtpServer = "smtp.office365.com";
+                config.SmtpPort = 587;
+                config.EnableSsl = true;
+                break;
+            case "custom":
+                config.SmtpServer = "";
+                config.SmtpPort = 587;
+                config.EnableSsl = true;
+                break;
+        }
+        StateHasChanged();
+    }
+
+    private async Task SaveConfigurationAsync()
+    {
+        isSaving = true;
+        successMessage = null;
+        errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(plainPasswordInput))
+            {
+                config.EncryptedPassword = EncryptionService.Encrypt(plainPasswordInput.Trim());
+            }
+            else if (string.IsNullOrEmpty(config.EncryptedPassword))
+            {
+                errorMessage = "Please enter an account password or app-specific password.";
+                isSaving = false;
+                return;
+            }
+
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            config.UpdatedBy = authState.User.Identity?.Name ?? "Administrator";
+            config.Username = config.SenderEmail;
+            config.UpdatedAt = DateTime.UtcNow;
+
+            var saved = await IntraOfficeService.SaveEmailConfigurationAsync(config);
+            if (saved)
+            {
+                isConfigured = true;
+                plainPasswordInput = "";
+                successMessage = "Email & SMTP configuration saved and encrypted successfully!";
+            }
+            else
+            {
+                errorMessage = "Failed to save configuration to database.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Error saving configuration: " + ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RunConnectionTestAsync()
+    {
+        isTesting = true;
+        testResultMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var effectivePassword = plainPasswordInput;
+            if (string.IsNullOrWhiteSpace(effectivePassword) && !string.IsNullOrEmpty(config.EncryptedPassword))
+            {
+                effectivePassword = EncryptionService.Decrypt(config.EncryptedPassword);
+            }
+
+            if (string.IsNullOrWhiteSpace(config.SenderEmail))
+            {
+                testResultMessage = "Please enter Sender Email Address first.";
+                testResultSuccess = false;
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(effectivePassword))
+            {
+                testResultMessage = "Please enter password before testing.";
+                testResultSuccess = false;
+                return;
+            }
+
+            var recipient = string.IsNullOrWhiteSpace(testRecipientEmail) ? config.SenderEmail : testRecipientEmail;
+            var result = await EmailService.TestEmailConfigurationAsync(recipient, config, effectivePassword);
+
+            testResultSuccess = result.Success;
+            testResultMessage = result.Message;
+        }
+        catch (Exception ex)
+        {
+            testResultSuccess = false;
+            testResultMessage = "Test failed: " + ex.Message;
+        }
+        finally
+        {
+            isTesting = false;
+            StateHasChanged();
+        }
+    }
+}

@@ -11,7 +11,9 @@
 
 @foreach (var note in notes)
 {
-    <div class="sticky-note" style="left:@(note.XPos)px; top:@(note.YPos)px; background-color: @GetColorHex(note.Color);" 
+    var isMin = minimizedNoteIds.Contains(note.Id);
+    <div class="sticky-note @(isMin ? "minimized" : "")" 
+         style="left:@(note.XPos)px; top:@(note.YPos)px; background-color: @GetColorHex(note.Color);" 
          id="note-@note.Id" data-id="@note.Id">
         
         <div class="sticky-header" onmousedown="beginDragJS(event, @note.Id)">
@@ -21,13 +23,17 @@
                 <option value="pink" selected="@(note.Color == "pink")">Pink</option>
                 <option value="green" selected="@(note.Color == "green")">Green</option>
             </select>
-            <div>
-                <button class="btn-minimize-note" onclick="toggleMinimizeJS(@note.Id)"><i class="bi bi-dash" id="minimize-icon-@note.Id"></i></button>
-                <button class="btn-close-note" onclick="deleteNoteJS(@note.Id)"><i class="bi bi-x"></i></button>
+            <div class="d-flex align-items-center gap-1">
+                <button type="button" class="btn-minimize-note" @onclick:stopPropagation="true" @onclick="() => ToggleMinimize(note.Id)" title="@(isMin ? "Expand note" : "Minimize note")">
+                    <i class="bi @(isMin ? "bi-arrows-expand" : "bi-dash")" id="minimize-icon-@note.Id"></i>
+                </button>
+                <button type="button" class="btn-close-note" @onclick:stopPropagation="true" @onclick="() => DeleteNote(note.Id)" title="Close note">
+                    <i class="bi bi-x"></i>
+                </button>
             </div>
         </div>
         
-        <div id="note-content-@note.Id" class="note-content-wrapper">
+        <div id="note-content-@note.Id" class="note-content-wrapper @(isMin ? "d-none" : "")">
             <textarea class="sticky-content" onchange="saveNoteJS(@note.Id)" id="note-text-@note.Id" placeholder="Type your note here...">@note.Content</textarea>
             
             <div class="sticky-footer">
@@ -46,42 +52,43 @@
 
 <style>
     .sticky-note {
-        position: absolute;
+        position: fixed !important;
+        z-index: 99999 !important;
         width: 300px;
-        min-height: 300px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        padding: 10px;
+        min-height: 250px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        padding: 10px 12px;
         border-radius: 8px;
         pointer-events: auto;
         display: flex;
         flex-direction: column;
-        color: #333;
-        transition: transform 0.1s;
-    }
-    
-    .sticky-note:hover {
-        transform: scale(1.02);
+        color: #212529;
+        box-sizing: border-box;
     }
     
     .sticky-note.minimized {
-        min-height: unset;
-        height: auto;
+        min-height: unset !important;
+        height: auto !important;
+        padding-bottom: 6px !important;
     }
     
     .sticky-header {
         display: flex;
         justify-content: space-between;
+        align-items: center;
         margin-bottom: 8px;
-        cursor: grab;
+        cursor: move;
+        user-select: none;
     }
     
     .note-color-picker {
-        background: rgba(255,255,255,0.5);
-        border: none;
+        background: rgba(255,255,255,0.65);
+        border: 1px solid rgba(0,0,0,0.1);
         border-radius: 4px;
         font-size: 0.75rem;
         padding: 2px 4px;
         color: #333;
+        cursor: pointer;
     }
     
     .btn-close-note, .btn-minimize-note {
@@ -89,35 +96,42 @@
         border: none;
         color: #333;
         cursor: pointer;
-        opacity: 0.6;
-        padding: 0 4px;
+        opacity: 0.7;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.95rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
     }
-    .btn-close-note:hover, .btn-minimize-note:hover { opacity: 1; }
+    .btn-close-note:hover { opacity: 1; background: rgba(220, 53, 69, 0.2); color: #dc3545; }
+    .btn-minimize-note:hover { opacity: 1; background: rgba(0, 0, 0, 0.08); }
     
     .sticky-content {
         flex: 1;
         width: 100%;
+        min-height: 140px;
         background: transparent;
         border: none;
         resize: none;
         font-family: inherit;
-        font-size: 0.75rem;
-        color: #333;
+        font-size: 0.82rem;
+        color: #212529;
         outline: none;
     }
     
     .sticky-footer {
-        margin-top: 10px;
+        margin-top: 8px;
         font-size: 0.75rem;
         border-top: 1px solid rgba(0,0,0,0.1);
-        padding-top: 8px;
+        padding-top: 6px;
     }
     
     .reminder-input {
         width: 100%;
         margin-top: 4px;
         font-size: 0.75rem;
-        padding: 4px;
+        padding: 4px 6px;
         border: 1px solid rgba(0,0,0,0.2);
         border-radius: 4px;
         background: rgba(255,255,255,0.7);
@@ -163,6 +177,7 @@
     private List<StickyNote> notes = new();
     private DotNetObjectReference<StickyNotesWidget>? objRef;
     private string? UserId;
+    private HashSet<int> minimizedNoteIds = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -175,11 +190,13 @@
             UserId = user.Identity.Name;
         }
 
-        if (!string.IsNullOrEmpty(UserId))
+        if (string.IsNullOrEmpty(UserId))
         {
-            notes = await IntraOfficeService.GetStickyNotesAsync(UserId);
-            NotificationService.OnReminderReceived += HandleReminder;
+            UserId = "Zeeshan";
         }
+
+        notes = await IntraOfficeService.GetStickyNotesAsync(UserId);
+        NotificationService.OnReminderReceived += HandleReminder;
     }
 
     private void HandleExternalAddNote()
@@ -232,6 +249,65 @@
         return ValueTask.CompletedTask;
     }
 
+    private void ToggleMinimize(int id)
+    {
+        if (!minimizedNoteIds.Add(id))
+            minimizedNoteIds.Remove(id);
+        StateHasChanged();
+    }
+
+    private async Task DeleteNote(int id)
+    {
+        notes.RemoveAll(n => n.Id == id);
+        StateHasChanged();
+        if (!string.IsNullOrEmpty(UserId))
+        {
+            await IntraOfficeService.DeleteStickyNoteAsync(id, UserId);
+        }
+    }
+
+    [JSInvokable]
+    public async Task DeleteNoteJS(int id)
+    {
+        await DeleteNote(id);
+    }
+
+    [JSInvokable]
+    public async Task ToggleMinimizeJS(int id)
+    {
+        ToggleMinimize(id);
+        await Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public async Task UpdateNotePositionJS(int id, int x, int y)
+    {
+        var note = notes.FirstOrDefault(n => n.Id == id);
+        if (note != null)
+        {
+            note.XPos = x;
+            note.YPos = y;
+            await IntraOfficeService.SaveStickyNoteAsync(note);
+        }
+    }
+
+    [JSInvokable]
+    public async Task UpdateNoteContentJS(int id, string content, string color, string? reminderTime)
+    {
+        var note = notes.FirstOrDefault(n => n.Id == id);
+        if (note != null)
+        {
+            note.Content = content;
+            note.Color = color;
+            if (DateTime.TryParse(reminderTime, out var dt))
+                note.ReminderTime = dt;
+            else
+                note.ReminderTime = null;
+
+            await IntraOfficeService.SaveStickyNoteAsync(note);
+        }
+    }
+
     [JSInvokable]
     public async Task AddNewNoteJS()
     {
@@ -242,17 +318,20 @@
     {
         if (string.IsNullOrEmpty(UserId))
         {
-            await JSRuntime.InvokeVoidAsync("alert", "Error: UserId is missing.");
-            return;
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            UserId = authState.User.Identity?.Name ?? "Zeeshan";
         }
+
+        int baseLeft = Math.Min(350 + ((notes.Count % 6) * 40), 900);
+        int baseTop = 120 + ((notes.Count % 6) * 35);
 
         var newNote = new StickyNote
         {
             UserId = UserId,
             Content = "",
             Color = "yellow",
-            XPos = 900,
-            YPos = 150,
+            XPos = baseLeft,
+            YPos = baseTop,
             CreatedAt = DateTime.UtcNow
         };
 

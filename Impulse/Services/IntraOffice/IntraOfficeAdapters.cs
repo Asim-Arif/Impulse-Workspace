@@ -85,16 +85,51 @@ namespace Impulse.Services.IntraOffice
             var id = await _intra.SendMessageAsync(message);
             message.Id = id;
 
+            var senderName = message.SenderName ?? message.SenderId;
+            if (string.IsNullOrEmpty(message.SenderName) && !string.IsNullOrEmpty(message.SenderId))
+            {
+                try
+                {
+                    var senderProfile = await _intra.GetUserProfileAsync(message.SenderId);
+                    if (senderProfile != null) senderName = senderProfile.FullName;
+                }
+                catch { }
+            }
+
+            var preview = !string.IsNullOrWhiteSpace(message.Content)
+                ? (message.Content.Length > 80 ? message.Content.Substring(0, 80) + "..." : message.Content)
+                : (message.Attachments != null && message.Attachments.Any() ? "[Attachment]" : "Sent a message");
+
             if (!string.IsNullOrEmpty(message.ReceiverId))
             {
-                await _notifications.SendNotificationAsync(new AppNotification
+                _ = _notifications.SendNotificationAsync(new AppNotification
                 {
                     Category = NotificationCategory.Message,
-                    Title = $"Message from {message.SenderName ?? message.SenderId}",
-                    Message = message.Content,
-                    SenderName = message.SenderName ?? message.SenderId,
+                    Title = $"New Message from {senderName}",
+                    Message = preview,
+                    SenderName = senderName,
                     TargetUserId = message.ReceiverId,
                     ActionUrl = $"/office/messages/{message.SenderId}"
+                });
+            }
+            else if (message.ChannelId.HasValue && message.ChannelId > 0)
+            {
+                var channelName = "Discussion";
+                try
+                {
+                    var channel = await _intra.GetChannelByIdAsync(message.ChannelId.Value);
+                    if (channel != null && !string.IsNullOrEmpty(channel.Name)) channelName = channel.Name;
+                }
+                catch { }
+
+                _ = _notifications.SendNotificationAsync(new AppNotification
+                {
+                    Category = NotificationCategory.Message,
+                    Title = $"#{channelName} • {senderName}",
+                    Message = preview,
+                    SenderName = senderName,
+                    TargetUserId = null, // broadcast to all channel participants
+                    ActionUrl = $"/office/chat/{message.ChannelId.Value}"
                 });
             }
             return message;
@@ -103,7 +138,29 @@ namespace Impulse.Services.IntraOffice
         public Task<Message?> GetMessageByIdAsync(long id) => Task.FromResult<Message?>(null);
         public Task MarkAsReadAsync(long messageId) => Task.CompletedTask;
         public async Task MarkAllAsReadAsync(string userId, int? channelId = null, string? senderId = null)
-            => await _intra.MarkMessagesAsReadAsync(userId, senderId, channelId);
+        {
+            await _intra.MarkMessagesAsReadAsync(userId, senderId, channelId);
+
+            if (!string.IsNullOrEmpty(senderId) && !string.Equals(senderId, userId, StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var reader = await _intra.GetUserProfileAsync(userId);
+                    var readerName = reader?.FullName ?? "Someone";
+                    _ = _notifications.SendNotificationAsync(new AppNotification
+                    {
+                        Category = NotificationCategory.Message,
+                        Title = $"✓✓ {readerName} read your messages",
+                        Message = $"{readerName} has seen your direct messages.",
+                        SenderName = readerName,
+                        TargetUserId = senderId,
+                        ActionUrl = $"/office/messages/{userId}",
+                        IsReadReceipt = true
+                    });
+                }
+                catch { }
+            }
+        }
 
         public async Task<int> GetUnreadCountAsync(string userId)
         {
@@ -180,11 +237,20 @@ namespace Impulse.Services.IntraOffice
         {
             var id = await _intra.CreateAnnouncementAsync(announcement);
             announcement.Id = id;
-            await _notifications.SendNotificationAsync(new AppNotification
+
+            var authorProfile = !string.IsNullOrEmpty(announcement.CreatedBy) ? await _intra.GetUserProfileAsync(announcement.CreatedBy) : null;
+            var authorName = authorProfile?.FullName ?? "Management";
+            var preview = !string.IsNullOrWhiteSpace(announcement.Content)
+                ? (announcement.Content.Length > 100 ? announcement.Content.Substring(0, 100) + "..." : announcement.Content)
+                : announcement.Title;
+
+            _ = _notifications.SendNotificationAsync(new AppNotification
             {
                 Category = NotificationCategory.Announcement,
-                Title = announcement.Title,
-                Message = announcement.Content,
+                Title = $"📢 Announcement: {announcement.Title}",
+                Message = preview,
+                SenderName = authorName,
+                TargetUserId = null, // broadcast to all
                 ActionUrl = "/office/announcements"
             });
             return announcement;
@@ -200,7 +266,30 @@ namespace Impulse.Services.IntraOffice
         }
         public Task MarkAnnouncementsAsReadAsync(string userId) => Task.CompletedTask;
         public async Task AcknowledgeAnnouncementAsync(int announcementId, string userId)
-            => await _intra.AcknowledgeAnnouncementAsync(announcementId, userId);
+        {
+            await _intra.AcknowledgeAnnouncementAsync(announcementId, userId);
+
+            try
+            {
+                var announcement = await _intra.GetAnnouncementByIdAsync(announcementId, userId);
+                if (announcement != null && !string.IsNullOrEmpty(announcement.CreatedBy) && !string.Equals(announcement.CreatedBy, userId, StringComparison.OrdinalIgnoreCase))
+                {
+                    var reader = await _intra.GetUserProfileAsync(userId);
+                    var readerName = reader?.FullName ?? "Someone";
+                    _ = _notifications.SendNotificationAsync(new AppNotification
+                    {
+                        Category = NotificationCategory.Announcement,
+                        Title = $"✓ {readerName} acknowledged your announcement",
+                        Message = $"\"{announcement.Title}\" was acknowledged by {readerName}.",
+                        SenderName = readerName,
+                        TargetUserId = announcement.CreatedBy,
+                        ActionUrl = "/office/announcements",
+                        IsReadReceipt = true
+                    });
+                }
+            }
+            catch { }
+        }
 
         public Task<List<int>> GetUserAcknowledgedAnnouncementIdsAsync(string userId)
             => Task.FromResult(new List<int>());
@@ -250,24 +339,42 @@ namespace Impulse.Services.IntraOffice
             var id = await _intra.CreateTaskAsync(task);
             task.Id = id;
 
-            if (!string.IsNullOrEmpty(task.AssignedTo))
+            var assignerProfile = !string.IsNullOrEmpty(task.AssignedBy) ? await _intra.GetUserProfileAsync(task.AssignedBy) : null;
+            var assignerName = assignerProfile?.FullName ?? task.AssignedBy ?? "Management";
+
+            var targetAssignees = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrEmpty(task.AssignedTo)) targetAssignees.Add(task.AssignedTo);
+            if (allAssigneeIds != null)
             {
-                await _notifications.SendNotificationAsync(new AppNotification
+                foreach (var a in allAssigneeIds)
+                {
+                    if (!string.IsNullOrEmpty(a)) targetAssignees.Add(a);
+                }
+            }
+
+            foreach (var assigneeId in targetAssignees)
+            {
+                _ = _notifications.SendNotificationAsync(new AppNotification
                 {
                     Category = NotificationCategory.Task,
                     Title = $"Task Assigned: {task.Title}",
-                    Message = task.Description ?? "You have been assigned a new task.",
-                    TargetUserId = task.AssignedTo,
+                    Message = $"Priority: {task.Priority} • Assigned by {assignerName}",
+                    SenderName = assignerName,
+                    TargetUserId = assigneeId,
                     ActionUrl = "/office/tasks"
                 });
 
                 if (sendWhatsApp)
                 {
-                    var userProfile = await _intra.GetUserProfileAsync(task.AssignedTo);
-                    if (!string.IsNullOrEmpty(userProfile?.CellNo))
+                    try
                     {
-                        task.WhatsAppMessageSent = await _whatsApp.SendTaskNotificationAsync(userProfile.CellNo, task.Title, userProfile.FullName ?? task.AssignedTo, task.Priority.ToString(), null, task.Description);
+                        var userProfile = await _intra.GetUserProfileAsync(assigneeId);
+                        if (!string.IsNullOrEmpty(userProfile?.CellNo))
+                        {
+                            task.WhatsAppMessageSent = await _whatsApp.SendTaskNotificationAsync(userProfile.CellNo, task.Title, userProfile.FullName ?? assigneeId, task.Priority.ToString(), null, task.Description);
+                        }
                     }
+                    catch { }
                 }
             }
 
@@ -276,7 +383,47 @@ namespace Impulse.Services.IntraOffice
 
         public Task UpdateTaskAsync(TaskItem task) => Task.CompletedTask;
         public async Task UpdateStatusAsync(int taskId, TaskItemStatus status, string? changedByUserId = null)
-            => await _intra.UpdateTaskStatusAsync(taskId, status);
+        {
+            var existingTask = await _intra.GetTaskByIdAsync(taskId);
+            var oldStatus = existingTask?.Status.ToString() ?? "Pending";
+            await _intra.UpdateTaskStatusAsync(taskId, status);
+
+            if (existingTask != null)
+            {
+                try
+                {
+                    var changerProfile = !string.IsNullOrEmpty(changedByUserId) ? await _intra.GetUserProfileAsync(changedByUserId) : null;
+                    var changerName = changerProfile?.FullName ?? changedByUserId ?? "System";
+
+                    var targetUsers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    if (!string.IsNullOrEmpty(existingTask.AssignedBy)) targetUsers.Add(existingTask.AssignedBy);
+                    if (!string.IsNullOrEmpty(existingTask.AssignedTo)) targetUsers.Add(existingTask.AssignedTo);
+                    if (!string.IsNullOrEmpty(existingTask.AdditionalAssigneeIds))
+                    {
+                        foreach (var a in existingTask.AdditionalAssigneeIds.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            var trimmed = a.Trim();
+                            if (!string.IsNullOrEmpty(trimmed)) targetUsers.Add(trimmed);
+                        }
+                    }
+                    if (!string.IsNullOrEmpty(changedByUserId)) targetUsers.Remove(changedByUserId);
+
+                    foreach (var target in targetUsers)
+                    {
+                        _ = _notifications.SendNotificationAsync(new AppNotification
+                        {
+                            Category = NotificationCategory.Task,
+                            Title = $"Task Status: {existingTask.Title}",
+                            Message = $"Status changed from {oldStatus} to {status} by {changerName}",
+                            SenderName = changerName,
+                            TargetUserId = target,
+                            ActionUrl = "/office/tasks"
+                        });
+                    }
+                }
+                catch { }
+            }
+        }
 
         public Task DeleteTaskAsync(int id) => Task.CompletedTask;
         public async Task<TaskComment> AddCommentAsync(TaskComment comment)
@@ -336,15 +483,21 @@ namespace Impulse.Services.IntraOffice
         {
             var id = await _intra.CreateMeetingAsync(meeting, participantUserIds);
             meeting.Id = id;
+
+            var organizerProfile = !string.IsNullOrEmpty(meeting.OrganizerId) ? await _intra.GetUserProfileAsync(meeting.OrganizerId) : null;
+            var organizerName = organizerProfile?.FullName ?? "Organizer";
+            var timeString = meeting.ScheduledStartTime.ToLocalTime().ToString("MMM dd, yyyy hh:mm tt");
+
             foreach (var p in participantUserIds)
             {
-                await _notifications.SendNotificationAsync(new AppNotification
+                _ = _notifications.SendNotificationAsync(new AppNotification
                 {
                     Category = NotificationCategory.Meeting,
-                    Title = $"Meeting Invitation: {meeting.Title}",
-                    Message = $"Starts at {meeting.ScheduledStartTime:g}",
+                    Title = $"Meeting Invite: {meeting.Title}",
+                    Message = $"Scheduled for {timeString} by {organizerName}",
+                    SenderName = organizerName,
                     TargetUserId = p,
-                    ActionUrl = $"/office/meetings/live/{id}"
+                    ActionUrl = "/office/meetings"
                 });
             }
             return meeting;
@@ -395,13 +548,16 @@ namespace Impulse.Services.IntraOffice
             minute.Id = id;
             if (!string.IsNullOrEmpty(minute.ForwardToUserId))
             {
-                await _notifications.SendNotificationAsync(new AppNotification
+                var creatorProfile = !string.IsNullOrEmpty(minute.CreatedByUserId) ? await _intra.GetUserProfileAsync(minute.CreatedByUserId) : null;
+                var creatorName = creatorProfile?.FullName ?? minute.CreatedByUserId ?? "Colleague";
+                _ = _notifications.SendNotificationAsync(new AppNotification
                 {
                     Category = NotificationCategory.Minute,
-                    Title = $"Minute Approval: {minute.Title}",
-                    Message = minute.Subject,
+                    Title = $"New Minute Pending Approval: #{minute.No}",
+                    Message = $"{creatorName} forwarded minute: \"{minute.Subject}\"",
+                    SenderName = creatorName,
                     TargetUserId = minute.ForwardToUserId,
-                    ActionUrl = $"/office/minutes-list"
+                    ActionUrl = $"/office/minutes-workflow/{minute.Id}"
                 });
             }
             return minute;
@@ -414,6 +570,42 @@ namespace Impulse.Services.IntraOffice
         public async Task ProcessWorkflowActionAsync(int minuteId, string userId, string actionTaken, string remarks, string? nextForwardToUserId, List<IBrowserFile>? attachments, IBrowserFile? signature)
         {
             await _intra.UpdateMinuteStatusAsync(minuteId, actionTaken, userId, actionTaken, remarks);
+
+            try
+            {
+                var minute = await _intra.GetMinuteByIdAsync(minuteId);
+                var actorProfile = !string.IsNullOrEmpty(userId) ? await _intra.GetUserProfileAsync(userId) : null;
+                var actorName = actorProfile?.FullName ?? userId ?? "Reviewer";
+
+                // If referred or forwarded to next user
+                if ((actionTaken == "Refer" || actionTaken == "Forward" || actionTaken == "Approve") && !string.IsNullOrEmpty(nextForwardToUserId))
+                {
+                    _ = _notifications.SendNotificationAsync(new AppNotification
+                    {
+                        Category = NotificationCategory.Minute,
+                        Title = $"Minute {actionTaken}: #{minute?.No ?? minuteId.ToString()}",
+                        Message = $"{actorName} forwarded minute: \"{minute?.Subject}\". Remarks: {remarks}",
+                        SenderName = actorName,
+                        TargetUserId = nextForwardToUserId,
+                        ActionUrl = $"/office/minutes-workflow/{minuteId}"
+                    });
+                }
+
+                // Notify original creator of status change
+                if (minute != null && !string.IsNullOrEmpty(minute.CreatedByUserId) && !string.Equals(minute.CreatedByUserId, userId, StringComparison.OrdinalIgnoreCase))
+                {
+                    _ = _notifications.SendNotificationAsync(new AppNotification
+                    {
+                        Category = NotificationCategory.Minute,
+                        Title = $"Minute #{minute.No} {actionTaken}",
+                        Message = $"{actorName} updated status to {actionTaken}. Remarks: {remarks}",
+                        SenderName = actorName,
+                        TargetUserId = minute.CreatedByUserId,
+                        ActionUrl = $"/office/minutes-workflow/{minuteId}"
+                    });
+                }
+            }
+            catch { }
         }
 
         public Task<List<MinuteWorkflowHistory>> GetMinuteHistoryAsync(int minuteId) => Task.FromResult(new List<MinuteWorkflowHistory>());
@@ -461,14 +653,95 @@ namespace Impulse.Services.IntraOffice
     public interface IEmailService
     {
         Task<bool> SendEmailAsync(string toEmail, string subject, string body, List<string>? attachmentPaths = null);
+        Task<(bool Success, string Message)> TestEmailConfigurationAsync(string recipientEmail, EmailConfiguration config, string plainPassword);
     }
 
     public class EmailService : IEmailService
     {
-        public Task<bool> SendEmailAsync(string toEmail, string subject, string body, List<string>? attachmentPaths = null)
+        private readonly IIntraOfficeService _intra;
+        private readonly IEmailEncryptionService _encryption;
+        private readonly ILogger<EmailService> _logger;
+
+        public EmailService(IIntraOfficeService intra, IEmailEncryptionService encryption, ILogger<EmailService> logger)
         {
-            // Background email service placeholder
-            return Task.FromResult(true);
+            _intra = intra;
+            _encryption = encryption;
+            _logger = logger;
+        }
+
+        public async Task<bool> SendEmailAsync(string toEmail, string subject, string body, List<string>? attachmentPaths = null)
+        {
+            try
+            {
+                var config = await _intra.GetEmailConfigurationAsync();
+                if (config == null || string.IsNullOrWhiteSpace(config.SenderEmail))
+                {
+                    _logger.LogWarning("Email configuration is not set up.");
+                    return false;
+                }
+
+                var plainPassword = _encryption.Decrypt(config.EncryptedPassword);
+                using var client = new System.Net.Mail.SmtpClient(config.SmtpServer, config.SmtpPort)
+                {
+                    EnableSsl = config.EnableSsl,
+                    Credentials = new System.Net.NetworkCredential(config.SenderEmail, plainPassword),
+                    Timeout = 15000
+                };
+
+                using var msg = new System.Net.Mail.MailMessage
+                {
+                    From = new System.Net.Mail.MailAddress(config.SenderEmail, string.IsNullOrWhiteSpace(config.SenderName) ? "IntraCom-CRM" : config.SenderName),
+                    Subject = subject,
+                    Body = body,
+                    IsBodyHtml = body.Contains("<html") || body.Contains("<div") || body.Contains("<p")
+                };
+                msg.To.Add(toEmail);
+
+                if (attachmentPaths != null)
+                {
+                    foreach (var path in attachmentPaths.Where(p => System.IO.File.Exists(p)))
+                    {
+                        msg.Attachments.Add(new System.Net.Mail.Attachment(path));
+                    }
+                }
+
+                await client.SendMailAsync(msg);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending email to {ToEmail}", toEmail);
+                return false;
+            }
+        }
+
+        public async Task<(bool Success, string Message)> TestEmailConfigurationAsync(string recipientEmail, EmailConfiguration config, string plainPassword)
+        {
+            try
+            {
+                using var client = new System.Net.Mail.SmtpClient(config.SmtpServer, config.SmtpPort)
+                {
+                    EnableSsl = config.EnableSsl,
+                    Credentials = new System.Net.NetworkCredential(config.SenderEmail, plainPassword),
+                    Timeout = 12000
+                };
+
+                using var msg = new System.Net.Mail.MailMessage
+                {
+                    From = new System.Net.Mail.MailAddress(config.SenderEmail, string.IsNullOrWhiteSpace(config.SenderName) ? "IntraCom-CRM" : config.SenderName),
+                    Subject = "IntraCom-CRM SMTP Connection Test",
+                    Body = "This is an automated test message from IntraCom-CRM verifying that your SMTP server settings and credentials are configured correctly."
+                };
+                msg.To.Add(recipientEmail);
+
+                await client.SendMailAsync(msg);
+                return (true, $"Test email sent successfully to {recipientEmail}!");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "SMTP connection test failed");
+                return (false, "SMTP connection test failed: " + ex.Message);
+            }
         }
     }
 
@@ -490,7 +763,7 @@ namespace Impulse.Services.IntraOffice
         private readonly IIntraOfficeService _intra;
         public MinuteTypeService(IIntraOfficeService intra) => _intra = intra;
 
-        public async Task<List<MinuteType>> GetAllAsync() => await _intra.GetMinuteTypesAsync();
+        public async Task<List<MinuteType>> GetAllAsync() => await _intra.GetAllMinuteTypesAsync();
         public async Task<List<MinuteType>> GetActiveAsync()
         {
             var all = await _intra.GetMinuteTypesAsync();
@@ -498,11 +771,66 @@ namespace Impulse.Services.IntraOffice
         }
         public async Task<MinuteType?> GetByIdAsync(int id)
         {
-            var all = await _intra.GetMinuteTypesAsync();
+            var all = await _intra.GetAllMinuteTypesAsync();
             return all.FirstOrDefault(t => t.Id == id);
         }
-        public Task<MinuteType> CreateAsync(string name) => Task.FromResult(new MinuteType { Name = name, IsActive = true });
-        public Task UpdateAsync(int id, string name, bool isActive) => Task.CompletedTask;
-        public Task DeleteAsync(int id) => Task.CompletedTask;
+        public async Task<MinuteType> CreateAsync(string name)
+        {
+            var id = await _intra.CreateMinuteTypeAsync(name);
+            return new MinuteType { Id = id, Name = name, IsActive = true, CreatedAt = DateTime.UtcNow };
+        }
+        public async Task UpdateAsync(int id, string name, bool isActive) => await _intra.UpdateMinuteTypeAsync(id, name, isActive);
+        public async Task DeleteAsync(int id) => await _intra.DeleteMinuteTypeAsync(id);
+    }
+
+    // -------------------------------------------------------------
+    // CRM Service (Reports & Templates)
+    // -------------------------------------------------------------
+    public interface ICrmService
+    {
+        Task<DashboardMetricsDto> GetDashboardMetricsAsync();
+        Task<ARAgingSummaryDto> GetARAgingSummaryAsync();
+        Task<List<EmailTemplate>> GetEmailTemplatesAsync(string? category = null);
+        Task<EmailTemplate?> GetEmailTemplateByCodeAsync(string code);
+        Task<EmailTemplate> SaveEmailTemplateAsync(EmailTemplate template, string userName);
+        (string Subject, string Body) RenderEmailTemplate(EmailTemplate template, Dictionary<string, string> placeholders);
+        Task SaveActivityAsync(LeadActivityModel activity, string userName);
+        Task<List<LeadModel>> GetCustomersAsync();
+    }
+
+    public class CrmService : ICrmService
+    {
+        private readonly IIntraOfficeService _intra;
+        public CrmService(IIntraOfficeService intra) => _intra = intra;
+
+        public Task<DashboardMetricsDto> GetDashboardMetricsAsync() => _intra.GetDashboardMetricsAsync();
+        public Task<ARAgingSummaryDto> GetARAgingSummaryAsync() => _intra.GetARAgingSummaryAsync();
+        public Task<List<EmailTemplate>> GetEmailTemplatesAsync(string? category = null) => _intra.GetEmailTemplatesAsync(category);
+        public Task<EmailTemplate?> GetEmailTemplateByCodeAsync(string code) => _intra.GetEmailTemplateByCodeAsync(code);
+
+        public async Task<EmailTemplate> SaveEmailTemplateAsync(EmailTemplate template, string userName)
+        {
+            var id = await _intra.SaveEmailTemplateAsync(template);
+            template.Id = id;
+            return template;
+        }
+
+        public (string Subject, string Body) RenderEmailTemplate(EmailTemplate template, Dictionary<string, string> placeholders)
+        {
+            var subject = template.SubjectTemplate;
+            var body = template.BodyTemplate;
+
+            foreach (var kvp in placeholders)
+            {
+                subject = subject.Replace(kvp.Key, kvp.Value);
+                body = body.Replace(kvp.Key, kvp.Value);
+            }
+
+            return (subject, body);
+        }
+
+        public Task SaveActivityAsync(LeadActivityModel activity, string userName) => _intra.AddLeadActivityAsync(activity);
+        public Task<List<LeadModel>> GetCustomersAsync() => _intra.GetLeadsAsync();
     }
 }
+

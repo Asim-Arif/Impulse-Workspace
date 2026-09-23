@@ -68,5 +68,34 @@ namespace Impulse.Services.IntraOffice
         Task<int> AddLeadActivityAsync(LeadActivityModel activity);
         Task<bool> ConvertLeadToForeignCustomerAsync(ConvertLeadToCustomerModel model);
         Task<bool> CheckCustCodeExistsAsync(string custCode);
+
+        // Customer 360 Hub
+        Task<Customer360Dto> GetCustomer360Async(string? customerCode = null);
+        Task<List<Customer360LookupDto>> GetCustomer360LookupListAsync();
+        Task<bool> ConvertCustomer360ToForeignCustomerAsync(ConvertCustomerToForeignCustomerModel model);
+        Task<bool> AddCustomer360ActivityAsync(CustomerActivityDto activity);
+        Task<bool> AddCustomer360ContactAsync(CustomerContactDto contact);
+
+        // Minute Types Admin
+        Task<List<MinuteType>> GetAllMinuteTypesAsync();
+        Task<int> CreateMinuteTypeAsync(string name);
+        Task<bool> UpdateMinuteTypeAsync(int id, string name, bool isActive);
+        Task<bool> DeleteMinuteTypeAsync(int id);
+
+        // Email Configuration
+        Task<EmailConfiguration?> GetEmailConfigurationAsync();
+        Task<bool> SaveEmailConfigurationAsync(EmailConfiguration config);
+
+        // Email Templates
+        Task<List<EmailTemplate>> GetEmailTemplatesAsync(string? category = null);
+        Task<EmailTemplate?> GetEmailTemplateByCodeAsync(string code);
+        Task<EmailTemplate?> GetEmailTemplateByIdAsync(int id);
+        Task<int> SaveEmailTemplateAsync(EmailTemplate template);
+        Task<bool> DeleteEmailTemplateAsync(int id);
+
+        // Executive Reports & Analytics
+        Task<DashboardMetricsDto> GetDashboardMetricsAsync();
+        Task<ARAgingSummaryDto> GetARAgingSummaryAsync();
     }
 }
+

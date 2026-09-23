@@ -1,0 +1,385 @@
+@page "/templates"
+@page "/office/templates"
+@layout IntraOfficeLayout
+@using DataAccessLibrary.Models.IntraOffice
+@using Impulse.Services.IntraOffice
+@inject ICrmService CrmSvc
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Email Templates - IntraCom CRM</PageTitle>
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">Export Email Template Library & Dispatcher</h4>
+        <p class="text-muted text-xs mb-0" style="font-size: 0.85rem;">Standardized international communication templates for quotations, shipping pre-alerts, sample tracking, and payment reminders</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm" @onclick="OpenCreateTemplateModal">
+            <i class="bi bi-plus-lg me-1"></i> + New Template
+        </button>
+    </div>
+</div>
+
+@if (showSuccessAlert)
+{
+    <div class="alert alert-success alert-dismissible fade show shadow-sm d-flex align-items-center gap-2 mb-3" role="alert">
+        <i class="bi bi-check-circle-fill fs-5"></i>
+        <div>Simulated email dispatched successfully and logged to customer activity timeline!</div>
+        <button type="button" class="btn-close" @onclick="() => showSuccessAlert = false"></button>
+    </div>
+}
+
+<div class="row g-4">
+    <!-- Left: Templates List -->
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm" style="border-radius: 14px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);">
+            <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center p-3">
+                <h6 class="fw-bold mb-0 text-dark">
+                    <i class="bi bi-envelope-paper text-primary me-2"></i>Communication Templates
+                </h6>
+                <select class="form-select form-select-sm" style="width: 175px;" @bind="selectedCategory" @bind:after="FilterTemplates">
+                    <option value="All">All Categories</option>
+                    <option value="QuotationFollowUp">Quote Follow-Up</option>
+                    <option value="SampleNotice">Sample Notice</option>
+                    <option value="PaymentReminder">Payment Reminder</option>
+                    <option value="ShipmentAdvice">Shipment Advice</option>
+                </select>
+            </div>
+
+            <div class="list-group list-group-flush" style="font-size: 0.85rem; max-height: 600px; overflow-y: auto;">
+                @if (isLoading)
+                {
+                    <div class="p-4 text-center text-muted">
+                        <div class="spinner-border spinner-border-sm text-primary"></div>
+                        <span class="ms-2">Loading templates...</span>
+                    </div>
+                }
+                else if (!filteredTemplates.Any())
+                {
+                    <div class="p-4 text-center text-muted">
+                        No templates found in this category.
+                    </div>
+                }
+                else
+                {
+                    @foreach (var t in filteredTemplates)
+                    {
+                        <button class="list-group-item list-group-item-action p-3 @(selectedTemplate?.Id == t.Id ? "bg-light border-start border-primary border-4" : "")"
+                                @onclick="() => SelectTemplate(t)">
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25" style="font-size: 0.72rem;">@FormatCategory(t.Category)</span>
+                                <span class="font-monospace text-xs text-muted" style="font-size: 0.75rem;">@t.TemplateCode</span>
+                            </div>
+                            <div class="fw-bold text-dark mb-1" style="font-size: 0.88rem;">@t.Name</div>
+                            <div class="text-muted text-truncate" style="font-size: 0.78rem;">@t.SubjectTemplate</div>
+                        </button>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Right: Template Preview & Token Interpolation -->
+    <div class="col-lg-7">
+        @if (selectedTemplate == null)
+        {
+            <div class="card border-0 shadow-sm p-5 text-center text-muted" style="border-radius: 14px; background: rgba(255, 255, 255, 0.95);">
+                <i class="bi bi-envelope-open fs-1 text-secondary opacity-50 mb-2"></i>
+                <div class="fw-semibold">Select a template on the left to preview and test.</div>
+            </div>
+        }
+        else
+        {
+            <div class="card border-0 shadow-sm" style="border-radius: 14px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);">
+                <div class="card-header bg-transparent border-bottom d-flex align-items-center justify-content-between p-3">
+                    <div>
+                        <h6 class="fw-bold mb-0 text-dark">@selectedTemplate.Name</h6>
+                        <span class="text-muted text-xs font-monospace">@selectedTemplate.TemplateCode</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" @onclick="() => OpenEditTemplateModal(selectedTemplate)">
+                            <i class="bi bi-pencil me-1"></i> Edit Template
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card-body p-4">
+                    <!-- Interactive Live Preview Box with Buyer Data -->
+                    <div class="p-3 bg-light rounded-3 border mb-4">
+                        <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom">
+                            <span class="fw-bold text-xs text-uppercase text-primary" style="font-size: 0.75rem;">
+                                <i class="bi bi-magic me-1"></i> Live Token Preview
+                            </span>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="text-xs text-muted" style="font-size: 0.8rem;">Test with Buyer:</span>
+                                <select class="form-select form-select-sm d-inline-block" style="width: 250px;" @bind="testCustomerId" @bind:after="GeneratePreview">
+                                    @foreach (var c in customers)
+                                    {
+                                        <option value="@c.Id">@c.CompanyName (@c.Country)</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="text-xs text-muted fw-bold" style="font-size: 0.75rem;">SUBJECT:</label>
+                            <div class="p-2 bg-white rounded border fw-bold text-dark" style="font-size: 0.85rem;">
+                                @previewSubject
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="text-xs text-muted fw-bold" style="font-size: 0.75rem;">MESSAGE BODY:</label>
+                            <div class="p-3 bg-white rounded border text-dark" style="white-space: pre-wrap; font-family: inherit; line-height: 1.6; font-size: 0.85rem;">
+                                @previewBody
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center justify-content-between pt-2">
+                        <div class="text-muted text-xs" style="font-size: 0.75rem;">
+                            <i class="bi bi-info-circle me-1"></i> Tokens like <code>{CompanyName}</code>, <code>{QuoteNumber}</code>, and <code>{Amount}</code> are replaced automatically upon dispatch.
+                        </div>
+                        <button class="btn btn-outline-primary btn-sm rounded-pill px-3" @onclick="SimulateSendEmail">
+                            <i class="bi bi-send me-1"></i> Simulate Send Email
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Create / Edit Modal -->
+@if (showModal && activeTemplate != null)
+{
+    <div class="modal fade show d-block" style="background: rgba(15, 23, 42, 0.6);" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+                <div class="modal-header border-bottom p-3">
+                    <h5 class="modal-title fw-bold text-dark">
+                        @(activeTemplate.Id == 0 ? "Create New Email Template" : "Edit Email Template")
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="() => showModal = false"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Template Code <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-sm" placeholder="e.g. QT-FOLLOWUP-02" @bind="activeTemplate.TemplateCode" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Category <span class="text-danger">*</span></label>
+                            <select class="form-select form-select-sm" @bind="activeTemplate.Category">
+                                <option value="QuotationFollowUp">Quote Follow-Up</option>
+                                <option value="SampleNotice">Sample Notice</option>
+                                <option value="PaymentReminder">Payment Reminder</option>
+                                <option value="ShipmentAdvice">Shipment Advice</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold">Template Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-sm" placeholder="e.g. Standard Quotation Follow-up (Formal)" @bind="activeTemplate.Name" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold">Subject Template <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-sm" placeholder="e.g. Commercial Proposal for {CompanyName} - Ref #{QuoteNumber}" @bind="activeTemplate.SubjectTemplate" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold">Body Template <span class="text-danger">*</span></label>
+                            <textarea class="form-control form-control-sm" rows="8" placeholder="Enter email message body with placeholder tokens..." @bind="activeTemplate.BodyTemplate"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold">Available Placeholders</label>
+                            <input type="text" class="form-control form-control-sm text-muted" @bind="activeTemplate.AvailablePlaceholders" />
+                            <div class="form-text text-xs">Separate tokens with commas. E.g. {CompanyName}, {ContactName}, {Amount}, {Currency}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top p-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" @onclick="() => showModal = false">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm rounded-pill px-4 shadow-sm" @onclick="SaveTemplate">
+                        <i class="bi bi-check-lg me-1"></i> Save Template
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<EmailTemplate> templates = new();
+    private List<EmailTemplate> filteredTemplates = new();
+    private List<LeadModel> customers = new();
+    private EmailTemplate? selectedTemplate;
+    private EmailTemplate? activeTemplate;
+    private string selectedCategory = "All";
+    private int testCustomerId = 0;
+    private string previewSubject = "";
+    private string previewBody = "";
+    private bool showModal = false;
+    private bool showSuccessAlert = false;
+    private bool isLoading = true;
+    private string currentUserName = "Administrator";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        currentUserName = authState.User.Identity?.Name ?? "Administrator";
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        templates = await CrmSvc.GetEmailTemplatesAsync();
+        customers = await CrmSvc.GetCustomersAsync();
+
+        if (!customers.Any())
+        {
+            customers = new List<LeadModel>
+            {
+                new LeadModel { Id = 1, CompanyName = "Al-Mansoor Industrial Supplies LLC", ContactPerson = "Tariq Al-Mansoor", Country = "United Arab Emirates", Currency = "USD" },
+                new LeadModel { Id = 2, CompanyName = "Apex Engineering & Industrial Tools", ContactPerson = "Marcus Vance", Country = "United Kingdom", Currency = "USD" },
+                new LeadModel { Id = 3, CompanyName = "Riyadh Petrochem Contracting", ContactPerson = "Abdullah Al-Ghamdi", Country = "Saudi Arabia", Currency = "USD" }
+            };
+        }
+
+        testCustomerId = customers.FirstOrDefault()?.Id ?? 0;
+        FilterTemplates();
+
+        if (selectedTemplate == null && filteredTemplates.Any())
+        {
+            SelectTemplate(filteredTemplates.First());
+        }
+        isLoading = false;
+    }
+
+    private void FilterTemplates()
+    {
+        if (selectedCategory == "All")
+        {
+            filteredTemplates = templates.ToList();
+        }
+        else
+        {
+            filteredTemplates = templates.Where(t => t.Category == selectedCategory).ToList();
+        }
+
+        if (selectedTemplate != null && !filteredTemplates.Any(t => t.Id == selectedTemplate.Id))
+        {
+            selectedTemplate = filteredTemplates.FirstOrDefault();
+            if (selectedTemplate != null) GeneratePreview();
+        }
+    }
+
+    private void SelectTemplate(EmailTemplate t)
+    {
+        selectedTemplate = t;
+        GeneratePreview();
+    }
+
+    private void GeneratePreview()
+    {
+        if (selectedTemplate == null) return;
+        var cust = customers.FirstOrDefault(c => c.Id == testCustomerId);
+
+        var placeholders = new Dictionary<string, string>
+        {
+            { "{CompanyName}", cust?.CompanyName ?? "Acme Global Industries" },
+            { "{ContactName}", cust?.ContactPerson ?? "Tariq Al-Mansoor" },
+            { "{QuoteNumber}", "QT-2026-0842" },
+            { "{OrderNumber}", "SO-2026-0199" },
+            { "{VesselName}", "CMA CGM Palais Royal" },
+            { "{VoyageNumber}", "2604E" },
+            { "{PortOfLoading}", "Port of Karachi" },
+            { "{PortOfDischarge}", "Jebel Ali Port, UAE" },
+            { "{ETD}", DateTime.UtcNow.AddDays(4).ToString("MMMM dd, yyyy") },
+            { "{ETA}", DateTime.UtcNow.AddDays(18).ToString("MMMM dd, yyyy") },
+            { "{Amount}", "149,687.50" },
+            { "{Currency}", cust?.Currency ?? "USD" },
+            { "{Incoterm}", "FOB" },
+            { "{PaymentTerms}", "30% Advance, 70% against BL" },
+            { "{DueDate}", DateTime.UtcNow.AddDays(20).ToString("MMMM dd, yyyy") },
+            { "{Date}", DateTime.UtcNow.ToString("MMMM dd, yyyy") },
+            { "{CourierName}", "DHL Express" },
+            { "{TrackingNumber}", "DHL-9928172635" },
+            { "{DeliveryDate}", DateTime.UtcNow.AddDays(4).ToString("MMMM dd, yyyy") },
+            { "{DestinationCountry}", cust?.Country ?? "United Arab Emirates" },
+            { "{SalespersonName}", currentUserName }
+        };
+
+        var result = CrmSvc.RenderEmailTemplate(selectedTemplate, placeholders);
+        previewSubject = result.Subject;
+        previewBody = result.Body;
+    }
+
+    private void OpenCreateTemplateModal()
+    {
+        activeTemplate = new EmailTemplate
+        {
+            Category = "QuotationFollowUp",
+            AvailablePlaceholders = "{CompanyName}, {ContactName}, {QuoteNumber}, {Amount}, {Currency}, {Incoterm}, {SalespersonName}"
+        };
+        showModal = true;
+    }
+
+    private void OpenEditTemplateModal(EmailTemplate t)
+    {
+        activeTemplate = new EmailTemplate
+        {
+            Id = t.Id,
+            TemplateCode = t.TemplateCode,
+            Name = t.Name,
+            Category = t.Category,
+            SubjectTemplate = t.SubjectTemplate,
+            BodyTemplate = t.BodyTemplate,
+            AvailablePlaceholders = t.AvailablePlaceholders,
+            IsActive = t.IsActive
+        };
+        showModal = true;
+    }
+
+    private async Task SaveTemplate()
+    {
+        if (activeTemplate == null || string.IsNullOrWhiteSpace(activeTemplate.Name)) return;
+
+        await CrmSvc.SaveEmailTemplateAsync(activeTemplate, currentUserName);
+        showModal = false;
+        await LoadData();
+
+        selectedTemplate = templates.FirstOrDefault(t => t.Id == activeTemplate.Id || t.TemplateCode == activeTemplate.TemplateCode);
+        GeneratePreview();
+    }
+
+    private async Task SimulateSendEmail()
+    {
+        if (selectedTemplate == null) return;
+        var cust = customers.FirstOrDefault(c => c.Id == testCustomerId);
+
+        if (cust != null)
+        {
+            await CrmSvc.SaveActivityAsync(new LeadActivityModel
+            {
+                LeadId = cust.Id,
+                ActivityType = "Email",
+                Description = $"[Template: {selectedTemplate.Name}] {previewSubject}",
+                PerformedBy = currentUserName,
+                ActivityDate = DateTime.UtcNow
+            }, currentUserName);
+        }
+
+        showSuccessAlert = true;
+    }
+
+    private string FormatCategory(string cat) => cat switch
+    {
+        "QuotationFollowUp" => "Quote Follow-Up",
+        "SampleNotice" => "Sample Notice",
+        "PaymentReminder" => "Payment Notice",
+        "ShipmentAdvice" => "Shipping Advice",
+        _ => cat
+    };
+}

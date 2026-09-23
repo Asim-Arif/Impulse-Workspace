@@ -1,6 +1,8 @@
 @using Impulse.Services.IntraOffice
 @using Microsoft.AspNetCore.Components.Authorization
+@using DataAccessLibrary.Models.IntraOffice
 @inject IAppNotificationService NotificationService
+@inject IIntraOfficeService IntraOfficeService
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
@@ -58,23 +60,24 @@
 
 <style>
     .notification-toaster-container {
-        position: fixed;
-        top: 72px;
-        right: 20px;
-        z-index: 999999;
+        position: fixed !important;
+        top: 24px !important;
+        right: 24px !important;
+        z-index: 2147483647 !important;
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 10px;
         pointer-events: none;
         max-width: 380px;
-        width: calc(100vw - 40px);
+        width: calc(100vw - 48px);
+        box-sizing: border-box;
     }
 
     .notification-toast {
         pointer-events: auto;
         background: #ffffff;
         border-radius: 12px;
-        box-shadow: 0 12px 28px -4px rgba(15, 23, 42, 0.15), 0 4px 10px -2px rgba(15, 23, 42, 0.08);
+        box-shadow: 0 12px 32px -4px rgba(15, 23, 42, 0.2), 0 4px 12px -2px rgba(15, 23, 42, 0.1);
         border: 1px solid #e2e8f0;
         border-left: 5px solid #64748b;
         padding: 14px 16px;
@@ -83,11 +86,14 @@
         gap: 8px;
         animation: toastSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
         transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.3s ease;
+        flex-shrink: 0;
+        position: relative;
+        box-sizing: border-box;
     }
 
     .notification-toast:hover {
         transform: translateY(-2px);
-        box-shadow: 0 16px 32px -4px rgba(15, 23, 42, 0.2);
+        box-shadow: 0 16px 36px -4px rgba(15, 23, 42, 0.25);
     }
 
     .notification-toast.toast-message { border-left-color: #3b82f6; }
@@ -222,28 +228,93 @@
 
     private readonly List<ActiveToast> activeToasts = new();
     private string? currentUserId;
+    private string? currentUserName;
+    private IntraUserProfile? currentUserProfile;
 
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        if (authState.User.Identity?.IsAuthenticated == true)
+        var user = authState.User;
+        if (user.Identity?.IsAuthenticated == true)
         {
-            currentUserId = authState.User.Identity.Name;
+            currentUserId = user.Identity.Name
+                ?? user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? user.FindFirst("sub")?.Value;
+            currentUserName = user.Identity.Name;
+
+            if (!string.IsNullOrEmpty(currentUserId))
+            {
+                try
+                {
+                    currentUserProfile = await IntraOfficeService.GetUserProfileAsync(currentUserId);
+                }
+                catch { }
+            }
         }
 
         NotificationService.OnNotificationReceived += HandleNotificationReceived;
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("requestNotificationPermission");
+            }
+            catch { }
+        }
+    }
+
+    private bool MatchesCurrentUser(string targetUserId)
+    {
+        if (string.IsNullOrEmpty(targetUserId)) return true;
+        if (!string.IsNullOrEmpty(currentUserId) && string.Equals(targetUserId, currentUserId, StringComparison.OrdinalIgnoreCase)) return true;
+        if (!string.IsNullOrEmpty(currentUserName) && string.Equals(targetUserId, currentUserName, StringComparison.OrdinalIgnoreCase)) return true;
+        if (currentUserProfile != null)
+        {
+            if (string.Equals(targetUserId, currentUserProfile.UserName, StringComparison.OrdinalIgnoreCase)) return true;
+            if (string.Equals(targetUserId, currentUserProfile.Id, StringComparison.OrdinalIgnoreCase)) return true;
+            if (currentUserProfile.UserID > 0 && string.Equals(targetUserId, currentUserProfile.UserID.ToString(), StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
+    }
+
+    private bool IsSentByMe(AppNotification notification)
+    {
+        if (!string.IsNullOrEmpty(notification.SenderName))
+        {
+            if (!string.IsNullOrEmpty(currentUserName) && string.Equals(notification.SenderName, currentUserName, StringComparison.OrdinalIgnoreCase)) return true;
+            if (!string.IsNullOrEmpty(currentUserId) && string.Equals(notification.SenderName, currentUserId, StringComparison.OrdinalIgnoreCase)) return true;
+            if (currentUserProfile != null && !string.IsNullOrEmpty(currentUserProfile.FullName) && string.Equals(notification.SenderName, currentUserProfile.FullName, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
+    }
+
     private async Task HandleNotificationReceived(AppNotification notification)
     {
-        // Check if notification is meant for this user
-        if (!string.IsNullOrEmpty(notification.TargetUserId) && notification.TargetUserId != currentUserId)
-        {
-            return;
-        }
+        if (notification == null) return;
 
         // Skip internal READ_SYNC signals
         if (notification.Message == "READ_SYNC") return;
+
+        // Check if notification is meant for this user
+        if (!string.IsNullOrEmpty(notification.TargetUserId))
+        {
+            if (!MatchesCurrentUser(notification.TargetUserId))
+            {
+                return;
+            }
+        }
+        else
+        {
+            // Broadcast notification: do not show toast to the sender themselves
+            if (IsSentByMe(notification))
+            {
+                return;
+            }
+        }
 
         // Add toast
         var toast = new ActiveToast

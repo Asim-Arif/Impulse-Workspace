@@ -10,6 +10,7 @@
 @inject LoadingService LoadingService
 @inject SecurityService SecurityService
 @inject IDBHelperService DB
+@inject Radzen.NotificationService NotificationService
 
 <PageTitle>Impulse ERP</PageTitle>
 
@@ -820,7 +821,8 @@
         }
         else
         {
-            await JSRuntime.InvokeVoidAsync("alert", "Invalid Password");
+            NotificationService.Notify(NotificationSeverity.Error, "Authorization Failed", "Invalid password. Please try again.");
+            UserInput = string.Empty;
         }
     }
     private void Cancel()

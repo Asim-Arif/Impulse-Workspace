@@ -68,5 +68,34 @@ namespace Impulse.Services.IntraOffice
         public Task<int> AddLeadActivityAsync(LeadActivityModel activity) => _dataAccess.AddLeadActivityAsync(activity);
         public Task<bool> CheckCustCodeExistsAsync(string custCode) => _dataAccess.CheckCustCodeExistsAsync(custCode);
         public Task<bool> ConvertLeadToForeignCustomerAsync(ConvertLeadToCustomerModel model) => _dataAccess.ConvertLeadToForeignCustomerAsync(model);
+
+        // Customer 360 Hub
+        public Task<Customer360Dto> GetCustomer360Async(string? customerCode = null) => _dataAccess.GetCustomer360Async(customerCode);
+        public Task<List<Customer360LookupDto>> GetCustomer360LookupListAsync() => _dataAccess.GetCustomer360LookupListAsync();
+        public Task<bool> ConvertCustomer360ToForeignCustomerAsync(ConvertCustomerToForeignCustomerModel model) => _dataAccess.ConvertCustomer360ToForeignCustomerAsync(model);
+        public Task<bool> AddCustomer360ActivityAsync(CustomerActivityDto activity) => _dataAccess.AddCustomer360ActivityAsync(activity);
+        public Task<bool> AddCustomer360ContactAsync(CustomerContactDto contact) => _dataAccess.AddCustomer360ContactAsync(contact);
+
+        // Minute Types Admin
+        public Task<List<MinuteType>> GetAllMinuteTypesAsync() => _dataAccess.GetAllMinuteTypesAsync();
+        public Task<int> CreateMinuteTypeAsync(string name) => _dataAccess.CreateMinuteTypeAsync(name);
+        public Task<bool> UpdateMinuteTypeAsync(int id, string name, bool isActive) => _dataAccess.UpdateMinuteTypeAsync(id, name, isActive);
+        public Task<bool> DeleteMinuteTypeAsync(int id) => _dataAccess.DeleteMinuteTypeAsync(id);
+
+        // Email Configuration
+        public Task<EmailConfiguration?> GetEmailConfigurationAsync() => _dataAccess.GetEmailConfigurationAsync();
+        public Task<bool> SaveEmailConfigurationAsync(EmailConfiguration config) => _dataAccess.SaveEmailConfigurationAsync(config);
+
+        // Email Templates
+        public Task<List<EmailTemplate>> GetEmailTemplatesAsync(string? category = null) => _dataAccess.GetEmailTemplatesAsync(category);
+        public Task<EmailTemplate?> GetEmailTemplateByCodeAsync(string code) => _dataAccess.GetEmailTemplateByCodeAsync(code);
+        public Task<EmailTemplate?> GetEmailTemplateByIdAsync(int id) => _dataAccess.GetEmailTemplateByIdAsync(id);
+        public Task<int> SaveEmailTemplateAsync(EmailTemplate template) => _dataAccess.SaveEmailTemplateAsync(template);
+        public Task<bool> DeleteEmailTemplateAsync(int id) => _dataAccess.DeleteEmailTemplateAsync(id);
+
+        // Executive Reports & Analytics
+        public Task<DashboardMetricsDto> GetDashboardMetricsAsync() => _dataAccess.GetDashboardMetricsAsync();
+        public Task<ARAgingSummaryDto> GetARAgingSummaryAsync() => _dataAccess.GetARAgingSummaryAsync();
     }
 }
+

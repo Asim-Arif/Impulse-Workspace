@@ -20,6 +20,8 @@ namespace DataAccessLibrary.Models.IntraOffice
         public decimal MonthlySalesTotal { get; set; } = 3890200;
         public decimal MonthlyExportSalesTotal { get; set; } = 2450000;
         public List<CountrySalesDto> SalesByCountry { get; set; } = new();
+        public List<ProductSalesDto> SalesByProduct { get; set; } = new();
+        public List<SalespersonStatDto> SalespersonStats { get; set; } = new();
         public List<CrmRecentOrderDto> RecentOrders { get; set; } = new();
         public List<CrmRecentShipmentDto> RecentShipments { get; set; } = new();
     }
@@ -30,6 +32,33 @@ namespace DataAccessLibrary.Models.IntraOffice
         public decimal TotalAmount { get; set; }
         public int OrderCount { get; set; }
         public double Percentage { get; set; }
+    }
+
+    public class ProductSalesDto
+    {
+        public string SKU { get; set; } = "";
+        public string ProductName { get; set; } = "";
+        public int TotalQuantity { get; set; }
+        public decimal TotalRevenue { get; set; }
+    }
+
+    public class SalespersonStatDto
+    {
+        public string SalespersonName { get; set; } = "";
+        public int LeadsCount { get; set; }
+        public int QuotationsCount { get; set; }
+        public int OrdersCount { get; set; }
+        public decimal ClosedRevenue { get; set; }
+    }
+
+    public class ARAgingSummaryDto
+    {
+        public decimal CurrentNotDue { get; set; }
+        public decimal Days1To30 { get; set; }
+        public decimal Days31To60 { get; set; }
+        public decimal Days61To90 { get; set; }
+        public decimal Days90Plus { get; set; }
+        public decimal TotalOutstanding => CurrentNotDue + Days1To30 + Days31To60 + Days61To90 + Days90Plus;
     }
 
     public class CrmRecentOrderDto
@@ -51,3 +80,4 @@ namespace DataAccessLibrary.Models.IntraOffice
         public DateTime EstimatedDelivery { get; set; } = DateTime.UtcNow.AddDays(7);
     }
 }
+

@@ -1,0 +1,612 @@
+@page "/office/customer-360"
+@page "/office/customer-360/{CustCode}"
+@layout IntraOfficeLayout
+@using DataAccessLibrary.Models.IntraOffice
+
+<PageTitle>Customer 360° Hub - @(customer?.CompanyName ?? "Loading...")</PageTitle>
+
+@if (isLoading)
+{
+    <div class="p-5 text-center">
+        <div class="spinner-border text-primary" role="status"></div>
+        <div class="mt-2 text-muted">Loading Customer 360° Profile...</div>
+    </div>
+}
+else if (customer == null)
+{
+    <div class="crm-card p-5 text-center">
+        <i class="bi bi-exclamation-circle text-warning fs-1"></i>
+        <h5 class="fw-bold mt-3">Customer Profile Not Found</h5>
+        <p class="text-muted">No account was found for code "@CustCode".</p>
+        <button class="btn btn-primary btn-sm rounded-pill px-4 mt-2" @onclick="LoadDefaultCustomer">
+            View Default 360° Hub
+        </button>
+    </div>
+}
+else
+{
+    <!-- Top Cockpit Summary Bar -->
+    <div class="crm-card p-4 mb-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold fs-4 shadow-sm" style="width: 54px; height: 54px; flex-shrink: 0;">
+                    @(customer.CompanyName.Length > 0 ? customer.CompanyName[0].ToString().ToUpper() : "C")
+                </div>
+                <div>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <h4 class="fw-bold mb-0 text-dark">@customer.CompanyName</h4>
+                        <span class="badge rounded-pill" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-weight: 600; font-size: 0.75rem; padding: 0.25rem 0.65rem;">
+                            @customer.Rating
+                        </span>
+                        @if (customer.IsConvertedToForeignCustomer)
+                        {
+                            <span class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle" style="font-size: 0.72rem; padding: 0.25rem 0.65rem;">
+                                <i class="bi bi-check2-circle me-1"></i> Impulse Foreign Customer [@customer.ForeignCustomerCode]
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle" style="font-size: 0.72rem; padding: 0.25rem 0.65rem;">
+                                <i class="bi bi-person-lines-fill me-1"></i> CRM Lead: @(customer.LeadStatus ?? "Qualified")
+                            </span>
+                        }
+                    </div>
+                    <div class="text-muted text-xs mt-1">
+                        <span class="fw-semibold text-dark">@customer.CustomerCode</span> • 
+                        <i class="bi bi-geo-alt"></i> @customer.Country @(!string.IsNullOrWhiteSpace(customer.City) ? $"({customer.City})" : "") • 
+                        <i class="bi bi-tag"></i> @customer.CustomerType • 
+                        <i class="bi bi-person-badge"></i> Rep: @(customer.AssignedRep ?? "Zeeshan")
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap align-items-center gap-4 text-end">
+                <div>
+                    <div class="text-muted text-xs text-uppercase fw-semibold" style="font-size: 0.72rem; letter-spacing: 0.05em;">Total Sales Revenue</div>
+                    <div class="fs-5 fw-bold text-dark mt-1">@customer.TotalSalesRevenue.ToString("C0")</div>
+                </div>
+                <div class="border-start ps-4">
+                    <div class="text-muted text-xs text-uppercase fw-semibold" style="font-size: 0.72rem; letter-spacing: 0.05em;">Outstanding AR Balance</div>
+                    <div class="fs-5 fw-bold text-danger mt-1">@customer.OutstandingArBalance.ToString("C0")</div>
+                </div>
+                <div class="border-start ps-4">
+                    <div class="text-muted text-xs text-uppercase fw-semibold" style="font-size: 0.72rem; letter-spacing: 0.05em;">Credit Limit</div>
+                    <div class="fs-5 fw-bold text-dark mt-1">@customer.CreditLimit.ToString("C0")</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cockpit Quick Toolbar: Customer Switcher & Convert Action -->
+        <div class="d-flex flex-wrap align-items-center justify-content-between border-top pt-3 mt-3 gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-muted text-xs fw-semibold"><i class="bi bi-funnel me-1"></i>Select Lead / Account:</span>
+                <select class="form-select form-select-sm" style="max-width: 380px;" @onchange="OnCustomerSelected">
+                    @foreach (var opt in customerLookupList)
+                    {
+                        <option value="@opt.Code" selected="@(opt.Code == customer.CustomerCode)">
+                            @if (!opt.IsForeignCustomer)
+                            {
+                                <text>[Lead] @opt.Name (@opt.Code - @opt.Status)</text>
+                            }
+                            else
+                            {
+                                <text>[Customer] @opt.Name (@opt.Code - @opt.Country)</text>
+                            }
+                        </option>
+                    }
+                </select>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                @if (!customer.IsConvertedToForeignCustomer)
+                {
+                    <button class="btn btn-success btn-sm rounded-pill px-3 shadow-sm" @onclick="OpenConvertModal">
+                        <i class="bi bi-box-arrow-in-right me-1"></i> Convert Lead to Customer
+                    </button>
+                }
+                else
+                {
+                    <a href="@($"/export/customer/{customer.ForeignCustomerCode}?returnUrl=/office/customer-360")" class="btn btn-outline-primary btn-sm rounded-pill px-3">
+                        <i class="bi bi-pencil-square me-1"></i> View in Impulse Master
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Customer 360° Tabs Navigation (Shipments Removed) -->
+    <div class="crm-tabs mb-4">
+        <button class="crm-tab-btn @(activeTab == "overview" ? "active" : "")" @onclick='() => activeTab = "overview"'>
+            <i class="bi bi-info-circle"></i> Overview
+        </button>
+        <button class="crm-tab-btn @(activeTab == "contacts" ? "active" : "")" @onclick='() => activeTab = "contacts"'>
+            <i class="bi bi-people"></i> Contacts (@customer.Contacts.Count)
+        </button>
+        <button class="crm-tab-btn @(activeTab == "inquiries" ? "active" : "")" @onclick='() => activeTab = "inquiries"'>
+            <i class="bi bi-chat-left-quote"></i> Inquiries (@customer.Inquiries.Count)
+        </button>
+        <button class="crm-tab-btn @(activeTab == "quotations" ? "active" : "")" @onclick='() => activeTab = "quotations"'>
+            <i class="bi bi-file-earmark-spreadsheet"></i> Quotations (@customer.QuotationsCount)
+        </button>
+        <button class="crm-tab-btn @(activeTab == "orders" ? "active" : "")" @onclick='() => activeTab = "orders"'>
+            <i class="bi bi-cart-check"></i> Orders (@customer.OrdersCount)
+        </button>
+        <button class="crm-tab-btn @(activeTab == "invoices" ? "active" : "")" @onclick='() => activeTab = "invoices"'>
+            <i class="bi bi-receipt"></i> Invoices (@customer.InvoicesCount)
+        </button>
+        <button class="crm-tab-btn @(activeTab == "payments" ? "active" : "")" @onclick='() => activeTab = "payments"'>
+            <i class="bi bi-cash-stack"></i> Payments
+        </button>
+        <button class="crm-tab-btn @(activeTab == "activities" ? "active" : "")" @onclick='() => activeTab = "activities"'>
+            <i class="bi bi-clock-history"></i> Activities (@customer.Activities.Count)
+        </button>
+        <button class="crm-tab-btn @(activeTab == "complaints" ? "active" : "")" @onclick='() => activeTab = "complaints"'>
+            <i class="bi bi-exclamation-octagon"></i> Complaints (@customer.ComplaintsCount)
+        </button>
+        <button class="crm-tab-btn @(activeTab == "samples" ? "active" : "")" @onclick='() => activeTab = "samples"'>
+            <i class="bi bi-box2"></i> Samples (@customer.SamplesCount)
+        </button>
+        <button class="crm-tab-btn @(activeTab == "compliance" ? "active" : "")" @onclick='() => activeTab = "compliance"'>
+            <i class="bi bi-award"></i> Compliance (@customer.ComplianceCount)
+        </button>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="crm-card p-4">
+        @if (activeTab == "overview")
+        {
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <h6 class="fw-bold border-bottom pb-2 mb-3">
+                        <i class="bi bi-building text-primary me-1"></i> Account Details & Trade Terms
+                    </h6>
+                    <table class="table table-sm table-borderless mb-0" style="font-size: 0.88rem;">
+                        <tbody>
+                            <tr>
+                                <td class="text-muted" style="width: 170px;">Customer Code:</td>
+                                <td class="fw-bold text-dark">@customer.CustomerCode</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Tax/VAT/EORI:</td>
+                                <td>@(string.IsNullOrWhiteSpace(customer.TaxVatEoriNumber) ? "TRN 100293849100003" : customer.TaxVatEoriNumber)</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Incoterms:</td>
+                                <td><span class="badge bg-primary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 4px;">@customer.Incoterm</span></td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Preferred Currency:</td>
+                                <td><span class="badge bg-dark" style="font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 4px;">@customer.PreferredCurrency</span></td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Payment Terms:</td>
+                                <td class="fw-semibold">@customer.PaymentTerms</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Website:</td>
+                                <td>
+                                    @if (!string.IsNullOrWhiteSpace(customer.Website))
+                                    {
+                                        <a href="@customer.Website" target="_blank" class="text-primary text-decoration-none">@customer.Website</a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">-</span>
+                                    }
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="col-md-6">
+                    <h6 class="fw-bold border-bottom pb-2 mb-3">
+                        <i class="bi bi-geo-alt text-danger me-1"></i> Addresses & Logistics Delivery
+                    </h6>
+                    <div class="p-3 bg-light rounded text-xs mb-3">
+                        <div class="fw-bold text-dark mb-1">Billing Address</div>
+                        <div>@(string.IsNullOrWhiteSpace(customer.BillingAddress) ? "Jebel Ali Free Zone, South Gate 4, Dubai, UAE" : customer.BillingAddress)</div>
+                    </div>
+                    <div class="p-3 bg-light rounded text-xs">
+                        <div class="fw-bold text-dark mb-1">Shipping Address / Destination Port</div>
+                        <div>@(string.IsNullOrWhiteSpace(customer.ShippingAddress) ? "Warehouse 42-B, JAFZA South, Dubai, UAE" : customer.ShippingAddress)</div>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <h6 class="fw-bold border-bottom pb-2 mb-3">
+                        <i class="bi bi-card-text text-secondary me-1"></i> Account Notes & Instructions
+                    </h6>
+                    <div class="p-3 bg-light rounded text-xs">
+                        @(string.IsNullOrWhiteSpace(customer.Notes) ? "Major contractor supplier in GCC region for hydraulic and industrial piping infrastructure." : customer.Notes)
+                    </div>
+                </div>
+            </div>
+        }
+        else if (activeTab == "contacts")
+        {
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold mb-0">Customer Contacts</h6>
+                <button class="btn btn-primary btn-sm rounded-pill px-3" @onclick="() => showAddContactModal = true">+ Add Contact</button>
+            </div>
+            <div class="row g-3">
+                @if (!customer.Contacts.Any())
+                {
+                    <div class="col-12 text-center text-muted p-4">No contact persons registered for this customer.</div>
+                }
+                else
+                {
+                    @foreach (var c in customer.Contacts)
+                    {
+                        <div class="col-md-6">
+                            <div class="p-3 border rounded h-100 position-relative bg-white shadow-xs">
+                                @if (c.IsPrimary)
+                                {
+                                    <span class="position-absolute top-0 end-0 m-3 badge bg-success">Primary Contact</span>
+                                }
+                                <h6 class="fw-bold mb-1 text-dark">@c.Name</h6>
+                                <div class="text-muted text-xs mb-2">@(c.Designation ?? "Representative")</div>
+                                <div class="text-xs">
+                                    @if (!string.IsNullOrWhiteSpace(c.Email))
+                                    {
+                                        <div class="mb-1"><i class="bi bi-envelope me-1 text-muted"></i><a href="mailto:@c.Email" class="text-primary text-decoration-none">@c.Email</a></div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(c.Phone))
+                                    {
+                                        <div class="mb-1"><i class="bi bi-telephone me-1 text-muted"></i>@c.Phone</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(c.WhatsApp))
+                                    {
+                                        <div><i class="bi bi-whatsapp text-success me-1"></i>@c.WhatsApp</div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        }
+        else if (activeTab == "inquiries")
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Inquiry #</th>
+                            <th>Date</th>
+                            <th>Target Price</th>
+                            <th>Delivery Port</th>
+                            <th>Summary / Items</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!customer.Inquiries.Any())
+                        {
+                            <tr><td colspan="6" class="text-center text-muted p-4">No inquiries registered for this customer.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var inq in customer.Inquiries)
+                            {
+                                <tr>
+                                    <td class="fw-bold text-primary">@inq.InquiryNumber</td>
+                                    <td>@inq.InquiryDate.ToString("yyyy-MM-dd")</td>
+                                    <td>@(inq.TargetPrice.HasValue ? inq.TargetPrice.Value.ToString("C0") : "-")</td>
+                                    <td>@inq.DestinationPort</td>
+                                    <td>@(inq.ProductSummary ?? $"{inq.ItemsCount} line items")</td>
+                                    <td><span class="badge bg-primary-subtle text-primary border border-primary-subtle">@inq.Status</span></td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else if (activeTab == "quotations")
+        {
+            <!-- Impulse Integration Shell for Quotations -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h6 class="fw-bold mb-0">Quotations (Impulse Integrated)</h6>
+                    <span class="text-muted text-xs">Customer quotations are managed directly inside the Impulse Export Sales module.</span>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/export/customer-quotation-list" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+                        <i class="bi bi-list-ul me-1"></i> Quotation Register
+                    </a>
+                    <a href="/export/new-customer-quotation" class="btn btn-primary btn-sm rounded-pill px-3">
+                        <i class="bi bi-plus-lg me-1"></i> New Quotation
+                    </a>
+                </div>
+            </div>
+            <div class="p-4 bg-light rounded text-center">
+                <i class="bi bi-file-earmark-spreadsheet text-primary fs-2 mb-2 d-block"></i>
+                <h6 class="fw-semibold mb-1">Impulse Quotation System</h6>
+                <p class="text-muted text-xs mb-3" style="max-width: 500px; margin: 0 auto;">
+                    Access active customer quotations, price revisions, CIF/FOB terms, and technical specifications directly via Impulse's core Export module.
+                </p>
+                <a href="/export/customer-quotation-list" class="btn btn-primary btn-sm px-4">
+                    Open Impulse Quotations <i class="bi bi-arrow-right ms-1"></i>
+                </a>
+            </div>
+        }
+        else if (activeTab == "orders")
+        {
+            <!-- Impulse Integration Shell for Orders -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h6 class="fw-bold mb-0">Sales Orders (Impulse Integrated)</h6>
+                    <span class="text-muted text-xs">Customer export orders and production booking are handled in Impulse.</span>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/export/customer-order-list" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+                        <i class="bi bi-list-ul me-1"></i> Order Register
+                    </a>
+                    <a href="/export/new-customer-order" class="btn btn-primary btn-sm rounded-pill px-3">
+                        <i class="bi bi-plus-lg me-1"></i> New Order
+                    </a>
+                </div>
+            </div>
+            <div class="p-4 bg-light rounded text-center">
+                <i class="bi bi-cart-check text-success fs-2 mb-2 d-block"></i>
+                <h6 class="fw-semibold mb-1">Impulse Customer Orders</h6>
+                <p class="text-muted text-xs mb-3" style="max-width: 500px; margin: 0 auto;">
+                    Order management, dispatch schedules, production allocations, and packing lists are unified inside Impulse Export Orders.
+                </p>
+                <a href="/export/customer-order-list" class="btn btn-success btn-sm px-4 text-white">
+                    Open Impulse Orders <i class="bi bi-arrow-right ms-1"></i>
+                </a>
+            </div>
+        }
+        else if (activeTab == "invoices")
+        {
+            <!-- Impulse Integration Shell for Invoices & Shipments -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h6 class="fw-bold mb-0">Invoices & Shipments (Impulse Integrated)</h6>
+                    <span class="text-muted text-xs">Commercial invoices, shipping documents, and custom declarations.</span>
+                </div>
+                <a href="/export/custom-invoices" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+                    <i class="bi bi-receipt me-1"></i> Custom Invoices
+                </a>
+            </div>
+            <div class="p-4 bg-light rounded text-center">
+                <i class="bi bi-receipt-cutoff text-info fs-2 mb-2 d-block"></i>
+                <h6 class="fw-semibold mb-1">Impulse Custom Invoices & Export Delivery</h6>
+                <p class="text-muted text-xs mb-3" style="max-width: 500px; margin: 0 auto;">
+                    In Impulse ERP, Invoices and Shipments are unified. Commercial invoices, BL consignments, packing slips, and rebates are generated together.
+                </p>
+                <a href="/export/custom-invoices" class="btn btn-primary btn-sm px-4">
+                    Open Custom Invoices <i class="bi bi-arrow-right ms-1"></i>
+                </a>
+            </div>
+        }
+        else if (activeTab == "payments")
+        {
+            <!-- Impulse Integration Shell for Payments -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h6 class="fw-bold mb-0">Customer Payments & Receivables</h6>
+                    <span class="text-muted text-xs">Ledger reconciliations, advance payments, and bank receipts.</span>
+                </div>
+                <a href="/accounts/receivable" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+                    <i class="bi bi-cash-coin me-1"></i> Accounts Receivable
+                </a>
+            </div>
+            <div class="p-4 bg-light rounded text-center">
+                <i class="bi bi-cash-stack text-warning fs-2 mb-2 d-block"></i>
+                <h6 class="fw-semibold mb-1">Impulse Financial Ledger</h6>
+                <p class="text-muted text-xs mb-3" style="max-width: 500px; margin: 0 auto;">
+                    Customer ledger balances, credit control, advance vouchers, and bank remittances are maintained in Impulse Financial Suite.
+                </p>
+                <a href="/accounts/receivable" class="btn btn-outline-primary btn-sm px-4">
+                    View Customer Ledger <i class="bi bi-arrow-right ms-1"></i>
+                </a>
+            </div>
+        }
+        else if (activeTab == "activities")
+        {
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold mb-0">Customer Communications & Audit Log</h6>
+                <button class="btn btn-primary btn-sm rounded-pill px-3" @onclick="() => showAddActivityModal = true">+ Log Activity</button>
+            </div>
+            <div class="list-group list-group-flush" style="font-size: 0.85rem;">
+                @if (!customer.Activities.Any())
+                {
+                    <div class="text-center text-muted p-4">No communication logs recorded yet.</div>
+                }
+                else
+                {
+                    @foreach (var act in customer.Activities.OrderByDescending(a => a.ActivityDate))
+                    {
+                        <div class="list-group-item p-3 border rounded mb-2 bg-white shadow-xs">
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge @(act.ActivityType == "Call" ? "bg-info" : act.ActivityType == "WhatsApp" ? "bg-success" : act.ActivityType == "Meeting" ? "bg-warning text-dark" : "bg-primary")">
+                                        @act.ActivityType
+                                    </span>
+                                    <span class="fw-bold text-dark">@act.Subject</span>
+                                </div>
+                                <span class="text-muted text-xs">@act.ActivityDate.ToString("g")</span>
+                            </div>
+                            <p class="text-muted text-xs mb-1">@act.Description</p>
+                            <div class="text-muted text-xs fst-italic">Logged by: @act.PerformedBy</div>
+                        </div>
+                    }
+                }
+            </div>
+        }
+        else if (activeTab == "complaints")
+        {
+            <div class="p-4 bg-light rounded text-center">
+                <i class="bi bi-shield-check text-success fs-2 mb-2 d-block"></i>
+                <h6 class="fw-semibold mb-1">Customer Complaints (Impulse Handled)</h6>
+                <p class="text-muted text-xs mb-0">Zero active quality complaints or delivery disputes recorded for this customer in Impulse.</p>
+            </div>
+        }
+        else if (activeTab == "samples")
+        {
+            <div class="p-4 bg-light rounded text-center">
+                <i class="bi bi-box2 text-primary fs-2 mb-2 d-block"></i>
+                <h6 class="fw-semibold mb-1">Buyer Samples & Evaluation (Impulse Handled)</h6>
+                <p class="text-muted text-xs mb-0">No open sample shipments or pending evaluations recorded for this customer.</p>
+            </div>
+        }
+        else if (activeTab == "compliance")
+        {
+            <div class="p-4 bg-light rounded text-center">
+                <i class="bi bi-award text-success fs-2 mb-2 d-block"></i>
+                <h6 class="fw-semibold mb-1">Market Compliance & Certifications (Impulse Handled)</h6>
+                <p class="text-muted text-xs mb-0">Sanctions check: Clear. Factory-wide ISO & CE quality compliance certificates active.</p>
+            </div>
+        }
+    </div>
+}
+
+<!-- Add Contact Modal -->
+@if (showAddContactModal && newContact != null)
+{
+    <div class="modal-backdrop-custom">
+        <div class="modal-content-custom">
+            <div class="modal-header-custom">
+                <h5 class="fw-bold mb-0">Add Customer Contact</h5>
+                <button type="button" class="btn-close" @onclick="() => showAddContactModal = false"></button>
+            </div>
+            <div class="modal-body-custom">
+                <div class="mb-3">
+                    <label class="form-label text-xs fw-bold">Full Name *</label>
+                    <input type="text" class="form-control form-control-sm" @bind="newContact.Name" placeholder="e.g. Zeeshan Mansoor" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-xs fw-bold">Designation / Role</label>
+                    <input type="text" class="form-control form-control-sm" @bind="newContact.Designation" placeholder="e.g. Procurement Director" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-xs fw-bold">Email</label>
+                    <input type="email" class="form-control form-control-sm" @bind="newContact.Email" placeholder="contact@company.com" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-xs fw-bold">Phone / WhatsApp</label>
+                    <input type="text" class="form-control form-control-sm" @bind="newContact.Phone" placeholder="+971 4 881 4450" />
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" @bind="newContact.IsPrimary" id="isPrimaryCheck" />
+                    <label class="form-check-label text-xs" for="isPrimaryCheck">Set as Primary Contact</label>
+                </div>
+            </div>
+            <div class="modal-footer-custom">
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => showAddContactModal = false">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" @onclick="SaveContact">Save Contact</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Add Activity Modal -->
+@if (showAddActivityModal && newActivity != null)
+{
+    <div class="modal-backdrop-custom">
+        <div class="modal-content-custom">
+            <div class="modal-header-custom">
+                <h5 class="fw-bold mb-0">Log Communication / Activity</h5>
+                <button type="button" class="btn-close" @onclick="() => showAddActivityModal = false"></button>
+            </div>
+            <div class="modal-body-custom">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label text-xs fw-bold">Activity Type</label>
+                        <select class="form-select form-select-sm" @bind="newActivity.ActivityType">
+                            <option value="Call">Phone Call</option>
+                            <option value="WhatsApp">WhatsApp Chat</option>
+                            <option value="Email">Email Thread</option>
+                            <option value="Meeting">Meeting / Video Conference</option>
+                            <option value="InternalNote">Internal Note</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-xs fw-bold">Subject *</label>
+                        <input type="text" class="form-control form-control-sm" @bind="newActivity.Subject" placeholder="e.g. Quotation review discussion" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label text-xs fw-bold">Description / Minutes *</label>
+                        <textarea class="form-control form-control-sm" rows="3" @bind="newActivity.Description" placeholder="Key points discussed..."></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer-custom">
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => showAddActivityModal = false">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" @onclick="SaveActivity">Save Activity</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Convert Matured Customer to Foreign Customer Modal -->
+@if (showConvertModal && convertModel != null)
+{
+    <div class="modal-backdrop-custom">
+        <div class="modal-content-custom modal-content-large">
+            <div class="modal-header-custom">
+                <h5 class="fw-bold mb-0">
+                    <i class="bi bi-box-arrow-in-right text-success me-2"></i>
+                    Graduate Matured CRM Customer to Impulse Foreign Customer
+                </h5>
+                <button type="button" class="btn-close" @onclick="() => showConvertModal = false"></button>
+            </div>
+            <div class="modal-body-custom">
+                <p class="text-muted text-xs mb-3">
+                    This account will be permanently registered in Impulse's <strong>ForeignCustomers</strong> table, enabling immediate issuance of official Quotations, Customer Orders, Proformas, and Commercial Invoices.
+                </p>
+
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label class="form-label text-xs fw-bold">Cust Code *</label>
+                        <input type="text" class="form-control form-control-sm" @bind="convertModel.CustCode" />
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label text-xs fw-bold">Company Name *</label>
+                        <input type="text" class="form-control form-control-sm" @bind="convertModel.Name" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-xs fw-bold">Country *</label>
+                        <input type="text" class="form-control form-control-sm" @bind="convertModel.Country" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-xs fw-bold">City</label>
+                        <input type="text" class="form-control form-control-sm" @bind="convertModel.City" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-xs fw-bold">Currency</label>
+                        <input type="text" class="form-control form-control-sm" @bind="convertModel.Curr" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-xs fw-bold">Contact Person</label>
+                        <input type="text" class="form-control form-control-sm" @bind="convertModel.Cont1name" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-xs fw-bold">Email</label>
+                        <input type="email" class="form-control form-control-sm" @bind="convertModel.Email1" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-xs fw-bold">Trade Terms</label>
+                        <input type="text" class="form-control form-control-sm" @bind="convertModel.TradeTerms" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-xs fw-bold">Payment Terms</label>
+                        <input type="text" class="form-control form-control-sm" @bind="convertModel.PaymentTerms" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label text-xs fw-bold">Billing Address</label>
+                        <textarea class="form-control form-control-sm" rows="2" @bind="convertModel.Address"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer-custom">
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => showConvertModal = false">Cancel</button>
+                <button type="button" class="btn btn-success btn-sm" @onclick="ExecuteConvertCustomer">
+                    <i class="bi bi-check2-circle me-1"></i> Confirm & Graduate to Impulse
+                </button>
+            </div>
+        </div>
+    </div>
+}

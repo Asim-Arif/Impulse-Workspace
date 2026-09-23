@@ -271,8 +271,17 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 window.stickyNotesWidgetRef = null;
-window.registerStickyNotesWidget = function(ref) { window.stickyNotesWidgetRef = ref; console.log('Sticky Notes Widget Registered!'); };
-window.triggerAddNewNote = function() { if (window.stickyNotesWidgetRef) { window.stickyNotesWidgetRef.invokeMethodAsync('AddNewNoteJS').catch(err => console.error('Error adding note:', err)); } else { fetch('/api/stickynotes', { method: 'POST' }).then(r => { if (r.ok) location.reload(); else alert('Failed to create note.'); }).catch(e => alert('Error creating note.')); } };
+window.highestStickyZIndex = 99999;
+
+window.registerStickyNotesWidget = function(ref) {
+    window.stickyNotesWidgetRef = ref;
+};
+
+window.triggerAddNewNote = function() {
+    if (window.stickyNotesWidgetRef) {
+        window.stickyNotesWidgetRef.invokeMethodAsync('AddNewNoteJS').catch(err => console.error('Error adding note:', err));
+    }
+};
 
 // STICKY NOTES VANILLA JS LOGIC
 let activeNoteId = null;
@@ -282,14 +291,30 @@ let initialNoteX = 0;
 let initialNoteY = 0;
 
 window.beginDragJS = function(e, id) {
-    if (e.target.tagName.toLowerCase() === 'select' || e.target.tagName.toLowerCase() === 'button' || e.target.closest('button')) return;
+    if (e.target.tagName.toLowerCase() === 'select' || 
+        e.target.tagName.toLowerCase() === 'button' || 
+        e.target.closest('button') || 
+        e.target.closest('select') ||
+        e.target.closest('input') ||
+        e.target.closest('textarea')) {
+        return;
+    }
+    
+    e.preventDefault();
     activeNoteId = id;
     dragStartX = e.clientX;
     dragStartY = e.clientY;
     
     let noteEl = document.getElementById('note-' + id);
-    initialNoteX = parseInt(noteEl.style.left) || 0;
-    initialNoteY = parseInt(noteEl.style.top) || 0;
+    if (!noteEl) return;
+    
+    // Bring dragged note to top
+    window.highestStickyZIndex++;
+    noteEl.style.zIndex = window.highestStickyZIndex;
+    
+    let rect = noteEl.getBoundingClientRect();
+    initialNoteX = rect.left;
+    initialNoteY = rect.top;
     
     document.addEventListener('mousemove', dragJS);
     document.addEventListener('mouseup', endDragJS);
@@ -303,13 +328,21 @@ function dragJS(e) {
     let deltaX = e.clientX - dragStartX;
     let deltaY = e.clientY - dragStartY;
     
-    noteEl.style.left = (initialNoteX + deltaX) + 'px';
-    noteEl.style.top = (initialNoteY + deltaY) + 'px';
+    let newX = Math.max(10, Math.min(window.innerWidth - 60, initialNoteX + deltaX));
+    let newY = Math.max(10, Math.min(window.innerHeight - 60, initialNoteY + deltaY));
+    
+    noteEl.style.left = newX + 'px';
+    noteEl.style.top = newY + 'px';
 }
 
 function endDragJS(e) {
     if (activeNoteId) {
-        window.saveNoteJS(activeNoteId);
+        let noteEl = document.getElementById('note-' + activeNoteId);
+        if (noteEl && window.stickyNotesWidgetRef) {
+            let x = parseInt(noteEl.style.left) || 0;
+            let y = parseInt(noteEl.style.top) || 0;
+            window.stickyNotesWidgetRef.invokeMethodAsync('UpdateNotePositionJS', activeNoteId, x, y).catch(console.error);
+        }
         activeNoteId = null;
     }
     document.removeEventListener('mousemove', dragJS);
@@ -317,53 +350,56 @@ function endDragJS(e) {
 }
 
 window.toggleMinimizeJS = function(id) {
+    if (window.stickyNotesWidgetRef) {
+        window.stickyNotesWidgetRef.invokeMethodAsync('ToggleMinimizeJS', id).catch(console.error);
+    }
     let content = document.getElementById('note-content-' + id);
     let noteEl = document.getElementById('note-' + id);
     let icon = document.getElementById('minimize-icon-' + id);
-    if (content.classList.contains('hidden')) {
-        content.classList.remove('hidden');
-        noteEl.classList.remove('minimized');
-        icon.classList.remove('bi-arrows-expand');
-        icon.classList.add('bi-dash');
-    } else {
-        content.classList.add('hidden');
-        noteEl.classList.add('minimized');
-        icon.classList.remove('bi-dash');
-        icon.classList.add('bi-arrows-expand');
+    if (content && noteEl) {
+        if (content.classList.contains('hidden') || content.classList.contains('d-none')) {
+            content.classList.remove('hidden', 'd-none');
+            noteEl.classList.remove('minimized');
+            if (icon) {
+                icon.classList.remove('bi-arrows-expand');
+                icon.classList.add('bi-dash');
+            }
+        } else {
+            content.classList.add('hidden', 'd-none');
+            noteEl.classList.add('minimized');
+            if (icon) {
+                icon.classList.remove('bi-dash');
+                icon.classList.add('bi-arrows-expand');
+            }
+        }
     }
 };
 
 window.deleteNoteJS = function(id) {
-    fetch('/api/stickynotes/' + id, { method: 'DELETE' }).then(r => {
-        if (r.ok) {
-            let el = document.getElementById('note-' + id);
-            if (el) el.remove();
-        }
-    });
+    if (window.stickyNotesWidgetRef) {
+        window.stickyNotesWidgetRef.invokeMethodAsync('DeleteNoteJS', id).catch(console.error);
+    }
+    let el = document.getElementById('note-' + id);
+    if (el) el.remove();
 };
 
 window.saveNoteJS = function(id) {
     let noteEl = document.getElementById('note-' + id);
     if (!noteEl) return;
     
-    let data = {
-        Id: id,
-        Content: document.getElementById('note-text-' + id).value || '',
-        Color: document.getElementById('note-color-' + id).value || 'yellow',
-        XPos: parseInt(noteEl.style.left) || 0,
-        YPos: parseInt(noteEl.style.top) || 0,
-        ReminderTime: document.getElementById('note-reminder-' + id).value || null
-    };
+    let content = document.getElementById('note-text-' + id)?.value || '';
+    let color = document.getElementById('note-color-' + id)?.value || 'yellow';
+    let reminder = document.getElementById('note-reminder-' + id)?.value || null;
+    let x = parseInt(noteEl.style.left) || 0;
+    let y = parseInt(noteEl.style.top) || 0;
     
-    // Convert background color immediately
     const colors = { 'yellow': '#fff9c4', 'blue': '#bbdefb', 'pink': '#f8bbd0', 'green': '#c8e6c9' };
-    noteEl.style.backgroundColor = colors[data.Color];
+    noteEl.style.backgroundColor = colors[color] || '#fff9c4';
     
-    fetch('/api/stickynotes/' + id, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    });
+    if (window.stickyNotesWidgetRef) {
+        window.stickyNotesWidgetRef.invokeMethodAsync('UpdateNoteContentJS', id, content, color, reminder).catch(console.error);
+        window.stickyNotesWidgetRef.invokeMethodAsync('UpdateNotePositionJS', id, x, y).catch(console.error);
+    }
 };
 
 

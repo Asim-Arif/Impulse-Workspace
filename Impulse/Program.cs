@@ -487,6 +487,8 @@ builder.Services.AddScoped<Impulse.Services.IntraOffice.IMinuteApprovalService, 
 builder.Services.AddScoped<Impulse.Services.IntraOffice.IMinuteTypeService, Impulse.Services.IntraOffice.MinuteTypeService>();
 builder.Services.AddScoped<Impulse.Services.IntraOffice.IWhatsAppService, Impulse.Services.IntraOffice.WhatsAppService>();
 builder.Services.AddScoped<Impulse.Services.IntraOffice.IEmailService, Impulse.Services.IntraOffice.EmailService>();
+builder.Services.AddSingleton<Impulse.Services.IntraOffice.IEmailEncryptionService, Impulse.Services.IntraOffice.EmailEncryptionService>();
+builder.Services.AddScoped<Impulse.Services.IntraOffice.ICrmService, Impulse.Services.IntraOffice.CrmService>();
 builder.Services.AddHttpClient<Impulse.Services.IntraOffice.IAiService, Impulse.Services.IntraOffice.OpenRouterAiService>();
 
 // Setup & User Management Registrations

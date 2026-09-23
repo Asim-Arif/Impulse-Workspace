@@ -52,6 +52,10 @@ namespace DataAccessLibrary.Interface.IntraOffice
         Task<int> CreateMinuteApprovalAsync(MinuteApproval minute);
         Task<bool> UpdateMinuteStatusAsync(int minuteId, string status, string userId, string actionTaken, string? remarks = null, string? signaturePath = null);
         Task<List<MinuteType>> GetMinuteTypesAsync();
+        Task<List<MinuteType>> GetAllMinuteTypesAsync();
+        Task<int> CreateMinuteTypeAsync(string name);
+        Task<bool> UpdateMinuteTypeAsync(int id, string name, bool isActive);
+        Task<bool> DeleteMinuteTypeAsync(int id);
 
         // 8. Presence & Sticky Notes
         Task<bool> UpdateUserPresenceAsync(string userId, UserStatus status, string? connectionId = null);
@@ -69,5 +73,28 @@ namespace DataAccessLibrary.Interface.IntraOffice
         Task<int> AddLeadActivityAsync(LeadActivityModel activity);
         Task<bool> ConvertLeadToForeignCustomerAsync(ConvertLeadToCustomerModel model);
         Task<bool> CheckCustCodeExistsAsync(string custCode);
+
+        // 10. Customer 360 Hub
+        Task<Customer360Dto> GetCustomer360Async(string? customerCode = null);
+        Task<List<Customer360LookupDto>> GetCustomer360LookupListAsync();
+        Task<bool> ConvertCustomer360ToForeignCustomerAsync(ConvertCustomerToForeignCustomerModel model);
+        Task<bool> AddCustomer360ActivityAsync(CustomerActivityDto activity);
+        Task<bool> AddCustomer360ContactAsync(CustomerContactDto contact);
+
+        // 11. Email & SMTP Configuration
+        Task<EmailConfiguration?> GetEmailConfigurationAsync();
+        Task<bool> SaveEmailConfigurationAsync(EmailConfiguration config);
+
+        // 12. Email Templates
+        Task<List<EmailTemplate>> GetEmailTemplatesAsync(string? category = null);
+        Task<EmailTemplate?> GetEmailTemplateByCodeAsync(string code);
+        Task<EmailTemplate?> GetEmailTemplateByIdAsync(int id);
+        Task<int> SaveEmailTemplateAsync(EmailTemplate template);
+        Task<bool> DeleteEmailTemplateAsync(int id);
+
+        // 13. Executive Reports & Business Intelligence
+        Task<DashboardMetricsDto> GetDashboardMetricsAsync();
+        Task<ARAgingSummaryDto> GetARAgingSummaryAsync();
     }
 }
+

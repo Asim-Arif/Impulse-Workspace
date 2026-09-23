@@ -38,6 +38,8 @@ namespace Impulse.Pages.Accounts
         private Impulse.Services.IReportNavigationService ReportNavigationService { get; set; } = null!;
         [Inject]
         private Impulse.Services.INotificationService NotificationService { get; set; } = null!;
+        [Inject]
+        private SecurityService SecurityService { get; set; } = default!;
         private List<GenericDropDownModel> Accounts = new List<GenericDropDownModel>();
         private List<AccountsReportingModel> AccountsList = new List<AccountsReportingModel>();
         private AccountsReportingModel CurrentAccount = new AccountsReportingModel();
@@ -238,6 +240,15 @@ namespace Impulse.Pages.Accounts
                 if (string.IsNullOrWhiteSpace(SelectedVoucher.DeleteReason))
                 {
                     await JS.InvokeVoidAsync("alert", "Please Enter Reason of Deletion.");
+                    return;
+                }
+
+                // Verify Password via Global Security Service
+                bool isAuthorized = await SecurityService.VerifyActionAsync("DeleteVoucher");
+
+                if (!isAuthorized)
+                {
+                    NotificationService.ShowError("Unauthorized", "Incorrect password or action cancelled.");
                     return;
                 }
 

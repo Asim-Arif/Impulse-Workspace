@@ -39,6 +39,10 @@ namespace Impulse.Pages.Accounts
         protected IFinancialStatementService _financialstatementService { get; set; }
         [Inject]
         protected IReportNavigationService ReportNavigationService { get; set; }
+        [Inject]
+        private Radzen.NotificationService NotificationService { get; set; } = default!;
+        [Inject]
+        private SecurityService SecurityService { get; set; } = default!;
 
         private List<GenericDropDownModel> Accounts = new List<GenericDropDownModel>();
         private List<AccountsReportingModel> AccountsList = new List<AccountsReportingModel>();
@@ -198,6 +202,15 @@ namespace Impulse.Pages.Accounts
                 if (string.IsNullOrWhiteSpace(SelectedVoucher.DeleteReason))
                 {
                     await JS.InvokeVoidAsync("alert", "Please Enter Reason of Deletion.");
+                    return;
+                }
+
+                // Verify Password via Global Security Service
+                bool isAuthorized = await SecurityService.VerifyActionAsync("DeleteVoucher");
+
+                if (!isAuthorized)
+                {
+                    NotificationService.Notify(Radzen.NotificationSeverity.Error, "Unauthorized", "Incorrect password or action cancelled.");
                     return;
                 }
 

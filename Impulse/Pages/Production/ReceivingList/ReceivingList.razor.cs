@@ -20,6 +20,7 @@ namespace Impulse.Pages.Production.ReceivingList
         [Inject] public NavigationManager NavigationManager { get; set; } = default!;
         [Inject] public AuthenticationStateProvider AuthenticationStateProvider { get; set; } = default!;
         [Inject] public IBlazorContextMenuService BlazorContextMenuService { get; set; } = default!;
+        [Inject] public SecurityService SecurityService { get; set; } = default!;
 
         // ─────────────────────────────────────────────────────────────
         // State
@@ -364,6 +365,15 @@ namespace Impulse.Pages.Production.ReceivingList
                     Detail = $"Lot {SelectedItem.LotNo} has {issCount} linked issuance(s). Delete them first.",
                     Duration = 5000
                 });
+                return;
+            }
+
+            // Verify Password via Global Security Service
+            bool isAuthorized = await SecurityService.VerifyActionAsync("DeleteProdRcv");
+
+            if (!isAuthorized)
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Unauthorized", "Incorrect password or action cancelled.");
                 return;
             }
 
