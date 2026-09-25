@@ -1,6 +1,8 @@
 @page "/payroll"
 @attribute [Authorize]
 
+@using Impulse.Shared.Components
+
 <PageTitle>Payroll Dashboard</PageTitle>
 
 <div class="dashboard-shell">
@@ -15,140 +17,140 @@
     </div>
 
     <div class="dashboard-modules">
-        <a href="/payroll/newemployee" class="dash-card">
+        <SecureDashCard Href="/payroll/newemployee">
             <i class="fas fa-user-plus"></i>
             <span>New Employee</span>
-        </a>
-        <a href="/payroll/employeelist" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/employeelist">
             <i class="fas fa-user-tie"></i>
             <span>Employee List</span>
-        </a>
-        <a href="/payroll/employeelist?contractorsOnly=true" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/employeelist?contractorsOnly=true">
             <i class="fas fa-user-clock"></i>
             <span>Temp. Employee List</span>
-        </a>
-        <a href="/payroll/deptlist" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/deptlist">
             <i class="fas fa-building"></i>
             <span>Departments List</span>
-        </a>
-        <a href="/payroll/salary-history?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/salary-history?returnUrl=/payroll">
             <i class="fas fa-file-invoice-dollar"></i>
             <span>Salary History</span>
-        </a>
-        <a href="/payroll/attendance-ledger?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/attendance-ledger?returnUrl=/payroll">
             <i class="fas fa-calendar-check"></i>
             <span>Attendance Ledger</span>
-        </a>
-        <a href="/payroll/employee-transfer?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/employee-transfer?returnUrl=/payroll">
             <i class="fas fa-exchange-alt"></i>
             <span>Employee Transfer</span>
-        </a>
-        <a href="/payroll/manual-attendance?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/manual-attendance?returnUrl=/payroll">
             <i class="fas fa-clock"></i>
             <span>Manual Attendance</span>
-        </a>
-        <a href="/payroll/overtime-authorization?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/overtime-authorization?returnUrl=/payroll">
             <i class="fas fa-user-clock"></i>
             <span>Overtime Authorization</span>
-        </a>
-        <a href="/payroll/manual-attendance?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/manual-attendance?returnUrl=/payroll">
             <i class="fas fa-sync-alt"></i>
             <span>Re-Calculate Attendance</span>
-        </a>
-        <a href="/payroll/auto-attendance?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/auto-attendance?returnUrl=/payroll">
             <i class="fas fa-magic"></i>
             <span>Auto Attendance</span>
-        </a>
-        <a href="/payroll/daily-activity?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/daily-activity?returnUrl=/payroll">
             <i class="fas fa-fingerprint"></i>
             <span>Daily Activity</span>
-        </a>
-        <a href="/payroll/leaves?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/leaves?returnUrl=/payroll">
             <i class="fas fa-calendar-minus"></i>
             <span>Employee Leaves</span>
-        </a>
-        <a href="/payroll/monthly-attendance?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/monthly-attendance?returnUrl=/payroll">
             <i class="fas fa-calendar-alt"></i>
             <span>Monthly Attendance Editor</span>
-        </a>
-        <a href="/payroll/gate-pass?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/gate-pass?returnUrl=/payroll">
             <i class="fas fa-id-badge"></i>
             <span>Gate Pass Entry</span>
-        </a>
-        <a href="/payroll/advance-long?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/advance-long?returnUrl=/payroll">
             <i class="fas fa-hand-holding-usd"></i>
             <span>Long Term Advance</span>
-        </a>
-        <a href="/payroll/advance-short?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/advance-short?returnUrl=/payroll">
             <i class="fas fa-hand-holding-usd"></i>
             <span>Short Term Advance</span>
-        </a>
-        <a href="/payroll/short-term-sheet?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/short-term-sheet?returnUrl=/payroll">
             <i class="fas fa-file-invoice-dollar"></i>
             <span>Short Term Sheet</span>
-        </a>
+        </SecureDashCard>
 
-        <a href="/payroll/emp-to-emp-transfer?returnUrl=/payroll" class="dash-card">
+        <SecureDashCard Href="/payroll/emp-to-emp-transfer?returnUrl=/payroll">
             <i class="fas fa-exchange-alt"></i>
             <span>Emp. to Emp. Transfer</span>
-        </a>
-        <a href="/payroll/adjust-deduction-amount?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/adjust-deduction-amount?returnUrl=/payroll">
             <i class="fas fa-edit"></i>
             <span>Adjust Deduction Amount</span>
-        </a>
-        <a href="/payroll/advance-ledger?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/advance-ledger?returnUrl=/payroll">
             <i class="fas fa-book"></i>
             <span>Loan & Advance Register</span>
-        </a>
-        <a href="/payroll/post-fine?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/post-fine?returnUrl=/payroll">
             <i class="fas fa-gavel"></i>
             <span>Post Fine</span>
-        </a>
-        <a href="/payroll/emp-fine-ledger?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/emp-fine-ledger?returnUrl=/payroll">
             <i class="fas fa-file-invoice"></i>
             <span>Employee Fine Register</span>
-        </a>
-        <a href="/payroll/salary-sheet?returnUrl=/payroll" class="dash-card primary-card">
+        </SecureDashCard>
+        <SecureDashCard Class="dash-card primary-card" Href="/payroll/salary-sheet?returnUrl=/payroll">
             <i class="fas fa-file-invoice-dollar"></i>
             <span>Salary Sheet</span>
-        </a>
-        <a href="/payroll/hold-salary?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/hold-salary?returnUrl=/payroll">
             <i class="fas fa-hand-holding-dollar"></i>
             <span>Hold Salary</span>
-        </a>
-        <a href="/payroll/gratuity-calculation?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/gratuity-calculation?returnUrl=/payroll">
             <i class="fas fa-gift"></i>
             <span>Gratuity Calculation</span>
-        </a>
-        <a href="/payroll/designations?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/designations?returnUrl=/payroll">
             <i class="fas fa-tags"></i>
             <span>Designations</span>
-        </a>
-        <a href="/payroll/settings?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/settings?returnUrl=/payroll">
             <i class="fas fa-sliders-h"></i>
             <span>Payroll Settings</span>
-        </a>
-        <a href="/payroll/policies?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/policies?returnUrl=/payroll">
             <i class="fas fa-file-contract"></i>
             <span>Payroll Policies</span>
-        </a>
-        <a href="/payroll/holidays?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/holidays?returnUrl=/payroll">
             <i class="fas fa-calendar-alt"></i>
             <span>Holidays Setup</span>
-        </a>
-        <a href="/payroll/reports?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/reports?returnUrl=/payroll">
             <i class="fas fa-chart-bar"></i>
             <span>Reports</span>
-        </a>
+        </SecureDashCard>
 
-        <a href="/payroll/clear-long-term-loan?returnUrl=/payroll" class="dash-card">
+        <SecureDashCard Href="/payroll/clear-long-term-loan?returnUrl=/payroll">
             <i class="fas fa-money-check-alt"></i>
             <span>Clear Long Term Loan</span>
-        </a>
-        <a href="/payroll/clear-short-term-loan?returnUrl=/payroll" class="dash-card">
+        </SecureDashCard>
+        <SecureDashCard Href="/payroll/clear-short-term-loan?returnUrl=/payroll">
             <i class="fas fa-money-bill-wave"></i>
             <span>Clear Short Term Loan</span>
-        </a>
+        </SecureDashCard>
     </div>
 </div>
 

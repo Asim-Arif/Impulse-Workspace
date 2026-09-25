@@ -46,6 +46,20 @@
                     </div>
                 </div>
 
+                <!-- Workplace Shortcuts: Sticky Notes & AI -->
+                <button type="button" class="btn btn-sm d-flex align-items-center gap-1 rounded-pill px-2 py-1 text-dark shadow-sm border" style="background: #fffbeb; font-size: 0.78rem; font-weight: 600;" @onclick="() => StickyNotesWidget.TriggerAddNote()" title="Open Sticky Notes">
+                    <i class="fas fa-sticky-note text-warning"></i>
+                    <span class="d-none d-xl-inline">Notes</span>
+                </button>
+
+                <button type="button" class="btn btn-sm d-flex align-items-center gap-1 rounded-pill px-2 py-1 text-white shadow-sm" style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); font-size: 0.78rem; font-weight: 600;" @onclick="() => AiChatbotWidget.TriggerToggle()" title="Ask Enterprise AI">
+                    <i class="fas fa-robot"></i>
+                    <span class="d-none d-xl-inline">Ask AI</span>
+                </button>
+
+                <!-- Global Notifications Bell -->
+                <NotificationBell />
+
                 <!-- Quick Logout Button -->
                 <a href="/Identity/Account/Logout" class="btn btn-outline-danger btn-sm header-logout-btn ms-1 d-flex align-items-center gap-1 shadow-none" title="Sign out of Impulse">
                     <i class="fas fa-arrow-right-from-bracket"></i>

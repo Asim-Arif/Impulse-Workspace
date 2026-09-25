@@ -1,0 +1,824 @@
+@page "/setup/users/edit/{UserId:int}"
+@page "/setup/users/new"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.Setup
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using Blazored.Typeahead
+
+<PageTitle>@(IsNewUser ? "Create User" : $"Edit User: {User.UserName}") - Impulse ERP</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-4">
+
+            <!-- Top Header & Action Bar -->
+            <div class="d-flex align-items-center justify-content-between pb-3 mb-3 border-bottom flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-3">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="CancelAsync">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                    <div class="p-2 bg-primary-subtle text-primary rounded-3">
+                        <i class="fas @(IsNewUser ? "fa-user-plus" : "fa-user-shield") fa-lg"></i>
+                    </div>
+                    <div>
+                        <div class="d-flex align-items-center gap-2">
+                            <h4 class="fw-bold text-dark mb-0">
+                                @(IsNewUser ? "Create New System User" : $"Edit User: {User.UserName}")
+                            </h4>
+                            @if (!IsNewUser)
+                            {
+                                @if (!User.InActive)
+                                {
+                                    <span class="badge bg-success-subtle text-success border border-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-danger-subtle text-danger border border-danger">Inactive</span>
+                                }
+                                @if (User.UserManagement)
+                                {
+                                    <span class="badge bg-warning-subtle text-warning border border-warning">
+                                        <i class="fas fa-crown me-1"></i>Administrator
+                                    </span>
+                                }
+                            }
+                        </div>
+                        <div class="text-secondary small mt-1">
+                            @if (!IsNewUser && !string.IsNullOrWhiteSpace(User.FullUserName))
+                            {
+                                <span class="fw-semibold text-primary">@User.FullUserName</span>
+                                <span class="mx-1">•</span>
+                            }
+                            @if (!IsNewUser && !string.IsNullOrWhiteSpace(User.EmpID))
+                            {
+                                <span>Employee: <strong>[@User.EmpID]</strong> @(User.EmployeeName ?? "")</span>
+                                <span class="mx-1">•</span>
+                            }
+                            <span>Configure credentials, module navigation rights, functional authorizations &amp; screen permissions</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    @if (!IsNewUser)
+                    {
+                        <button class="btn btn-sm btn-outline-info shadow-sm" @onclick="OpenCopyModal" title="Clone this user profile to create a new user">
+                            <i class="fas fa-copy me-1"></i> Copy User
+                        </button>
+                    }
+                    <button class="btn btn-sm btn-outline-secondary px-3" @onclick="CancelAsync">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                    <button class="btn btn-sm btn-primary px-3 shadow-sm" @onclick="SaveUserAsync" disabled="@IsSaving">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-check me-1"></i>
+                            <span>Save User</span>
+                        }
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modern Single-Line Tab Bar -->
+            <ul class="nav nav-pills gap-2 p-1 bg-light border rounded-3 mb-4 flex-nowrap overflow-x-auto" style="font-size: 0.88rem;">
+                <li class="nav-item">
+                    <button class="nav-link text-nowrap py-2 px-3 @(ActiveTab == 0 ? "active fw-bold shadow-sm" : "text-secondary")" @onclick="() => ActiveTab = 0">
+                        <i class="fas fa-id-card me-1"></i> General &amp; Credentials
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link text-nowrap py-2 px-3 @(ActiveTab == 1 ? "active fw-bold shadow-sm" : "text-secondary")" @onclick="() => ActiveTab = 1">
+                        <i class="fas fa-th-large me-1"></i> Module Navigation
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link text-nowrap py-2 px-3 @(ActiveTab == 2 ? "active fw-bold shadow-sm" : "text-secondary")" @onclick="() => ActiveTab = 2">
+                        <i class="fas fa-user-shield me-1"></i> Operations &amp; Authorizations
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link text-nowrap py-2 px-3 @(ActiveTab == 3 ? "active fw-bold shadow-sm" : "text-secondary")" @onclick="() => ActiveTab = 3">
+                        <i class="fas fa-boxes me-1"></i> Item Profile Rights
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link text-nowrap py-2 px-3 @(ActiveTab == 4 ? "active fw-bold shadow-sm" : "text-secondary")" @onclick="() => ActiveTab = 4">
+                        <i class="fas fa-shield-alt me-1"></i> Screen &amp; Menu Rights
+                        @if (TotalSelectedOptionsCount > 0)
+                        {
+                            <span class="badge @(ActiveTab == 4 ? "bg-white text-primary" : "bg-primary-subtle text-primary") ms-1">@TotalSelectedOptionsCount</span>
+                        }
+                    </button>
+                </li>
+            </ul>
+
+            <!-- Tab Contents -->
+            @if (IsLoadingUser)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="text-muted mt-2 small">Loading user details...</p>
+                </div>
+            }
+            else
+            {
+                @if (ActiveTab == 0)
+                {
+                    <!-- Tab 0: General & Credentials -->
+                    <div class="row g-4">
+                        <div class="col-lg-7">
+                            <div class="card border border-light-subtle shadow-none h-100 bg-light-subtle p-3 rounded-3">
+                                <h6 class="fw-bold text-primary mb-3">
+                                    <i class="fas fa-user-circle me-1"></i> User Credentials &amp; Identity
+                                </h6>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-secondary mb-1">
+                                            Username <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="text" class="form-control form-control-sm" @bind="User.UserName" placeholder="e.g. saim, admin, ahmad" disabled="@(!IsNewUser)" />
+                                        @if (!IsNewUser)
+                                        {
+                                            <small class="text-muted" style="font-size: 0.72rem;">Usernames cannot be modified once created.</small>
+                                        }
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-secondary mb-1">
+                                            Password @(IsNewUser ? "*" : "(Leave blank to keep unchanged)")
+                                        </label>
+                                        <input type="password" class="form-control form-control-sm" @bind="User.Password" placeholder="@(IsNewUser ? "Enter initial password" : "••••••••")" />
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-secondary mb-1">Full Display Name</label>
+                                        <input type="text" class="form-control form-control-sm" @bind="User.FullUserName" placeholder="e.g. Saim Ahmad" />
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-secondary mb-1">Link to Employee Profile</label>
+                                        <BlazoredTypeahead SearchMethod="SearchEmployeesAsync"
+                                                           @bind-Value="SelectedEmployee"
+                                                           Placeholder="Type employee ID, name or designation..."
+                                                           MaximumSuggestions="1000"
+                                                           EnableDropDown="true">
+                                            <SelectedTemplate Context="emp">
+                                                @if (!string.IsNullOrEmpty(emp?.EmpID) && emp.EmpID != "0")
+                                                {
+                                                    <text>[@emp.EmpID] </text>
+                                                }
+                                                @emp?.Name
+                                            </SelectedTemplate>
+                                            <ResultTemplate Context="emp">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span>
+                                                        @if (!string.IsNullOrEmpty(emp?.EmpID) && emp.EmpID != "0")
+                                                        {
+                                                            <strong class="text-primary me-1">[@emp.EmpID]</strong>
+                                                        }
+                                                        @emp?.Name
+                                                    </span>
+                                                    <small class="text-muted">@emp?.Designation</small>
+                                                </div>
+                                            </ResultTemplate>
+                                            <NotFoundTemplate>
+                                                <span class="text-muted small">No matching employee found.</span>
+                                            </NotFoundTemplate>
+                                        </BlazoredTypeahead>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-5">
+                            <div class="card border border-light-subtle shadow-none h-100 bg-light-subtle p-3 rounded-3">
+                                <h6 class="fw-bold text-primary mb-3">
+                                    <i class="fas fa-cog me-1"></i> Account Security &amp; Status
+                                </h6>
+                                <div class="d-flex flex-column gap-3">
+                                    <div class="p-3 border rounded-3 bg-white">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="userInActiveSwitch" @bind="User.InActive" />
+                                            <label class="form-check-label small fw-semibold text-dark" for="userInActiveSwitch">
+                                                Account Inactive / Suspended
+                                            </label>
+                                            <div class="text-muted" style="font-size: 0.75rem;">If enabled, user cannot login to any system module.</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="p-3 border rounded-3 bg-white">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="changePwSwitch" @bind="User.ChangePassword" />
+                                            <label class="form-check-label small fw-semibold text-dark" for="changePwSwitch">
+                                                Allow Change Password
+                                            </label>
+                                            <div class="text-muted" style="font-size: 0.75rem;">User can self-update their own password.</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="p-3 border rounded-3 bg-white">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="userMgmtSwitch" @bind="User.UserManagement" />
+                                            <label class="form-check-label small fw-bold text-danger" for="userMgmtSwitch">
+                                                <i class="fas fa-crown me-1 text-warning"></i> Super Administrator (User Management)
+                                            </label>
+                                            <div class="text-muted" style="font-size: 0.75rem;">Grants full unrestricted access to all modules, screens and user rights configuration.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else if (ActiveTab == 1)
+                {
+                    <!-- Tab 1: Module Navigation Rights -->
+                    <div class="mb-3 d-flex align-items-center justify-content-between">
+                        <span class="small text-secondary fw-semibold">Select the top-level modules this user is authorized to access from the main navigation &amp; module hub:</span>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-xl-3 col-lg-4 col-md-6 col-12">
+                            <div class="p-3 border rounded-3 bg-light h-100 transition-all">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkFin" @bind="User.FinancialMainLink" />
+                                    <label class="form-check-label small fw-semibold text-dark" for="chkFin">
+                                        <i class="fas fa-file-invoice-dollar text-primary me-2"></i>Financial Accounts
+                                    </label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">General Ledger, Vouchers, Cashbook, Balance Sheet</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-xl-3 col-lg-4 col-md-6 col-12">
+                            <div class="p-3 border rounded-3 bg-light h-100 transition-all">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkPay" @bind="User.PayrollMainLink" />
+                                    <label class="form-check-label small fw-semibold text-dark" for="chkPay">
+                                        <i class="fas fa-users-cog text-success me-2"></i>Payroll &amp; HR
+                                    </label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">Employees, Attendance, Salary Sheets, Advances, Loans</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-xl-3 col-lg-4 col-md-6 col-12">
+                            <div class="p-3 border rounded-3 bg-light h-100 transition-all">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkStk" @bind="User.StockMainLink" />
+                                    <label class="form-check-label small fw-semibold text-dark" for="chkStk">
+                                        <i class="fas fa-warehouse text-warning me-2"></i>Inventory &amp; Stock
+                                    </label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">Raw Materials, Finished Goods, Stock Ledgers &amp; Adjustments</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-xl-3 col-lg-4 col-md-6 col-12">
+                            <div class="p-3 border rounded-3 bg-light h-100 transition-all">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkPrd" @bind="User.ProductionMainLink" />
+                                    <label class="form-check-label small fw-semibold text-dark" for="chkPrd">
+                                        <i class="fas fa-industry text-danger me-2"></i>Production
+                                    </label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">Lot Issuance, Lot Receiving, Maker Bills &amp; Costing</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-xl-3 col-lg-4 col-md-6 col-12">
+                            <div class="p-3 border rounded-3 bg-light h-100 transition-all">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkExp" @bind="User.ExportMainLink" />
+                                    <label class="form-check-label small fw-semibold text-dark" for="chkExp">
+                                        <i class="fas fa-globe text-info me-2"></i>Commercial Export
+                                    </label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">Commercial Invoices, Packing Lists, Shipping, Customers</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-xl-3 col-lg-4 col-md-6 col-12">
+                            <div class="p-3 border rounded-3 bg-light h-100 transition-all">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkCmp" @bind="User.CompanyMainLink" />
+                                    <label class="form-check-label small fw-semibold text-dark" for="chkCmp">
+                                        <i class="fas fa-building text-secondary me-2"></i>Company Catalog
+                                    </label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">Product Definitions, Categories, Processes, Pricing Master</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-xl-3 col-lg-4 col-md-6 col-12">
+                            <div class="p-3 border rounded-3 bg-light h-100 transition-all">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkQms" @bind="User.QMSMainLink" />
+                                    <label class="form-check-label small fw-semibold text-dark" for="chkQms">
+                                        <i class="fas fa-certificate text-primary me-2"></i>QMS Quality
+                                    </label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">Inspection, CAPA Management, Audits &amp; Compliances</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-xl-3 col-lg-4 col-md-6 col-12">
+                            <div class="p-3 border rounded-3 bg-light h-100 transition-all">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkFix" @bind="User.FixedAssetsMainLink" />
+                                    <label class="form-check-label small fw-semibold text-dark" for="chkFix">
+                                        <i class="fas fa-truck text-dark me-2"></i>Fixed Assets
+                                    </label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">Plant &amp; Machinery, Equipment, Depreciation Register</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-xl-3 col-lg-4 col-md-6 col-12">
+                            <div class="p-3 border rounded-3 bg-light h-100 transition-all">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkSmp" @bind="User.SamplingMainLink" />
+                                    <label class="form-check-label small fw-semibold text-dark" for="chkSmp">
+                                        <i class="fas fa-vial text-info me-2"></i>Sampling
+                                    </label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">R&amp;D Samples, Inquiries, Tracking &amp; Customer Revisions</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-xl-3 col-lg-4 col-md-6 col-12">
+                            <div class="p-3 border rounded-3 bg-light h-100 transition-all">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkDsh" @bind="User.DashBoardMainLink" />
+                                    <label class="form-check-label small fw-semibold text-dark" for="chkDsh">
+                                        <i class="fas fa-tachometer-alt text-purple me-2"></i>Executive Dashboards
+                                    </label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">Executive KPIs, Manufacturing Command &amp; Live Analytics</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-xl-3 col-lg-4 col-md-6 col-12">
+                            <div class="p-3 border rounded-3 bg-light h-100 transition-all">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkCmd" @bind="User.OpenCommandCenter" />
+                                    <label class="form-check-label small fw-semibold text-dark" for="chkCmd">
+                                        <i class="fas fa-terminal text-dark me-2"></i>Command Center
+                                    </label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">High-level production operations visual board</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-xl-3 col-lg-4 col-md-6 col-12">
+                            <div class="p-3 border rounded-3 bg-light h-100 transition-all">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkHelp" @bind="User.HelpMainLink" />
+                                    <label class="form-check-label small fw-semibold text-dark" for="chkHelp">
+                                        <i class="fas fa-question-circle text-secondary me-2"></i>Help &amp; Documentation
+                                    </label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">System guidance, user manual &amp; operational SOPs</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else if (ActiveTab == 2)
+                {
+                    <!-- Tab 2: Operations & Authorizations -->
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <div class="card border border-light-subtle shadow-none bg-light-subtle p-3 rounded-3 h-100">
+                                <h6 class="fw-bold text-primary mb-3">
+                                    <i class="fas fa-stamp me-1"></i> Approvals &amp; Authorizations
+                                </h6>
+                                <div class="d-flex flex-column gap-3">
+                                    <div class="p-2 border rounded-2 bg-white">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="chkAuthVouch" @bind="User.AuthorizeVouchers" />
+                                            <label class="form-check-label small fw-semibold" for="chkAuthVouch">Authorize Financial Vouchers</label>
+                                            <div class="text-muted" style="font-size: 0.75rem;">Permission to approve and finalize payment/receipt vouchers.</div>
+                                        </div>
+                                    </div>
+                                    <div class="p-2 border rounded-2 bg-white">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="chkAuthIss" @bind="User.AuthorizeIssuance" />
+                                            <label class="form-check-label small fw-semibold" for="chkAuthIss">Authorize Material Issuance</label>
+                                            <div class="text-muted" style="font-size: 0.75rem;">Approve factory lots and raw material dispatch.</div>
+                                        </div>
+                                    </div>
+                                    <div class="p-2 border rounded-2 bg-white">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="chkPostMaker" @bind="User.PostMakerBill" />
+                                            <label class="form-check-label small fw-semibold" for="chkPostMaker">Post Maker Invoices &amp; Bills</label>
+                                            <div class="text-muted" style="font-size: 0.75rem;">Authorize vendor/maker invoices to accounts ledger.</div>
+                                        </div>
+                                    </div>
+                                    <div class="p-2 border rounded-2 bg-white">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="chkCloseCapa" @bind="User.CloseCAPA" />
+                                            <label class="form-check-label small fw-semibold" for="chkCloseCapa">Close CAPA &amp; Quality Audit</label>
+                                            <div class="text-muted" style="font-size: 0.75rem;">Sign off on corrective and preventive actions.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="card border border-light-subtle shadow-none bg-light-subtle p-3 rounded-3 h-100">
+                                <h6 class="fw-bold text-primary mb-3">
+                                    <i class="fas fa-coins me-1"></i> Rates &amp; Costing Privileges
+                                </h6>
+                                <div class="d-flex flex-column gap-3">
+                                    <div class="p-2 border rounded-2 bg-white">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="chkRateIss" @bind="User.ChangeRateonIssuance" />
+                                            <label class="form-check-label small fw-semibold" for="chkRateIss">Change Rate on Issuance</label>
+                                            <div class="text-muted" style="font-size: 0.75rem;">Allow manual modification of piece rates during lot issuance.</div>
+                                        </div>
+                                    </div>
+                                    <div class="p-2 border rounded-2 bg-white">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="chkRateMaker" @bind="User.ChangeRateMakerAssign" />
+                                            <label class="form-check-label small fw-semibold" for="chkRateMaker">Change Rate on Maker Assignment</label>
+                                            <div class="text-muted" style="font-size: 0.75rem;">Override maker rate contracts in production planning.</div>
+                                        </div>
+                                    </div>
+                                    <div class="p-2 border rounded-2 bg-white">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="chkEditRateBill" @bind="User.MakerBill_EditRate" />
+                                            <label class="form-check-label small fw-semibold" for="chkEditRateBill">Edit Rate in Maker Billing</label>
+                                            <div class="text-muted" style="font-size: 0.75rem;">Modify rates at time of vendor invoice entry.</div>
+                                        </div>
+                                    </div>
+                                    <div class="p-2 border rounded-2 bg-white">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="chkHideMakerRate" @bind="User.HideRateMakerAssign" />
+                                            <label class="form-check-label small fw-semibold" for="chkHideMakerRate">Hide Rate on Maker Assignment</label>
+                                            <div class="text-muted" style="font-size: 0.75rem;">Conceal commercial pricing from production floor operators.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="card border border-light-subtle shadow-none bg-light-subtle p-3 rounded-3 h-100">
+                                <h6 class="fw-bold text-primary mb-3">
+                                    <i class="fas fa-tools me-1"></i> System Data &amp; Maintenance
+                                </h6>
+                                <div class="d-flex flex-column gap-3">
+                                    <div class="p-2 border rounded-2 bg-white">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="chkBackup" @bind="User.BackupData" />
+                                            <label class="form-check-label small fw-semibold" for="chkBackup">Perform System Data Backup</label>
+                                            <div class="text-muted" style="font-size: 0.75rem;">Trigger live database backups to local or network storage.</div>
+                                        </div>
+                                    </div>
+                                    <div class="p-2 border rounded-2 bg-white">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="chkRestore" @bind="User.RestoreData" />
+                                            <label class="form-check-label small fw-semibold text-danger" for="chkRestore">Restore System Database</label>
+                                            <div class="text-muted" style="font-size: 0.75rem;">Dangerous: restore database from backup file.</div>
+                                        </div>
+                                    </div>
+                                    <div class="p-2 border rounded-2 bg-white">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="chkShowTips" @bind="User.ShowTips" />
+                                            <label class="form-check-label small fw-semibold" for="chkShowTips">Show Startup Tips &amp; Guidance</label>
+                                            <div class="text-muted" style="font-size: 0.75rem;">Display tip-of-the-day hints upon dashboard load.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="card border border-light-subtle shadow-none bg-light-subtle p-3 rounded-3 h-100">
+                                <h6 class="fw-bold text-primary mb-3">
+                                    <i class="fas fa-headset me-1"></i> Production &amp; Customer Support
+                                </h6>
+                                <div class="d-flex flex-column gap-3">
+                                    <div class="p-2 border rounded-2 bg-white">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="chkAddProd" @bind="User.AddProdPlan" />
+                                            <label class="form-check-label small fw-semibold" for="chkAddProd">Add Production Plan</label>
+                                            <div class="text-muted" style="font-size: 0.75rem;">Create new batch schedules and work-order allotments.</div>
+                                        </div>
+                                    </div>
+                                    <div class="p-2 border rounded-2 bg-white">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="chkCustComplaint" @bind="User.AddEditCustomerComplaint" />
+                                            <label class="form-check-label small fw-semibold" for="chkCustComplaint">Add / Edit Customer Complaints</label>
+                                            <div class="text-muted" style="font-size: 0.75rem;">Record and manage customer rejection or RMA tickets.</div>
+                                        </div>
+                                    </div>
+                                    <div class="p-2 border rounded-2 bg-white">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="chkEditFollow" @bind="User.EditFollowUp" />
+                                            <label class="form-check-label small fw-semibold" for="chkEditFollow">Edit Inquiry Follow-Ups</label>
+                                            <div class="text-muted" style="font-size: 0.75rem;">Update communication logs for export inquiries.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else if (ActiveTab == 3)
+                {
+                    <!-- Tab 3: Item Profile Permissions -->
+                    <div class="mb-3">
+                        <span class="small text-secondary fw-semibold">Configure access rights to specific tabs within the Item Profile master screen:</span>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6 col-lg-4">
+                            <div class="p-3 border rounded-3 bg-light h-100">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkGenInfo" @bind="User.GeneralInfoItemProfile" />
+                                    <label class="form-check-label small fw-semibold" for="chkGenInfo">General Information Tab</label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">Product name, codes, categories, unit of measures</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4">
+                            <div class="p-3 border rounded-3 bg-light h-100">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkProcs" @bind="User.ProcessesItemProfile" />
+                                    <label class="form-check-label small fw-semibold" for="chkProcs">Processes Tab</label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">Manufacturing route steps, sequences, cycle times</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4">
+                            <div class="p-3 border rounded-3 bg-light h-100">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkWgt" @bind="User.WeightItemProfile" />
+                                    <label class="form-check-label small fw-semibold" for="chkWgt">Weight &amp; Dimensions Tab</label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">Net/gross weights, sizes, cubic volumes</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4">
+                            <div class="p-3 border rounded-3 bg-light h-100">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkPrc" @bind="User.PriceItemProfile" />
+                                    <label class="form-check-label small fw-semibold" for="chkPrc">Pricing &amp; Rates Tab</label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">Standard sale prices, maker piece rates, margins</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4">
+                            <div class="p-3 border rounded-3 bg-light h-100">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkRM" @bind="User.RMItemProfile" />
+                                    <label class="form-check-label small fw-semibold" for="chkRM">Raw Material Specifications</label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">Material grades, standards, dimensions &amp; yield</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4">
+                            <div class="p-3 border rounded-3 bg-light h-100">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkPic" @bind="User.PictureItemProfile" />
+                                    <label class="form-check-label small fw-semibold" for="chkPic">Item Pictures &amp; Drawings</label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">Product photos, technical blueprints &amp; CAD files</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4">
+                            <div class="p-3 border rounded-3 bg-light h-100">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkRef" @bind="User.ReferencesItemProfile" />
+                                    <label class="form-check-label small fw-semibold" for="chkRef">Reference Codes &amp; Standards</label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">Customer cross-reference numbers, OEM codes</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4">
+                            <div class="p-3 border rounded-3 bg-light h-100">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkShip" @bind="User.ShipInfoItemProfile" />
+                                    <label class="form-check-label small fw-semibold" for="chkShip">Shipping &amp; Packaging Specs</label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">Inner/outer cartons, HS customs codes, barcodes</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="p-3 border rounded-3 bg-warning-subtle text-dark">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkRestrCat" @bind="User.RestrictCompanyCatalogEditing" />
+                                    <label class="form-check-label small fw-bold" for="chkRestrCat">
+                                        <i class="fas fa-lock me-1"></i> Restrict Editing of Company Catalog Items (Read-Only Mode)
+                                    </label>
+                                    <div class="small mt-1 text-secondary">If checked, user can view catalog items but cannot insert, modify, or delete specifications.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else if (ActiveTab == 4)
+                {
+                    <!-- Tab 4: Screen & Menu Rights (Legacy UserHasAccessEX Parity) -->
+                    <div class="d-flex flex-column gap-3">
+
+                        <!-- Filter & Quick Action Bar -->
+                        <div class="p-3 border rounded-3 bg-light d-flex flex-wrap align-items-center justify-content-between gap-3 shadow-none">
+                            <div class="d-flex align-items-center gap-2 flex-grow-1" style="min-width: 250px; max-width: 380px;">
+                                <label class="form-label small fw-bold text-secondary mb-0 text-nowrap">
+                                    <i class="fas fa-folder-open me-1 text-primary"></i> Module:
+                                </label>
+                                <select class="form-select form-select-sm" value="@SelectedModule" @onchange="e => OnModuleChangedAsync(e.Value?.ToString() ?? string.Empty)">
+                                    @foreach (var mod in AvailableModules)
+                                    {
+                                        <option value="@mod">@mod</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="d-flex align-items-center gap-2 flex-grow-1" style="min-width: 250px; max-width: 420px;">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
+                                    <input type="text" class="form-control border-start-0" placeholder="Search screen rights by name or code..." @bind="OptionSearchFilter" @bind:event="oninput" />
+                                    @if (!string.IsNullOrWhiteSpace(OptionSearchFilter))
+                                    {
+                                        <button class="btn btn-outline-secondary" type="button" @onclick="() => OptionSearchFilter = string.Empty">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
+                                <button type="button" class="btn btn-sm btn-outline-primary shadow-sm" @onclick="SelectAllCurrentModule" title="Grant all options in this module">
+                                    <i class="fas fa-check-double me-1"></i> Select All
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary shadow-sm" @onclick="ClearAllCurrentModule" title="Revoke all options in this module">
+                                    <i class="fas fa-ban me-1"></i> Clear All
+                                </button>
+                                <span class="badge bg-white text-dark small py-2 px-3 border shadow-sm" style="font-size: 0.8rem;">
+                                    <strong>@CurrentModuleSelectedCount</strong> / @CurrentModuleOptions.Count Permitted
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Screen Options Checklist Grid (Spacious Full Page Grid) -->
+                        @if (IsLoadingOptions)
+                        {
+                            <div class="text-center py-5">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                <span class="ms-2 small text-secondary">Loading module permissions...</span>
+                            </div>
+                        }
+                        else if (!FilteredModuleOptions.Any())
+                        {
+                            <div class="text-center py-5 border rounded-3 bg-light">
+                                <i class="fas fa-folder-open fa-2x text-muted mb-2"></i>
+                                <p class="small text-muted mb-0">No screen options found for module "@SelectedModule" matching your search filter.</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="row g-3">
+                                @foreach (var opt in FilteredModuleOptions)
+                                {
+                                    var isChecked = UserSelectedOptionIds.Contains(opt.OptionID);
+                                    <div class="col-xxl-3 col-lg-4 col-md-6 col-12">
+                                        <div class="p-3 border rounded-3 @(isChecked ? "bg-primary-subtle border-primary-subtle shadow-sm" : "bg-white") transition-all"
+                                             style="cursor: pointer; transition: all 0.15s ease-in-out;"
+                                             @onclick="() => ToggleOption(opt.OptionID, !isChecked)">
+                                            <div class="form-check form-switch mb-0 d-flex align-items-start">
+                                                <input class="form-check-input me-3 mt-1" type="checkbox" id="@($"opt_{opt.OptionID}")"
+                                                       checked="@isChecked"
+                                                       @onchange="e => ToggleOption(opt.OptionID, (bool)(e.Value ?? false))"
+                                                       @onclick:stopPropagation="true" />
+                                                <label class="form-check-label small d-flex flex-column" for="@($"opt_{opt.OptionID}")" style="cursor: pointer; width: 100%;">
+                                                    <span class="fw-semibold @(isChecked ? "text-primary" : "text-dark")" style="font-size: 0.9rem;">
+                                                        @opt.OptionName
+                                                    </span>
+                                                    <span class="text-muted mt-1" style="font-size: 0.74rem;">
+                                                        <i class="fas fa-key me-1 text-secondary" style="font-size: 0.65rem;"></i>@opt.OptionID
+                                                    </span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            }
+
+            <!-- Bottom Floating/Sticky Action Bar -->
+            <div class="d-flex align-items-center justify-content-between pt-4 mt-4 border-top">
+                <div class="text-secondary small">
+                    @if (!IsNewUser)
+                    {
+                        <span>User ID: <strong>#@User.UserID</strong></span>
+                        <span class="mx-2">•</span>
+                        <span>Total Screens Permitted: <strong class="text-primary">@TotalSelectedOptionsCount</strong></span>
+                    }
+                    else
+                    {
+                        <span>New User Registration</span>
+                    }
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-outline-secondary px-3" @onclick="CancelAsync">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                    <button class="btn btn-sm btn-primary px-4 shadow-sm" @onclick="SaveUserAsync" disabled="@IsSaving">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-check me-1"></i>
+                            <span>Save User</span>
+                        }
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Copy User Modal -->
+@if (IsCopyModalOpen)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.55); z-index: 1060;" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 14px; overflow: hidden;">
+                <div class="modal-header bg-light border-bottom py-2 px-3 d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="p-2 bg-info-subtle text-info rounded-2">
+                            <i class="fas fa-copy"></i>
+                        </div>
+                        <div>
+                            <h6 class="modal-title fw-bold text-dark mb-0">Copy User Profile</h6>
+                            <small class="text-secondary">Clone rights &amp; permissions from @User.UserName</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" @onclick="CloseCopyModal"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div class="alert alert-info py-2 px-3 small mb-3">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Copies all module navigation links, operational authorizations, and screen permissions from <strong>@User.UserName</strong> to a new user account.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary mb-1">
+                            New Username <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control form-control-sm" @bind="NewCopyUserName" placeholder="e.g. adeel.export" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary mb-1">Initial Password (Optional)</label>
+                        <input type="password" class="form-control form-control-sm" @bind="NewCopyPassword" placeholder="Leave blank or enter initial password" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold text-secondary mb-1">Full Display Name (Optional)</label>
+                        <input type="text" class="form-control form-control-sm" @bind="NewCopyFullName" placeholder="e.g. Adeel Ahmad" />
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2 px-3 d-flex justify-content-between">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CloseCopyModal">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                    <button type="button" class="btn btn-sm btn-info text-white shadow-sm" @onclick="ExecuteCopyAsync" disabled="@IsCopying">
+                        @if (IsCopying)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            <span>Copying...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-copy me-1"></i>
+                            <span>Create Copy &amp; Open</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+

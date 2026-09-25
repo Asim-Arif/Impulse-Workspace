@@ -1,0 +1,380 @@
+@using Impulse.Services.IntraOffice
+@using DataAccessLibrary.Models.IntraOffice
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IIntraOfficeService IntraOfficeService
+@inject IAppNotificationService NotificationService
+@implements IDisposable
+
+<div class="notification-bell-container position-relative">
+    <button type="button" class="btn btn-sm header-notif-btn @(notificationOpen ? "active" : "")" @onclick="ToggleNotifications" title="Notifications">
+        <i class="fas fa-bell"></i>
+        @if (totalUnreadNotifications > 0)
+        {
+            <span class="header-notif-badge">@(totalUnreadNotifications > 99 ? "99+" : totalUnreadNotifications.ToString())</span>
+        }
+    </button>
+
+    @if (notificationOpen)
+    {
+        <div class="notification-backdrop" @onclick="() => notificationOpen = false"></div>
+        <div class="notification-flyout shadow-lg">
+            <div class="notification-flyout-header">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fw-bold text-dark" style="font-size: 0.95rem;">Notifications</span>
+                    @if (totalUnreadNotifications > 0)
+                    {
+                        <span class="badge bg-danger rounded-pill" style="font-size: 0.7rem;">@totalUnreadNotifications new</span>
+                    }
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    @if (totalUnreadNotifications > 0)
+                    {
+                        <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 text-primary fw-semibold" style="font-size: 0.75rem;" @onclick="MarkAllNotificationsRead">
+                            Mark all read
+                        </button>
+                    }
+                    <button type="button" class="btn-close" style="font-size: 0.7rem;" @onclick="() => notificationOpen = false"></button>
+                </div>
+            </div>
+
+            <div class="notification-flyout-body">
+                @if (recentNotifications == null || !recentNotifications.Any())
+                {
+                    <div class="p-4 text-center text-muted">
+                        <i class="far fa-bell-slash fs-2 mb-2 d-block text-secondary opacity-50"></i>
+                        <div class="fw-semibold text-xs">No notifications yet</div>
+                        <small class="text-muted" style="font-size: 0.75rem;">You're completely up to date!</small>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var notif in recentNotifications)
+                    {
+                        <div class="notification-item @(notif.IsRead ? "read" : "unread")" @onclick="() => OnNotificationClick(notif)">
+                            <div class="notif-icon-box @GetCategoryClass(notif.Category)">
+                                <i class="@GetCategoryIcon(notif.Category)"></i>
+                            </div>
+                            <div class="notif-text-box">
+                                <div class="notif-title">@notif.Title</div>
+                                <div class="notif-msg">@notif.Message</div>
+                                <div class="notif-meta">
+                                    <span><i class="far fa-clock me-1"></i>@GetRelativeTime(notif.CreatedAt)</span>
+                                    @if (!string.IsNullOrEmpty(notif.SenderName))
+                                    {
+                                        <span class="ms-2"><i class="far fa-user me-1"></i>@notif.SenderName</span>
+                                    }
+                                </div>
+                            </div>
+                            @if (!notif.IsRead)
+                            {
+                                <div class="notif-dot-box">
+                                    <span class="unread-dot"></span>
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+
+            <div class="notification-flyout-footer">
+                <span class="text-muted" style="font-size: 0.72rem;"><i class="fas fa-circle text-success me-1 fa-2xs"></i>Real-time alerts active</span>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool notificationOpen;
+    private List<AppNotification> recentNotifications = new();
+    private int totalUnreadNotifications;
+    private string? currentUserName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            currentUserName = user.Identity.Name ?? "";
+            LoadNotifications();
+            NotificationService.OnNotificationReceived += HandleLiveNotification;
+        }
+    }
+
+    private void LoadNotifications()
+    {
+        if (!string.IsNullOrEmpty(currentUserName))
+        {
+            recentNotifications = NotificationService.GetRecentNotifications(currentUserName);
+            totalUnreadNotifications = NotificationService.GetUnreadCount(currentUserName);
+        }
+    }
+
+    private async Task HandleLiveNotification(AppNotification notif)
+    {
+        if (!string.IsNullOrEmpty(currentUserName) && (string.IsNullOrEmpty(notif.TargetUserId) || notif.TargetUserId == currentUserName))
+        {
+            LoadNotifications();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void ToggleNotifications()
+    {
+        notificationOpen = !notificationOpen;
+        if (notificationOpen)
+        {
+            LoadNotifications();
+        }
+    }
+
+    private void MarkAllNotificationsRead()
+    {
+        if (!string.IsNullOrEmpty(currentUserName))
+        {
+            NotificationService.MarkAllAsRead(currentUserName);
+            LoadNotifications();
+        }
+    }
+
+    private void OnNotificationClick(AppNotification notif)
+    {
+        if (!string.IsNullOrEmpty(currentUserName))
+        {
+            NotificationService.MarkAsRead(notif.Id, currentUserName);
+            totalUnreadNotifications = NotificationService.GetUnreadCount(currentUserName);
+        }
+        notificationOpen = false;
+        if (!string.IsNullOrEmpty(notif.ActionUrl))
+        {
+            Navigation.NavigateTo(notif.ActionUrl);
+        }
+    }
+
+    private string GetCategoryClass(NotificationCategory category) => category switch
+    {
+        NotificationCategory.Message => "cat-msg",
+        NotificationCategory.Announcement => "cat-ann",
+        NotificationCategory.Minute => "cat-min",
+        NotificationCategory.Meeting => "cat-meet",
+        NotificationCategory.Task => "cat-task",
+        _ => "cat-sys"
+    };
+
+    private string GetCategoryIcon(NotificationCategory category) => category switch
+    {
+        NotificationCategory.Message => "fas fa-comments text-primary",
+        NotificationCategory.Announcement => "fas fa-bullhorn text-danger",
+        NotificationCategory.Minute => "fas fa-file-signature text-warning",
+        NotificationCategory.Meeting => "fas fa-video text-purple",
+        NotificationCategory.Task => "fas fa-tasks text-success",
+        _ => "fas fa-bell text-secondary"
+    };
+
+    private string GetRelativeTime(DateTime time)
+    {
+        var span = DateTime.UtcNow - time;
+        if (span.TotalMinutes < 1) return "Just now";
+        if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes}m ago";
+        if (span.TotalHours < 24) return $"{(int)span.TotalHours}h ago";
+        return time.ToLocalTime().ToString("MMM dd");
+    }
+
+    public void Dispose()
+    {
+        NotificationService.OnNotificationReceived -= HandleLiveNotification;
+    }
+}
+
+<style>
+    .notification-bell-container {
+        position: relative !important;
+        z-index: 100000 !important;
+    }
+
+    .header-notif-btn {
+        position: relative;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+        cursor: pointer;
+        transition: all 0.2s;
+        padding: 0;
+    }
+
+    .header-notif-btn:hover, .header-notif-btn.active {
+        background: #e2e8f0;
+        color: #0f172a;
+    }
+
+    .header-notif-badge {
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        background: #ef4444;
+        color: #ffffff;
+        font-size: 0.65rem;
+        font-weight: 700;
+        min-width: 18px;
+        height: 18px;
+        border-radius: 9px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 4px;
+        border: 2px solid #ffffff;
+        box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+        animation: pulseNotif 2s infinite;
+    }
+
+    @@keyframes pulseNotif {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+        100% { transform: scale(1); }
+    }
+
+    .notification-backdrop {
+        position: fixed !important;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 99998 !important;
+        background: transparent;
+    }
+
+    .notification-flyout {
+        position: absolute !important;
+        top: 44px;
+        right: 0;
+        width: 380px;
+        max-width: 90vw;
+        background: #ffffff;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.2), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
+        z-index: 99999 !important;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        animation: flyoutSlide 0.2s ease-out;
+    }
+
+    @@keyframes flyoutSlide {
+        from { opacity: 0; transform: translateY(-8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .notification-flyout-header {
+        padding: 12px 16px;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #ffffff;
+    }
+
+    .notification-flyout-body {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .notification-item {
+        padding: 12px 16px;
+        border-bottom: 1px solid #f8fafc;
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+
+    .notification-item:hover {
+        background: #f8fafc;
+    }
+
+    .notification-item.unread {
+        background: #f0fdf4;
+    }
+
+    .notification-item.unread:hover {
+        background: #e7faea;
+    }
+
+    .notif-icon-box {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.95rem;
+        flex-shrink: 0;
+    }
+
+    .notif-icon-box.cat-msg { background: #eff6ff; color: #2563eb; }
+    .notif-icon-box.cat-ann { background: #fef2f2; color: #dc2626; }
+    .notif-icon-box.cat-min { background: #fffbeb; color: #d97706; }
+    .notif-icon-box.cat-meet { background: #f5f3ff; color: #7c3aed; }
+    .notif-icon-box.cat-task { background: #ecfdf5; color: #059669; }
+    .notif-icon-box.cat-sys { background: #f1f5f9; color: #64748b; }
+
+    .notif-text-box {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .notif-title {
+        font-size: 0.84rem;
+        font-weight: 600;
+        color: #0f172a;
+        line-height: 1.3;
+        margin-bottom: 2px;
+    }
+
+    .notif-msg {
+        font-size: 0.78rem;
+        color: #64748b;
+        line-height: 1.35;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .notif-meta {
+        font-size: 0.7rem;
+        color: #94a3b8;
+        margin-top: 4px;
+    }
+
+    .notif-dot-box {
+        display: flex;
+        align-items: center;
+        padding-top: 6px;
+    }
+
+    .unread-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #10b981;
+    }
+
+    .notification-flyout-footer {
+        padding: 8px 16px;
+        border-top: 1px solid #f1f5f9;
+        background: #f8fafc;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>

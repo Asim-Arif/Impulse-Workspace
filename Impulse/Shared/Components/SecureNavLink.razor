@@ -1,0 +1,73 @@
+@using Impulse.Services.Setup
+@using Impulse.Models.Setup
+@using BlazorContextMenu
+@inject IUserPermissionService PermissionService
+
+@if (IsAllowed)
+{
+    @if (!string.IsNullOrEmpty(OptionId))
+    {
+        <ContextMenuTrigger MenuId="navLinkContextMenu" Data="@(new NavLinkContextData { OptionId = OptionId, Href = Href, Module = Module, Title = Title, IconClass = IconClass })" WrapperTag="span" class="d-inline-block w-100">
+            <NavLink class="@ComputedClass" href="@Href" Match="@Match" @attributes="AdditionalAttributes">
+                @ChildContent
+            </NavLink>
+        </ContextMenuTrigger>
+    }
+    else
+    {
+        <NavLink class="@ComputedClass" href="@Href" Match="@Match" @attributes="AdditionalAttributes">
+            @ChildContent
+        </NavLink>
+    }
+}
+else
+{
+    <span class="@($"nav-link nav-link-disabled text-muted {Class}")"
+          title="Access Restricted - Permission Required"
+          style="opacity: 0.45; cursor: not-allowed; display: flex; align-items: center; user-select: none;">
+        @ChildContent
+        <i class="fas fa-lock ms-auto text-secondary" style="font-size: 0.68rem; margin-left: auto;" title="Locked"></i>
+    </span>
+}
+
+@code {
+    [Parameter]
+    public string Href { get; set; } = string.Empty;
+
+    [Parameter]
+    public string OptionId { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Module { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter]
+    public string? IconClass { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter]
+    public NavLinkMatch Match { get; set; } = NavLinkMatch.Prefix;
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public Dictionary<string, object>? AdditionalAttributes { get; set; }
+
+    private bool IsAllowed
+    {
+        get
+        {
+            if (PermissionService.IsAdministrator) return true;
+            if (!string.IsNullOrEmpty(Module) && !PermissionService.HasModuleAccess(Module)) return false;
+            if (!string.IsNullOrEmpty(OptionId) && !PermissionService.HasOptionAccess(OptionId)) return false;
+            return true;
+        }
+    }
+
+    private string ComputedClass => string.IsNullOrEmpty(Class) ? "nav-link" : Class;
+}

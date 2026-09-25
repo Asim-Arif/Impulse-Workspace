@@ -16,6 +16,9 @@ namespace Impulse.Pages.Setups.Users
         protected IUserService UserService { get; set; } = default!;
 
         [Inject]
+        protected IUserPermissionService PermissionService { get; set; } = default!;
+
+        [Inject]
         protected NotificationService NotificationService { get; set; } = default!;
 
         [Inject]
@@ -26,6 +29,7 @@ namespace Impulse.Pages.Setups.Users
         protected string SearchQuery { get; set; } = string.Empty;
         protected string StatusFilter { get; set; } = "all";
         protected bool IsLoading { get; set; } = true;
+        protected bool IsSyncing { get; set; } = false;
 
         // Modal States
         protected bool IsModalOpen { get; set; } = false;
@@ -116,75 +120,12 @@ namespace Impulse.Pages.Setups.Users
 
         protected void OpenCreateModal()
         {
-            EditingUser = new UserModel
-            {
-                InActive = false,
-                ChangePassword = true,
-                DashBoardMainLink = true,
-                OpenCommandCenter = true,
-                ShowTips = true
-            };
-            IsCreatingNew = true;
-            IsModalOpen = true;
+            NavigationManager.NavigateTo("/setup/users/new?returnUrl=/setup/users");
         }
 
         protected void OpenEditModal(UserModel user)
         {
-            // Clone user to avoid in-place mutations before saving
-            EditingUser = new UserModel
-            {
-                UserID = user.UserID,
-                UserName = user.UserName,
-                Password = user.Password,
-                FullUserName = user.FullUserName,
-                EmpID = user.EmpID,
-                InActive = user.InActive,
-                EmployeeName = user.EmployeeName,
-                Designation = user.Designation,
-                DepartmentName = user.DepartmentName,
-                CellNo = user.CellNo,
-                UserManagement = user.UserManagement,
-                ChangePassword = user.ChangePassword,
-                CompanyMainLink = user.CompanyMainLink,
-                FinancialMainLink = user.FinancialMainLink,
-                PayrollMainLink = user.PayrollMainLink,
-                ExportMainLink = user.ExportMainLink,
-                StockMainLink = user.StockMainLink,
-                ProductionMainLink = user.ProductionMainLink,
-                DashBoardMainLink = user.DashBoardMainLink,
-                QMSMainLink = user.QMSMainLink,
-                FixedAssetsMainLink = user.FixedAssetsMainLink,
-                SamplingMainLink = user.SamplingMainLink,
-                HelpMainLink = user.HelpMainLink,
-                OpenCommandCenter = user.OpenCommandCenter,
-                RestrictedItemProfile = user.RestrictedItemProfile,
-                GeneralInfoItemProfile = user.GeneralInfoItemProfile,
-                ProcessesItemProfile = user.ProcessesItemProfile,
-                WeightItemProfile = user.WeightItemProfile,
-                PriceItemProfile = user.PriceItemProfile,
-                ReferencesItemProfile = user.ReferencesItemProfile,
-                PictureItemProfile = user.PictureItemProfile,
-                RMItemProfile = user.RMItemProfile,
-                ShipInfoItemProfile = user.ShipInfoItemProfile,
-                RestrictCompanyCatalogEditing = user.RestrictCompanyCatalogEditing,
-                AuthorizeVouchers = user.AuthorizeVouchers,
-                AuthorizeIssuance = user.AuthorizeIssuance,
-                PostMakerBill = user.PostMakerBill,
-                ChangeRateonIssuance = user.ChangeRateonIssuance,
-                ChangeRateMakerAssign = user.ChangeRateMakerAssign,
-                MakerBill_EditRate = user.MakerBill_EditRate,
-                HideRateMakerAssign = user.HideRateMakerAssign,
-                AddEditCustomerComplaint = user.AddEditCustomerComplaint,
-                EditFollowUp = user.EditFollowUp,
-                CloseCAPA = user.CloseCAPA,
-                BackupData = user.BackupData,
-                RestoreData = user.RestoreData,
-                HicoVisible = user.HicoVisible,
-                AddProdPlan = user.AddProdPlan,
-                ShowTips = user.ShowTips
-            };
-            IsCreatingNew = false;
-            IsModalOpen = true;
+            NavigationManager.NavigateTo($"/setup/users/edit/{user.UserID}?returnUrl=/setup/users");
         }
 
         protected void CloseModal(bool changed)
@@ -268,6 +209,139 @@ namespace Impulse.Pages.Setups.Users
                     Detail = msg,
                     Duration = 4000
                 });
+            }
+        }
+
+        protected async Task SyncMenuOptionsAsync()
+        {
+            try
+            {
+                IsSyncing = true;
+                var success = await PermissionService.ResetAllOptionsAsync();
+                if (success)
+                {
+                    NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Options Synced",
+                        Detail = "System screen menu options catalog updated successfully.",
+                        Duration = 3500
+                    });
+                }
+                else
+                {
+                    NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Error",
+                        Detail = "Failed to synchronize menu options catalog.",
+                        Duration = 4000
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+            }
+            finally
+            {
+                IsSyncing = false;
+            }
+        }
+
+        protected bool IsCopyUserOpen { get; set; } = false;
+        protected UserModel? CopyingSourceUser { get; set; }
+        protected string NewCopyUserName { get; set; } = string.Empty;
+        protected string NewCopyPassword { get; set; } = string.Empty;
+        protected string NewCopyFullName { get; set; } = string.Empty;
+        protected bool IsCopyingUser { get; set; } = false;
+
+        protected void OpenCopyUserModal(UserModel user)
+        {
+            CopyingSourceUser = user;
+            NewCopyUserName = $"Copy Of {user.UserName}";
+            NewCopyPassword = string.Empty;
+            NewCopyFullName = user.FullUserName ?? string.Empty;
+            IsCopyUserOpen = true;
+        }
+
+        protected void CloseCopyUserModal()
+        {
+            IsCopyUserOpen = false;
+            CopyingSourceUser = null;
+        }
+
+        protected async Task ExecuteCopyUserAsync()
+        {
+            if (CopyingSourceUser == null) return;
+
+            if (string.IsNullOrWhiteSpace(NewCopyUserName))
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Warning,
+                    Summary = "Validation",
+                    Detail = "New Username is required.",
+                    Duration = 3000
+                });
+                return;
+            }
+
+            try
+            {
+                IsCopyingUser = true;
+                var (success, msg, newId) = await UserService.CopyUserAsync(
+                    CopyingSourceUser.UserID,
+                    NewCopyUserName.Trim(),
+                    string.IsNullOrWhiteSpace(NewCopyPassword) ? null : NewCopyPassword.Trim(),
+                    string.IsNullOrWhiteSpace(NewCopyFullName) ? null : NewCopyFullName.Trim()
+                );
+
+                if (success)
+                {
+                    NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "User Copied",
+                        Detail = msg,
+                        Duration = 3000
+                    });
+                    CloseCopyUserModal();
+                    await LoadUsersAsync();
+
+                    // Open the newly created user in edit page so admin can fine-tune
+                    NavigationManager.NavigateTo($"/setup/users/edit/{newId}?returnUrl=/setup/users");
+                }
+                else
+                {
+                    NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Copy Failed",
+                        Detail = msg,
+                        Duration = 4000
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+            }
+            finally
+            {
+                IsCopyingUser = false;
             }
         }
     }

@@ -1,0 +1,71 @@
+@using Impulse.Services.Setup
+@inject IUserPermissionService PermissionService
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+@if (IsAuthorized)
+{
+    @ChildContent
+}
+else
+{
+    <div class="container-fluid py-5 text-center" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+        <div class="card border-0 shadow-sm mx-auto p-5" style="max-width: 540px; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border-radius: 16px;">
+            <div class="mb-3">
+                <span class="d-inline-flex p-3 rounded-circle bg-danger-subtle text-danger">
+                    <i class="fas fa-user-lock fa-3x"></i>
+                </span>
+            </div>
+            <h4 class="fw-bold text-dark mb-1">Access Restricted</h4>
+            <p class="text-secondary small mb-4">
+                Your user account is not authorized to access this module or screen. Please contact your system administrator to request access permissions.
+            </p>
+            <div class="d-flex justify-content-center gap-2">
+                <a href="/" class="btn btn-sm btn-primary px-3 shadow-sm">
+                    <i class="fas fa-home me-1"></i> Return to Home
+                </a>
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.history.back()">
+                    <i class="fas fa-arrow-left me-1"></i> Go Back
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private bool IsAuthorized { get; set; } = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await PermissionService.InitializeAsync();
+        CheckAuthorization();
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        CheckAuthorization();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void CheckAuthorization()
+    {
+        try
+        {
+            var relative = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+            IsAuthorized = PermissionService.IsRouteAuthorized(relative);
+        }
+        catch
+        {
+            IsAuthorized = true;
+        }
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+}

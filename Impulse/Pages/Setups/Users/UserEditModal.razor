@@ -47,6 +47,15 @@
                                 <i class="fas fa-boxes me-1"></i>Item Profile Rights
                             </button>
                         </li>
+                        <li class="nav-item">
+                            <button class="nav-link @(ActiveTab == 4 ? "active fw-bold text-primary" : "text-secondary")" @onclick="() => ActiveTab = 4">
+                                <i class="fas fa-shield-alt me-1"></i>Screen &amp; Menu Rights
+                                @if (TotalSelectedOptionsCount > 0)
+                                {
+                                    <span class="badge bg-primary-subtle text-primary ms-1" style="font-size: 0.72rem;">@TotalSelectedOptionsCount</span>
+                                }
+                            </button>
+                        </li>
                     </ul>
                 </div>
 
@@ -420,6 +429,97 @@
                                         </label>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    }
+                    else if (ActiveTab == 4)
+                    {
+                        <!-- Tab 5: Screen & Menu Permissions (Legacy UserHasAccessEX Parity) -->
+                        <div class="d-flex flex-column gap-2">
+                            <!-- Filter & Control Bar -->
+                            <div class="p-2 border rounded-2 bg-light d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                <div class="d-flex align-items-center gap-2 flex-grow-1" style="max-width: 450px;">
+                                    <label class="form-label small fw-bold text-secondary mb-0 text-nowrap">
+                                        <i class="fas fa-folder-open me-1"></i>Module:
+                                    </label>
+                                    <select class="form-select form-select-sm" value="@SelectedModule" @onchange="e => OnModuleChangedAsync(e.Value?.ToString() ?? string.Empty)">
+                                        @foreach (var mod in AvailableModules)
+                                        {
+                                            <option value="@mod">@mod</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="d-flex align-items-center gap-2 flex-grow-1" style="max-width: 300px;">
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                                        <input type="text" class="form-control" placeholder="Search screen rights..." @bind="OptionSearchFilter" @bind:event="oninput" />
+                                        @if (!string.IsNullOrWhiteSpace(OptionSearchFilter))
+                                        {
+                                            <button class="btn btn-outline-secondary" type="button" @onclick="() => OptionSearchFilter = string.Empty">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="d-flex align-items-center gap-2">
+                                    <button type="button" class="btn btn-xs btn-outline-primary" @onclick="SelectAllCurrentModule" title="Grant all options in this module">
+                                        <i class="fas fa-check-double me-1"></i>Select All
+                                    </button>
+                                    <button type="button" class="btn btn-xs btn-outline-secondary" @onclick="ClearAllCurrentModule" title="Revoke all options in this module">
+                                        <i class="fas fa-ban me-1"></i>Clear All
+                                    </button>
+                                    <span class="badge bg-secondary-subtle text-secondary small py-1 px-2 border" style="font-size: 0.75rem;">
+                                        @CurrentModuleSelectedCount / @CurrentModuleOptions.Count Permitted
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Screen Options Checklist Grid -->
+                            @if (IsLoadingOptions)
+                            {
+                                <div class="text-center py-4">
+                                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                    <span class="ms-2 small text-secondary">Loading module permissions...</span>
+                                </div>
+                            }
+                            else if (!FilteredModuleOptions.Any())
+                            {
+                                <div class="text-center py-4 border rounded-2 bg-light">
+                                    <i class="fas fa-folder-open fa-2x text-muted mb-2"></i>
+                                    <p class="small text-muted mb-0">No screen options found for module "@SelectedModule".</p>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="border rounded-2 p-2 bg-white" style="max-height: 48vh; overflow-y: auto;">
+                                    <div class="row g-2">
+                                        @foreach (var opt in FilteredModuleOptions)
+                                        {
+                                            var isChecked = UserSelectedOptionIds.Contains(opt.OptionID);
+                                            <div class="col-md-6">
+                                                <div class="p-2 border rounded-2 @(isChecked ? "bg-primary-subtle border-primary-subtle" : "bg-light") transition-all" style="cursor: pointer;" @onclick="() => ToggleOption(opt.OptionID, !isChecked)">
+                                                    <div class="form-check form-switch mb-0 d-flex align-items-center">
+                                                        <input class="form-check-input me-2" type="checkbox" id="@($"opt_{opt.OptionID}")"
+                                                               checked="@isChecked"
+                                                               @onchange="e => ToggleOption(opt.OptionID, (bool)(e.Value ?? false))"
+                                                               @onclick:stopPropagation="true" />
+                                                        <label class="form-check-label small d-flex flex-column" for="@($"opt_{opt.OptionID}")" style="cursor: pointer;">
+                                                            <span class="fw-semibold @(isChecked ? "text-primary" : "text-dark")">@opt.OptionName</span>
+                                                            <span class="text-muted" style="font-size: 0.72rem;">Code: @opt.OptionID</span>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="d-flex justify-content-between align-items-center text-muted small px-1">
+                                <span><i class="fas fa-info-circle me-1"></i>Granted options enable screen access. Denied options appear locked with restricted access.</span>
+                                <span>Total Across Modules: <strong>@TotalSelectedOptionsCount</strong></span>
                             </div>
                         </div>
                     }

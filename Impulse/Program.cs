@@ -494,6 +494,10 @@ builder.Services.AddHttpClient<Impulse.Services.IntraOffice.IAiService, Impulse.
 // Setup & User Management Registrations
 builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IUserDataAccess, DataAccessLibrary.DAC.Setup.UserDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Setup.IUserService, Impulse.Services.Setup.UserService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IUserPermissionDataAccess, DataAccessLibrary.DAC.Setup.UserPermissionDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Setup.IUserPermissionService, Impulse.Services.Setup.UserPermissionService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IFavouriteDataAccess, DataAccessLibrary.DAC.Setup.FavouriteDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Setup.IFavouriteService, Impulse.Services.Setup.FavouriteService>();
 
 var app = builder.Build();
 

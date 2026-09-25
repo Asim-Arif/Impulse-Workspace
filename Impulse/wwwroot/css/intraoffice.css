@@ -146,65 +146,7 @@
 }
 
 
-/* Reset & Base */
-*, *::before, *::after {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-/* Base Screen Resolution & Typography Scaling (Sleek, Compact & Readable) */
-html {
-    font-size: 12px;
-    scroll-behavior: smooth;
-    -webkit-text-size-adjust: 100%;
-}
-
-@media (min-width: 1400px) {
-    html {
-        font-size: 12.5px;
-    }
-}
-
-@media (min-width: 1920px) {
-    html {
-        font-size: 13px;
-    }
-}
-
-/* User Display Scale Overrides (saved in localStorage) */
-html[data-scale="compact"] {
-    font-size: 11px !important;
-}
-html[data-scale="normal"] {
-    font-size: 12px !important;
-}
-@media (min-width: 1400px) {
-    html[data-scale="normal"] {
-        font-size: 12.5px !important;
-    }
-}
-@media (min-width: 1920px) {
-    html[data-scale="normal"] {
-        font-size: 13px !important;
-    }
-}
-html[data-scale="large"] {
-    font-size: 13.5px !important;
-}
-html[data-scale="xlarge"] {
-    font-size: 15px !important;
-}
-
-body {
-    font-family: var(--font-family);
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    line-height: 1.45;
-    font-size: 1rem;
-    overflow: hidden;
-    height: 100vh;
-}
+/* Base & Component Scoping */
 
 /* Scrollbar - Modern, Visible, High-Contrast */
 ::-webkit-scrollbar {
@@ -234,335 +176,8 @@ body {
 }
 
 /* ============================================================
-   Layout
+   IntraOffice Components & Content
    ============================================================ */
-
-.app-layout {
-    display: flex;
-    flex-direction: row;
-    height: 100vh;
-    width: 100vw;
-    overflow: hidden;
-    background: var(--theme-bg);
-}
-
-/* Reset global Impulse site.css collisions on main and sidebar */
-.app-layout main,
-.app-layout .main-content {
-    margin-left: 0 !important;
-    padding: 0 4px 0 0 !important;
-    background: transparent !important;
-}
-
-.app-layout .sidebar {
-    position: relative !important;
-    width: var(--sidebar-width) !important;
-    height: calc(100vh - 32px) !important;
-    margin: 16px !important;
-    border-radius: 12px !important;
-    background: var(--theme-sidebar) !important;
-    padding-top: 0 !important;
-    border-right: none !important;
-}
-
-.main-wrapper {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    overflow: hidden;
-    min-height: 0;
-    padding: 16px 16px 16px 0;
-}
-
-/* Top Bar */
-.top-bar {
-    position: relative !important;
-    height: 64px;
-    min-height: 64px;
-    background: #ffffff;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.02);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 20px;
-    z-index: 1000 !important;
-    margin-bottom: 12px;
-}
-
-.top-bar-left, .top-bar-right {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
-
-.top-bar-brand {
-    display: flex;
-    flex-direction: column;
-    margin-right: 20px;
-}
-
-.top-bar-brand-title {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: var(--heading-color, var(--text-heading)) !important;
-}
-
-.top-bar-brand-sub {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-}
-
-.top-indicator {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-light);
-    border-radius: 20px;
-    padding: 5px 12px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    height: 42px;
-    box-sizing: border-box;
-}
-
-.top-indicator i {
-    color: var(--text-muted);
-    font-size: 1rem;
-}
-
-.top-badge {
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #fff;
-    height: 32px;
-    display: flex;
-    align-items: center;
-}
-
-.top-badge-success { background: #1f8a70; }
-.top-badge-warning { background: #ffb300; color: #333; }
-
-.top-dropdown {
-    background: var(--bg-primary);
-    border: 1px solid var(--border-light);
-    border-radius: 20px;
-    padding: 5px 12px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    height: 36px;
-    box-sizing: border-box;
-}
-
-/* Sidebar */
-.sidebar {
-    width: var(--sidebar-width);
-    min-width: var(--sidebar-width);
-    height: calc(100vh - 32px);
-    margin: 16px;
-    border-radius: 12px;
-    background: var(--theme-sidebar);
-    display: flex;
-    flex-direction: column;
-    position: relative;
-    z-index: 10;
-    transition: transform var(--transition-base);
-}
-
-.sidebar-header {
-    padding: 20px 20px 16px;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.sidebar-brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    text-decoration: none;
-}
-
-.sidebar-brand .brand-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: var(--radius-md);
-    background: var(--accent-gradient);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.3rem;
-    color: #fff;
-    box-shadow: var(--shadow-glow);
-}
-
-.sidebar-brand .brand-text {
-    font-size: 1.2rem;
-    font-weight: 700;
-    color: var(--text-heading);
-    letter-spacing: -0.3px;
-}
-
-.sidebar-brand .brand-sub {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-/* Navigation */
-.sidebar-nav {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-}
-
-.sidebar-nav::-webkit-scrollbar {
-    display: none;
-    width: 0;
-    height: 0;
-}
-
-.nav-section {
-    margin-bottom: 20px;
-}
-
-.nav-section-title {
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: var(--text-muted);
-    padding: 8px 12px 6px;
-}
-
-.nav-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 14px;
-    border-radius: 8px;
-    color: #8a8a9e;
-    text-decoration: none;
-    font-weight: 500;
-    font-size: 1rem;
-    transition: all var(--transition-fast);
-    cursor: pointer;
-    position: relative;
-    margin-bottom: 4px;
-}
-
-.nav-item:hover {
-    background: rgba(255,255,255,0.03);
-    color: #e8e8f0;
-}
-
-.nav-item.active {
-    background: rgba(255,255,255,0.06);
-    color: #ffffff;
-}
-
-.nav-item.active::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 3px;
-    height: calc(100% - 12px);
-    background: #00e5ff;
-    border-radius: 0 4px 4px 0;
-}
-
-.nav-item i {
-    font-size: 1.15rem;
-    width: 22px;
-    text-align: center;
-}
-
-.nav-item-nested {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    border-radius: 6px;
-    color: #8a8a9e;
-    text-decoration: none;
-    font-weight: 500;
-    font-size: 0.95rem;
-    transition: all var(--transition-fast);
-    cursor: pointer;
-    margin-bottom: 2px;
-}
-
-.nav-item-nested:hover {
-    background: rgba(255,255,255,0.03);
-    color: #e8e8f0;
-}
-
-.nav-item-nested.active {
-    background: rgba(255,255,255,0.06);
-    color: #ffffff;
-}
-
-.nav-pin {
-    font-size: 0.65rem;
-    opacity: 0.3;
-    margin-right: 4px;
-}
-
-.nav-badge {
-    margin-left: auto;
-    background: var(--accent-primary);
-    color: #fff;
-    font-size: 0.7rem;
-    font-weight: 600;
-    padding: 2px 7px;
-    border-radius: 10px;
-    min-width: 20px;
-    text-align: center;
-}
-
-/* Sidebar User */
-.sidebar-user {
-    padding: 16px 20px;
-    border-top: 1px solid var(--border-color);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.sidebar-user .user-avatar {
-    position: relative;
-}
-
-.sidebar-user .user-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.sidebar-user .user-name {
-    font-weight: 600;
-    font-size: 0.9rem;
-    color: var(--text-primary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.sidebar-user .user-role {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-}
 
 /* Main Content - Always Scrollable with Right-Side Scrollbar */
 .main-content {
@@ -821,7 +436,9 @@ select.form-control {
 }
 
 /* Form Controls Isolation in IntraOffice (Overrides Impulse site.css bleed) */
-.app-layout .form-group:not(.d-flex) {
+.intraoffice-page .form-group:not(.d-flex),
+.intraoffice-content-wrapper .form-group:not(.d-flex),
+.content-area .form-group:not(.d-flex) {
     display: flex !important;
     flex-direction: column !important;
     align-items: stretch !important;
@@ -829,19 +446,27 @@ select.form-control {
     margin-bottom: 16px;
 }
 
-.app-layout .form-group.d-flex {
+.intraoffice-page .form-group.d-flex,
+.intraoffice-content-wrapper .form-group.d-flex,
+.content-area .form-group.d-flex {
     display: flex !important;
     flex-direction: row !important;
     align-items: center !important;
     width: auto !important;
 }
 
-.app-layout .form-group.mb-0 {
+.intraoffice-page .form-group.mb-0,
+.intraoffice-content-wrapper .form-group.mb-0,
+.content-area .form-group.mb-0 {
     margin-bottom: 0 !important;
 }
 
-.app-layout .form-label,
-.app-layout .form-group label {
+.intraoffice-page .form-label,
+.intraoffice-page .form-group label,
+.intraoffice-content-wrapper .form-label,
+.intraoffice-content-wrapper .form-group label,
+.content-area .form-label,
+.content-area .form-group label {
     display: block !important;
     width: 100% !important;
     font-weight: 500 !important;
@@ -852,16 +477,28 @@ select.form-control {
     white-space: nowrap;
 }
 
-.app-layout .form-group.d-flex label,
-.app-layout .form-group.d-flex .form-label {
+.intraoffice-page .form-group.d-flex label,
+.intraoffice-page .form-group.d-flex .form-label,
+.intraoffice-content-wrapper .form-group.d-flex label,
+.intraoffice-content-wrapper .form-group.d-flex .form-label,
+.content-area .form-group.d-flex label,
+.content-area .form-group.d-flex .form-label {
     width: auto !important;
     margin-bottom: 0 !important;
 }
 
-.app-layout .form-control,
-.app-layout .form-group input:not([type="checkbox"]):not([type="radio"]),
-.app-layout select.form-control,
-.app-layout input.form-control:not([type="checkbox"]):not([type="radio"]) {
+.intraoffice-page .form-control,
+.intraoffice-page .form-group input:not([type="checkbox"]):not([type="radio"]),
+.intraoffice-page select.form-control,
+.intraoffice-page input.form-control:not([type="checkbox"]):not([type="radio"]),
+.intraoffice-content-wrapper .form-control,
+.intraoffice-content-wrapper .form-group input:not([type="checkbox"]):not([type="radio"]),
+.intraoffice-content-wrapper select.form-control,
+.intraoffice-content-wrapper input.form-control:not([type="checkbox"]):not([type="radio"]),
+.content-area .form-control,
+.content-area .form-group input:not([type="checkbox"]):not([type="radio"]),
+.content-area select.form-control,
+.content-area input.form-control:not([type="checkbox"]):not([type="radio"]) {
     display: block !important;
     width: 100% !important;
     height: 38px !important;
@@ -882,10 +519,10 @@ select.form-control {
 }
 
 /* Explicit Checkbox / Radio styling */
-.app-layout input[type="checkbox"],
-.app-layout input[type="radio"],
-.app-layout .form-group input[type="checkbox"],
-.app-layout .form-group input[type="radio"] {
+.intraoffice-page input[type="checkbox"],
+.intraoffice-page input[type="radio"],
+.intraoffice-page .form-group input[type="checkbox"],
+.intraoffice-page .form-group input[type="radio"] {
     width: 17px !important;
     height: 17px !important;
     min-width: 17px !important;
@@ -900,21 +537,21 @@ select.form-control {
     accent-color: var(--accent-primary, #4f46e5) !important;
 }
 
-.app-layout textarea.form-control {
+.intraoffice-page textarea.form-control {
     min-height: 80px !important;
     max-height: none !important;
     height: auto !important;
 }
 
-.app-layout .form-control:focus,
-.app-layout .form-group input:not([type="checkbox"]):not([type="radio"]):focus,
-.app-layout select.form-control:focus,
-.app-layout input.form-control:not([type="checkbox"]):not([type="radio"]):focus {
+.intraoffice-page .form-control:focus,
+.intraoffice-page .form-group input:not([type="checkbox"]):not([type="radio"]):focus,
+.intraoffice-page select.form-control:focus,
+.intraoffice-page input.form-control:not([type="checkbox"]):not([type="radio"]):focus {
     border-color: var(--accent-primary, #4f46e5) !important;
     box-shadow: 0 0 0 3px var(--accent-glow, rgba(79, 70, 229, 0.15)) !important;
 }
 
-.app-layout select.form-control {
+.intraoffice-page select.form-control {
     appearance: none !important;
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
@@ -925,7 +562,7 @@ select.form-control {
     cursor: pointer;
 }
 
-.app-layout .btn-secondary {
+.intraoffice-page .btn-secondary {
     background: var(--bg-tertiary, #f1f5f9) !important;
     color: var(--text-primary, #0f172a) !important;
     border: 1px solid var(--border-color, #cbd5e1) !important;
@@ -935,7 +572,7 @@ select.form-control {
     transition: all var(--transition-fast) !important;
 }
 
-.app-layout .btn-secondary:hover {
+.intraoffice-page .btn-secondary:hover {
     background: #e2e8f0 !important;
     border-color: #94a3b8 !important;
     color: var(--text-primary, #0f172a) !important;
@@ -944,17 +581,17 @@ select.form-control {
 /* ============================================================
    Input Groups Isolation in IntraOffice (e.g. Search Bars)
    ============================================================ */
-.app-layout .input-group {
+.intraoffice-page .input-group {
     display: flex !important;
     flex-wrap: nowrap !important;
     align-items: stretch !important;
     width: 100% !important;
 }
 
-.app-layout .input-group > .form-control,
-.app-layout .input-group > input.form-control,
-.app-layout .input-group > .form-select,
-.app-layout .input-group > select.form-select {
+.intraoffice-page .input-group > .form-control,
+.intraoffice-page .input-group > input.form-control,
+.intraoffice-page .input-group > .form-select,
+.intraoffice-page .input-group > select.form-select {
     position: relative !important;
     flex: 1 1 auto !important;
     width: 1% !important;
@@ -963,17 +600,17 @@ select.form-control {
     border-radius: 0 !important;
 }
 
-.app-layout .input-group > :first-child {
+.intraoffice-page .input-group > :first-child {
     border-top-left-radius: 8px !important;
     border-bottom-left-radius: 8px !important;
 }
 
-.app-layout .input-group > :last-child {
+.intraoffice-page .input-group > :last-child {
     border-top-right-radius: 8px !important;
     border-bottom-right-radius: 8px !important;
 }
 
-.app-layout .input-group-text {
+.intraoffice-page .input-group-text {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -985,19 +622,19 @@ select.form-control {
     color: var(--text-secondary, #64748b) !important;
 }
 
-.app-layout .input-group:not(.input-group-sm) > .form-control,
-.app-layout .input-group:not(.input-group-sm) > .form-select,
-.app-layout .input-group:not(.input-group-sm) > .input-group-text,
-.app-layout .input-group:not(.input-group-sm) > .btn {
+.intraoffice-page .input-group:not(.input-group-sm) > .form-control,
+.intraoffice-page .input-group:not(.input-group-sm) > .form-select,
+.intraoffice-page .input-group:not(.input-group-sm) > .input-group-text,
+.intraoffice-page .input-group:not(.input-group-sm) > .btn {
     height: 38px !important;
     min-height: 38px !important;
     max-height: 38px !important;
 }
 
-.app-layout .input-group-sm > .form-control,
-.app-layout .input-group-sm > .form-select,
-.app-layout .input-group-sm > .input-group-text,
-.app-layout .input-group-sm > .btn {
+.intraoffice-page .input-group-sm > .form-control,
+.intraoffice-page .input-group-sm > .form-select,
+.intraoffice-page .input-group-sm > .input-group-text,
+.intraoffice-page .input-group-sm > .btn {
     height: 35px !important;
     min-height: 35px !important;
     max-height: 35px !important;
@@ -1006,7 +643,7 @@ select.form-control {
     padding-bottom: 4px !important;
 }
 
-.app-layout .form-select {
+.intraoffice-page .form-select {
     border: 1px solid var(--border-color, #cbd5e1) !important;
     border-radius: 8px;
     font-size: 0.85rem !important;
@@ -1801,15 +1438,6 @@ select.form-control {
 
 /* Responsive */
 @media (max-width: 768px) {
-    .sidebar {
-        position: fixed;
-        transform: translateX(-100%);
-        z-index: 100;
-    }
-
-    .sidebar.open {
-        transform: translateX(0);
-    }
 
     .task-board {
         grid-template-columns: 1fr;
@@ -2359,8 +1987,7 @@ select.form-control option {
     gap: 0.5rem;
 }
 
-.crm-card-body,
-.card-body {
+.crm-card-body {
     padding: 1.25rem !important;
 }
 
@@ -2637,16 +2264,14 @@ select.form-control option {
     font-weight: 700;
 }
 
-.modal-body-custom,
-.modal-body {
+.modal-body-custom {
     padding: 1.5rem !important;
     background: #ffffff !important;
     color: #0f172a !important;
     flex-grow: 1;
 }
 
-.modal-footer-custom,
-.modal-footer {
+.modal-footer-custom {
     padding: 1rem 1.5rem !important;
     border-top: 1px solid #e2e8f0 !important;
     background: #fafbfc !important;

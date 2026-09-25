@@ -24,11 +24,16 @@
         </div>
         @* <article class="content px-4"> *@
         <article class="content">
-            @Body
+            <RoutePermissionGuard>
+                @Body
+            </RoutePermissionGuard>
         </article>
     </main>
     <RadzenNotification />
     <RadzenDialog />
+    <StickyNotesWidget />
+    <AiChatbotWidget />
+    <NotificationToaster />
 </div>
 
 @* These modals sit on top of the whole app *@

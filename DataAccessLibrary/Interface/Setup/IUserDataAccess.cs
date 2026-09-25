@@ -14,6 +14,7 @@ namespace DataAccessLibrary.Interface.Setup
         Task<bool> ToggleUserStatusAsync(int userId, bool inActive);
         Task<bool> ResetPasswordAsync(int userId, string newPassword);
         Task<bool> DeleteUserAsync(int userId);
+        Task<int> CopyUserAsync(int fromUserId, string newUserName, string? password = null, string? fullUserName = null);
         Task<int> GetTotalUsersCountAsync();
         Task<int> GetActiveUsersCountAsync();
     }

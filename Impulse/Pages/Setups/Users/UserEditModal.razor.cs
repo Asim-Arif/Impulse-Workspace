@@ -20,6 +20,9 @@ namespace Impulse.Pages.Setups.Users
         protected IEmployeeService EmployeeService { get; set; } = default!;
 
         [Inject]
+        protected IUserPermissionService PermissionService { get; set; } = default!;
+
+        [Inject]
         protected NotificationService NotificationService { get; set; } = default!;
 
         [Parameter]
@@ -42,23 +45,164 @@ namespace Impulse.Pages.Setups.Users
         protected EmployeeListItemModel? SelectedEmployee { get; set; }
         private List<EmployeeListItemModel> _allEmployees = new();
 
+        // Screen & Menu Options State
+        protected List<string> AvailableModules { get; set; } = new();
+        protected string SelectedModule { get; set; } = "Accounts";
+        protected List<MenuOptionModel> CurrentModuleOptions { get; set; } = new();
+        protected HashSet<string> UserSelectedOptionIds { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        protected string OptionSearchFilter { get; set; } = string.Empty;
+        protected bool IsLoadingOptions { get; set; } = false;
+
+        private int _lastLoadedUserId = -1;
+        private bool _wasOpen = false;
+
         protected override async Task OnParametersSetAsync()
         {
             if (IsOpen)
             {
-                ActiveTab = 0;
-                await LoadEmployeesAsync();
-
-                if (!string.IsNullOrEmpty(User.EmpID))
+                if (!_wasOpen || _lastLoadedUserId != User.UserID)
                 {
-                    SelectedEmployee = _allEmployees.FirstOrDefault(e => e.EmpID == User.EmpID);
+                    _wasOpen = true;
+                    _lastLoadedUserId = User.UserID;
+                    ActiveTab = 0;
+                    OptionSearchFilter = string.Empty;
+
+                    await LoadEmployeesAsync();
+                    await LoadPermissionsDataAsync();
+
+                    if (!string.IsNullOrEmpty(User.EmpID))
+                    {
+                        SelectedEmployee = _allEmployees.FirstOrDefault(e => e.EmpID == User.EmpID);
+                    }
+                    else
+                    {
+                        SelectedEmployee = null;
+                    }
+                }
+            }
+            else
+            {
+                _wasOpen = false;
+                _lastLoadedUserId = -1;
+            }
+        }
+
+        private async Task LoadPermissionsDataAsync()
+        {
+            try
+            {
+                IsLoadingOptions = true;
+
+                // 1. Fetch available modules
+                AvailableModules = await PermissionService.GetDistinctModulesAsync();
+                if (!AvailableModules.Any())
+                {
+                    // If table was empty, seed with standard catalog
+                    await PermissionService.ResetAllOptionsAsync();
+                    AvailableModules = await PermissionService.GetDistinctModulesAsync();
+                }
+
+                if (!string.IsNullOrEmpty(SelectedModule) && !AvailableModules.Contains(SelectedModule) && AvailableModules.Any())
+                {
+                    SelectedModule = AvailableModules.First();
+                }
+                else if (string.IsNullOrEmpty(SelectedModule) && AvailableModules.Any())
+                {
+                    SelectedModule = AvailableModules.First();
+                }
+
+                // 2. Fetch existing user options
+                if (!IsNewUser && User.UserID > 0)
+                {
+                    UserSelectedOptionIds = await PermissionService.GetUserMenuOptionIdsAsync(User.UserID);
                 }
                 else
                 {
-                    SelectedEmployee = null;
+                    UserSelectedOptionIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 }
+
+                // 3. Load options for initial module
+                await LoadModuleOptionsAsync(SelectedModule);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading permissions data: {ex.Message}");
+            }
+            finally
+            {
+                IsLoadingOptions = false;
             }
         }
+
+        protected async Task OnModuleChangedAsync(string moduleName)
+        {
+            SelectedModule = moduleName;
+            await LoadModuleOptionsAsync(moduleName);
+        }
+
+        private async Task LoadModuleOptionsAsync(string moduleName)
+        {
+            if (string.IsNullOrWhiteSpace(moduleName)) return;
+
+            try
+            {
+                IsLoadingOptions = true;
+                CurrentModuleOptions = await PermissionService.GetMenuOptionsByModuleAsync(moduleName);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading module options: {ex.Message}");
+            }
+            finally
+            {
+                IsLoadingOptions = false;
+            }
+        }
+
+        protected IEnumerable<MenuOptionModel> FilteredModuleOptions
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(OptionSearchFilter))
+                    return CurrentModuleOptions;
+                var q = OptionSearchFilter.Trim().ToLowerInvariant();
+                return CurrentModuleOptions.Where(o =>
+                    (!string.IsNullOrEmpty(o.OptionName) && o.OptionName.ToLowerInvariant().Contains(q)) ||
+                    (!string.IsNullOrEmpty(o.OptionID) && o.OptionID.ToLowerInvariant().Contains(q))
+                );
+            }
+        }
+
+        protected void ToggleOption(string optionId, bool isChecked)
+        {
+            if (isChecked)
+            {
+                UserSelectedOptionIds.Add(optionId);
+            }
+            else
+            {
+                UserSelectedOptionIds.Remove(optionId);
+            }
+        }
+
+        protected void SelectAllCurrentModule()
+        {
+            foreach (var opt in FilteredModuleOptions)
+            {
+                UserSelectedOptionIds.Add(opt.OptionID);
+            }
+        }
+
+        protected void ClearAllCurrentModule()
+        {
+            foreach (var opt in FilteredModuleOptions)
+            {
+                UserSelectedOptionIds.Remove(opt.OptionID);
+            }
+        }
+
+        protected int CurrentModuleSelectedCount => CurrentModuleOptions.Count(o => UserSelectedOptionIds.Contains(o.OptionID));
+        protected int TotalSelectedOptionsCount => UserSelectedOptionIds.Count;
 
         private async Task LoadEmployeesAsync()
         {
@@ -133,6 +277,8 @@ namespace Impulse.Pages.Setups.Users
                     if (success)
                     {
                         User.UserID = newId;
+                        await PermissionService.SaveAllUserMenuOptionsAsync(newId, UserSelectedOptionIds);
+
                         NotificationService.Notify(new NotificationMessage
                         {
                             Severity = NotificationSeverity.Success,
@@ -158,6 +304,8 @@ namespace Impulse.Pages.Setups.Users
                     var (success, msg) = await UserService.UpdateUserAsync(User);
                     if (success)
                     {
+                        await PermissionService.SaveAllUserMenuOptionsAsync(User.UserID, UserSelectedOptionIds);
+
                         NotificationService.Notify(new NotificationMessage
                         {
                             Severity = NotificationSeverity.Success,

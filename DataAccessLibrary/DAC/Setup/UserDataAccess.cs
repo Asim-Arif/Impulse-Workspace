@@ -356,5 +356,51 @@ namespace DataAccessLibrary.DAC.Setup
                 return 0;
             }
         }
+
+        public async Task<int> CopyUserAsync(int fromUserId, string newUserName, string? password = null, string? fullUserName = null)
+        {
+            try
+            {
+                using var db = CreateConnection();
+                var parameters = new DynamicParameters();
+                parameters.Add("@FromID", fromUserId);
+                parameters.Add("@NewUserName", newUserName);
+
+                await db.ExecuteAsync("SP_CopyUser", parameters, commandType: CommandType.StoredProcedure);
+
+                var newId = await db.QueryFirstOrDefaultAsync<int>(
+                    "SELECT UserID FROM Users WHERE UserName = @NewUserName",
+                    new { NewUserName = newUserName }
+                );
+
+                if (newId > 0 && (!string.IsNullOrWhiteSpace(password) || !string.IsNullOrWhiteSpace(fullUserName)))
+                {
+                    var updates = new List<string>();
+                    var updateParams = new DynamicParameters();
+                    updateParams.Add("@UserID", newId);
+
+                    if (!string.IsNullOrWhiteSpace(password))
+                    {
+                        updates.Add("Password = @Password");
+                        updateParams.Add("@Password", password);
+                    }
+                    if (!string.IsNullOrWhiteSpace(fullUserName))
+                    {
+                        updates.Add("FullUserName = @FullUserName");
+                        updateParams.Add("@FullUserName", fullUserName);
+                    }
+
+                    var updateSql = $"UPDATE Users SET {string.Join(", ", updates)} WHERE UserID = @UserID";
+                    await db.ExecuteAsync(updateSql, updateParams);
+                }
+
+                return newId;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error copying user ID {FromID} to {NewUserName}", fromUserId, newUserName);
+                throw;
+            }
+        }
     }
 }

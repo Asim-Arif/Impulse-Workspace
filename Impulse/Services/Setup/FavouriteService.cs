@@ -1,0 +1,400 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using DataAccessLibrary.Interface.Setup;
+using Impulse.Models.Setup;
+using Microsoft.Extensions.Logging;
+
+namespace Impulse.Services.Setup
+{
+    public class FavouriteService : IFavouriteService
+    {
+        private readonly IFavouriteDataAccess _favouriteData;
+        private readonly IUserPermissionService _permissionService;
+        private readonly ILogger<FavouriteService> _logger;
+
+        public event Action? OnFavouritesChanged;
+
+        private static readonly ConcurrentDictionary<string, (string Title, string Href, string Module, string IconClass)> DynamicCatalog = new(StringComparer.OrdinalIgnoreCase);
+
+        private static readonly Dictionary<string, (string Title, string Href, string Module, string IconClass)> StaticCatalog = new(StringComparer.OrdinalIgnoreCase)
+        {
+["AccCashBankStatus"] = ("Cash & Bank Status", "/accounts/bankbalancestatement", "Accounts", "fas fa-piggy-bank"),
+            ["AccCashBook"] = ("Cash Book Report", "/accounts/cashbookreport", "Accounts", "fas fa-Rupee-sign"),
+            ["AccChangeAccHeads"] = ("Change Category", "/accounts/changecategory", "Accounts", "fas fa-exchange-alt"),
+            ["AccChartOfAccounts"] = ("Chart of Accounts", "/accounts/chartofaccounts", "Accounts", "fas fa-file-invoice"),
+            ["AccChqBookDetail"] = ("Bank & Chq Book Detail", "/accounts/chqbookdetail", "Accounts", "fa fa-money-check-alt"),
+            ["AccCustomInvoiceAuth"] = ("Custom Invoice Authorization", "/accounts/custominvoiceauth", "Accounts", "fas fa-file-signature"),
+            ["AccEV"] = ("Cash Payment", "/accounts/cashpaymentvoucher", "Accounts", "fas fa-money-check-dollar"),
+            ["AccExpenseGroups"] = ("Account Groups", "/accounts/accountgroups", "Accounts", "fas fa-layer-group"),
+            ["AccJV"] = ("Journal Voucher", "/accounts/journalvoucher", "Accounts", "fas fa-book"),
+            ["AccLedger"] = ("Accounts Ledgder", "/accounts/accountsledger", "Accounts", "fas fa-list"),
+            ["AccMakerLoan"] = ("Maker Long Term Loan", "/accounts/maker-long-term-loan", "Accounts", "fas fa-hand-holding-usd"),
+            ["AccMakerLoanClearance"] = ("Maker Loan Clearance", "/accounts/maker-loan-clearance", "Accounts", "fas fa-check-double"),
+            ["AccMakerLoanLedger"] = ("Maker L.T Loan Ledger", "/accounts/maker-long-term-loan-ledger", "Accounts", "fas fa-book-open"),
+            ["AccMakerLoanTransfer"] = ("Maker Loan Transfer", "/accounts/maker-loan-transfer", "Accounts", "fas fa-exchange-alt"),
+            ["AccPV"] = ("Bank Payment", "/accounts/bankpaymentvoucher", "Accounts", "fas fa-money-check"),
+            ["AccPayables"] = ("Accounts Payable", "/accounts/payable", "Accounts", "fas fa-money-bill-wave"),
+            ["AccRV"] = ("Bank Receipt", "/accounts/bankreceiptvoucher", "Accounts", "fas fa-receipt"),
+            ["AccRe-Index"] = ("Financial Re-Indexing", "/accounts/reindex", "Accounts", "fas fa-sync-alt"),
+            ["AccReceivables"] = ("Accounts Receivable", "/accounts/receivable", "Accounts", "fas fa-hand-holding-usd"),
+            ["AccTBSummary"] = ("Trial Balance", "/accounts/trialbalance", "Accounts", "fas fa-scale-balanced"),
+            ["AccTransactionRegister"] = ("Transaction Register", "/accounts/transactionregister", "Accounts", "fas fa-list"),
+            ["BankList"] = ("Bank List", "/accounts/banklist", "Accounts", "fa fa-university"),
+            ["CmpCustomerCatalog"] = ("Customer Catalog", "/company/customer-catalog", "Company", "fas fa-address-book"),
+            ["CmpExchangeRates"] = ("Exchange Rates", "/company/currency-exchange-rates", "Company", "fas fa-money-bill-wave"),
+            ["CmpItemGroups"] = ("Finished Quality", "/company/misc-setup/ItemFinishedQuality", "Company", "fas fa-list-ul"),
+            ["CmpItems"] = ("Items List", "/company/items", "Company", "fas fa-boxes-stacked"),
+            ["CmpNewItem"] = ("New Item", "/company/new-item", "Company", "fas fa-plus-circle"),
+            ["CmpPorts"] = ("Ports & Locations", "/company/ports", "Company", "fas fa-globe-americas"),
+            ["CmpSteelList"] = ("Steel List", "/company/steel-list", "Company", "fas fa-layer-group"),
+            ["CmpStores"] = ("Stores, Racks & Bins", "/company/stores-racks-bins", "Company", "fas fa-warehouse"),
+            ["DshCommandCenter"] = ("Command Center (Visual)", "/dashboards/command-center-analytics", "DashBoard", "fas fa-tower-observation"),
+            ["DshCommandCenterGrid"] = ("Command Center (Grid)", "/dashboards/command-center", "DashBoard", "fas fa-tower-control"),
+            ["DshExecutive"] = ("Executive Dashboards", "/dashboards/executive", "DashBoard", "fas fa-chart-line"),
+            ["DshProductionPlanning"] = ("Production Planning (Visual)", "/dashboards/production-planning-analytics", "DashBoard", "fas fa-chart-pie"),
+            ["DshProductionPlanningGrid"] = ("Production Planning (Grid)", "/dashboards/production-planning", "DashBoard", "fas fa-bullseye"),
+            ["ExpAdvancePayment"] = ("Advance Payment List", "/export/advance-payment-list", "Export", "fas fa-money-check-dollar"),
+            ["ExpArticlewiseShipped"] = ("Articlewise Shipped Status", "/export/orders/articlewise-shipped-status", "Export", "fas fa-boxes"),
+            ["ExpBankInvoice"] = ("Bank Invoice List", "/export/invoices/bank", "Export", "fas fa-university"),
+            ["ExpCommercialCovering"] = ("Commercial Covering Letter", "/export/invoices/commercial-covering", "Export", "fas fa-file-alt"),
+            ["ExpCommercialInvoice"] = ("Commercial Invoice List", "/export/invoices/commercial", "Export", "fas fa-file-invoice-dollar"),
+            ["ExpCustomInvoice"] = ("Custom Invoice List", "/export/invoices/custom", "Export", "fas fa-file-invoice-dollar"),
+            ["ExpCustomPaymentStatus"] = ("Custom Payment Status", "/export/custom-payment-status", "Export", "fas fa-money-check-alt"),
+            ["ExpCustomer"] = ("New Customer", "/export/customer", "Export", "fas fa-user-plus"),
+            ["ExpCustomerItemBalances"] = ("Customer Item Balances", "/export/orders/customer-item-balances", "Export", "fas fa-balance-scale"),
+            ["ExpNewCustomInvoice"] = ("New Custom Invoice", "/export/custominvoices/new-custominvoice", "Export", "fas fa-file-invoice"),
+            ["ExpOrderEntry"] = ("New Customer Order", "/export/new-customer-order", "Export", "fas fa-file-invoice"),
+            ["ExpOrderItemList"] = ("Order Item List", "/export/order-item-list", "Export", "fas fa-clipboard-list"),
+            ["ExpOrderList"] = ("Customer Order List", "/export/customer-order-list", "Export", "fas fa-list-alt"),
+            ["ExpPackingList"] = ("Print Inner Labels", "/export/invoices/print-inner-labels", "Export", "fas fa-print"),
+            ["ExpProforma"] = ("New Proforma Invoice", "/export/proformas/new-proforma", "Export", "fas fa-plus-square"),
+            ["ExpProformaList"] = ("Proforma List", "/export/proformas/proforma-list", "Export", "fas fa-file-invoice"),
+            ["ExpQuotationList"] = ("Customer Quotation List", "/export/customer-quotation-list", "Export", "fas fa-file-invoice"),
+            ["ExpReceiveCustomPayment"] = ("Receive Custom Payment", "/export/receive-custom-payment", "Export", "fas fa-hand-holding-usd"),
+            ["ExpShippingInstructions"] = ("Shipping Instructions", "/export/invoices/shipping-instructions", "Export", "fas fa-ship"),
+            ["ExpValuationForm"] = ("Print Valuation Form", "/export/invoices/print-valuation-form", "Export", "fas fa-file-invoice"),
+            ["IntraOfficeHealth"] = ("Diagnostics", "/intraoffice/health", "Setup", "fas fa-heartbeat"),
+            ["OfficeAI"] = ("AI Assistant", "/office/ai-assistant", "IntraOffice", "fas fa-robot  text-info"),
+            ["OfficeAnnouncements"] = ("Announcements", "/office/announcements", "IntraOffice", "fas fa-bullhorn  text-primary"),
+            ["OfficeChat"] = ("Group Discussions", "/office/chat", "IntraOffice", "fas fa-comments  text-info"),
+            ["OfficeDirectory"] = ("Employee Directory", "/office/directory", "IntraOffice", "fas fa-address-book  text-secondary"),
+            ["OfficeEmailSettings"] = ("Email & SMTP Settings", "/office/admin/email-settings", "IntraOffice", "fas fa-mail-bulk  text-warning"),
+            ["OfficeForms"] = ("All Office Menus &amp; Forms", "/office", "IntraOffice", "fas fa-th-large  text-secondary"),
+            ["OfficeHub"] = ("Collaboration Hub", "/office/hub", "IntraOffice", "fas fa-desktop  text-primary"),
+            ["OfficeLeads"] = ("Leads & Pipeline", "/office/leads", "IntraOffice", "fas fa-funnel-dollar  text-success"),
+            ["OfficeMeetings"] = ("Meetings & Rooms", "/office/meetings", "IntraOffice", "fas fa-video  text-danger"),
+            ["OfficeMessages"] = ("Direct Messages", "/office/messages", "IntraOffice", "fas fa-envelope  text-warning"),
+            ["OfficeMinuteTypes"] = ("Minute Types", "/office/admin/minute-types", "IntraOffice", "fas fa-tags  text-secondary"),
+            ["OfficeMinutes"] = ("Executive Minutes", "/office/minutes-list", "IntraOffice", "fas fa-file-signature  text-warning"),
+            ["OfficeReports"] = ("CRM Reports", "/office/reports", "IntraOffice", "fas fa-chart-line  text-success"),
+            ["OfficeTasks"] = ("Team Tasks", "/office/tasks", "IntraOffice", "fas fa-tasks  text-danger"),
+            ["OfficeTemplates"] = ("Email Templates", "/office/templates", "IntraOffice", "fas fa-envelope-open-text  text-info"),
+            ["PayAbsentSheet"] = ("Absent Sheet", "/payroll/absent-sheet?returnUrl=/payroll", "Payroll", "fas fa-user-slash"),
+            ["PayAdvanceRegister"] = ("Loan & Advance Register", "/payroll/advance-ledger?returnUrl=/payroll", "Payroll", "fas fa-book"),
+            ["PayAdvances"] = ("Short Term Sheet", "/payroll/short-term-sheet?returnUrl=/payroll", "Payroll", "fas fa-file-invoice-dollar"),
+            ["PayAttendance"] = ("Attendance Ledger", "/payroll/attendance-ledger", "Payroll", "fas fa-calendar-check"),
+            ["PayAttendanceAuto"] = ("Auto Attendance", "/payroll/auto-attendance", "Payroll", "fas fa-magic"),
+            ["PayAttendanceManual"] = ("Manual Attendance", "/payroll/manual-attendance", "Payroll", "fas fa-clock"),
+            ["PayAttendanceMonthly"] = ("Monthly Attendance Editor", "/payroll/monthly-attendance", "Payroll", "fas fa-calendar-alt"),
+            ["PayDailyActivity"] = ("Daily Activity", "/payroll/daily-activity", "Payroll", "fas fa-fingerprint"),
+            ["PayDeductionAdjust"] = ("Adjust Deduction Amount", "/payroll/adjust-deduction-amount?returnUrl=/payroll", "Payroll", "fas fa-edit"),
+            ["PayDepartment"] = ("Departments List", "/payroll/deptlist", "Payroll", "fas fa-building"),
+            ["PayDesignation"] = ("Designations", "/payroll/designations?returnUrl=/payroll", "Payroll", "fas fa-tags"),
+            ["PayEOBI"] = ("EOBI Sheet", "/payroll/eobi?returnUrl=/payroll", "Payroll", "fas fa-building-user"),
+            ["PayEmpProfile"] = ("Temp. Employee List", "/payroll/employeelist?contractorsOnly=true", "Payroll", "fas fa-user-clock"),
+            ["PayEmpTransfer"] = ("Emp. to Emp. Transfer", "/payroll/emp-to-emp-transfer?returnUrl=/payroll", "Payroll", "fas fa-exchange-alt"),
+            ["PayFineRegister"] = ("Employee Fine Register", "/payroll/emp-fine-ledger?returnUrl=/payroll", "Payroll", "fas fa-file-invoice"),
+            ["PayGatePass"] = ("Gate Pass Entry", "/payroll/gate-pass", "Payroll", "fas fa-id-badge"),
+            ["PayGratuity"] = ("Gratuity Calculation", "/payroll/gratuity-calculation?returnUrl=/payroll", "Payroll", "fas fa-gift"),
+            ["PayHoldSalary"] = ("Hold Salary", "/payroll/hold-salary?returnUrl=/payroll", "Payroll", "fas fa-hand-holding-dollar"),
+            ["PayHolidays"] = ("Holidays Setup", "/payroll/holidays?returnUrl=/payroll", "Payroll", "fas fa-calendar-alt"),
+            ["PayLeaves"] = ("Employee Leaves", "/payroll/leaves", "Payroll", "fas fa-calendar-minus"),
+            ["PayLoan"] = ("Clear Short Term Loan", "/payroll/clear-short-term-loan?returnUrl=/payroll", "Payroll", "fas fa-money-bill-wave"),
+            ["PayNewEmp"] = ("New Employee", "/payroll/newemployee", "Payroll", "fas fa-user-plus"),
+            ["PayOvertimeAuth"] = ("Overtime Authorization", "/payroll/overtime-authorization", "Payroll", "fas fa-user-clock"),
+            ["PayPolicies"] = ("Payroll Policies", "/payroll/policies?returnUrl=/payroll", "Payroll", "fas fa-file-contract"),
+            ["PayPostFine"] = ("Post Fine", "/payroll/post-fine?returnUrl=/payroll", "Payroll", "fas fa-gavel"),
+            ["PayReports"] = ("Payroll Reports", "/payroll/reports?returnUrl=/payroll", "Payroll", "fas fa-file-chart-column"),
+            ["PaySalaryCalculation"] = ("Salary History", "/payroll/salary-history", "Payroll", "fas fa-file-invoice-dollar"),
+            ["PaySalarySheet"] = ("Salary Sheet", "/payroll/salary-sheet?returnUrl=/payroll", "Payroll", "fas fa-file-invoice-dollar"),
+            ["PaySettings"] = ("Payroll Settings", "/payroll/settings?returnUrl=/payroll", "Payroll", "fas fa-sliders-h"),
+            ["PaySocialSecurity"] = ("Social Security", "/payroll/social-security?returnUrl=/payroll", "Payroll", "fas fa-shield-alt"),
+            ["PrdAuthReceived"] = ("Authorize Received", "/production/authorize-received", "Production", "fas fa-check-double"),
+            ["PrdCreateDispatchList"] = ("Create Dispatch List", "/production/create-dispatch-list", "Production", "fas fa-shipping-fast"),
+            ["PrdDispatchList"] = ("Dispatch List", "/production/dispatch-list", "Production", "fas fa-clipboard-list"),
+            ["PrdItemList"] = ("Production Item List", "/production/item-list", "Production", "fas fa-layer-group"),
+            ["PrdLotIssuance"] = ("Lot Issuance", "/production/lot-issuance", "Production", "fas fa-boxes-packing"),
+            ["PrdMakerBilling"] = ("Maker Billing", "/production/maker-billing", "Production", "fas fa-file-invoice-dollar"),
+            ["PrdMakerBillingList"] = ("Maker Billing List", "/production/maker-billing-list", "Production", "fas fa-list-check"),
+            ["PrdMakerIssuanceSF"] = ("Maker Issuance from SF", "/production/maker-issuance-from-sf", "Production", "fas fa-boxes-packing"),
+            ["PrdMakerItemAssign"] = ("Maker Item Assignment", "/production/maker-item-assignment", "Production", "fas fa-link"),
+            ["PrdMakerList"] = ("Maker List", "/production/maker-list", "Production", "fas fa-users-gear"),
+            ["PrdMakerPO"] = ("Maker PO", "/production/maker-po", "Production", "fas fa-file-invoice-dollar"),
+            ["PrdMakerPOList"] = ("Maker PO List", "/production/maker-po-list", "Production", "fas fa-list-alt"),
+            ["PrdMakerRework"] = ("Rework Issuance", "/production/rework-issuance", "Production", "fas fa-tools"),
+            ["PrdNewMaker"] = ("New Maker", "/production/new-maker", "Production", "fas fa-person-digging"),
+            ["PrdProcessGroups"] = ("Process Groups", "/production/process-groups", "Production", "fas fa-layer-group"),
+            ["PrdProcesses"] = ("Processes Setup", "/production/processes", "Production", "fas fa-network-wired"),
+            ["PrdReceiveLot"] = ("Receive Lot", "/production/receive-lot", "Production", "fas fa-boxes-stacked"),
+            ["PrdReceivePO"] = ("Receive against PO", "/production/receive-against-po", "Production", "fas fa-truck-ramp-box"),
+            ["PrdReceivingList"] = ("Receiving List", "/production/receiving-list", "Production", "fas fa-truck-loading"),
+            ["PrdRepairTypes"] = ("Repair Types", "/production/repair-types", "Production", "fas fa-tools"),
+            ["PrdStatistics"] = ("Production Statistics", "/production/statistics", "Production", "fas fa-chart-line"),
+            ["PrdTransferReadyFinish"] = ("Transfer to Ready Finish", "/production/transfer-to-ready-finish-stock", "Production", "fas fa-dolly-flatbed"),
+            ["PrdWastageTypes"] = ("Wastage Types", "/production/wastage-types", "Production", "fas fa-trash-alt"),
+            ["SetupUsers"] = ("User Management", "/setup/users", "Setup", "fas fa-users-cog"),
+            ["StkChangeBatchLot"] = ("Change Batch / Lot", "/stock/change-batch-lot", "Stock", "fas fa-edit"),
+            ["StkChangeBatchNo"] = ("Change Batch No", "/stock/change-batch-no", "Stock", "fas fa-edit"),
+            ["StkFinishIssuance"] = ("Finish Stock Issuance", "/stock/finish-stock-issuance", "Stock", "fas fa-boxes-stacked"),
+            ["StkFinishItemLedger"] = ("Finish Item Ledger", "/stock/finish-item-ledger", "Stock", "fas fa-book-open"),
+            ["StkFinishMovement"] = ("Finish Stock Movement", "/stock/finish-stock-movement", "Stock", "fas fa-right-left"),
+            ["StkFinishReceiving"] = ("Finish Stock Receiving", "/stock/finish-stock-receiving", "Stock", "fas fa-boxes-packing"),
+            ["StkFinishTransactions"] = ("Finish Stock Transactions", "/stock/finish-transactions", "Stock", "fas fa-history"),
+            ["StkMaterialMovement"] = ("Material Movement", "/stock/rm-movement", "Stock", "fas fa-exchange-alt"),
+            ["StkMaterialPlacement"] = ("Material Placement", "/stock/material-placement", "Stock", "fas fa-map-marker-alt"),
+            ["StkMaterialPlacementList"] = ("Material Placement List", "/stock/material-placement-list", "Stock", "fas fa-link"),
+            ["StkNewRM"] = ("New Raw Material", "/newrm", "Stock", "fas fa-boxes"),
+            ["StkNewRMPO"] = ("New RM PO", "/stock/new-rm-po", "Stock", "fas fa-file-invoice-dollar"),
+            ["StkNewVendor"] = ("New Vendor", "/newvendor", "Stock", "fas fa-truck"),
+            ["StkRMGroups"] = ("Raw Material Groups", "/stock/rmgroups", "Stock", "fas fa-layer-group"),
+            ["StkRMIssuance"] = ("RM Issuance", "/stock/rm-issuance", "Stock", "fas fa-boxes"),
+            ["StkRMIssuanceList"] = ("RM Issuance List", "/stock/rm-issuance-list", "Stock", "fas fa-list-alt"),
+            ["StkRMLedger"] = ("RM Stock Ledger", "/stock/stock-ledger", "Stock", "fas fa-book-open"),
+            ["StkRMList"] = ("Raw Materials List", "/rmlist", "Stock", "fas fa-list"),
+            ["StkRMPOList"] = ("RM PO List", "/stock/rmpolist", "Stock", "fas fa-list-alt"),
+            ["StkSFMovement"] = ("Semi Finish Material Movement", "/stock/sf-movement", "Stock", "fas fa-exchange-alt"),
+            ["StkSFOpenRcv"] = ("Semi Finish Open Receiving", "/stock/semi-finish-open-receiving", "Stock", "fas fa-boxes-packing"),
+            ["StkSFTransactions"] = ("Semi Finish Transactions", "/stock/sf-transactions", "Stock", "fas fa-history"),
+            ["StkVendorBilling"] = ("Vendor Billing", "/stock/vendor-billing", "Stock", "fas fa-file-invoice"),
+            ["StkVendorBillingList"] = ("Vendor Billing List", "/stock/vendor-billing-list", "Stock", "fas fa-file-invoice-dollar"),
+            ["StkVendorGateRcv"] = ("Vendor Gate Receiving", "/stock/vend-gate-rcvd", "Stock", "fas fa-truck-loading"),
+            ["StkVendorList"] = ("Vendor List", "/vendorlist", "Stock", "fas fa-users"),
+            ["StkVendorRMAssign"] = ("Vendor RM Assignment", "/stock/vendor-rm-assignment", "Stock", "fas fa-link"),
+            ["StkVendorRcvList"] = ("Vendor Receiving List", "/stock/vend-rcv-list", "Stock", "fas fa-list-check"),
+        };
+
+        public FavouriteService(
+            IFavouriteDataAccess favouriteData,
+            IUserPermissionService permissionService,
+            ILogger<FavouriteService> logger)
+        {
+            _favouriteData = favouriteData;
+            _permissionService = permissionService;
+            _logger = logger;
+        }
+
+        public async Task<List<FavouriteLinkDto>> GetCurrentUserFavouritesAsync()
+        {
+            try
+            {
+                int userId = _permissionService.CurrentUserId;
+                if (userId <= 0)
+                {
+                    await _permissionService.InitializeAsync();
+                    userId = _permissionService.CurrentUserId;
+                }
+
+                if (userId <= 0)
+                {
+                    return new List<FavouriteLinkDto>();
+                }
+
+                var rawList = await _favouriteData.GetUserFavouritesAsync(userId);
+                var dtoList = new List<FavouriteLinkDto>();
+
+                foreach (var item in rawList)
+                {
+                    string optionId = item.OptionID?.Trim() ?? string.Empty;
+                    string title = item.OptionName;
+                    string href = string.Empty;
+                    string module = string.Empty;
+                    string iconClass = "fas fa-star";
+
+                    if (DynamicCatalog.TryGetValue(optionId, out var dynMeta))
+                    {
+                        title = dynMeta.Title;
+                        href = dynMeta.Href;
+                        module = dynMeta.Module;
+                        iconClass = dynMeta.IconClass;
+                    }
+                    else if (StaticCatalog.TryGetValue(optionId, out var staticMeta))
+                    {
+                        title = staticMeta.Title;
+                        href = staticMeta.Href;
+                        module = staticMeta.Module;
+                        iconClass = staticMeta.IconClass;
+                    }
+
+                    if (string.IsNullOrEmpty(module) && !string.IsNullOrEmpty(item.ModuleName))
+                    {
+                        module = item.ModuleName;
+                    }
+
+                    // Security check: User must have active permission for both module and option
+                    bool isAuthorized = _permissionService.IsAdministrator;
+                    if (!isAuthorized)
+                    {
+                        bool moduleAllowed = string.IsNullOrEmpty(module) || _permissionService.HasModuleAccess(module);
+                        bool optionAllowed = _permissionService.HasOptionAccess(item.OptionID);
+                        isAuthorized = moduleAllowed && optionAllowed;
+                    }
+
+                    dtoList.Add(new FavouriteLinkDto
+                    {
+                        OptionId = item.OptionID,
+                        Title = string.IsNullOrWhiteSpace(title) ? item.OptionID : title,
+                        Href = href,
+                        Module = module,
+                        IconClass = string.IsNullOrWhiteSpace(iconClass) ? "fas fa-star" : iconClass,
+                        IsAuthorized = isAuthorized
+                    });
+                }
+
+                return dtoList;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting current user favourites");
+                return new List<FavouriteLinkDto>();
+            }
+        }
+
+        public async Task<(bool Success, string Message)> AddCurrentUserFavouriteAsync(
+            string optionId,
+            string? title = null,
+            string? href = null,
+            string? module = null,
+            string? iconClass = null)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(optionId))
+                {
+                    return (false, "Invalid option ID.");
+                }
+
+                int userId = _permissionService.CurrentUserId;
+                if (userId <= 0)
+                {
+                    await _permissionService.InitializeAsync();
+                    userId = _permissionService.CurrentUserId;
+                }
+
+                if (userId <= 0)
+                {
+                    return (false, "User is not authenticated.");
+                }
+
+                // Check if already in favourites
+                bool alreadyExists = await _favouriteData.IsFavouriteAsync(userId, optionId);
+                if (alreadyExists)
+                {
+                    return (false, "Already in Favourites.");
+                }
+
+                // Register metadata if provided
+                if (!string.IsNullOrEmpty(title) && !string.IsNullOrEmpty(href))
+                {
+                    DynamicCatalog[optionId] = (title, href, module ?? string.Empty, iconClass ?? "fas fa-star");
+                }
+
+                bool success = await _favouriteData.AddFavouriteAsync(userId, optionId);
+                if (success)
+                {
+                    string displayTitle = title ?? string.Empty;
+                    if (string.IsNullOrEmpty(displayTitle))
+                    {
+                        displayTitle = StaticCatalog.TryGetValue(optionId, out var m) ? m.Title : optionId;
+                    }
+
+                    OnFavouritesChanged?.Invoke();
+                    return (true, $"'{displayTitle}' added to Favourites.");
+                }
+
+                return (false, "Failed to save favourite.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error adding favourite {OptionId}", optionId);
+                return (false, "An error occurred while adding to favourites.");
+            }
+        }
+
+        public async Task<(bool Success, string Message)> RemoveCurrentUserFavouriteAsync(string optionId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(optionId))
+                {
+                    return (false, "Invalid option ID.");
+                }
+
+                int userId = _permissionService.CurrentUserId;
+                if (userId <= 0)
+                {
+                    await _permissionService.InitializeAsync();
+                    userId = _permissionService.CurrentUserId;
+                }
+
+                if (userId <= 0)
+                {
+                    return (false, "User is not authenticated.");
+                }
+
+                bool success = await _favouriteData.RemoveFavouriteAsync(userId, optionId);
+                if (success)
+                {
+                    OnFavouritesChanged?.Invoke();
+                    return (true, "Removed from Favourites.");
+                }
+
+                return (false, "Failed to remove favourite.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error removing favourite {OptionId}", optionId);
+                return (false, "An error occurred while removing favourite.");
+            }
+        }
+
+        public async Task<bool> IsCurrentUserFavouriteAsync(string optionId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(optionId)) return false;
+
+                int userId = _permissionService.CurrentUserId;
+                if (userId <= 0)
+                {
+                    await _permissionService.InitializeAsync();
+                    userId = _permissionService.CurrentUserId;
+                }
+
+                if (userId <= 0) return false;
+
+                return await _favouriteData.IsFavouriteAsync(userId, optionId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking favourite {OptionId}", optionId);
+                return false;
+            }
+        }
+
+        public async Task<int> GetCurrentUserFavouritesCountAsync()
+        {
+            try
+            {
+                var list = await GetCurrentUserFavouritesAsync();
+                return list.Count;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+    }
+}

@@ -1,0 +1,59 @@
+@using Impulse.Services.Setup
+@inject IUserPermissionService PermissionService
+
+@if (IsAllowed)
+{
+    <a href="@Href" class="@Class" @attributes="AdditionalAttributes">
+        @ChildContent
+    </a>
+}
+else
+{
+    <div class="@($"{Class} dash-card-disabled")"
+         title="Access Restricted - Permission Required"
+         style="opacity: 0.45; cursor: not-allowed; pointer-events: none; position: relative;">
+        @ChildContent
+        <span style="position: absolute; top: 10px; right: 12px; font-size: 0.75rem; color: #6c757d;" title="Locked">
+            <i class="fas fa-lock"></i>
+        </span>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string Href { get; set; } = string.Empty;
+
+    [Parameter]
+    public string OptionId { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Module { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Class { get; set; } = "dash-card";
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public Dictionary<string, object>? AdditionalAttributes { get; set; }
+
+    private bool IsAllowed
+    {
+        get
+        {
+            if (PermissionService.IsAdministrator) return true;
+            if (!string.IsNullOrEmpty(OptionId) || !string.IsNullOrEmpty(Module))
+            {
+                if (!string.IsNullOrEmpty(Module) && !PermissionService.HasModuleAccess(Module)) return false;
+                if (!string.IsNullOrEmpty(OptionId) && !PermissionService.HasOptionAccess(OptionId)) return false;
+                return true;
+            }
+            if (!string.IsNullOrEmpty(Href))
+            {
+                return PermissionService.IsRouteAuthorized(Href);
+            }
+            return true;
+        }
+    }
+}

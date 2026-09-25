@@ -125,5 +125,39 @@ namespace Impulse.Services.Setup
             var inactive = Math.Max(0, total - active);
             return (total, active, inactive);
         }
+
+        public async Task<(bool Success, string Message, int NewUserId)> CopyUserAsync(int fromUserId, string newUserName, string? password = null, string? fullUserName = null)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(newUserName))
+                {
+                    return (false, "New username is required.", 0);
+                }
+
+                newUserName = newUserName.Trim();
+
+                // Check duplicate username
+                var existing = await _userDataAccess.GetUserByUserNameAsync(newUserName);
+                if (existing != null)
+                {
+                    return (false, $"A user with username '{newUserName}' already exists.", 0);
+                }
+
+                var sourceUser = await _userDataAccess.GetUserByIdAsync(fromUserId);
+                if (sourceUser == null)
+                {
+                    return (false, $"Source user ID #{fromUserId} could not be found.", 0);
+                }
+
+                var newUserId = await _userDataAccess.CopyUserAsync(fromUserId, newUserName, password?.Trim(), fullUserName?.Trim());
+                return (true, $"User profile '{sourceUser.UserName}' successfully copied to '{newUserName}'.", newUserId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error copying user ID {FromUserId} to {NewUserName}", fromUserId, newUserName);
+                return (false, $"Failed to copy user: {ex.Message}", 0);
+            }
+        }
     }
 }

@@ -1,7 +1,14 @@
 @using Impulse.Services
+@using Impulse.Services.Setup
+@using Impulse.Models.Setup
+@using BlazorContextMenu
+@implements IDisposable
 @inject IJSRuntime JSRuntime
 @inject IReportManagerService ReportManager
 @inject NavigationManager NavigationManager
+@inject IUserPermissionService PermissionService
+@inject IFavouriteService FavouriteService
+@inject Radzen.NotificationService NotificationService
 
 <div class="sidebar @(IsSidebarCollapsed ? "collapsed" : "")">
     <div class="sidebar-header p-3 bg-transparent">
@@ -16,174 +23,237 @@
     </div>
     <nav class="nav flex-column">
         <div class="nav-item">
-            <div class="nav-section-header" @onclick="NavigateSetups">
+            <NavLink class="nav-link fw-semibold" href="/favourites" Match="NavLinkMatch.All">
+                <i class="fas fa-star me-2 text-warning"></i>
+                <span>Favourites</span>
+                @if (favouritesCount > 0)
+                {
+                    <span class="badge rounded-pill bg-warning text-dark ms-auto" style="font-size: 0.72rem; font-weight: 600;">@favouritesCount</span>
+                }
+            </NavLink>
+        </div>
+        <div class="nav-item">
+            <div class="nav-section-header @(!PermissionService.HasModuleAccess("Setup") ? "disabled-nav-header text-muted" : "")"
+                 style="@(!PermissionService.HasModuleAccess("Setup") ? "opacity: 0.45; cursor: not-allowed;" : "")"
+                 @onclick="NavigateSetups"
+                 title="@(!PermissionService.HasModuleAccess("Setup") ? "Module Access Denied" : "")">
                 <i class="fas fa-sliders-h me-2"></i>
                 <span>Setups</span>
-                <i class="fas fa-chevron-down ms-auto @(isSetupsExpanded ? "rotated" : "")"></i>
+                @if (PermissionService.HasModuleAccess("Setup"))
+                {
+                    <i class="fas fa-chevron-down ms-auto @(isSetupsExpanded ? "rotated" : "")"></i>
+                }
+                else
+                {
+                    <i class="fas fa-lock ms-auto text-secondary" style="font-size: 0.72rem;"></i>
+                }
             </div>
             @if (isSetupsExpanded)
             {
                 <div class="nav-sub-section">
                     <div class="nav-sub-links">
-                        <NavLink class="nav-link" href="/setup" Match="NavLinkMatch.All">
+                        <SecureNavLink class="nav-link" href="/setup" Module="Setup" Match="NavLinkMatch.All">
                             <i class="fas fa-sliders-h me-2"></i> Setups Hub
-                        </NavLink>
-                        <NavLink class="nav-link" href="/setup/users">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/setup/users" OptionId="SetupUsers" Module="Setup">
                             <i class="fas fa-users-cog me-2"></i> User Management
-                        </NavLink>
-                        <NavLink class="nav-link" href="/office/admin/minute-types">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/office/admin/minute-types" OptionId="OfficeMinuteTypes" Module="Setup">
                             <i class="fas fa-tags me-2"></i> Minute Types
-                        </NavLink>
-                        <NavLink class="nav-link" href="/office/admin/email-settings">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/office/admin/email-settings" OptionId="OfficeEmailSettings" Module="Setup">
                             <i class="fas fa-envelope-cog me-2"></i> Email & SMTP Settings
-                        </NavLink>
-                        <NavLink class="nav-link" href="/intraoffice/health">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/intraoffice/health" OptionId="IntraOfficeHealth" Module="Setup">
                             <i class="fas fa-heartbeat me-2"></i> Diagnostics
-                        </NavLink>
+                        </SecureNavLink>
                     </div>
                 </div>
             }
         </div>
         <div class="nav-item">
-            <div class="nav-section-header" @onclick="NavigateDashboards">
+            <div class="nav-section-header @(!PermissionService.HasModuleAccess("DashBoard") ? "disabled-nav-header text-muted" : "")"
+                 style="@(!PermissionService.HasModuleAccess("DashBoard") ? "opacity: 0.45; cursor: not-allowed;" : "")"
+                 @onclick="NavigateDashboards"
+                 title="@(!PermissionService.HasModuleAccess("DashBoard") ? "Module Access Denied" : "")">
                 <i class="fas fa-chart-pie me-2"></i>
                 <span>Dashboards</span>
-                <i class="fas fa-chevron-down ms-auto @(isDashboardsExpanded ? "rotated" : "")"></i>
+                @if (PermissionService.HasModuleAccess("DashBoard"))
+                {
+                    <i class="fas fa-chevron-down ms-auto @(isDashboardsExpanded ? "rotated" : "")"></i>
+                }
+                else
+                {
+                    <i class="fas fa-lock ms-auto text-secondary" style="font-size: 0.72rem;"></i>
+                }
             </div>
             @if (isDashboardsExpanded)
             {
                 <div class="nav-sub-section">
                     <div class="nav-sub-links">
-                        <NavLink class="nav-link" href="/dashboards" Match="NavLinkMatch.All">
+                        <SecureNavLink class="nav-link" href="/dashboards" Module="DashBoard" Match="NavLinkMatch.All">
                             <i class="fas fa-gauge-high me-2"></i> Dashboards Hub
-                        </NavLink>
-                        <NavLink class="nav-link" href="/dashboards/executive">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/dashboards/executive" OptionId="DshExecutive" Module="DashBoard">
                             <i class="fas fa-chart-line me-2" style="color: #8BAE26;"></i> Executive Dashboards
-                        </NavLink>
-                        <NavLink class="nav-link" href="/dashboards/command-center-analytics">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/dashboards/command-center-analytics" OptionId="DshCommandCenter" Module="DashBoard">
                             <i class="fas fa-tower-observation me-2"></i> Command Center (Visual)
-                        </NavLink>
-                        <NavLink class="nav-link" href="/dashboards/command-center">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/dashboards/command-center" OptionId="DshCommandCenterGrid" Module="DashBoard">
                             <i class="fas fa-tower-control me-2"></i> Command Center (Grid)
-                        </NavLink>
-                        <NavLink class="nav-link" href="/dashboards/production-planning-analytics">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/dashboards/production-planning-analytics" OptionId="DshProductionPlanning" Module="DashBoard">
                             <i class="fas fa-chart-pie me-2"></i> Production Planning (Visual)
-                        </NavLink>
-                        <NavLink class="nav-link" href="/dashboards/production-planning">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/dashboards/production-planning" OptionId="DshProductionPlanningGrid" Module="DashBoard">
                             <i class="fas fa-bullseye me-2"></i> Production Planning (Grid)
-                        </NavLink>
+                        </SecureNavLink>
                     </div>
                 </div>
             }
         </div>
         <div class="nav-item">
-            <div class="nav-section-header" @onclick="NavigateIntraOffice">
+            <div class="nav-section-header @(!PermissionService.HasModuleAccess("IntraOffice") ? "disabled-nav-header text-muted" : "")"
+                 style="@(!PermissionService.HasModuleAccess("IntraOffice") ? "opacity: 0.45; cursor: not-allowed;" : "")"
+                 @onclick="NavigateIntraOffice"
+                 title="@(!PermissionService.HasModuleAccess("IntraOffice") ? "Module Access Denied" : "")">
                 <i class="fas fa-network-wired me-2 text-info"></i>
                 <span>IntraOffice CRM</span>
-                <i class="fas fa-chevron-down ms-auto @(isIntraOfficeExpanded ? "rotated" : "")"></i>
+                @if (PermissionService.HasModuleAccess("IntraOffice"))
+                {
+                    <i class="fas fa-chevron-down ms-auto @(isIntraOfficeExpanded ? "rotated" : "")"></i>
+                }
+                else
+                {
+                    <i class="fas fa-lock ms-auto text-secondary" style="font-size: 0.72rem;"></i>
+                }
             </div>
             @if (isIntraOfficeExpanded)
             {
                 <div class="nav-sub-section">
                     <div class="nav-sub-links">
-                        <NavLink class="nav-link" href="/office" Match="NavLinkMatch.All">
-                            <i class="fas fa-desktop me-2 text-primary"></i> Office Collaboration Hub
-                        </NavLink>
-                        <NavLink class="nav-link" href="/office/leads">
+                        <SecureNavLink class="nav-link" href="/office/hub" OptionId="OfficeHub" Module="IntraOffice">
+                            <i class="fas fa-desktop me-2 text-primary"></i> Collaboration Hub
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/office" OptionId="OfficeForms" Module="IntraOffice" Match="NavLinkMatch.All">
+                            <i class="fas fa-th-large me-2 text-secondary"></i> All Office Menus &amp; Forms
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/office/leads" OptionId="OfficeLeads" Module="IntraOffice">
                             <i class="fas fa-funnel-dollar me-2 text-success"></i> Leads & Pipeline
-                        </NavLink>
-                        <NavLink class="nav-link" href="/office/chat">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/office/chat" OptionId="OfficeChat" Module="IntraOffice">
                             <i class="fas fa-comments me-2 text-info"></i> Group Discussions
-                        </NavLink>
-                        <NavLink class="nav-link" href="/office/messages">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/office/messages" OptionId="OfficeMessages" Module="IntraOffice">
                             <i class="fas fa-envelope me-2 text-warning"></i> Direct Messages
-                        </NavLink>
-                        <NavLink class="nav-link" href="/office/tasks">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/office/tasks" OptionId="OfficeTasks" Module="IntraOffice">
                             <i class="fas fa-tasks me-2 text-danger"></i> Team Tasks
-                        </NavLink>
-                        <NavLink class="nav-link" href="/office/announcements">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/office/announcements" OptionId="OfficeAnnouncements" Module="IntraOffice">
                             <i class="fas fa-bullhorn me-2 text-primary"></i> Announcements
-                        </NavLink>
-                        <NavLink class="nav-link" href="/office/meetings">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/office/meetings" OptionId="OfficeMeetings" Module="IntraOffice">
                             <i class="fas fa-video me-2 text-danger"></i> Meetings & Rooms
-                        </NavLink>
-                        <NavLink class="nav-link" href="/office/minutes-list">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/office/minutes-list" OptionId="OfficeMinutes" Module="IntraOffice">
                             <i class="fas fa-file-signature me-2 text-warning"></i> Executive Minutes
-                        </NavLink>
-                        <NavLink class="nav-link" href="/office/admin/minute-types">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/office/admin/minute-types" OptionId="OfficeMinuteTypes" Module="IntraOffice">
                             <i class="fas fa-tags me-2 text-secondary"></i> Minute Types
-                        </NavLink>
-                        <NavLink class="nav-link" href="/office/reports">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/office/reports" OptionId="OfficeReports" Module="IntraOffice">
                             <i class="fas fa-chart-line me-2 text-success"></i> CRM Reports
-                        </NavLink>
-                        <NavLink class="nav-link" href="/office/templates">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/office/templates" OptionId="OfficeTemplates" Module="IntraOffice">
                             <i class="fas fa-envelope-open-text me-2 text-info"></i> Email Templates
-                        </NavLink>
-                        <NavLink class="nav-link" href="/office/admin/email-settings">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/office/admin/email-settings" OptionId="OfficeEmailSettings" Module="IntraOffice">
                             <i class="fas fa-mail-bulk me-2 text-warning"></i> Email & SMTP Settings
-                        </NavLink>
-                        <NavLink class="nav-link" href="/office/directory">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/office/directory" OptionId="OfficeDirectory" Module="IntraOffice">
                             <i class="fas fa-address-book me-2 text-secondary"></i> Employee Directory
-                        </NavLink>
-                        <NavLink class="nav-link" href="/office/ai-assistant">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/office/ai-assistant" OptionId="OfficeAI" Module="IntraOffice">
                             <i class="fas fa-robot me-2 text-info"></i> AI Assistant
-                        </NavLink>
+                        </SecureNavLink>
                     </div>
                 </div>
             }
         </div>
         <div class="nav-item">
-            <div class="nav-section-header" @onclick="NavigateCompany">
+            <div class="nav-section-header @(!PermissionService.HasModuleAccess("Company") ? "disabled-nav-header text-muted" : "")"
+                 style="@(!PermissionService.HasModuleAccess("Company") ? "opacity: 0.45; cursor: not-allowed;" : "")"
+                 @onclick="NavigateCompany"
+                 title="@(!PermissionService.HasModuleAccess("Company") ? "Module Access Denied" : "")">
                 <i class="fas fa-building me-2"></i>
                 <span>Company</span>
-                <i class="fas fa-chevron-down ms-auto @(isCompanyExpanded ? "rotated" : "")"></i>
+                @if (PermissionService.HasModuleAccess("Company"))
+                {
+                    <i class="fas fa-chevron-down ms-auto @(isCompanyExpanded ? "rotated" : "")"></i>
+                }
+                else
+                {
+                    <i class="fas fa-lock ms-auto text-secondary" style="font-size: 0.72rem;"></i>
+                }
             </div>
             @if (isCompanyExpanded)
             {
                 <div class="nav-sub-section">
                     <div class="nav-sub-links">
-                        <NavLink class="nav-link" href="/company/items">
+                        <SecureNavLink class="nav-link" href="/company/items" OptionId="CmpItems" Module="Company">
                             <i class="fas fa-boxes-stacked me-2"></i> Items List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/company/new-item">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/company/new-item" OptionId="CmpNewItem" Module="Company">
                             <i class="fas fa-plus-circle me-2"></i> New Item
-                        </NavLink>
-                        <NavLink class="nav-link" href="/company/item-groups">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/company/item-groups" OptionId="CmpItemGroups" Module="Company">
                             <i class="fas fa-layer-group me-2"></i> Item Groups
-                        </NavLink>
-                        <NavLink class="nav-link" href="/company/misc-setup/AdditionalGroups">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/company/misc-setup/AdditionalGroups" OptionId="CmpItemGroups" Module="Company">
                             <i class="fas fa-list-ul me-2"></i> Additional Groups
-                        </NavLink>
-                        <NavLink class="nav-link" href="/company/misc-setup/ItemTypes">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/company/misc-setup/ItemTypes" OptionId="CmpItemGroups" Module="Company">
                             <i class="fas fa-list-ul me-2"></i> Item Types
-                        </NavLink>
-                        <NavLink class="nav-link" href="/company/misc-setup/ItemFinishedQuality">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/company/misc-setup/ItemFinishedQuality" OptionId="CmpItemGroups" Module="Company">
                             <i class="fas fa-list-ul me-2"></i> Finished Quality
-                        </NavLink>
-                        <NavLink class="nav-link" href="/company/ports">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/company/ports" OptionId="CmpPorts" Module="Company">
                             <i class="fas fa-globe-americas me-2"></i> Ports & Locations
-                        </NavLink>
-                        <NavLink class="nav-link" href="/company/stores-racks-bins">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/company/stores-racks-bins" OptionId="CmpStores" Module="Company">
                             <i class="fas fa-warehouse me-2"></i> Stores, Racks & Bins
-                        </NavLink>
-                        <NavLink class="nav-link" href="/company/steel-list">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/company/steel-list" OptionId="CmpSteelList" Module="Company">
                             <i class="fas fa-layer-group me-2"></i> Steel List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/company/currency-exchange-rates">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/company/currency-exchange-rates" OptionId="CmpExchangeRates" Module="Company">
                             <i class="fas fa-money-bill-wave me-2"></i> Exchange Rates
-                        </NavLink>
-                        <NavLink class="nav-link" href="/company/customer-catalog">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/company/customer-catalog" OptionId="CmpCustomerCatalog" Module="Company">
                             <i class="fas fa-address-book me-2"></i> Customer Catalog
-                        </NavLink>
+                        </SecureNavLink>
                     </div>
                 </div>
             }
         </div>
         <div class="nav-item">
-            <div class="nav-section-header" @onclick="NavigateFinancial">
+            <div class="nav-section-header @(!PermissionService.HasModuleAccess("Accounts") ? "disabled-nav-header text-muted" : "")"
+                 style="@(!PermissionService.HasModuleAccess("Accounts") ? "opacity: 0.45; cursor: not-allowed;" : "")"
+                 @onclick="NavigateFinancial"
+                 title="@(!PermissionService.HasModuleAccess("Accounts") ? "Module Access Denied" : "")">
                 <i class="fas fa-chart-line me-2"></i>
                 <span>Financial</span>
-                <i class="fas fa-chevron-down ms-auto @(isFinancialExpanded ? "rotated" : "")"></i>
+                @if (PermissionService.HasModuleAccess("Accounts"))
+                {
+                    <i class="fas fa-chevron-down ms-auto @(isFinancialExpanded ? "rotated" : "")"></i>
+                }
+                else
+                {
+                    <i class="fas fa-lock ms-auto text-secondary" style="font-size: 0.72rem;"></i>
+                }
             </div>
             @if (isFinancialExpanded)
             {
@@ -197,28 +267,28 @@
                         @if (isAccountSetupExpanded)
                         {
                             <div class="nav-sub-links">
-                                <NavLink class="nav-link" href="/accounts/chartofaccounts">
+                                <SecureNavLink class="nav-link" href="/accounts/chartofaccounts" OptionId="AccChartOfAccounts" Module="Accounts">
                                     <i class="fas fa-file-invoice me-2"></i> Chart of Accounts
-                                </NavLink>
-                                <NavLink class="nav-link" href="/accounts/payable">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/payable" OptionId="AccPayables" Module="Accounts">
                                     <i class="fas fa-money-bill-wave me-2"></i> Accounts Payable
-                                </NavLink>
-                                <NavLink class="nav-link" href="/accounts/receivable">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/receivable" OptionId="AccReceivables" Module="Accounts">
                                     <i class="fas fa-hand-holding-usd me-2"></i> Accounts Receivable
-                                </NavLink>
-                                <NavLink class="nav-link" href="/accounts/accountgroups">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/accountgroups" OptionId="AccExpenseGroups" Module="Accounts">
                                     <i class="fas fa-layer-group me-2"></i> Account Groups
-                                </NavLink>
-                                <NavLink class="nav-link" href="/accounts/changecategory">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/changecategory" OptionId="AccChangeAccHeads" Module="Accounts">
                                     <i class="fas fa-exchange-alt me-2"></i> Change Category
-                                </NavLink>
-                                <NavLink class="nav-link" href="/accounts/reindex">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/reindex" OptionId="AccRe-Index" Module="Accounts">
                                     <i class="fas fa-sync-alt me-2"></i> Financial Re-Indexing
-                                </NavLink>
+                                </SecureNavLink>
                             </div>
                         }
                     </div>
-@* BANK OPTIONS *@
+                    @* BANK OPTIONS *@
                     <div class="nav-sub-item">
                         <div class="nav-sub-header" @onclick="ToggleBanks">
                             <i class="fas fa-user-tie me-2"></i>
@@ -228,12 +298,12 @@
                         @if (isBankSetupExpanded)
                         {
                             <div class="nav-sub-links">
-                                <NavLink class="nav-link" href="/accounts/banklist">
+                                <SecureNavLink class="nav-link" href="/accounts/banklist" OptionId="BankList" Module="Accounts">
                                     <i class="fa fa-university me-2"></i> Bank List
-                                </NavLink>
-                                <NavLink class="nav-link" href="/accounts/chqbookdetail">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/chqbookdetail" OptionId="AccChqBookDetail" Module="Accounts">
                                     <i class="fa fa-money-check-alt me-2"></i> Bank & Chq Book Detail
-                                </NavLink>
+                                </SecureNavLink>
                             </div>
                         }
                     </div>
@@ -246,54 +316,47 @@
                         @if (isVouchersExpanded)
                         {
                             <div class="nav-sub-links">
-                                <NavLink class="nav-link" href="/accounts/cashpaymentvoucher">
+                                <SecureNavLink class="nav-link" href="/accounts/cashpaymentvoucher" OptionId="AccEV" Module="Accounts">
                                     <i class="fas fa-money-check-dollar me-2"></i> Cash Payment
-                                </NavLink>
-                                <NavLink class="nav-link" href="/accounts/bankpaymentvoucher">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/bankpaymentvoucher" OptionId="AccPV" Module="Accounts">
                                     <i class="fas fa-money-check me-2"></i> Bank Payment
-                                </NavLink>
-                                <NavLink class="nav-link" href="/accounts/cashreceiptvoucher">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/cashreceiptvoucher" OptionId="AccRV" Module="Accounts">
                                     <i class="fas fa-file-invoice-dollar me-2"></i> Cash Receipt
-                                </NavLink>
-                                <NavLink class="nav-link" href="/accounts/bankreceiptvoucher">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/bankreceiptvoucher" OptionId="AccRV" Module="Accounts">
                                     <i class="fas fa-receipt me-2"></i> Bank Receipt
-                                </NavLink>
-                                <NavLink class="nav-link" href="/accounts/journalvoucher">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/journalvoucher" OptionId="AccJV" Module="Accounts">
                                     <i class="fas fa-book me-2"></i> Journal Voucher
-                                </NavLink>
-                                <NavLink class="nav-link" href="/accounts/maker-short-term-loan">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/maker-short-term-loan" OptionId="AccMakerLoan" Module="Accounts">
                                     <i class="fas fa-hand-holding-usd me-2"></i> Maker Short Term Loan
-                                </NavLink>
-                                <NavLink class="nav-link" href="/accounts/maker-long-term-loan">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/maker-long-term-loan" OptionId="AccMakerLoan" Module="Accounts">
                                     <i class="fas fa-hand-holding-usd me-2"></i> Maker Long Term Loan
-                                </NavLink>
-                                <NavLink class="nav-link" href="/accounts/maker-short-term-loan-ledger">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/maker-short-term-loan-ledger" OptionId="AccMakerLoanLedger" Module="Accounts">
                                     <i class="fas fa-book-open me-2"></i> Maker S.T Loan Ledger
-                                </NavLink>
-                                <NavLink class="nav-link" href="/accounts/maker-long-term-loan-ledger">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/maker-long-term-loan-ledger" OptionId="AccMakerLoanLedger" Module="Accounts">
                                     <i class="fas fa-book-open me-2"></i> Maker L.T Loan Ledger
-                                </NavLink>
-                                <NavLink class="nav-link" href="/accounts/maker-loan-clearance">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/maker-loan-clearance" OptionId="AccMakerLoanClearance" Module="Accounts">
                                     <i class="fas fa-check-double me-2"></i> Maker Loan Clearance
-                                </NavLink>
-                                <NavLink class="nav-link" href="/accounts/maker-loan-transfer">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/maker-loan-transfer" OptionId="AccMakerLoanTransfer" Module="Accounts">
                                     <i class="fas fa-exchange-alt me-2"></i> Maker Loan Transfer
-                                </NavLink>
-
-                                <NavLink class="nav-link" href="/accounts/custominvoiceauth">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/custominvoiceauth" OptionId="AccCustomInvoiceAuth" Module="Accounts">
                                     <i class="fas fa-file-signature me-2"></i> Custom Invoice Authorization
-                                </NavLink>
-
-
-
-
-
-
+                                </SecureNavLink>
                             </div>
                         }
                     </div>
 
-@* Reports *@
+                    @* Reports *@
                     <div class="nav-sub-item">
                         <div class="nav-sub-header" @onclick="ToggleReports">
                             <i class="fas fa-user-tie me-2"></i>
@@ -303,420 +366,453 @@
                         @if (isReportsExpanded)
                         {
                             <div class="nav-sub-links">
-                                <NavLink class="nav-link" href="/accounts/accountsledger">
+                                <SecureNavLink class="nav-link" href="/accounts/accountsledger" OptionId="AccLedger" Module="Accounts">
                                     <i class="fas fa-list me-2"></i> Accounts Ledgder
-                                </NavLink>
-                                <NavLink class="nav-link" href="/accounts/transactionregister">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/transactionregister" OptionId="AccTransactionRegister" Module="Accounts">
                                     <i class="fas fa-list me-2"></i> Transaction Register
-                                </NavLink>
-                                <NavLink class="nav-link" href="/accounts/trialbalance">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/trialbalance" OptionId="AccTBSummary" Module="Accounts">
                                     <i class="fas fa-scale-balanced me-2"></i> Trial Balance
-                                </NavLink>
-                                <NavLink class="nav-link" href="/accounts/bankbalancestatement">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/bankbalancestatement" OptionId="AccCashBankStatus" Module="Accounts">
                                     <i class="fas fa-piggy-bank me-2"></i> Cash & Bank Status
-                                </NavLink>
-                                <NavLink class="nav-link" href="/accounts/cashbookreport">
+                                </SecureNavLink>
+                                <SecureNavLink class="nav-link" href="/accounts/cashbookreport" OptionId="AccCashBook" Module="Accounts">
                                     <i class="fas fa-Rupee-sign me-2"></i> Cash Book Report
-                                </NavLink>
-
+                                </SecureNavLink>
                             </div>
-                    }
+                        }
                     </div>
-
-
-
-
                 </div>
             }
         </div>
         <div class="nav-item">
-            <div class="nav-section-header" @onclick="NavigateExport">
+            <div class="nav-section-header @(!PermissionService.HasModuleAccess("Export") ? "disabled-nav-header text-muted" : "")"
+                 style="@(!PermissionService.HasModuleAccess("Export") ? "opacity: 0.45; cursor: not-allowed;" : "")"
+                 @onclick="NavigateExport"
+                 title="@(!PermissionService.HasModuleAccess("Export") ? "Module Access Denied" : "")">
                 <i class="fas fa-ship me-2"></i>
                 <span>Export</span>
-                <i class="fas fa-chevron-down ms-auto @(isExportExpanded ? "rotated" : "")"></i>
+                @if (PermissionService.HasModuleAccess("Export"))
+                {
+                    <i class="fas fa-chevron-down ms-auto @(isExportExpanded ? "rotated" : "")"></i>
+                }
+                else
+                {
+                    <i class="fas fa-lock ms-auto text-secondary" style="font-size: 0.72rem;"></i>
+                }
             </div>
             @if (isExportExpanded)
             {
                 <div class="nav-sub-section">
                     <div class="nav-sub-links">
-                        <NavLink class="nav-link" href="/export/customers">
+                        <SecureNavLink class="nav-link" href="/export/customers" OptionId="ExpCustomer" Module="Export">
                             <i class="fas fa-users me-2"></i> Foreign Customers
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/customer">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/customer" OptionId="ExpCustomer" Module="Export">
                             <i class="fas fa-user-plus me-2"></i> New Customer
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/new-customer-order">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/new-customer-order" OptionId="ExpOrderEntry" Module="Export">
                             <i class="fas fa-file-invoice me-2"></i> New Customer Order
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/customer-order-list">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/customer-order-list" OptionId="ExpOrderList" Module="Export">
                             <i class="fas fa-list-alt me-2"></i> Customer Order List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/customer-quotation-list">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/customer-quotation-list" OptionId="ExpQuotationList" Module="Export">
                             <i class="fas fa-file-invoice me-2"></i> Customer Quotation List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/advance-payment-list">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/advance-payment-list" OptionId="ExpAdvancePayment" Module="Export">
                             <i class="fas fa-money-check-dollar me-2"></i> Advance Payment List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/order-item-list">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/order-item-list" OptionId="ExpOrderItemList" Module="Export">
                             <i class="fas fa-clipboard-list me-2"></i> Order Item List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/orders/customer-item-balances">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/orders/customer-item-balances" OptionId="ExpCustomerItemBalances" Module="Export">
                             <i class="fas fa-balance-scale me-2"></i> Customer Item Balances
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/orders/articlewise-shipped-status">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/orders/articlewise-shipped-status" OptionId="ExpArticlewiseShipped" Module="Export">
                             <i class="fas fa-boxes me-2"></i> Articlewise Shipped Status
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/proformas/new-proforma">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/proformas/new-proforma" OptionId="ExpProforma" Module="Export">
                             <i class="fas fa-plus-square me-2"></i> New Proforma Invoice
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/proformas/proforma-list">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/proformas/proforma-list" OptionId="ExpProformaList" Module="Export">
                             <i class="fas fa-file-invoice me-2"></i> Proforma List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/invoices/custom">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/invoices/custom" OptionId="ExpCustomInvoice" Module="Export">
                             <i class="fas fa-file-invoice-dollar me-2"></i> Custom Invoice List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/custominvoices/new-custominvoice">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/custominvoices/new-custominvoice" OptionId="ExpNewCustomInvoice" Module="Export">
                             <i class="fas fa-file-invoice me-2"></i> New Custom Invoice
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/custom-payment-status">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/custom-payment-status" OptionId="ExpCustomPaymentStatus" Module="Export">
                             <i class="fas fa-money-check-alt me-2"></i> Custom Payment Status
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/receive-custom-payment">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/receive-custom-payment" OptionId="ExpReceiveCustomPayment" Module="Export">
                             <i class="fas fa-hand-holding-usd me-2"></i> Receive Custom Payment
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/invoices/commercial">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/invoices/commercial" OptionId="ExpCommercialInvoice" Module="Export">
                             <i class="fas fa-file-invoice-dollar me-2"></i> Commercial Invoice List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/invoices/bank">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/invoices/bank" OptionId="ExpBankInvoice" Module="Export">
                             <i class="fas fa-university me-2"></i> Bank Invoice List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/invoices/packing-labels">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/invoices/packing-labels" OptionId="ExpPackingList" Module="Export">
                             <i class="fas fa-boxes me-2"></i> Packing Outer Labels
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/invoices/print-inner-labels">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/invoices/print-inner-labels" OptionId="ExpPackingList" Module="Export">
                             <i class="fas fa-print me-2"></i> Print Inner Labels
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/invoices/shipping-instructions">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/invoices/shipping-instructions" OptionId="ExpShippingInstructions" Module="Export">
                             <i class="fas fa-ship me-2"></i> Shipping Instructions
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/invoices/print-valuation-form">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/invoices/print-valuation-form" OptionId="ExpValuationForm" Module="Export">
                             <i class="fas fa-file-invoice me-2"></i> Print Valuation Form
-                        </NavLink>
-                        <NavLink class="nav-link" href="/export/invoices/commercial-covering">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/invoices/commercial-covering" OptionId="ExpCommercialCovering" Module="Export">
                             <i class="fas fa-file-alt me-2"></i> Commercial Covering Letter
-                        </NavLink>
+                        </SecureNavLink>
                     </div>
                 </div>
             }
         </div>
         <div class="nav-item">
-            <div class="nav-section-header" @onclick="NavigatePayroll">
+            <div class="nav-section-header @(!PermissionService.HasModuleAccess("Payroll") ? "disabled-nav-header text-muted" : "")"
+                 style="@(!PermissionService.HasModuleAccess("Payroll") ? "opacity: 0.45; cursor: not-allowed;" : "")"
+                 @onclick="NavigatePayroll"
+                 title="@(!PermissionService.HasModuleAccess("Payroll") ? "Module Access Denied" : "")">
                 <i class="fas fa-users-gear me-2"></i>
                 <span>Payroll</span>
-                <i class="fas fa-chevron-down ms-auto @(isPayrollExpanded ? "rotated" : "")"></i>
+                @if (PermissionService.HasModuleAccess("Payroll"))
+                {
+                    <i class="fas fa-chevron-down ms-auto @(isPayrollExpanded ? "rotated" : "")"></i>
+                }
+                else
+                {
+                    <i class="fas fa-lock ms-auto text-secondary" style="font-size: 0.72rem;"></i>
+                }
             </div>
             @if (isPayrollExpanded)
             {
                 <div class="nav-sub-section">
                     <div class="nav-sub-links">
-                        <NavLink class="nav-link" href="/payroll/newemployee">
+                        <SecureNavLink class="nav-link" href="/payroll/newemployee" OptionId="PayNewEmp" Module="Payroll">
                             <i class="fas fa-user-plus me-2"></i> New Employee
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/employeelist">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/employeelist" OptionId="PayEmpProfile" Module="Payroll">
                             <i class="fas fa-user-tie me-2"></i> Employee List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/employeelist?contractorsOnly=true">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/employeelist?contractorsOnly=true" OptionId="PayEmpProfile" Module="Payroll">
                             <i class="fas fa-user-clock me-2"></i> Temp. Employee List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/deptlist">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/deptlist" OptionId="PayDepartment" Module="Payroll">
                             <i class="fas fa-building me-2"></i> Departments List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/salary-history">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/salary-history" OptionId="PaySalaryCalculation" Module="Payroll">
                             <i class="fas fa-file-invoice-dollar me-2"></i> Salary History
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/attendance-ledger">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/attendance-ledger" OptionId="PayAttendance" Module="Payroll">
                             <i class="fas fa-calendar-check me-2"></i> Attendance Ledger
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/employee-transfer">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/employee-transfer" OptionId="PayEmpTransfer" Module="Payroll">
                             <i class="fas fa-exchange-alt me-2"></i> Employee Transfer
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/manual-attendance">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/manual-attendance" OptionId="PayAttendanceManual" Module="Payroll">
                             <i class="fas fa-clock me-2"></i> Manual Attendance
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/overtime-authorization">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/overtime-authorization" OptionId="PayOvertimeAuth" Module="Payroll">
                             <i class="fas fa-user-clock me-2"></i> Overtime Authorization
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/auto-attendance">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/auto-attendance" OptionId="PayAttendanceAuto" Module="Payroll">
                             <i class="fas fa-magic me-2"></i> Auto Attendance
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/daily-activity">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/daily-activity" OptionId="PayDailyActivity" Module="Payroll">
                             <i class="fas fa-fingerprint me-2"></i> Daily Activity
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/leaves">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/leaves" OptionId="PayLeaves" Module="Payroll">
                             <i class="fas fa-calendar-minus me-2"></i> Employee Leaves
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/monthly-attendance">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/monthly-attendance" OptionId="PayAttendanceMonthly" Module="Payroll">
                             <i class="fas fa-calendar-alt me-2"></i> Monthly Attendance Editor
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/gate-pass">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/gate-pass" OptionId="PayGatePass" Module="Payroll">
                             <i class="fas fa-id-badge me-2"></i> Gate Pass Entry
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/advance-long?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/advance-long?returnUrl=/payroll" OptionId="PayAdvances" Module="Payroll">
                             <i class="fas fa-hand-holding-usd me-2"></i> Long Term Advance
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/advance-short?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/advance-short?returnUrl=/payroll" OptionId="PayAdvances" Module="Payroll">
                             <i class="fas fa-hand-holding-usd me-2"></i> Short Term Advance
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/short-term-sheet?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/short-term-sheet?returnUrl=/payroll" OptionId="PayAdvances" Module="Payroll">
                             <i class="fas fa-file-invoice-dollar me-2"></i> Short Term Sheet
-                        </NavLink>
-
-                        <NavLink class="nav-link" href="/payroll/emp-to-emp-transfer?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/emp-to-emp-transfer?returnUrl=/payroll" OptionId="PayEmpTransfer" Module="Payroll">
                             <i class="fas fa-exchange-alt me-2"></i> Emp. to Emp. Transfer
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/adjust-deduction-amount?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/adjust-deduction-amount?returnUrl=/payroll" OptionId="PayDeductionAdjust" Module="Payroll">
                             <i class="fas fa-edit me-2"></i> Adjust Deduction Amount
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/advance-ledger?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/advance-ledger?returnUrl=/payroll" OptionId="PayAdvanceRegister" Module="Payroll">
                             <i class="fas fa-book me-2"></i> Loan & Advance Register
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/post-fine?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/post-fine?returnUrl=/payroll" OptionId="PayPostFine" Module="Payroll">
                             <i class="fas fa-gavel me-2"></i> Post Fine
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/emp-fine-ledger?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/emp-fine-ledger?returnUrl=/payroll" OptionId="PayFineRegister" Module="Payroll">
                             <i class="fas fa-file-invoice me-2"></i> Employee Fine Register
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/salary-sheet?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/salary-sheet?returnUrl=/payroll" OptionId="PaySalarySheet" Module="Payroll">
                             <i class="fas fa-file-invoice-dollar me-2"></i> Salary Sheet
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/hold-salary?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/hold-salary?returnUrl=/payroll" OptionId="PayHoldSalary" Module="Payroll">
                             <i class="fas fa-hand-holding-dollar me-2"></i> Hold Salary
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/gratuity-calculation?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/gratuity-calculation?returnUrl=/payroll" OptionId="PayGratuity" Module="Payroll">
                             <i class="fas fa-gift me-2"></i> Gratuity Calculation
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/absent-sheet?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/absent-sheet?returnUrl=/payroll" OptionId="PayAbsentSheet" Module="Payroll">
                             <i class="fas fa-user-slash me-2"></i> Absent Sheet
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/social-security?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/social-security?returnUrl=/payroll" OptionId="PaySocialSecurity" Module="Payroll">
                             <i class="fas fa-shield-alt me-2"></i> Social Security
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/eobi?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/eobi?returnUrl=/payroll" OptionId="PayEOBI" Module="Payroll">
                             <i class="fas fa-building-user me-2"></i> EOBI Sheet
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/designations?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/designations?returnUrl=/payroll" OptionId="PayDesignation" Module="Payroll">
                             <i class="fas fa-tags me-2"></i> Designations
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/settings?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/settings?returnUrl=/payroll" OptionId="PaySettings" Module="Payroll">
                             <i class="fas fa-sliders-h me-2"></i> Payroll Settings
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/policies?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/policies?returnUrl=/payroll" OptionId="PayPolicies" Module="Payroll">
                             <i class="fas fa-file-contract me-2"></i> Payroll Policies
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/holidays?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/holidays?returnUrl=/payroll" OptionId="PayHolidays" Module="Payroll">
                             <i class="fas fa-calendar-alt me-2"></i> Holidays Setup
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/reports?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/reports?returnUrl=/payroll" OptionId="PayReports" Module="Payroll">
                             <i class="fas fa-file-chart-column me-2"></i> Payroll Reports
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/clear-long-term-loan?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/clear-long-term-loan?returnUrl=/payroll" OptionId="PayLoan" Module="Payroll">
                             <i class="fas fa-money-check-alt me-2"></i> Clear Long Term Loan
-                        </NavLink>
-                        <NavLink class="nav-link" href="/payroll/clear-short-term-loan?returnUrl=/payroll">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/payroll/clear-short-term-loan?returnUrl=/payroll" OptionId="PayLoan" Module="Payroll">
                             <i class="fas fa-money-bill-wave me-2"></i> Clear Short Term Loan
-                        </NavLink>
+                        </SecureNavLink>
                     </div>
                 </div>
             }
         </div>
         <div class="nav-item">
-            <div class="nav-section-header" @onclick="NavigateStock">
+            <div class="nav-section-header @(!PermissionService.HasModuleAccess("Stock") ? "disabled-nav-header text-muted" : "")"
+                 style="@(!PermissionService.HasModuleAccess("Stock") ? "opacity: 0.45; cursor: not-allowed;" : "")"
+                 @onclick="NavigateStock"
+                 title="@(!PermissionService.HasModuleAccess("Stock") ? "Module Access Denied" : "")">
                 <i class="fas fa-boxes-stacked me-2"></i>
                 <span>Stock</span>
-                <i class="fas fa-chevron-down ms-auto @(isStockExpanded ? "rotated" : "")"></i>
+                @if (PermissionService.HasModuleAccess("Stock"))
+                {
+                    <i class="fas fa-chevron-down ms-auto @(isStockExpanded ? "rotated" : "")"></i>
+                }
+                else
+                {
+                    <i class="fas fa-lock ms-auto text-secondary" style="font-size: 0.72rem;"></i>
+                }
             </div>
             @if (isStockExpanded)
             {
                 <div class="nav-sub-section">
                     <div class="nav-sub-links">
-                        <NavLink class="nav-link" href="/stock">
+                        <SecureNavLink class="nav-link" href="/stock" Module="Stock">
                             <i class="fas fa-gauge me-2"></i> Stock Dashboard
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/rmgroups">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/rmgroups" OptionId="StkRMGroups" Module="Stock">
                             <i class="fas fa-layer-group me-2"></i> Raw Material Groups
-                        </NavLink>
-                        <NavLink class="nav-link" href="/newrm">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/newrm" OptionId="StkNewRM" Module="Stock">
                             <i class="fas fa-boxes me-2"></i> New Raw Material
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/rmpolist">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/rmpolist" OptionId="StkRMPOList" Module="Stock">
                             <i class="fas fa-list-alt me-2"></i> RM PO List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/newvendor">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/newvendor" OptionId="StkNewVendor" Module="Stock">
                             <i class="fas fa-truck me-2"></i> New Vendor
-                        </NavLink>
-                        <NavLink class="nav-link" href="/vendorlist">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/vendorlist" OptionId="StkVendorList" Module="Stock">
                             <i class="fas fa-users me-2"></i> Vendor List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/vendor-rm-assignment">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/vendor-rm-assignment" OptionId="StkVendorRMAssign" Module="Stock">
                             <i class="fas fa-link me-2"></i> Vendor RM Assignment
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/new-rm-po">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/new-rm-po" OptionId="StkNewRMPO" Module="Stock">
                             <i class="fas fa-file-invoice-dollar me-2"></i> New RM PO
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/vend-gate-rcvd">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/vend-gate-rcvd" OptionId="StkVendorGateRcv" Module="Stock">
                             <i class="fas fa-truck-loading me-2"></i> Vendor Gate Receiving
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/vend-rcv-list">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/vend-rcv-list" OptionId="StkVendorRcvList" Module="Stock">
                             <i class="fas fa-list-check me-2"></i> Vendor Receiving List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/material-placement">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/material-placement" OptionId="StkMaterialPlacement" Module="Stock">
                             <i class="fas fa-map-marker-alt me-2"></i> Material Placement
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/material-placement-list">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/material-placement-list" OptionId="StkMaterialPlacementList" Module="Stock">
                             <i class="bi bi-list-check me-2"></i> Material Placement List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/rm-movement">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/rm-movement" OptionId="StkMaterialMovement" Module="Stock">
                             <i class="fas fa-exchange-alt me-2"></i> Material Movement
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/change-batch-lot">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/change-batch-lot" OptionId="StkChangeBatchLot" Module="Stock">
                             <i class="fas fa-edit me-2"></i> Change Batch / Lot
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/stock-ledger">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/stock-ledger" OptionId="StkRMLedger" Module="Stock">
                             <i class="fas fa-book-open me-2"></i> RM Stock Ledger
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/semi-finish-open-receiving">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/semi-finish-open-receiving" OptionId="StkSFOpenRcv" Module="Stock">
                             <i class="fas fa-boxes-packing me-2"></i> Semi Finish Open Receiving
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/sf-movement">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/sf-movement" OptionId="StkSFMovement" Module="Stock">
                             <i class="fas fa-exchange-alt me-2"></i> Semi Finish Material Movement
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/sf-transactions">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/sf-transactions" OptionId="StkSFTransactions" Module="Stock">
                             <i class="fas fa-history me-2"></i> Semi Finish Transactions
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/finish-stock-issuance">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/finish-stock-issuance" OptionId="StkFinishIssuance" Module="Stock">
                             <i class="fas fa-boxes-stacked me-2"></i> Finish Stock Issuance
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/finish-stock-receiving">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/finish-stock-receiving" OptionId="StkFinishReceiving" Module="Stock">
                             <i class="fas fa-boxes-packing me-2"></i> Finish Stock Receiving
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/finish-transactions">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/finish-transactions" OptionId="StkFinishTransactions" Module="Stock">
                             <i class="fas fa-history me-2"></i> Finish Stock Transactions
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/finish-item-ledger">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/finish-item-ledger" OptionId="StkFinishItemLedger" Module="Stock">
                             <i class="fas fa-book-open me-2"></i> Finish Item Ledger
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/finish-stock-movement">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/finish-stock-movement" OptionId="StkFinishMovement" Module="Stock">
                             <i class="fas fa-right-left me-2"></i> Finish Stock Movement
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/vendor-billing-list">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/vendor-billing-list" OptionId="StkVendorBillingList" Module="Stock">
                             <i class="fas fa-file-invoice-dollar me-2"></i> Vendor Billing List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/vendor-billing">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/vendor-billing" OptionId="StkVendorBilling" Module="Stock">
                             <i class="fas fa-file-invoice me-2"></i> Vendor Billing
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/change-batch-no">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/change-batch-no" OptionId="StkChangeBatchNo" Module="Stock">
                             <i class="fas fa-edit me-2"></i> Change Batch No
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/rm-issuance">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/rm-issuance" OptionId="StkRMIssuance" Module="Stock">
                             <i class="fas fa-boxes me-2"></i> RM Issuance
-                        </NavLink>
-                        <NavLink class="nav-link" href="/stock/rm-issuance-list">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/rm-issuance-list" OptionId="StkRMIssuanceList" Module="Stock">
                             <i class="fas fa-list-alt me-2"></i> RM Issuance List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/rmlist">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/rmlist" OptionId="StkRMList" Module="Stock">
                             <i class="fas fa-list me-2"></i> Raw Materials List
-                        </NavLink>
+                        </SecureNavLink>
                     </div>
                 </div>
             }
         </div>
         <div class="nav-item">
-            <div class="nav-section-header" @onclick="NavigateProduction">
+            <div class="nav-section-header @(!PermissionService.HasModuleAccess("Production") ? "disabled-nav-header text-muted" : "")"
+                 style="@(!PermissionService.HasModuleAccess("Production") ? "opacity: 0.45; cursor: not-allowed;" : "")"
+                 @onclick="NavigateProduction"
+                 title="@(!PermissionService.HasModuleAccess("Production") ? "Module Access Denied" : "")">
                 <i class="fas fa-industry me-2"></i>
                 <span>Production</span>
-                <i class="fas fa-chevron-down ms-auto @(isProductionExpanded ? "rotated" : "")"></i>
+                @if (PermissionService.HasModuleAccess("Production"))
+                {
+                    <i class="fas fa-chevron-down ms-auto @(isProductionExpanded ? "rotated" : "")"></i>
+                }
+                else
+                {
+                    <i class="fas fa-lock ms-auto text-secondary" style="font-size: 0.72rem;"></i>
+                }
             </div>
             @if (isProductionExpanded)
             {
                 <div class="nav-sub-section">
                     <div class="nav-sub-links">
-                        <NavLink class="nav-link" href="/production">
+                        <SecureNavLink class="nav-link" href="/production" Module="Production">
                             <i class="fas fa-gauge me-2"></i> Production Dashboard
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/new-maker">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/new-maker" OptionId="PrdNewMaker" Module="Production">
                             <i class="fas fa-person-digging me-2"></i> New Maker
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/maker-list">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/maker-list" OptionId="PrdMakerList" Module="Production">
                             <i class="fas fa-users-gear me-2"></i> Maker List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/maker-item-assignment">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/maker-item-assignment" OptionId="PrdMakerItemAssign" Module="Production">
                             <i class="fas fa-link me-2"></i> Maker Item Assignment
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/maker-po">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/maker-po" OptionId="PrdMakerPO" Module="Production">
                             <i class="fas fa-file-invoice-dollar me-2"></i> Maker PO
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/maker-po-list">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/maker-po-list" OptionId="PrdMakerPOList" Module="Production">
                             <i class="fas fa-list-alt me-2"></i> Maker PO List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/maker-issuance-from-sf">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/maker-issuance-from-sf" OptionId="PrdMakerIssuanceSF" Module="Production">
                             <i class="fas fa-boxes-packing me-2"></i> Maker Issuance from SF
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/receive-against-po">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/receive-against-po" OptionId="PrdReceivePO" Module="Production">
                             <i class="fas fa-truck-ramp-box me-2"></i> Receive against PO
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/receive-lot">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/receive-lot" OptionId="PrdReceiveLot" Module="Production">
                             <i class="fas fa-boxes-stacked me-2"></i> Receive Lot
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/lot-issuance">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/lot-issuance" OptionId="PrdLotIssuance" Module="Production">
                             <i class="fas fa-boxes-packing me-2"></i> Lot Issuance
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/authorize-received">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/authorize-received" OptionId="PrdAuthReceived" Module="Production">
                             <i class="fas fa-check-double me-2"></i> Authorize Received
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/receiving-list">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/receiving-list" OptionId="PrdReceivingList" Module="Production">
                             <i class="fas fa-truck-loading me-2"></i> Receiving List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/rework-issuance">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/rework-issuance" OptionId="PrdMakerRework" Module="Production">
                             <i class="fas fa-tools me-2"></i> Rework Issuance
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/transfer-to-ready-finish-stock">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/transfer-to-ready-finish-stock" OptionId="PrdTransferReadyFinish" Module="Production">
                             <i class="fas fa-dolly-flatbed me-2"></i> Transfer to Ready Finish
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/create-dispatch-list">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/create-dispatch-list" OptionId="PrdCreateDispatchList" Module="Production">
                             <i class="fas fa-shipping-fast me-2"></i> Create Dispatch List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/dispatch-list">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/dispatch-list" OptionId="PrdDispatchList" Module="Production">
                             <i class="fas fa-clipboard-list me-2"></i> Dispatch List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/maker-billing">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/maker-billing" OptionId="PrdMakerBilling" Module="Production">
                             <i class="fas fa-file-invoice-dollar me-2"></i> Maker Billing
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/maker-billing-list">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/maker-billing-list" OptionId="PrdMakerBillingList" Module="Production">
                             <i class="fas fa-list-check me-2"></i> Maker Billing List
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/processes">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/processes" OptionId="PrdProcesses" Module="Production">
                             <i class="fas fa-network-wired me-2"></i> Processes Setup
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/process-groups">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/process-groups" OptionId="PrdProcessGroups" Module="Production">
                             <i class="fas fa-layer-group me-2"></i> Process Groups
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/repair-types">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/repair-types" OptionId="PrdRepairTypes" Module="Production">
                             <i class="fas fa-tools me-2"></i> Repair Types
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/wastage-types">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/wastage-types" OptionId="PrdWastageTypes" Module="Production">
                             <i class="fas fa-trash-alt me-2"></i> Wastage Types
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/statistics">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/statistics" OptionId="PrdStatistics" Module="Production">
                             <i class="fas fa-chart-line me-2"></i> Production Statistics
-                        </NavLink>
-                        <NavLink class="nav-link" href="/production/item-list">
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/item-list" OptionId="PrdItemList" Module="Production">
                             <i class="fas fa-layer-group me-2"></i> Production Item List
-                        </NavLink>
+                        </SecureNavLink>
                     </div>
                 </div>
             }
         </div>
-
 
         <div class="nav-item mt-auto">
             <form method="post" action="/Identity/Account/Logout">
@@ -728,6 +824,12 @@
     </nav>
 </div>
 
+<BlazorContextMenu.ContextMenu Id="navLinkContextMenu" Template="Win11Style">
+    <BlazorContextMenu.Item OnClick="HandleAddToFavourites" CssClass="win11-menu-item">
+        <i class="fas fa-star win11-icon text-warning"></i> Add to Favourites
+    </BlazorContextMenu.Item>
+</BlazorContextMenu.ContextMenu>
+
 @code {
     [Parameter]
     public bool IsSidebarCollapsed { get; set; }
@@ -735,6 +837,7 @@
     [Parameter]
     public EventCallback OnToggleSidebar { get; set; }
 
+    private int favouritesCount = 0;
     private bool isFinancialExpanded = false;
     private bool isAccountSetupExpanded = false;
     private bool isBankSetupExpanded = false;
@@ -752,6 +855,57 @@
     private bool isIntraOfficeExpanded = false;
     private bool isSetupsExpanded = false;
 
+    protected override async Task OnInitializedAsync()
+    {
+        await PermissionService.InitializeAsync();
+        FavouriteService.OnFavouritesChanged += HandleFavouritesChanged;
+        await LoadFavouritesCountAsync();
+    }
+
+    private async Task LoadFavouritesCountAsync()
+    {
+        try
+        {
+            favouritesCount = await FavouriteService.GetCurrentUserFavouritesCountAsync();
+        }
+        catch { }
+    }
+
+    private void HandleFavouritesChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadFavouritesCountAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task HandleAddToFavourites(BlazorContextMenu.ItemClickEventArgs e)
+    {
+        if (e.Data is NavLinkContextData data && !string.IsNullOrEmpty(data.OptionId))
+        {
+            var result = await FavouriteService.AddCurrentUserFavouriteAsync(
+                data.OptionId,
+                data.Title,
+                data.Href,
+                data.Module,
+                data.IconClass);
+
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = result.Success ? Radzen.NotificationSeverity.Success : Radzen.NotificationSeverity.Info,
+                Summary = "Favourites",
+                Detail = result.Message,
+                Duration = 3000
+            });
+        }
+    }
+
+    public void Dispose()
+    {
+        FavouriteService.OnFavouritesChanged -= HandleFavouritesChanged;
+    }
+
     private async Task ToggleNavMenu()
     {
         await OnToggleSidebar.InvokeAsync();
@@ -759,18 +913,21 @@
 
     private void NavigateSetups()
     {
+        if (!PermissionService.HasModuleAccess("Setup")) return;
         isSetupsExpanded = !isSetupsExpanded;
         NavigationManager.NavigateTo("/setup");
     }
 
     private void NavigateDashboards()
     {
+        if (!PermissionService.HasModuleAccess("DashBoard")) return;
         isDashboardsExpanded = !isDashboardsExpanded;
         NavigationManager.NavigateTo("/dashboards");
     }
 
     private void NavigateIntraOffice()
     {
+        if (!PermissionService.HasModuleAccess("IntraOffice")) return;
         isIntraOfficeExpanded = !isIntraOfficeExpanded;
         NavigationManager.NavigateTo("/office");
     }
@@ -778,36 +935,42 @@
     // Dual-action: navigate to module dashboard AND expand its sub-menu
     private void NavigateFinancial()
     {
+        if (!PermissionService.HasModuleAccess("Accounts")) return;
         isFinancialExpanded = !isFinancialExpanded;
         NavigationManager.NavigateTo("/financial");
     }
 
     private void NavigateExport()
     {
+        if (!PermissionService.HasModuleAccess("Export")) return;
         isExportExpanded = !isExportExpanded;
         NavigationManager.NavigateTo("/export");
     }
 
     private void NavigatePayroll()
     {
+        if (!PermissionService.HasModuleAccess("Payroll")) return;
         isPayrollExpanded = !isPayrollExpanded;
         NavigationManager.NavigateTo("/payroll");
     }
 
     private void NavigateStock()
     {
+        if (!PermissionService.HasModuleAccess("Stock")) return;
         isStockExpanded = !isStockExpanded;
         NavigationManager.NavigateTo("/stock");
     }
 
     private void NavigateProduction()
     {
+        if (!PermissionService.HasModuleAccess("Production")) return;
         isProductionExpanded = !isProductionExpanded;
         NavigationManager.NavigateTo("/production");
     }
 
     private void NavigateCompany()
     {
+        if (!PermissionService.HasModuleAccess("Company")) return;
         isCompanyExpanded = !isCompanyExpanded;
         NavigationManager.NavigateTo("/company");
     }

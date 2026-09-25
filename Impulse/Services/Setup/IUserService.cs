@@ -14,6 +14,7 @@ namespace Impulse.Services.Setup
         Task<bool> ToggleUserStatusAsync(int userId, bool inActive);
         Task<(bool Success, string Message)> ResetPasswordAsync(int userId, string newPassword);
         Task<bool> DeleteUserAsync(int userId);
+        Task<(bool Success, string Message, int NewUserId)> CopyUserAsync(int fromUserId, string newUserName, string? password = null, string? fullUserName = null);
         Task<(int TotalUsers, int ActiveUsers, int InactiveUsers)> GetUserStatisticsAsync();
     }
 }

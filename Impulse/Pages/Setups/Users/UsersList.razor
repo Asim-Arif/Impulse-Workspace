@@ -19,6 +19,18 @@
                     </div>
                 </div>
                 <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1 shadow-sm" @onclick="SyncMenuOptionsAsync" disabled="@IsSyncing" title="Sync &amp; update system screen options catalog with all standard options">
+                        @if (IsSyncing)
+                        {
+                            <span class="spinner-border spinner-border-sm"></span>
+                            <span>Syncing...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-sync-alt"></i>
+                            <span>Sync Options</span>
+                        }
+                    </button>
                     <button class="btn btn-sm btn-primary d-flex align-items-center gap-1 shadow-sm px-3" @onclick="OpenCreateModal">
                         <i class="fas fa-user-plus"></i>
                         <span>New User</span>
@@ -149,6 +161,9 @@
                                             <button class="btn btn-xs btn-outline-primary" @onclick="() => OpenEditModal(user)" title="Edit Permissions">
                                                 <i class="fas fa-pencil-alt"></i>
                                             </button>
+                                            <button class="btn btn-xs btn-outline-info" @onclick="() => OpenCopyUserModal(user)" title="Copy User Profile">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
                                             <button class="btn btn-xs btn-outline-secondary" @onclick="() => OpenResetPasswordModal(user)" title="Reset Password">
                                                 <i class="fas fa-key"></i>
                                             </button>
@@ -217,3 +232,64 @@
         </div>
     </div>
 }
+
+<!-- Copy User Modal -->
+@if (IsCopyUserOpen && CopyingSourceUser != null)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.55); z-index: 1060;" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 14px; overflow: hidden;">
+                <div class="modal-header bg-light border-bottom py-2 px-3 d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="p-2 bg-info-subtle text-info rounded-2">
+                            <i class="fas fa-copy"></i>
+                        </div>
+                        <div>
+                            <h6 class="modal-title fw-bold text-dark mb-0">Copy User Profile</h6>
+                            <small class="text-secondary">Clone rights &amp; permissions from @CopyingSourceUser.UserName</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" @onclick="CloseCopyUserModal"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div class="alert alert-info py-2 px-3 small mb-3">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Copies all module navigation links, operational authorizations, and screen permissions from <strong>@CopyingSourceUser.UserName</strong> to a new user account.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary mb-1">
+                            New Username <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control form-control-sm" @bind="NewCopyUserName" placeholder="e.g. adeel.export" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary mb-1">Initial Password (Optional)</label>
+                        <input type="password" class="form-control form-control-sm" @bind="NewCopyPassword" placeholder="Leave blank or enter initial password" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold text-secondary mb-1">Full Display Name (Optional)</label>
+                        <input type="text" class="form-control form-control-sm" @bind="NewCopyFullName" placeholder="e.g. Adeel Ahmad" />
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2 px-3 d-flex justify-content-between">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CloseCopyUserModal">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                    <button type="button" class="btn btn-sm btn-info text-white shadow-sm" @onclick="ExecuteCopyUserAsync" disabled="@IsCopyingUser">
+                        @if (IsCopyingUser)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            <span>Copying...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-copy me-1"></i>
+                            <span>Create Copy</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
