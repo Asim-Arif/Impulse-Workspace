@@ -28,6 +28,9 @@ namespace Impulse.Pages.Setups.Users
         [Inject]
         protected NavigationManager NavigationManager { get; set; } = default!;
 
+        [Inject]
+        protected DataAccessLibrary.Interface.Setup.IUserRoleDataAccess UserRoleDataAccess { get; set; } = default!;
+
         [Parameter]
         public int? UserId { get; set; }
 
@@ -41,6 +44,11 @@ namespace Impulse.Pages.Setups.Users
         protected bool IsSaving { get; set; } = false;
         protected EmployeeListItemModel? SelectedEmployee { get; set; }
         private List<EmployeeListItemModel> _allEmployees = new();
+
+        // Operational Roles State
+        protected List<UserRoleModel> AvailableRoles { get; set; } = new();
+        protected HashSet<string> SelectedRoles { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        protected bool IsManageRolesOpen { get; set; } = false;
 
         // Screen & Menu Options State
         protected List<string> AvailableModules { get; set; } = new();
@@ -57,6 +65,7 @@ namespace Impulse.Pages.Setups.Users
                 IsLoadingUser = true;
 
                 await LoadEmployeesAsync();
+                AvailableRoles = await UserRoleDataAccess.GetAllRolesAsync();
 
                 if (UserId.HasValue && UserId.Value > 0)
                 {
@@ -65,6 +74,8 @@ namespace Impulse.Pages.Setups.Users
                     if (existingUser != null)
                     {
                         User = existingUser;
+                        var userRoles = await UserRoleDataAccess.GetRolesByUserIdAsync(UserId.Value);
+                        SelectedRoles = new HashSet<string>(userRoles, StringComparer.OrdinalIgnoreCase);
                     }
                     else
                     {
@@ -305,6 +316,7 @@ namespace Impulse.Pages.Setups.Users
                     {
                         User.UserID = newId;
                         await PermissionService.SaveAllUserMenuOptionsAsync(newId, UserSelectedOptionIds);
+                        await UserRoleDataAccess.SaveUserRolesAsync(newId, SelectedRoles);
 
                         NotificationService.Notify(new NotificationMessage
                         {
@@ -332,6 +344,7 @@ namespace Impulse.Pages.Setups.Users
                     if (success)
                     {
                         await PermissionService.SaveAllUserMenuOptionsAsync(User.UserID, UserSelectedOptionIds);
+                        await UserRoleDataAccess.SaveUserRolesAsync(User.UserID, SelectedRoles);
 
                         NotificationService.Notify(new NotificationMessage
                         {
@@ -368,6 +381,25 @@ namespace Impulse.Pages.Setups.Users
             {
                 IsSaving = false;
             }
+        }
+
+        protected void ToggleRole(string role)
+        {
+            if (SelectedRoles.Contains(role))
+            {
+                SelectedRoles.Remove(role);
+            }
+            else
+            {
+                SelectedRoles.Add(role);
+            }
+        }
+
+        protected bool IsRoleSelected(string role) => SelectedRoles.Contains(role);
+
+        protected async Task HandleRolesChanged()
+        {
+            AvailableRoles = await UserRoleDataAccess.GetAllRolesAsync();
         }
 
         protected Task CancelAsync()

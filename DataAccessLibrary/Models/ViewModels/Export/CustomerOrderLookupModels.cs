@@ -43,6 +43,9 @@ namespace DataAccessLibrary.Models.ViewModels.Export
         public decimal? TotalPlannedQty { get; set; }
         public bool? OrderPlanApproved { get; set; }
         public bool? LateOrderAlerts { get; set; }
+        public bool Authorized { get; set; }
+        public string? AuthorizedBy { get; set; }
+        public DateTime? AuthorizedDT { get; set; }
 
         // Helper derived fields for UI display
         public string OrderStatus { get; set; } = string.Empty;

@@ -115,7 +115,8 @@
 
     private async Task HandleLiveNotification(AppNotification notif)
     {
-        if (!string.IsNullOrEmpty(currentUserName) && (string.IsNullOrEmpty(notif.TargetUserId) || notif.TargetUserId == currentUserName))
+        if (!string.IsNullOrEmpty(currentUserName) && 
+            (string.IsNullOrEmpty(notif.TargetUserId) || string.Equals(notif.TargetUserId.Trim(), currentUserName.Trim(), StringComparison.OrdinalIgnoreCase)))
         {
             LoadNotifications();
             await InvokeAsync(StateHasChanged);

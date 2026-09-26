@@ -226,5 +226,137 @@ namespace DataAccessLibrary.DAC.Production
             var list = (await db.QueryAsync<LookupItemInt>(sql)).ToList();
             return list;
         }
+
+        public async Task<List<string>> GetHubNamesAsync()
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            const string sql = "SELECT Hub_Name FROM Hub_Names ORDER BY Hub_Name";
+            return (await db.QueryAsync<string>(sql)).ToList();
+        }
+
+        public async Task<bool> AddHubNameAsync(string hubName)
+        {
+            if (string.IsNullOrWhiteSpace(hubName)) return false;
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            const string sql = @"
+                IF NOT EXISTS (SELECT 1 FROM Hub_Names WHERE Hub_Name = @Hub_Name)
+                BEGIN
+                    INSERT INTO Hub_Names (Hub_Name) VALUES (@Hub_Name);
+                END";
+            await db.ExecuteAsync(sql, new { Hub_Name = hubName.Trim() });
+            return true;
+        }
+
+        public async Task<(bool CanDelete, string Reason)> CanDeleteHubNameAsync(string hubName)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            const string checkSql = "SELECT COUNT(*) FROM ProcessGroupsProcesses WHERE Hub_Name = @Hub_Name";
+            int count = await db.ExecuteScalarAsync<int>(checkSql, new { Hub_Name = hubName.Trim() });
+            if (count > 0)
+            {
+                return (false, $"Cannot delete Hub '{hubName}' because it is currently assigned to {count} process sequence step(s).");
+            }
+            return (true, string.Empty);
+        }
+
+        public async Task<bool> DeleteHubNameAsync(string hubName)
+        {
+            var (canDelete, _) = await CanDeleteHubNameAsync(hubName);
+            if (!canDelete) return false;
+
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            const string sql = "DELETE FROM Hub_Names WHERE Hub_Name = @Hub_Name";
+            int affected = await db.ExecuteAsync(sql, new { Hub_Name = hubName.Trim() });
+            return affected > 0;
+        }
+
+        public async Task<List<ProcessGroupHubOverviewDto>> GetGroupHubOverviewAsync(int groupId)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+
+            // 1. Get distinct hubs with processes in this group
+            const string hubProcessSql = @"
+                SELECT 
+                    pgp.Hub_Name,
+                    ISNULL(p.Description, '') AS ProcessName,
+                    pgp.SeqNo
+                FROM ProcessGroupsProcesses pgp
+                LEFT JOIN Processes p ON pgp.Process_RefID = p.ProcessID
+                WHERE pgp.Group_RefID = @GroupId AND ISNULL(pgp.Hub_Name, '') <> ''
+                ORDER BY pgp.SeqNo";
+
+            var rows = (await db.QueryAsync(hubProcessSql, new { GroupId = groupId })).ToList();
+
+            // 2. Get existing assigned supervisors
+            const string supervisorSql = @"
+                SELECT 
+                    s.GroupID,
+                    s.Hub_Name,
+                    s.UserID,
+                    s.UserName,
+                    e.EmpID,
+                    e.Name AS EmployeeName,
+                    e.Designation
+                FROM ProcessGroup_Hub_Supervisors s
+                LEFT JOIN Users u ON s.UserID = u.UserID
+                LEFT JOIN Employees e ON u.EmpID = e.EmpID
+                WHERE s.GroupID = @GroupId
+                ORDER BY s.Hub_Name, e.Name";
+
+            var supervisors = (await db.QueryAsync<HubSupervisorDto>(supervisorSql, new { GroupId = groupId })).ToList();
+            var supervisorsByHub = supervisors.GroupBy(s => s.Hub_Name, StringComparer.OrdinalIgnoreCase)
+                                              .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+
+            var hubGroups = rows.GroupBy(r => (string)r.Hub_Name, StringComparer.OrdinalIgnoreCase);
+            var result = new List<ProcessGroupHubOverviewDto>();
+
+            foreach (var hg in hubGroups)
+            {
+                var hubOverview = new ProcessGroupHubOverviewDto
+                {
+                    Hub_Name = hg.Key,
+                    ProcessNames = hg.Select(r => (string)r.ProcessName).Distinct().ToList(),
+                    Supervisors = supervisorsByHub.TryGetValue(hg.Key, out var sups) ? sups : new List<HubSupervisorDto>()
+                };
+                result.Add(hubOverview);
+            }
+
+            return result;
+        }
+
+        public async Task<bool> SaveGroupHubSupervisorsAsync(int groupId, string hubName, List<int> userIds)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            if (db.State != ConnectionState.Open) db.Open();
+            using var trans = db.BeginTransaction();
+
+            try
+            {
+                const string delSql = "DELETE FROM ProcessGroup_Hub_Supervisors WHERE GroupID = @GroupID AND Hub_Name = @Hub_Name";
+                await db.ExecuteAsync(delSql, new { GroupID = groupId, Hub_Name = hubName }, trans);
+
+                if (userIds != null && userIds.Any())
+                {
+                    const string insertSql = @"
+                        INSERT INTO ProcessGroup_Hub_Supervisors (GroupID, Hub_Name, UserID, UserName, AssignedAt)
+                        SELECT @GroupID, @Hub_Name, u.UserID, u.UserName, GETDATE()
+                        FROM Users u
+                        WHERE u.UserID = @UserID";
+
+                    foreach (var uid in userIds.Distinct())
+                    {
+                        await db.ExecuteAsync(insertSql, new { GroupID = groupId, Hub_Name = hubName, UserID = uid }, trans);
+                    }
+                }
+
+                trans.Commit();
+                return true;
+            }
+            catch
+            {
+                trans.Rollback();
+                throw;
+            }
+        }
     }
 }

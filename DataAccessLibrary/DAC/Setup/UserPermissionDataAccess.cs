@@ -134,7 +134,8 @@ namespace DataAccessLibrary.DAC.Setup
                         COALESCE(u.QMSMainLink, 0) AS QMSMainLink,
                         COALESCE(u.FixedAssetsMainLink, 0) AS FixedAssetsMainLink,
                         COALESCE(u.SamplingMainLink, 0) AS SamplingMainLink,
-                        COALESCE(u.HelpMainLink, 0) AS HelpMainLink
+                        COALESCE(u.HelpMainLink, 0) AS HelpMainLink,
+                        COALESCE(u.IntraOfficeMainLink, 0) AS IntraOfficeMainLink
                     FROM Users u
                     WHERE u.UserName = @UserName";
 

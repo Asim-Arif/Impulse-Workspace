@@ -10,6 +10,7 @@ namespace DataAccessLibrary.Models.Setup
         public string? FullUserName { get; set; }
         public string? EmpID { get; set; }
         public bool InActive { get; set; }
+        public System.Collections.Generic.List<string> AssignedRoles { get; set; } = new();
 
         // Joined Employee Details
         public string? EmployeeName { get; set; }
@@ -33,6 +34,7 @@ namespace DataAccessLibrary.Models.Setup
         public bool FixedAssetsMainLink { get; set; }
         public bool SamplingMainLink { get; set; }
         public bool HelpMainLink { get; set; }
+        public bool IntraOfficeMainLink { get; set; }
         public bool OpenCommandCenter { get; set; }
 
         // Item Profile Access Controls

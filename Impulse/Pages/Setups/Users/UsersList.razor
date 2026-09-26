@@ -31,6 +31,10 @@
                             <span>Sync Options</span>
                         }
                     </button>
+                    <button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1 shadow-sm px-3" @onclick="OpenManageRolesModal" title="Manage Defined User Roles">
+                        <i class="fas fa-tags"></i>
+                        <span>Manage Roles</span>
+                    </button>
                     <button class="btn btn-sm btn-primary d-flex align-items-center gap-1 shadow-sm px-3" @onclick="OpenCreateModal">
                         <i class="fas fa-user-plus"></i>
                         <span>New User</span>
@@ -45,7 +49,7 @@
             <!-- Filter Panel -->
             <div class="p-2 mb-3 bg-light rounded-3 border">
                 <div class="row g-2 align-items-end">
-                    <div class="col-md-5">
+                    <div class="col-md-4">
                         <label class="form-label small text-secondary fw-semibold mb-1">Search Account or Employee</label>
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
@@ -53,6 +57,16 @@
                         </div>
                     </div>
                     <div class="col-md-3">
+                        <label class="form-label small text-secondary fw-semibold mb-1">Operational Role</label>
+                        <select class="form-select form-select-sm" @bind="RoleFilter">
+                            <option value="all">All Roles</option>
+                            @foreach (var r in AvailableRoles)
+                            {
+                                <option value="@r.User_Role">@r.User_Role (@r.AssignedUsersCount)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2">
                         <label class="form-label small text-secondary fw-semibold mb-1">Account Status</label>
                         <select class="form-select form-select-sm" @bind="StatusFilter">
                             <option value="all">All Accounts</option>
@@ -60,7 +74,7 @@
                             <option value="inactive">Inactive / Suspended</option>
                         </select>
                     </div>
-                    <div class="col-md-4 d-flex gap-2">
+                    <div class="col-md-3 d-flex gap-2">
                         <button class="btn btn-sm btn-primary flex-grow-1" @onclick="ApplyFilterAsync">
                             <i class="fas fa-filter me-1"></i>Apply Filter
                         </button>
@@ -94,13 +108,14 @@
                         <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
                             <tr>
                                 <th style="width: 70px;">ID</th>
-                                <th style="width: 140px;">Username</th>
-                                <th style="width: 180px;">Full Name</th>
+                                <th style="width: 130px;">Username</th>
+                                <th style="width: 160px;">Full Name</th>
                                 <th>Linked Employee</th>
-                                <th style="width: 160px;">Department</th>
-                                <th style="width: 220px;">Module Access</th>
-                                <th style="width: 100px;">Status</th>
-                                <th class="text-end" style="width: 150px;">Actions</th>
+                                <th style="width: 140px;">Department</th>
+                                <th style="width: 150px;">Roles</th>
+                                <th style="width: 200px;">Module Access</th>
+                                <th style="width: 90px;">Status</th>
+                                <th class="text-end" style="width: 140px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -136,6 +151,23 @@
                                         <span class="small text-secondary">@(user.DepartmentName ?? "-")</span>
                                     </td>
                                     <td>
+                                        @if (user.AssignedRoles != null && user.AssignedRoles.Count > 0)
+                                        {
+                                            <div class="d-flex flex-wrap gap-1">
+                                                @foreach (var role in user.AssignedRoles)
+                                                {
+                                                    <span class="badge @GetRoleBadgeClass(role)" style="font-size: 0.7rem;">
+                                                        @role
+                                                    </span>
+                                                }
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">-</span>
+                                        }
+                                    </td>
+                                    <td>
                                         <div class="d-flex flex-wrap gap-1" style="font-size: 0.7rem;">
                                             @if (user.FinancialMainLink) { <span class="badge bg-primary-subtle text-primary border border-primary-subtle">FIN</span> }
                                             @if (user.PayrollMainLink) { <span class="badge bg-success-subtle text-success border border-success-subtle">PAY</span> }
@@ -143,6 +175,7 @@
                                             @if (user.ProductionMainLink) { <span class="badge bg-danger-subtle text-danger border border-danger-subtle">PRD</span> }
                                             @if (user.ExportMainLink) { <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">EXP</span> }
                                             @if (user.QMSMainLink) { <span class="badge bg-purple-subtle text-purple border" style="color: #7c3aed; background: #ede9fe;">QMS</span> }
+                                            @if (user.IntraOfficeMainLink) { <span class="badge border" style="color: #0f766e; background: #ccfbf1; border-color: #99f6e4 !important;">OFFICE</span> }
                                             @if (user.UserManagement) { <span class="badge bg-danger text-white">ADMIN</span> }
                                         </div>
                                     </td>
@@ -292,4 +325,8 @@
         </div>
     </div>
 }
+
+<!-- Manage User Roles Modal -->
+<ManageRolesModal IsOpen="@IsManageRolesOpen" OnClose="CloseManageRolesModal" OnRolesChanged="HandleRolesChanged" />
+
 

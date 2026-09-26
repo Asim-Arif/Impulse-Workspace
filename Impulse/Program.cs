@@ -344,6 +344,16 @@ builder.Services.AddScoped<Impulse.Services.Dashboard.IProductionPlanningDashboa
 builder.Services.AddScoped<DataAccessLibrary.Interface.Dashboard.ICommandCenterDashboardDataAccess, DataAccessLibrary.DAC.Dashboard.CommandCenterDashboardDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Dashboard.ICommandCenterDashboardService, Impulse.Services.Dashboard.CommandCenterDashboardService>();
 
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IPpcOrderPlanningDataAccess, DataAccessLibrary.DAC.Production.PpcOrderPlanningDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IPpcOrderPlanningService, Impulse.Services.Production.PpcOrderPlanningService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IPpcMakerOrderDataAccess, DataAccessLibrary.DAC.Production.PpcMakerOrderDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IPpcMakerOrderService, Impulse.Services.Production.PpcMakerOrderService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IPpcStockAdjustmentDataAccess, DataAccessLibrary.DAC.Stock.PpcStockAdjustmentDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Stock.IPpcStockAdjustmentService, Impulse.Services.Stock.PpcStockAdjustmentService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IHubWorkflowDataAccess, DataAccessLibrary.DAC.Production.HubWorkflowDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IHubWorkflowOrchestrator, Impulse.Services.Production.HubWorkflowOrchestrator>();
+builder.Services.AddHostedService<Impulse.Services.WorkflowTasks.TaskDueMonitoringBackgroundService>();
+
 
 builder.Services.AddScoped<DataAccessLibrary.Interface.Company.IItemDataAccess, DataAccessLibrary.DAC.Company.ItemDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Company.IItemService, Impulse.Services.Company.ItemService>();
@@ -493,11 +503,15 @@ builder.Services.AddHttpClient<Impulse.Services.IntraOffice.IAiService, Impulse.
 
 // Setup & User Management Registrations
 builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IUserDataAccess, DataAccessLibrary.DAC.Setup.UserDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IUserRoleDataAccess, DataAccessLibrary.DAC.Setup.UserRoleDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Setup.IUserService, Impulse.Services.Setup.UserService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IUserPermissionDataAccess, DataAccessLibrary.DAC.Setup.UserPermissionDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Setup.IUserPermissionService, Impulse.Services.Setup.UserPermissionService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IFavouriteDataAccess, DataAccessLibrary.DAC.Setup.FavouriteDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Setup.IFavouriteService, Impulse.Services.Setup.FavouriteService>();
+
+// Workflow & Task Management Engine
+builder.Services.AddScoped<Impulse.Services.WorkflowTasks.IWorkflowTaskEngine, Impulse.Services.WorkflowTasks.WorkflowTaskEngine>();
 
 var app = builder.Build();
 

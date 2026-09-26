@@ -1,0 +1,494 @@
+@page "/stock/stock-order-adjustment"
+@page "/stock/stock-order-adjustment/{OrderNo}"
+@page "/stock/finishstockissuance"
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.ViewModels.Stock
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <!-- Page Header & Action Bar -->
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom pb-2 mb-2">
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="NavigateBack" title="Go Back">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark">
+                            <i class="fas fa-boxes-packing text-primary me-2"></i>Stock Issuance Against PPC Planning
+                        </h5>
+                        <small class="text-muted">Issue in-hand warehouse stock against PPC planned order allocations directly into production</small>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    @if (OrderHeader != null && PlannedItems.Any(i => i.RemainingQtyToIssue > 0))
+                    {
+                        <button class="btn btn-outline-primary btn-sm px-2 shadow-sm" @onclick="AutoAllocateAllStock" title="Auto-allocate available stock FIFO for all items">
+                            <i class="fas fa-magic me-1"></i>Auto-Allocate All
+                        </button>
+                    }
+
+                    @if (OrderHeader != null && PlannedItems.Any(i => i.AdjQty > 0))
+                    {
+                        <button class="btn btn-primary btn-sm px-3 shadow-sm" @onclick="SaveStockAdjustmentAsync" disabled="@IsSaving">
+                            @if (IsSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                <span>Issuing Stock...</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-save me-1"></i>
+                                <span>Save & Issue Stock</span>
+                            }
+                        </button>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(EffectiveOrderNo))
+                    {
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="() => LoadOrderDataAsync(EffectiveOrderNo)" disabled="@IsLoading" title="Refresh">
+                            <i class="fas fa-sync-alt @(IsLoading ? "fa-spin" : "")"></i>
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <!-- Order Selector & Adjustment Parameters Bar -->
+            <div class="row g-2 align-items-end" style="position: relative !important; z-index: 9999 !important;">
+                <div class="col-md-4">
+                    <label class="form-label small fw-semibold text-secondary mb-1">
+                        <i class="fas fa-search me-1"></i>Select Customer Order
+                    </label>
+                    <BlazoredTypeahead SearchMethod="SearchOrdersAsync"
+                                       TValue="PpcStockAdjustmentOrderHeaderModel"
+                                       TItem="PpcStockAdjustmentOrderHeaderModel"
+                                       Value="SelectedOrderLookup"
+                                       ValueChanged="OnOrderSelected"
+                                       ValueExpression="@(() => SelectedOrderLookup)"
+                                       Placeholder="Search Order # or Customer..."
+                                       MaximumSuggestions="1000"
+                                       MinimumLength="0">
+                        <SelectedTemplate Context="ord">
+                            <strong>#@ord.OrderNo</strong> - @ord.CustomerName
+                        </SelectedTemplate>
+                        <ResultTemplate Context="ord">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>#@ord.OrderNo</strong> - @ord.CustomerName
+                                </div>
+                                <div>
+                                    @if (ord.TotalRemainingStockQty > 0)
+                                    {
+                                        <span class="badge bg-warning text-dark" style="font-size: 0.72rem;">@ord.TotalRemainingStockQty Remaining</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-success" style="font-size: 0.72rem;">Fulfilled</span>
+                                    }
+                                </div>
+                            </div>
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold text-secondary mb-1">
+                        <i class="fas fa-calendar-day me-1"></i>Adjustment Date
+                    </label>
+                    <input type="date" class="form-control form-control-sm" @bind="AdjustmentDate" style="height: 35px;" />
+                </div>
+
+                @if (OrderHeader != null)
+                {
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold text-secondary mb-1">
+                            <i class="fas fa-id-card me-1"></i>Order &amp; Customer Details
+                        </label>
+                        <div class="px-3 border rounded bg-light d-flex align-items-center justify-content-between flex-wrap gap-2" style="height: 35px; box-sizing: border-box;">
+                            <div class="text-truncate">
+                                <span class="text-secondary small me-1">Customer:</span>
+                                <strong>@OrderHeader.CustomerName</strong>
+                                @if (!string.IsNullOrWhiteSpace(OrderHeader.CustPONo))
+                                {
+                                    <span class="badge bg-secondary ms-1">PO: @OrderHeader.CustPONo</span>
+                                }
+                            </div>
+                            <div class="d-flex align-items-center gap-1 flex-shrink-0">
+                                <span class="badge bg-primary" style="font-size: 0.76rem;">Planned: @OrderHeader.TotalPlannedStockQty pcs</span>
+                                <span class="badge @(OrderHeader.TotalRemainingStockQty > 0 ? "bg-warning text-dark" : "bg-success")" style="font-size: 0.76rem;">
+                                    Remaining: @OrderHeader.TotalRemainingStockQty pcs
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    @if (IsLoading)
+    {
+        <div class="card border-0 shadow-sm p-5 text-center" style="background: rgba(255, 255, 255, 0.85); border-radius: 12px;">
+            <div class="spinner-border text-primary mx-auto mb-2" role="status"></div>
+            <p class="text-muted mb-0">Loading stock planning details...</p>
+        </div>
+    }
+    else if (OrderHeader == null)
+    {
+        <div class="card border-0 shadow-sm p-5 text-center" style="background: rgba(255, 255, 255, 0.85); border-radius: 12px;">
+            <i class="fas fa-search-plus text-muted fa-3x mb-3"></i>
+            <h5 class="text-dark">No Order Selected</h5>
+            <p class="text-muted mb-0">Please select an order above to view items planned from stock and perform adjustments.</p>
+        </div>
+    }
+    else if (!PlannedItems.Any())
+    {
+        <div class="card border-0 shadow-sm p-5 text-center" style="background: rgba(255, 255, 255, 0.85); border-radius: 12px;">
+            <i class="fas fa-info-circle text-info fa-3x mb-3"></i>
+            <h5 class="text-dark">No Stock Planning Found</h5>
+            <p class="text-muted mb-0">There are no items planned from stock for Order #@OrderHeader.OrderNo. All items may have been planned for Maker Purchase Orders.</p>
+        </div>
+    }
+    else
+    {
+        <!-- Items Grid -->
+        <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+            <div class="card-body p-0">
+                <div class="table-responsive" style="position: relative !important; z-index: 1 !important; max-height: 65vh; overflow-y: auto;">
+                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                        <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                            <tr>
+                                <th style="width: 50px;" class="text-center">#</th>
+                                <th style="min-width: 140px;">Item Code</th>
+                                <th style="min-width: 220px;">Item Description</th>
+                                <th style="width: 100px;" class="text-center">Order Qty</th>
+                                <th style="width: 100px;" class="text-center">Planned Stock</th>
+                                <th style="width: 100px;" class="text-center">Adjusted</th>
+                                <th style="width: 100px;" class="text-center">Remaining</th>
+                                <th style="width: 100px;" class="text-center">In-Hand</th>
+                                <th style="min-width: 180px;">Target Process</th>
+                                <th style="width: 120px;" class="text-center">Issue Qty</th>
+                                <th style="min-width: 220px;">Shelf / Lot Allocation</th>
+                                <th style="width: 80px;" class="text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (int i = 0; i < PlannedItems.Count; i++)
+                            {
+                                var item = PlannedItems[i];
+                                int idx = i + 1;
+                                bool isFullyAdjusted = item.RemainingQtyToIssue <= 0;
+
+                                <tr class="@(isFullyAdjusted ? "table-light text-muted" : "")">
+                                    <td class="text-center text-muted fw-bold">@idx</td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border font-monospace">@item.ItemID</span>
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold text-dark">@item.ItemName</div>
+                                    </td>
+                                    <td class="text-center fw-bold">@item.OrderQty</td>
+                                    <td class="text-center">
+                                        <span class="badge bg-primary">@item.PlannedStockQty</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-secondary">@item.AlreadyAdjustedQty</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge @(item.RemainingQtyToIssue > 0 ? "bg-warning text-dark fw-bold" : "bg-success")">
+                                            @item.RemainingQtyToIssue
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-info text-dark">@item.AvailableInHandQty</span>
+                                    </td>
+                                    <td>
+                                        @if (isFullyAdjusted)
+                                        {
+                                            <span class="text-muted small">Completed</span>
+                                        }
+                                        else
+                                        {
+                                            <select class="form-select form-select-sm" @bind="item.SelectedProcessId" style="height: 33px; font-size: 0.82rem;">
+                                                @foreach (var proc in item.Processes)
+                                                {
+                                                    <option value="@proc.ProcessID">@proc.Description</option>
+                                                }
+                                            </select>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (isFullyAdjusted)
+                                        {
+                                            <span class="text-muted small text-center d-block">-</span>
+                                        }
+                                        else
+                                        {
+                                            <input type="number"
+                                                   class="form-control form-control-sm text-center fw-bold @(item.AdjQty > item.RemainingQtyToIssue ? "is-invalid border-danger" : "")"
+                                                   style="height: 33px;"
+                                                   min="0"
+                                                   max="@item.RemainingQtyToIssue"
+                                                   value="@item.AdjQty"
+                                                   @onchange="(e) => OnAdjQtyChanged(item, e)" />
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (isFullyAdjusted)
+                                        {
+                                            <span class="badge bg-light text-muted border">None Needed</span>
+                                        }
+                                        else
+                                        {
+                                            <div class="d-flex align-items-center justify-content-between gap-1">
+                                                <div>
+                                                    @if (item.Allocations != null && item.Allocations.Any(a => a.AllocatedQty > 0))
+                                                    {
+                                                        var activeAllocs = item.Allocations.Where(a => a.AllocatedQty > 0).ToList();
+                                                        <div class="d-flex flex-wrap gap-1">
+                                                            @foreach (var a in activeAllocs)
+                                                            {
+                                                                <span class="badge bg-light text-dark border" style="font-size: 0.74rem;">
+                                                                    <i class="fas fa-warehouse text-primary me-1"></i>@a.StoreName @a.ShelfNo: <strong>@a.AllocatedQty</strong>
+                                                                </span>
+                                                            }
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-danger small"><i class="fas fa-exclamation-circle me-1"></i>No shelf allocated</span>
+                                                    }
+                                                </div>
+                                                <button class="btn btn-outline-primary btn-sm px-2 py-0" style="height: 28px; white-space: nowrap;" @onclick="() => OpenShelfAllocationModal(item)" title="Change or split quantity across multiple shelves/locations">
+                                                    <i class="fas fa-layer-group me-1"></i>Edit
+                                                </button>
+                                            </div>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        @if (isFullyAdjusted)
+                                        {
+                                            <i class="fas fa-check-circle text-success" title="Fully Adjusted"></i>
+                                        }
+                                        else if (item.IsAllocationValid)
+                                        {
+                                            <i class="fas fa-check text-primary" title="Ready to Issue"></i>
+                                        }
+                                        else
+                                        {
+                                            <i class="fas fa-times-circle text-danger" title="Allocation mismatch or invalid qty"></i>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Footer Summary Bar -->
+            <div class="card-footer bg-white border-top py-2 px-3">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="small text-muted">
+                            Total Items Planned: <strong>@PlannedItems.Count</strong>
+                        </span>
+                        <span class="small text-muted">
+                            Pending Adjustment: <strong>@PlannedItems.Count(i => i.RemainingQtyToIssue > 0)</strong>
+                        </span>
+                        <span class="small text-muted">
+                            Total Qty to Issue: <strong>@PlannedItems.Sum(i => i.AdjQty)</strong> pcs
+                        </span>
+                    </div>
+
+                    @if (PlannedItems.Any(i => i.AdjQty > 0))
+                    {
+                        <button class="btn btn-primary btn-sm px-4 shadow-sm" @onclick="SaveStockAdjustmentAsync" disabled="@IsSaving">
+                            @if (IsSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                <span>Issuing Stock...</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-save me-1"></i>
+                                <span>Save & Issue Stock (@PlannedItems.Sum(i => i.AdjQty) pcs)</span>
+                            }
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Shelf & Lot Allocation Modal -->
+@if (IsShelfModalOpen && ModalItem != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0" style="border-radius: 12px;">
+                <div class="modal-header border-bottom py-2">
+                    <div>
+                        <h6 class="modal-title fw-bold text-dark mb-0">
+                            <i class="fas fa-warehouse text-primary me-2"></i>Shelf & Lot Allocation
+                        </h6>
+                        <small class="text-muted">
+                            Item: <strong class="font-monospace text-primary">@ModalItem.ItemID</strong> - @ModalItem.ItemName
+                        </small>
+                    </div>
+                    <button type="button" class="btn-close" @onclick="CloseShelfAllocationModal"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div class="d-flex align-items-center justify-content-between p-2 mb-3 bg-light rounded border">
+                        <div>
+                            <span class="text-secondary small">Required Adjustment Qty:</span>
+                            <span class="fw-bold fs-6 ms-1 text-primary">@ModalItem.AdjQty</span> pcs
+                        </div>
+                        <div>
+                            <span class="text-secondary small">Current Total Allocated:</span>
+                            <span class="fw-bold fs-6 ms-1 @(ModalItemAllocatedSum == ModalItem.AdjQty ? "text-success" : "text-danger")">
+                                @ModalItemAllocatedSum
+                            </span> pcs
+                        </div>
+                        <div>
+                            @if (ModalItemAllocatedSum == ModalItem.AdjQty)
+                            {
+                                <span class="badge bg-success"><i class="fas fa-check me-1"></i>Balanced</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-danger"><i class="fas fa-exclamation-triangle me-1"></i>Difference: @(ModalItem.AdjQty - ModalItemAllocatedSum)</span>
+                            }
+                        </div>
+                    </div>
+
+                    @if (!ModalItem.AvailableShelfLots.Any())
+                    {
+                        <div class="alert alert-warning py-2 mb-0">
+                            <i class="fas fa-exclamation-circle me-1"></i>No shelf inventory with batch numbers found for this item.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive" style="max-height: 350px;">
+                            <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.85rem;">
+                                <thead class="table-light sticky-top">
+                                    <tr>
+                                        <th>Store / Shelf</th>
+                                        <th>Lot #</th>
+                                        <th>Batch #</th>
+                                        <th>Mill Cert #</th>
+                                        <th class="text-center">Avail Qty</th>
+                                        <th style="width: 140px;" class="text-center">Allocate Qty</th>
+                                        <th style="width: 70px;" class="text-center">Quick</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var lot in ModalItem.AvailableShelfLots)
+                                    {
+                                        var alloc = ModalItem.Allocations?.FirstOrDefault(a => a.Shelf_RefID == lot.Shelf_RefID && a.LotNo == lot.LotNo);
+                                        int curAlloc = alloc?.AllocatedQty ?? 0;
+
+                                        <tr>
+                                            <td>
+                                                <div class="fw-semibold">@lot.StoreName</div>
+                                                <small class="text-muted">@lot.RackNo - Shelf: @lot.ShelfNo</small>
+                                            </td>
+                                            <td><span class="font-monospace">@lot.LotNo</span></td>
+                                            <td><span class="badge bg-light text-dark border">@lot.Batch_No</span></td>
+                                            <td><span class="text-muted small">@(string.IsNullOrWhiteSpace(lot.Mill_Certificate_No) ? "-" : lot.Mill_Certificate_No)</span></td>
+                                            <td class="text-center fw-bold text-info">@lot.NetAvailableQty</td>
+                                            <td>
+                                                <input type="number"
+                                                       class="form-control form-control-sm text-center fw-bold"
+                                                       min="0"
+                                                       max="@lot.NetAvailableQty"
+                                                       value="@curAlloc"
+                                                       @onchange="(e) => OnShelfAllocQtyChanged(lot, e)" />
+                                            </td>
+                                            <td class="text-center">
+                                                <button class="btn btn-outline-secondary btn-sm py-0 px-1" style="font-size: 0.75rem;" @onclick="() => SetMaxShelfAlloc(lot)">
+                                                    Max
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer py-2 border-top">
+                    <button class="btn btn-outline-primary btn-sm" @onclick="() => AutoAllocateCurrentModalItem()">
+                        <i class="fas fa-magic me-1"></i>Auto-Fill FIFO
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => ClearCurrentModalAllocations()">
+                        <i class="fas fa-undo me-1"></i>Clear
+                    </button>
+                    <button class="btn btn-primary btn-sm px-3" @onclick="CloseShelfAllocationModal">
+                        <i class="fas fa-check me-1"></i>Apply & Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Generated Lots Confirmation Modal -->
+@if (IsResultModalOpen && LastResult != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-md modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0" style="border-radius: 12px;">
+                <div class="modal-header bg-success text-white py-2">
+                    <h6 class="modal-title fw-bold mb-0">
+                        <i class="fas fa-check-circle me-2"></i>Stock Adjustment Successfully Posted!
+                    </h6>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseResultModal"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <p class="text-secondary mb-2">
+                        Stock has been adjusted against Order <strong>#@EffectiveOrderNo</strong>. The following production lots were generated:
+                    </p>
+                    <div class="bg-light p-3 rounded border font-monospace mb-3" style="max-height: 250px; overflow-y: auto; font-size: 0.82rem;">
+                        @foreach (var lotMsg in LastResult.GeneratedLots)
+                        {
+                            <div class="py-1 border-bottom text-dark">
+                                <i class="fas fa-tag text-primary me-2"></i>@lotMsg
+                            </div>
+                        }
+                    </div>
+                    <div class="alert alert-info py-2 mb-0" style="font-size: 0.82rem;">
+                        <i class="fas fa-info-circle me-1"></i>Ledgers and stock quantities have been updated. The warehouse task has been completed.
+                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button class="btn btn-primary btn-sm px-4" @onclick="CloseResultModal">
+                        <i class="fas fa-check me-1"></i>Done
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        min-height: 35px !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__controls {
+        height: 35px !important;
+        min-height: 35px !important;
+    }
+    .blazored-typeahead__input-mask,
+    .blazored-typeahead__input {
+        height: 35px !important;
+        font-size: 0.88rem !important;
+    }
+</style>

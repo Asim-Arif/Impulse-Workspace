@@ -30,4 +30,23 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string Hub_Name { get; set; } = string.Empty;
         public int SeqNo { get; set; }
     }
+
+    public class HubSupervisorDto
+    {
+        public int GroupID { get; set; }
+        public string Hub_Name { get; set; } = string.Empty;
+        public int UserID { get; set; }
+        public string UserName { get; set; } = string.Empty;
+        public string? EmpID { get; set; }
+        public string? EmployeeName { get; set; }
+        public string? Designation { get; set; }
+    }
+
+    public class ProcessGroupHubOverviewDto
+    {
+        public string Hub_Name { get; set; } = string.Empty;
+        public List<string> ProcessNames { get; set; } = new();
+        public List<HubSupervisorDto> Supervisors { get; set; } = new();
+    }
 }
+

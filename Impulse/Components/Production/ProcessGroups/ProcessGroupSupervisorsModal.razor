@@ -1,0 +1,219 @@
+@using DataAccessLibrary.Models.ViewModels.Production
+@using DataAccessLibrary.Models.Setup
+@using Blazored.Typeahead
+
+@if (IsOpen && Group != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0, 0, 0, 0.5); z-index: 100050; font-family: 'Calibri', 'Segoe UI', sans-serif;">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-primary text-white py-2 px-3">
+                    <h6 class="modal-title fw-bold mb-0" style="font-size: 1.05rem;">
+                        <i class="fas fa-user-shield me-2"></i> Assign Hub Supervisors: @Group.GroupName
+                    </h6>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body p-3" style="max-height: 75vh; overflow-y: auto;">
+
+                    <div class="alert alert-info py-2 px-3 mb-3 d-flex align-items-center gap-2" style="font-size: 0.85rem;">
+                        <i class="fas fa-info-circle fa-lg text-info"></i>
+                        <div>
+                            Each manufacturing process in this group is mapped to a production <strong>Hub</strong>. Assign one or more supervisors responsible for each station.
+                        </div>
+                    </div>
+
+                    @if (IsLoading)
+                    {
+                        <div class="text-center py-5 text-muted">
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            Loading group hubs and assigned supervisors...
+                        </div>
+                    }
+                    else if (!HubsList.Any())
+                    {
+                        <div class="text-center py-5 text-muted">
+                            <i class="fas fa-exclamation-triangle fa-2x d-block mb-2 text-warning opacity-75"></i>
+                            No processes or hubs configured for this Process Group yet. Add processes with hub assignments first.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-column gap-3">
+                            @for (int i = 0; i < HubsList.Count; i++)
+                            {
+                                var hub = HubsList[i];
+                                int zIndex = 200 - i;
+                                <div class="card border rounded-3 shadow-none p-3 hub-card" style="background-color: #fafbfc; position: relative; z-index: @zIndex;">
+                                    <div class="d-flex align-items-center justify-content-between border-bottom pb-2 mb-2">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="badge bg-primary px-3 py-1 fs-6">
+                                                <i class="fas fa-cubes me-1"></i> Hub @hub.Hub_Name
+                                            </span>
+                                            <span class="text-muted small">
+                                                (@hub.ProcessNames.Count @(hub.ProcessNames.Count == 1 ? "process" : "processes"))
+                                            </span>
+                                        </div>
+                                        <div class="text-muted small text-end" style="max-width: 50%;">
+                                            <span class="fw-semibold text-secondary">Processes:</span> @string.Join(" • ", hub.ProcessNames)
+                                        </div>
+                                    </div>
+
+                                    <!-- Current Supervisors Chips -->
+                                    <div class="mb-2">
+                                        <label class="form-label form-label-sm fw-bold text-secondary mb-1" style="font-size: 0.8rem;">
+                                            Assigned Supervisors / Users:
+                                        </label>
+                                        <div>
+                                            @if (!hub.Supervisors.Any())
+                                            {
+                                                <span class="text-muted small fst-italic">No supervisors assigned to Hub @hub.Hub_Name yet.</span>
+                                            }
+                                            else
+                                            {
+                                                @foreach (var sup in hub.Supervisors)
+                                                {
+                                                    <span class="badge bg-white text-dark border px-2 py-1 me-1 mb-1 shadow-sm d-inline-flex align-items-center gap-1" style="font-size: 0.82rem; font-weight: 500;">
+                                                        <i class="fas fa-user-circle text-primary"></i>
+                                                        @if (!string.IsNullOrEmpty(sup.EmpID) && sup.EmpID != "0")
+                                                        {
+                                                            <strong class="text-primary">[@sup.EmpID]</strong>
+                                                        }
+                                                        <span>@(string.IsNullOrEmpty(sup.EmployeeName) ? sup.UserName : sup.EmployeeName)</span>
+                                                        @if (!string.IsNullOrEmpty(sup.Designation))
+                                                        {
+                                                            <small class="text-muted">(@sup.Designation)</small>
+                                                        }
+                                                        <button type="button" class="btn-close ms-1" style="font-size: 0.65rem;" title="Remove Supervisor" @onclick="() => RemoveSupervisor(hub, sup)"></button>
+                                                    </span>
+                                                }
+                                            }
+                                        </div>
+                                    </div>
+
+                                    <!-- Add Supervisor Dropdown -->
+                                    <div class="row g-2 align-items-center mt-1 position-relative" style="z-index: 10;">
+                                        <div class="col-md-7">
+                                            <div class="custom-typeahead-container">
+                                                <BlazoredTypeahead SearchMethod="SearchUsers"
+                                                                   TValue="UserModel"
+                                                                   TItem="UserModel"
+                                                                   Value="SelectedTempUser"
+                                                                   ValueChanged="@(u => OnUserSelected(hub, u))"
+                                                                   ValueExpression="@(() => SelectedTempUser)"
+                                                                   Placeholder="Search employee or user to add..."
+                                                                   EnableDropDown="true"
+                                                                   MaximumSuggestions="1000">
+                                                    <SelectedTemplate Context="usr">
+                                                        @if (!string.IsNullOrEmpty(usr.EmpID) && usr.EmpID != "0")
+                                                        {
+                                                            <text>[@usr.EmpID] </text>
+                                                        }
+                                                        @(string.IsNullOrEmpty(usr.EmployeeName) ? usr.UserName : usr.EmployeeName)
+                                                        @if (!string.IsNullOrEmpty(usr.Designation))
+                                                        {
+                                                            <text> (@usr.Designation)</text>
+                                                        }
+                                                    </SelectedTemplate>
+                                                    <ResultTemplate Context="usr">
+                                                        <div class="d-flex align-items-center justify-content-between">
+                                                            <div>
+                                                                @if (!string.IsNullOrEmpty(usr.EmpID) && usr.EmpID != "0")
+                                                                {
+                                                                    <strong class="text-primary me-1">[@usr.EmpID]</strong>
+                                                                }
+                                                                <span>@(string.IsNullOrEmpty(usr.EmployeeName) ? usr.UserName : usr.EmployeeName)</span>
+                                                            </div>
+                                                            <small class="text-muted">@(usr.Designation ?? usr.DepartmentName ?? "")</small>
+                                                        </div>
+                                                    </ResultTemplate>
+                                                    <NotFoundTemplate Context="searchText">
+                                                        <span class="text-muted small">No users matching "@searchText"</span>
+                                                    </NotFoundTemplate>
+                                                </BlazoredTypeahead>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-5">
+                                            <small class="text-muted">Search by ID, name, designation, or department.</small>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            }
+                        </div>
+                    }
+
+                </div>
+                <div class="modal-footer py-2 px-3 bg-light d-flex justify-content-between">
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-3" @onclick="CloseModal" disabled="@IsSaving">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-sm btn-success fw-bold px-4" @onclick="SaveAllSupervisorsAsync" disabled="@(IsSaving || !HubsList.Any())">
+                        @if (IsSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-check me-1"></i>
+                            <span>Save Supervisors</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .hub-card {
+        position: relative;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .hub-card:focus-within {
+        z-index: 9999 !important;
+        border-color: #86b7fe !important;
+        box-shadow: 0 0 0 0.15rem rgba(13, 110, 253, 0.1) !important;
+    }
+    .custom-typeahead-container .blazored-typeahead {
+        height: 35px !important;
+        position: relative;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .custom-typeahead-container .blazored-typeahead__controls {
+        height: 35px !important;
+    }
+    .custom-typeahead-container .blazored-typeahead__input-mask,
+    .custom-typeahead-container .blazored-typeahead__input {
+        height: 35px !important;
+        font-size: 0.875rem !important;
+        padding: 0.35rem 0.6rem !important;
+        line-height: 1.5 !important;
+    }
+    .custom-typeahead-container .blazored-typeahead__results {
+        position: absolute !important;
+        z-index: 99999 !important;
+        background: #ffffff !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22) !important;
+        border: 1px solid #ced4da !important;
+        border-radius: 6px !important;
+        max-height: 220px !important;
+        overflow-y: auto !important;
+    }
+    .custom-typeahead-container .blazored-typeahead__result {
+        padding: 0.4rem 0.65rem !important;
+        border-bottom: 1px solid #f1f3f5;
+    }
+    .custom-typeahead-container .blazored-typeahead__result:last-child {
+        border-bottom: none;
+    }
+    .custom-typeahead-container .blazored-typeahead__result-selected {
+        background-color: #0d6efd !important;
+        color: #ffffff !important;
+    }
+    .custom-typeahead-container .blazored-typeahead__result-selected .text-muted,
+    .custom-typeahead-container .blazored-typeahead__result-selected .text-primary {
+        color: #ffffff !important;
+    }
+</style>

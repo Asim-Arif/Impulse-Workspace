@@ -51,5 +51,17 @@ namespace Impulse.Services.Production
         public Task<bool> UpdateItemProcessesFromProcessGroupAsync(int entryId) => _dataAccess.UpdateItemProcessesFromProcessGroupAsync(entryId);
 
         public Task<List<LookupItemInt>> GetAvailableProcessesLookupAsync() => _dataAccess.GetAvailableProcessesLookupAsync();
+
+        public Task<List<string>> GetHubNamesAsync() => _dataAccess.GetHubNamesAsync();
+
+        public Task<bool> AddHubNameAsync(string hubName) => _dataAccess.AddHubNameAsync(hubName);
+
+        public Task<(bool CanDelete, string Reason)> CanDeleteHubNameAsync(string hubName) => _dataAccess.CanDeleteHubNameAsync(hubName);
+
+        public Task<bool> DeleteHubNameAsync(string hubName) => _dataAccess.DeleteHubNameAsync(hubName);
+
+        public Task<List<ProcessGroupHubOverviewDto>> GetGroupHubOverviewAsync(int groupId) => _dataAccess.GetGroupHubOverviewAsync(groupId);
+
+        public Task<bool> SaveGroupHubSupervisorsAsync(int groupId, string hubName, List<int> userIds) => _dataAccess.SaveGroupHubSupervisorsAsync(groupId, hubName, userIds);
     }
 }

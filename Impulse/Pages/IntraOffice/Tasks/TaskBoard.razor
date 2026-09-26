@@ -91,7 +91,7 @@
 
             <!-- Reset & Counter -->
             <div class="col-12 col-md-2 d-flex align-items-center justify-content-md-end justify-content-between gap-2">
-                @if (currentUser != null && allTasks != null && allTasks.Any(t => (t.AssignedTo == currentUser.Id || (t.AdditionalAssigneeIds != null && t.AdditionalAssigneeIds.Contains(currentUser.Id))) && !t.IsRead && t.Status != TaskItemStatus.Completed && t.Status != TaskItemStatus.Cancelled))
+                @if (currentUser != null && allTasks != null && allTasks.Any(t => IsTaskAssignedToUser(t, currentUser.Id) && !t.IsRead && t.Status != TaskItemStatus.Completed && t.Status != TaskItemStatus.Cancelled))
                 {
                     <button class="btn btn-outline-success btn-sm" @onclick="MarkAllTasksRead" title="Mark all your assigned tasks as read">
                         <i class="bi bi-check2-all me-1"></i>Mark Read
@@ -128,7 +128,7 @@
                         <div class="task-card" @onclick="() => SelectTask(task)">
                             <div class="d-flex align-center justify-content-between gap-8 mb-8">
                                 <span class="priority-badge @GetPriorityBadge(task.Priority)">@task.Priority</span>
-                                @if (!task.IsRead && (task.AssignedTo == currentUser?.Id || (task.AdditionalAssigneeIds != null && task.AdditionalAssigneeIds.Contains(currentUser?.Id ?? ""))) && task.Status != TaskItemStatus.Completed && task.Status != TaskItemStatus.Cancelled)
+                                @if (!task.IsRead && IsTaskAssignedToUser(task, currentUser?.Id) && task.Status != TaskItemStatus.Completed && task.Status != TaskItemStatus.Cancelled)
                                 {
                                     <span class="badge bg-danger text-white" style="font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 10px; letter-spacing: 0.5px;">
                                         <i class="bi bi-bell-fill me-1"></i>NEW
@@ -176,7 +176,7 @@
                                         }
                                     </div>
                                     <div>
-                                        <div style="line-height: 1.1; font-weight: 500;">@(string.IsNullOrEmpty(task.AssignedToNames) ? (task.Assignee?.FullName ?? "Unassigned") : task.AssignedToNames)</div>
+                                        <div style="line-height: 1.1; font-weight: 500;">@GetTaskAssigneesDisplay(task)</div>
                                         @if (!string.IsNullOrEmpty(task.Assigner?.FullName))
                                         {
                                             <small class="text-muted" style="font-size: 0.68rem;">By: @task.Assigner.FullName</small>
@@ -185,11 +185,18 @@
                                 </div>
                                 @if (task.DueDate.HasValue)
                                 {
-                                    <span class="@(task.DueDate < DateTime.UtcNow && task.Status != TaskItemStatus.Completed ? "text-danger" : "")">
-                                        <i class="bi bi-calendar"></i> @task.DueDate.Value.ToString("MMM dd")
+                                    var cd = GetTaskCountdown(task);
+                                    <span class="badge @cd.BadgeClass d-inline-flex align-items-center gap-1 py-1 px-2" style="font-size: 0.72rem; letter-spacing: 0.2px;" title="Deadline: @task.DueDate.Value.ToString("MMM dd, yyyy HH:mm")">
+                                        <i class="@cd.IconClass"></i> @cd.Text
                                     </span>
                                 }
                                 <div class="d-flex align-items-center gap-1 ms-auto">
+                                    @if (!string.IsNullOrEmpty(task.ActionUrl))
+                                    {
+                                        <a href="@task.ActionUrl" class="btn btn-outline-primary py-0 px-1 border-0" style="font-size: 0.82rem;" title="Open linked document/order" @onclick:stopPropagation="true">
+                                            <i class="bi bi-box-arrow-up-right"></i>
+                                        </a>
+                                    }
                                     @if (task.WhatsAppMessageSent)
                                     {
                                         <span style="color: #25D366; font-size: 1.05rem;" title="WhatsApp Notification Sent">
@@ -227,22 +234,8 @@
                 <button class="btn btn-ghost btn-icon" @onclick="() => showCreateModal = false"><i class="bi bi-x-lg"></i></button>
             </div>
             <div class="form-group">
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                    <label class="form-label mb-0">Title</label>
-                    @if (selectedAssigneeIds.Count >= 2)
-                    {
-                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25" style="font-size: 0.72rem;">
-                            <i class="bi bi-people-fill me-1"></i>Multi-User Caption Active
-                        </span>
-                    }
-                </div>
-                <input type="text" class="form-control" value="@newTitle" @oninput="HandleTitleInput" placeholder="Task title" />
-                @if (selectedAssigneeIds.Count >= 2)
-                {
-                    <div class="form-text text-muted small" style="font-size: 0.75rem;">
-                        Caption includes the names of all assigned users: <b>@GetAssigneesCaption()</b>
-                    </div>
-                }
+                <label class="form-label">Title</label>
+                <input type="text" class="form-control" @bind="newTitle" placeholder="Task title" />
             </div>
             <div class="form-group">
                 <div class="d-flex justify-content-between align-items-center mb-1">
@@ -272,8 +265,13 @@
                             if (u != null)
                             {
                                 <span class="badge bg-primary d-inline-flex align-items-center gap-1 py-1 px-2" style="font-size: 0.82rem; font-weight: 500;">
-                                    <i class="bi bi-person-check-fill"></i> @u.FullName
-                                    <button type="button" class="btn-close btn-close-white" style="font-size: 0.55rem;" @onclick="() => ToggleUserSelection(id)"></button>
+                                    <i class="bi bi-person-check-fill"></i>
+                                    <span>@u.UserName</span>
+                                    @if (!string.IsNullOrEmpty(u.FullUserName) && !string.Equals(u.FullUserName, u.UserName, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <span style="opacity: 0.85; font-size: 0.78rem;">(@u.FullUserName)</span>
+                                    }
+                                    <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.55rem;" @onclick="() => ToggleUserSelection(id)"></button>
                                 </span>
                             }
                         }
@@ -292,11 +290,17 @@
                         <span class="text-truncate">
                             @if (!selectedAssigneeIds.Any())
                             {
-                                <span class="text-muted">Select employee(s)...</span>
+                                <span class="text-muted">Select user(s)...</span>
                             }
                             else
                             {
-                                <span>@(string.Join(", ", selectedAssigneeIds.Select(id => allUsers?.FirstOrDefault(u => u.Id == id)?.FullName).Where(n => !string.IsNullOrEmpty(n))))</span>
+                                <span>@(string.Join(", ", selectedAssigneeIds.Select(id => {
+                                    var u = allUsers?.FirstOrDefault(x => x.Id == id);
+                                    if (u == null) return null;
+                                    return !string.IsNullOrEmpty(u.FullUserName) && !string.Equals(u.FullUserName, u.UserName, StringComparison.OrdinalIgnoreCase) 
+                                        ? $"{u.UserName} ({u.FullUserName})" 
+                                        : u.UserName;
+                                }).Where(n => !string.IsNullOrEmpty(n))))</span>
                             }
                         </span>
                         <i class="bi bi-chevron-down text-muted small"></i>
@@ -305,13 +309,17 @@
                     {
                         <div class="dropdown-menu show w-100 shadow-lg p-2" style="max-height: 230px; overflow-y: auto; z-index: 1050; border: 1px solid #cbd5e1; position: absolute; top: 100%; left: 0;">
                             <div class="px-1 pb-2 border-bottom mb-2">
-                                <input type="text" class="form-control form-control-sm" placeholder="Search employees..." @bind="userSearchFilter" @bind:event="oninput" @onclick:stopPropagation />
+                                <input type="text" class="form-control form-control-sm" placeholder="Search by username or name..." @bind="userSearchFilter" @bind:event="oninput" @onclick:stopPropagation />
                             </div>
                             @if (allUsers != null)
                             {
                                 var filtered = string.IsNullOrWhiteSpace(userSearchFilter) 
                                     ? allUsers 
-                                    : allUsers.Where(u => u.FullName.Contains(userSearchFilter, StringComparison.OrdinalIgnoreCase)).ToList();
+                                    : allUsers.Where(u => 
+                                        (u.UserName != null && u.UserName.Contains(userSearchFilter, StringComparison.OrdinalIgnoreCase)) ||
+                                        (!string.IsNullOrEmpty(u.FullUserName) && u.FullUserName.Contains(userSearchFilter, StringComparison.OrdinalIgnoreCase)) ||
+                                        (!string.IsNullOrEmpty(u.DepartmentName) && u.DepartmentName.Contains(userSearchFilter, StringComparison.OrdinalIgnoreCase))
+                                    ).ToList();
 
                                 @foreach (var u in filtered)
                                 {
@@ -320,7 +328,19 @@
                                          style="cursor: pointer;"
                                          @onclick="() => ToggleUserSelection(u.Id)" @onclick:stopPropagation>
                                         <input type="checkbox" class="form-check-input mt-0" checked="@isSelected" @onclick:stopPropagation @onchange="() => ToggleUserSelection(u.Id)" style="cursor: pointer;" />
-                                        <span>@u.FullName</span>
+                                        <div class="d-flex flex-column" style="line-height: 1.2;">
+                                            <div class="d-flex align-items-center gap-1">
+                                                <span class="fw-semibold text-dark">@u.UserName</span>
+                                                @if (!string.IsNullOrEmpty(u.FullUserName) && !string.Equals(u.FullUserName, u.UserName, StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    <span class="text-secondary small">(@u.FullUserName)</span>
+                                                }
+                                            </div>
+                                            @if (!string.IsNullOrEmpty(u.Designation))
+                                            {
+                                                <span class="text-muted" style="font-size: 0.72rem;">@u.Designation</span>
+                                            }
+                                        </div>
                                         @if (!string.IsNullOrEmpty(u.Department?.Name))
                                         {
                                             <span class="badge bg-light text-muted border ms-auto small" style="font-size: 0.7rem;">@u.Department.Name</span>
@@ -388,8 +408,18 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" @onclick="() => showCreateModal = false">Cancel</button>
-                <button class="btn btn-primary" @onclick="CreateTask">Create Task</button>
+                <button class="btn btn-secondary" @onclick="() => showCreateModal = false" disabled="@isSavingTask">Cancel</button>
+                <button class="btn btn-primary" @onclick="CreateTask" disabled="@isSavingTask">
+                    @if (isSavingTask)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        <span>Saving...</span>
+                    }
+                    else
+                    {
+                        <span>Create Task</span>
+                    }
+                </button>
             </div>
         </div>
     </div>
@@ -428,11 +458,24 @@
             }
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; font-size: 0.88rem;">
-                <div><strong>Assigned To:</strong> @(string.IsNullOrEmpty(selectedTask.AssignedToNames) ? (selectedTask.Assignee?.FullName ?? "Unassigned") : selectedTask.AssignedToNames)</div>
+                <div><strong>Assigned To:</strong> @GetTaskAssigneesDisplay(selectedTask)</div>
                 <div><strong>Assigned By:</strong> @(selectedTask.Assigner?.FullName ?? "Unknown")</div>
                 <div><strong>Created:</strong> @selectedTask.CreatedAt.ToString("MMM dd, yyyy hh:mm tt")</div>
                 <div><strong>Due:</strong> @(selectedTask.DueDate?.ToString("MMM dd, yyyy") ?? "No due date")</div>
             </div>
+
+            @if (!string.IsNullOrEmpty(selectedTask.ActionUrl))
+            {
+                <div class="mb-3 p-2 rounded-3 bg-primary bg-opacity-10 border border-primary border-opacity-25 d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-2 text-primary" style="font-size: 0.85rem;">
+                        <i class="bi bi-link-45deg fs-5"></i>
+                        <span><strong>Linked Entity:</strong> @(selectedTask.SourceEntityType ?? "Record") @(selectedTask.SourceEntityRefId)</span>
+                    </div>
+                    <a href="@selectedTask.ActionUrl" class="btn btn-primary btn-sm px-3 shadow-sm">
+                        <i class="bi bi-box-arrow-up-right me-1"></i> Open Record
+                    </a>
+                </div>
+            }
 
             <!-- State Transitions & Time Taken Section -->
             <div class="card mb-3 border-0 bg-light rounded-3 p-3">
@@ -641,7 +684,7 @@
 
             if (!string.IsNullOrWhiteSpace(filterAssignedToId))
             {
-                q = q.Where(t => t.AssignedTo == filterAssignedToId || (t.AdditionalAssigneeIds != null && t.AdditionalAssigneeIds.Contains(filterAssignedToId)));
+                q = q.Where(t => IsTaskAssignedToUser(t, filterAssignedToId));
             }
 
             return q;
@@ -680,11 +723,16 @@
         }
 
         var rawUsers = await IntraOfficeService.GetActiveUsersAsync();
-        allUsers = rawUsers.Where(u => u.IsActive).OrderBy(u => u.FullName).ToList();
+        allUsers = rawUsers.Where(u => u.IsActive).OrderBy(u => u.UserName).ToList();
 
         await LoadTasks();
 
         NotificationService.OnNotificationReceived += HandleTaskNotification;
+
+        _countdownTimer = new Timer(async _ =>
+        {
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
     }
 
     private async Task HandleTaskNotification(AppNotification notif)
@@ -830,14 +878,12 @@
             selectedAssigneeIds.Add(userId);
         }
         newAssigneeId = selectedAssigneeIds.FirstOrDefault() ?? "";
-        UpdateTaskCaptionWithAssignees();
     }
 
     private void ClearSelectedAssignees()
     {
         selectedAssigneeIds.Clear();
         newAssigneeId = "";
-        UpdateTaskCaptionWithAssignees();
     }
 
     private string GetAssigneesCaption()
@@ -845,7 +891,9 @@
         if (allUsers == null || !selectedAssigneeIds.Any()) return "";
         var names = allUsers
             .Where(u => selectedAssigneeIds.Contains(u.Id))
-            .Select(u => u.FullName ?? u.UserName ?? "User")
+            .Select(u => !string.IsNullOrEmpty(u.FullUserName) && !string.Equals(u.FullUserName, u.UserName, StringComparison.OrdinalIgnoreCase)
+                ? $"{u.UserName} ({u.FullUserName})"
+                : u.UserName)
             .ToList();
 
         if (!names.Any()) return "";
@@ -854,85 +902,81 @@
         return $"{string.Join(", ", names.Take(names.Count - 1))} & {names.Last()}";
     }
 
-    private void UpdateTaskCaptionWithAssignees()
+    private bool IsTaskAssignedToUser(TaskItem? task, string? userId)
     {
-        var caption = GetAssigneesCaption();
-        if (string.IsNullOrWhiteSpace(caption))
-        {
-            if (isTitleAutoGenerated)
-            {
-                newTitle = "";
-                isTitleAutoGenerated = false;
-            }
-            else if (newTitle.StartsWith("[") && newTitle.Contains("]"))
-            {
-                var closing = newTitle.IndexOf("]");
-                newTitle = newTitle.Substring(closing + 1).TrimStart();
-            }
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(newTitle) || isTitleAutoGenerated)
-        {
-            newTitle = caption;
-            isTitleAutoGenerated = true;
-        }
-        else if (newTitle.StartsWith("[") && newTitle.Contains("]"))
-        {
-            var closing = newTitle.IndexOf("]");
-            var rest = newTitle.Substring(closing + 1).TrimStart();
-            newTitle = string.IsNullOrWhiteSpace(rest) ? caption : $"[{caption}] {rest}";
-        }
-        else
-        {
-            newTitle = $"[{caption}] {newTitle}";
-        }
+        if (task == null || string.IsNullOrWhiteSpace(userId)) return false;
+        if (string.Equals(task.AssignedTo, userId, StringComparison.OrdinalIgnoreCase)) return true;
+        if (task.Assignees != null && task.Assignees.Any(a => string.Equals(a.UserName, userId, StringComparison.OrdinalIgnoreCase))) return true;
+        if (!string.IsNullOrEmpty(task.AdditionalAssigneeIds) && ("," + task.AdditionalAssigneeIds + ",").Contains("," + userId + ",")) return true;
+        return false;
     }
 
-    private void HandleTitleInput(ChangeEventArgs e)
+    private string GetTaskAssigneesDisplay(TaskItem? task)
     {
-        newTitle = e.Value?.ToString() ?? "";
-        isTitleAutoGenerated = false;
+        if (task == null) return "Unassigned";
+        if (task.Assignees != null && task.Assignees.Any())
+        {
+            var names = task.Assignees
+                .Select(a => !string.IsNullOrWhiteSpace(a.FullUserName) ? a.FullUserName : a.UserName)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Distinct()
+                .ToList();
+            if (names.Count > 0)
+            {
+                return names.Count == 1 ? names[0] : $"{string.Join(", ", names.Take(names.Count - 1))} & {names.Last()}";
+            }
+        }
+        return !string.IsNullOrEmpty(task.AssignedToNames) ? task.AssignedToNames : (task.Assignee?.FullName ?? "Unassigned");
     }
+
+    private bool isSavingTask = false;
 
     private async Task CreateTask()
     {
-        if (string.IsNullOrWhiteSpace(newTitle) || currentUser == null) return;
+        if (string.IsNullOrWhiteSpace(newTitle) || currentUser == null || isSavingTask) return;
+        isSavingTask = true;
         try
         {
+            var firstAssignee = selectedAssigneeIds.FirstOrDefault() ?? (string.IsNullOrEmpty(newAssigneeId) ? null : newAssigneeId);
+
             var task = new TaskItem
             {
                 Title = newTitle.Trim(),
                 Description = newDesc,
-                AssignedTo = selectedAssigneeIds.FirstOrDefault() ?? (string.IsNullOrEmpty(newAssigneeId) ? null : newAssigneeId),
+                AssignedTo = firstAssignee,
+                AdditionalAssigneeIds = selectedAssigneeIds.Count > 1 ? string.Join(",", selectedAssigneeIds) : null,
+                AssignedToNames = GetAssigneesCaption(),
                 AssignedBy = currentUser.Id,
                 Priority = (TaskPriority)newPriority,
                 DueDate = newDueDate,
-                Attachments = pendingAttachments.ToList()
+                Attachments = pendingAttachments.ToList(),
+                Assignees = selectedAssigneeIds.Select(id => new TaskAssignee
+                {
+                    UserName = id,
+                    FullUserName = allUsers?.FirstOrDefault(u => u.Id == id)?.FullName ?? id
+                }).ToList()
             };
-            var createdTask = await TaskService.CreateTaskAsync(task, sendWhatsApp, null, sendEmail, selectedAssigneeIds);
+
+            // Close modal immediately and update state
             showCreateModal = false;
+            StateHasChanged();
+
+            var createdTask = await TaskService.CreateTaskAsync(task, sendWhatsApp, null, sendEmail, selectedAssigneeIds);
             newTitle = ""; newDesc = ""; newAssigneeId = ""; newPriority = 1; newDueDate = null;
             selectedAssigneeIds.Clear();
             pendingAttachments.Clear();
             sendWhatsApp = true;
             sendEmail = true;
-            isTitleAutoGenerated = false;
             await LoadTasks();
 
-            var toasts = new List<string>();
-            if (createdTask.WhatsAppMessageSent) toasts.Add("WhatsApp Sent");
-            if (createdTask.EmailMessageSent) toasts.Add("Email Sent");
+            toastMessage = "Task created successfully!";
+            StateHasChanged();
 
-            if (toasts.Any())
+            _ = Task.Run(async () =>
             {
-                toastMessage = string.Join(" & ", toasts) + " to Assigned User(s)";
-                _ = Task.Run(async () =>
-                {
-                    try { await Task.Delay(4000, _cts.Token); toastMessage = null; await InvokeAsync(StateHasChanged); }
-                    catch (OperationCanceledException) { }
-                });
-            }
+                try { await Task.Delay(4000, _cts.Token); toastMessage = null; await InvokeAsync(StateHasChanged); }
+                catch (OperationCanceledException) { }
+            });
         }
         catch (Exception ex)
         {
@@ -943,12 +987,16 @@
                 catch (OperationCanceledException) { }
             });
         }
+        finally
+        {
+            isSavingTask = false;
+        }
     }
 
     private async Task SelectTask(TaskItem task)
     {
         selectedTask = await TaskService.GetTaskByIdAsync(task.Id);
-        var isAssignedToCurrent = currentUser != null && (task.AssignedTo == currentUser.Id || (task.AdditionalAssigneeIds != null && task.AdditionalAssigneeIds.Contains(currentUser.Id)));
+        var isAssignedToCurrent = currentUser != null && IsTaskAssignedToUser(task, currentUser.Id);
         if (!task.IsRead && isAssignedToCurrent)
         {
             task.IsRead = true;
@@ -964,7 +1012,7 @@
         await TaskService.MarkAllTasksAsReadAsync(currentUser.Id);
         if (allTasks != null)
         {
-            foreach (var t in allTasks.Where(t => t.AssignedTo == currentUser.Id || (t.AdditionalAssigneeIds != null && t.AdditionalAssigneeIds.Contains(currentUser.Id))))
+            foreach (var t in allTasks.Where(t => IsTaskAssignedToUser(t, currentUser.Id)))
             {
                 t.IsRead = true;
             }
@@ -1174,10 +1222,75 @@
     };
 
     private CancellationTokenSource _cts = new();
+    private Timer? _countdownTimer;
+
+    private record TaskCountdownInfo(string Text, string BadgeClass, string IconClass);
+
+    private TaskCountdownInfo GetTaskCountdown(TaskItem task)
+    {
+        if (!task.DueDate.HasValue)
+        {
+            return new TaskCountdownInfo("No deadline", "bg-light text-muted border", "bi bi-calendar");
+        }
+
+        var dueDate = task.DueDate.Value;
+        var now = DateTime.UtcNow;
+
+        if (task.Status == TaskItemStatus.Completed)
+        {
+            return new TaskCountdownInfo($"Completed ({dueDate:MMM dd})", "bg-success bg-opacity-10 text-success border border-success border-opacity-25", "bi bi-check-circle-fill");
+        }
+
+        if (task.Status == TaskItemStatus.Cancelled)
+        {
+            return new TaskCountdownInfo("Cancelled", "bg-secondary bg-opacity-10 text-muted border", "bi bi-x-circle");
+        }
+
+        if (now >= dueDate)
+        {
+            var overdue = now - dueDate;
+            string formatted = FormatTimeSpan(overdue);
+            return new TaskCountdownInfo($"Overdue by {formatted}", "bg-danger text-white fw-bold shadow-sm", "bi bi-exclamation-triangle-fill");
+        }
+
+        var remaining = dueDate - now;
+        var totalDuration = dueDate - task.CreatedAt;
+
+        // Check if 70% of time has elapsed
+        bool is70PercentElapsed = false;
+        if (totalDuration.TotalSeconds > 0)
+        {
+            var elapsed = now - task.CreatedAt;
+            is70PercentElapsed = (elapsed.TotalSeconds / totalDuration.TotalSeconds) >= 0.70;
+        }
+
+        string remainingText = $"{FormatTimeSpan(remaining)} left";
+
+        if (is70PercentElapsed)
+        {
+            return new TaskCountdownInfo(remainingText, "bg-warning text-dark border border-warning fw-semibold shadow-sm", "bi bi-clock-history");
+        }
+
+        return new TaskCountdownInfo(remainingText, "bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25", "bi bi-stopwatch");
+    }
+
+    private static string FormatTimeSpan(TimeSpan ts)
+    {
+        if (ts.TotalDays >= 1)
+        {
+            return $"{ts.Days}d {ts.Hours}h {ts.Minutes}m";
+        }
+        if (ts.TotalHours >= 1)
+        {
+            return $"{ts.Hours}h {ts.Minutes}m";
+        }
+        return $"{Math.Max(1, ts.Minutes)}m";
+    }
 
     public void Dispose()
     {
         NotificationService.OnNotificationReceived -= HandleTaskNotification;
+        _countdownTimer?.Dispose();
         _cts.Cancel();
         _cts.Dispose();
     }

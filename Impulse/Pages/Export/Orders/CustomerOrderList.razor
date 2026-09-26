@@ -1,4 +1,5 @@
 @page "/export/customer-order-list"
+@page "/export/orders/customer-order-list"
 @attribute [Authorize]
 @using DataAccessLibrary.Models.ViewModels.Export
 @using Impulse.Services
@@ -188,6 +189,7 @@
                                             <th>Customer</th>
                                             <th>Country</th>
                                             <th>Order #</th>
+                                            <th class="text-center">Auth</th>
                                             <th>Type</th>
                                             <th>Int. Ref #</th>
                                             <th class="text-center">Order DT</th>
@@ -207,7 +209,7 @@
                                         @if (!allOrders.Any())
                                         {
                                             <tr>
-                                                <td colspan="18" class="text-center text-muted py-4">No customer orders found matching these filters.</td>
+                                                <td colspan="19" class="text-center text-muted py-4">No customer orders found matching these filters.</td>
                                             </tr>
                                         }
                                         else
@@ -227,6 +229,20 @@
                                                     <td>@order.CustCode</td>
                                                     <td>@order.Country</td>
                                                     <td class="fw-semibold">@order.OrderNo</td>
+                                                    <td class="text-center">
+                                                        @if (order.Authorized)
+                                                        {
+                                                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" title="Authorized by @order.AuthorizedBy on @(order.AuthorizedDT?.ToString("dd-MMM-yyyy HH:mm"))">
+                                                                <i class="fas fa-check-circle me-1"></i>Auth
+                                                            </span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1" title="Pending Director Authorization">
+                                                                <i class="fas fa-clock me-1"></i>Pending
+                                                            </span>
+                                                        }
+                                                    </td>
                                                     <td>@order.OrderType</td>
                                                     <td>@order.InternalRefNo</td>
                                                     <td class="text-center">@order.DT.ToString("dd-MMM-yyyy")</td>
@@ -335,6 +351,18 @@
 
         <div class="win11-divider"></div>
         <div class="win11-section-header">Status Management</div>
+        @if (!order.Authorized && isDirector)
+        {
+            <Item class="win11-menu-item" OnClick="@(() => AuthorizeOrder(order))">
+                <i class="fas fa-stamp fa-fw win11-icon text-success"></i> Authorize Order
+            </Item>
+        }
+        @if (order.Authorized)
+        {
+            <div class="px-3 py-1 text-muted" style="font-size: 0.75rem;">
+                <i class="fas fa-shield-alt text-success me-1"></i>Authorized by @order.AuthorizedBy
+            </div>
+        }
         @if (order.Cancelled == 0)
         {
             <Item class="win11-menu-item" OnClick="@(() => CancelOrder(order))">

@@ -39,6 +39,11 @@ namespace DataAccessLibrary.Interface.IntraOffice
         Task<int> CreateTaskAsync(TaskItem task);
         Task<bool> UpdateTaskStatusAsync(int taskId, TaskItemStatus status, DateTime? completedAt = null);
         Task<int> AddTaskCommentAsync(TaskComment comment);
+        Task<List<TaskDueMonitoringDto>> GetTasksPending70PercentDueWarningAsync();
+        Task<List<TaskDueMonitoringDto>> GetTasksPendingOverdueAlertAsync();
+        Task<bool> MarkDueWarningSentAsync(int taskId);
+        Task<bool> MarkOverdueWarningSentAsync(int taskId);
+        Task<List<string>> GetHubSupervisorsForLotTaskAsync(string lotNo, string hubName);
 
         // 6. Meetings
         Task<List<Meeting>> GetMeetingsForUserAsync(string userId);

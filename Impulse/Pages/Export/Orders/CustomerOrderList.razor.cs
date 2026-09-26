@@ -10,6 +10,8 @@ using DataAccessLibrary.Models.ViewModels.Export;
 using Impulse.Constants;
 using Impulse.Services;
 using Impulse.Services.Export;
+using Impulse.Services.WorkflowTasks;
+using DataAccessLibrary.Interface.Setup;
 
 namespace Impulse.Pages.Export.Orders
 {
@@ -22,10 +24,19 @@ namespace Impulse.Pages.Export.Orders
         [Inject] private IDBHelperService DbHelper { get; set; } = null!;
         [Inject] private IBlazorContextMenuService BlazorContextMenuService { get; set; } = null!;
         [Inject] private Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthenticationStateProvider { get; set; } = null!;
+        [Inject] private IWorkflowTaskEngine WorkflowTaskEngine { get; set; } = null!;
+        [Inject] private IUserRoleDataAccess UserRoleDataAccess { get; set; } = null!;
+        [Inject] private IUserDataAccess UserDataAccess { get; set; } = null!;
 
         [Parameter]
         [SupplyParameterFromQuery(Name = "viewType")]
         public int ViewType { get; set; } = 0; // 0 = Show All, 1 = Non Parts & Stock, 2 = Parts & Stock Only
+
+        [Parameter]
+        [SupplyParameterFromQuery(Name = "orderNo")]
+        public string? OrderNoParam { get; set; }
+
+        private bool isDirector = false;
 
         private bool isLoading = true;
         private string searchText = string.Empty;
@@ -72,13 +83,58 @@ namespace Impulse.Pages.Export.Orders
 
         protected override async Task OnInitializedAsync()
         {
+            await CheckDirectorRoleAsync();
             await LoadLookups();
+
+            if (!string.IsNullOrWhiteSpace(OrderNoParam))
+            {
+                searchText = OrderNoParam.Trim();
+                selectedStatusFilter = 4; // <All Orders>
+                dtFrom = DateTime.Today.AddYears(-5); // Widen date range to ensure target order is loaded
+            }
+
             await RefreshList();
         }
 
         protected override async Task OnParametersSetAsync()
         {
+            if (!string.IsNullOrWhiteSpace(OrderNoParam) && searchText != OrderNoParam.Trim())
+            {
+                searchText = OrderNoParam.Trim();
+                selectedStatusFilter = 4;
+                dtFrom = DateTime.Today.AddYears(-5);
+            }
             await RefreshList();
+        }
+
+        private async Task CheckDirectorRoleAsync()
+        {
+            try
+            {
+                var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                var user = authState.User;
+                if (user.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(user.Identity.Name))
+                {
+                    var dbUser = await UserDataAccess.GetUserByUserNameAsync(user.Identity.Name);
+                    if (dbUser != null)
+                    {
+                        if (dbUser.UserManagement == true)
+                        {
+                            isDirector = true;
+                            return;
+                        }
+                        var roles = await UserRoleDataAccess.GetRolesByUserIdAsync(dbUser.UserID);
+                        if (roles != null && roles.Any(r => r.Equals("Director", StringComparison.OrdinalIgnoreCase)))
+                        {
+                            isDirector = true;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error checking director role: {ex.Message}");
+            }
         }
 
         private async Task LoadLookups()
@@ -144,6 +200,11 @@ namespace Impulse.Pages.Export.Orders
                 // Recalculate totals
                 totalAmtPKR = allOrders.Sum(o => o.OrderAmt * (o.ExchRate ?? 1));
                 highlightedOrder = null;
+
+                if (!string.IsNullOrWhiteSpace(OrderNoParam))
+                {
+                    highlightedOrder = allOrders.FirstOrDefault(o => o.OrderNo.Equals(OrderNoParam.Trim(), StringComparison.OrdinalIgnoreCase));
+                }
             }
             catch (Exception ex)
             {
@@ -445,6 +506,42 @@ namespace Impulse.Pages.Export.Orders
             }
         }
 
+        // ── Director Authorization ──
+
+        private async Task AuthorizeOrder(CustomerOrderListItemModel order)
+        {
+            if (order.Authorized)
+            {
+                NotificationServiceManager.ShowWarning("Already Authorized", $"Order {order.OrderNo} is already authorized.");
+                return;
+            }
+
+            if (!isDirector)
+            {
+                NotificationServiceManager.ShowWarning("Permission Denied", "Only users with the Director role can authorize customer orders.");
+                return;
+            }
+
+            try
+            {
+                string currentUserName = await GetLoggedInUserNameAsync();
+                bool success = await WorkflowTaskEngine.AuthorizeCustomerOrderAsync(order.OrderNo, currentUserName);
+                if (success)
+                {
+                    NotificationServiceManager.ShowSuccess("Order Authorized", $"Customer Order {order.OrderNo} has been authorized successfully and workflow task generated for PPC.");
+                    await RefreshList();
+                }
+                else
+                {
+                    NotificationServiceManager.ShowError("Authorization Failed", $"Could not authorize Customer Order {order.OrderNo}.");
+                }
+            }
+            catch (Exception ex)
+            {
+                NotificationServiceManager.ShowError("Authorization Error", ex.Message);
+            }
+        }
+
         // ── Crystal Reports Triggering ──
 
         private async Task PrintOrderWrangler(string orderNo, bool printBalance = false, bool makerWise = false, bool stockSummary = false, bool groupwise = false, bool markingPlan = false, bool withValue = false, bool productionOrder = false, bool orderStatus = false, bool orderDetails = false, int reportType = 0)
@@ -534,6 +631,13 @@ namespace Impulse.Pages.Export.Orders
 
         private async Task PrintMaterialConsumptionSheet(string orderNo, bool articleWise = false)
         {
+            var order = allOrders.FirstOrDefault(o => o.OrderNo.Equals(orderNo, StringComparison.OrdinalIgnoreCase));
+            if (order != null && !order.Authorized)
+            {
+                NotificationServiceManager.ShowWarning("Unauthorized Order", $"Order {orderNo} is not authorized yet. Material consumption planning is restricted until authorized by a Director.");
+                return;
+            }
+
             string reportName = articleWise ? "MaterialConsumptionSheet_Articlewise.rpt" : "MaterialConsumptionSheet.rpt";
             var request = new ReportRequest
             {
@@ -555,6 +659,13 @@ namespace Impulse.Pages.Export.Orders
 
         private async Task PrintDeliverySchedule(string orderNo)
         {
+            var order = allOrders.FirstOrDefault(o => o.OrderNo.Equals(orderNo, StringComparison.OrdinalIgnoreCase));
+            if (order != null && !order.Authorized)
+            {
+                NotificationServiceManager.ShowWarning("Unauthorized Order", $"Order {orderNo} is not authorized yet. Delivery scheduling is restricted until authorized by a Director.");
+                return;
+            }
+
             var request = new ReportRequest
             {
                 ReportName = ReportNames.Export.OrderItemList,
@@ -633,6 +744,13 @@ namespace Impulse.Pages.Export.Orders
 
         private async Task PrintProductionExportCost(string orderNo)
         {
+            var order = allOrders.FirstOrDefault(o => o.OrderNo.Equals(orderNo, StringComparison.OrdinalIgnoreCase));
+            if (order != null && !order.Authorized)
+            {
+                NotificationServiceManager.ShowWarning("Unauthorized Order", $"Order {orderNo} is not authorized yet. Production export costing is restricted until authorized by a Director.");
+                return;
+            }
+
             var request = new ReportRequest
             {
                 ReportName = ReportNames.Export.ProductionExportCost,

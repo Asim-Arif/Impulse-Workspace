@@ -23,6 +23,9 @@
                 </div>
 
                 <div class="ms-auto d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold px-3" @onclick="OpenHubNamesModal">
+                        <i class="fas fa-layer-group me-1"></i> Manage Hub Names
+                    </button>
                     <button type="button" class="btn btn-sm btn-success fw-bold px-3" @onclick="OpenCreateModal">
                         <i class="fas fa-plus-circle me-1"></i> New Process Group
                     </button>
@@ -55,7 +58,7 @@
                             <th style="min-width: 250px;">Group Description</th>
                             <th style="width: 110px;" class="text-center">Total Steps</th>
                             <th style="min-width: 350px;">Sequential Flow Preview</th>
-                            <th style="width: 150px;" class="text-center">Actions</th>
+                            <th style="width: 160px;" class="text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -109,6 +112,9 @@
                                             <button type="button" class="btn btn-link btn-sm p-1 text-primary" title="Edit Group" @onclick="() => OpenEditModal(g)">
                                                 <i class="fas fa-pencil-alt"></i>
                                             </button>
+                                            <button type="button" class="btn btn-link btn-sm p-1" style="color: #6f42c1;" title="Assign Hub Supervisors" @onclick="() => OpenSupervisorsModal(g)">
+                                                <i class="fas fa-user-shield"></i>
+                                            </button>
                                             <button type="button" class="btn btn-link btn-sm p-1 text-info" title="Copy Group" @onclick="() => OpenCopyModal(g)">
                                                 <i class="fas fa-copy"></i>
                                             </button>
@@ -140,6 +146,9 @@
     <Item class="win11-menu-item" OnClick="@ContextEdit">
         <i class="fas fa-pencil-alt fa-fw win11-icon text-primary"></i> Edit Group
     </Item>
+    <Item class="win11-menu-item" OnClick="@ContextAssignSupervisors">
+        <i class="fas fa-user-shield fa-fw win11-icon" style="color: #6f42c1;"></i> Assign Hub Supervisors
+    </Item>
     <Item class="win11-menu-item" OnClick="@ContextCopy">
         <i class="fas fa-copy fa-fw win11-icon text-info"></i> Copy Group
     </Item>
@@ -162,6 +171,16 @@
                    IsCopy="IsCopyMode"
                    OnSaved="OnGroupModalSaved"
                    OnClosed="OnGroupModalClosed" />
+
+<!-- Hub Names Management Modal -->
+<HubNamesModal IsOpen="ShowHubNamesModal"
+               OnClosed="() => ShowHubNamesModal = false" />
+
+<!-- Process Group Hub Supervisors Modal -->
+<ProcessGroupSupervisorsModal IsOpen="ShowSupervisorsModal"
+                              Group="GroupForSupervisors"
+                              OnClosed="() => ShowSupervisorsModal = false"
+                              OnSaved="OnSupervisorsSaved" />
 
 <!-- Cascade Update Confirmation Modal -->
 @if (ShowCascadeModal && GroupForCascade != null)

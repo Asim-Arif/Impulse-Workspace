@@ -65,10 +65,10 @@
                                                    ValueExpression="@(() => SelectedCustomer)"
                                                    Placeholder="Select Customer">
                                     <SelectedTemplate Context="selectedCust">
-                                        @selectedCust?.Name
+                                        @selectedCust?.CustCode
                                     </SelectedTemplate>
                                     <ResultTemplate Context="cust">
-                                        @cust.Name
+                                        @cust.CustCode
                                     </ResultTemplate>
                                 </BlazoredTypeahead>
                             </div>
@@ -345,5 +345,12 @@
     .form-control-sm, .form-select-sm {
         height: 31px !important;
         font-size: 0.875rem !important;
+    }
+    .form-select-sm, select.form-select-sm {
+        padding-top: 0.15rem !important;
+        padding-bottom: 0.15rem !important;
+        padding-left: 0.5rem !important;
+        padding-right: 1.75rem !important;
+        line-height: 1.5 !important;
     }
 </style>

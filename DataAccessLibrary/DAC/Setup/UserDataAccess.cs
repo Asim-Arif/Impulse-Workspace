@@ -52,6 +52,7 @@ namespace DataAccessLibrary.DAC.Setup
                         COALESCE(u.FixedAssetsMainLink, 0) AS FixedAssetsMainLink,
                         COALESCE(u.SamplingMainLink, 0) AS SamplingMainLink,
                         COALESCE(u.HelpMainLink, 0) AS HelpMainLink,
+                        COALESCE(u.IntraOfficeMainLink, 0) AS IntraOfficeMainLink,
                         COALESCE(u.OpenCommandCenter, 0) AS OpenCommandCenter,
                         COALESCE(u.RestrictedItemProfile, 0) AS RestrictedItemProfile,
                         COALESCE(u.GeneralInfoItemProfile, 0) AS GeneralInfoItemProfile,
@@ -91,7 +92,26 @@ namespace DataAccessLibrary.DAC.Setup
 
                 var searchParam = string.IsNullOrWhiteSpace(search) ? null : $"%{search.Trim()}%";
                 var result = await db.QueryAsync<UserModel>(sql, new { Search = search, SearchParam = searchParam, ActiveOnly = activeOnly });
-                return result.ToList();
+                var users = result.ToList();
+
+                if (users.Count > 0)
+                {
+                    const string rolesSql = "SELECT UserID, User_Role FROM Users_User_Roles ORDER BY UserID, User_Role";
+                    var roleRows = await db.QueryAsync<(int UserID, string User_Role)>(rolesSql);
+                    var roleMap = roleRows
+                        .GroupBy(r => r.UserID)
+                        .ToDictionary(g => g.Key, g => g.Select(r => r.User_Role).ToList());
+
+                    foreach (var user in users)
+                    {
+                        if (roleMap.TryGetValue(user.UserID, out var roles))
+                        {
+                            user.AssignedRoles = roles;
+                        }
+                    }
+                }
+
+                return users;
             }
             catch (Exception ex)
             {
@@ -126,6 +146,7 @@ namespace DataAccessLibrary.DAC.Setup
                         COALESCE(u.FixedAssetsMainLink, 0) AS FixedAssetsMainLink,
                         COALESCE(u.SamplingMainLink, 0) AS SamplingMainLink,
                         COALESCE(u.HelpMainLink, 0) AS HelpMainLink,
+                        COALESCE(u.IntraOfficeMainLink, 0) AS IntraOfficeMainLink,
                         COALESCE(u.OpenCommandCenter, 0) AS OpenCommandCenter,
                         COALESCE(u.RestrictedItemProfile, 0) AS RestrictedItemProfile,
                         COALESCE(u.GeneralInfoItemProfile, 0) AS GeneralInfoItemProfile,
@@ -161,7 +182,14 @@ namespace DataAccessLibrary.DAC.Setup
                     LEFT JOIN Departments d ON e.deptid = d.deptid
                     WHERE u.UserID = @UserID";
 
-                return await db.QueryFirstOrDefaultAsync<UserModel>(sql, new { UserID = userId });
+                var user = await db.QueryFirstOrDefaultAsync<UserModel>(sql, new { UserID = userId });
+                if (user != null)
+                {
+                    const string rolesSql = "SELECT User_Role FROM Users_User_Roles WHERE UserID = @UserID ORDER BY User_Role";
+                    var roles = await db.QueryAsync<string>(rolesSql, new { UserID = userId });
+                    user.AssignedRoles = roles.ToList();
+                }
+                return user;
             }
             catch (Exception ex)
             {
@@ -176,7 +204,14 @@ namespace DataAccessLibrary.DAC.Setup
             {
                 using var db = CreateConnection();
                 var sql = "SELECT * FROM Users WHERE UserName = @UserName";
-                return await db.QueryFirstOrDefaultAsync<UserModel>(sql, new { UserName = userName });
+                var user = await db.QueryFirstOrDefaultAsync<UserModel>(sql, new { UserName = userName });
+                if (user != null)
+                {
+                    const string rolesSql = "SELECT User_Role FROM Users_User_Roles WHERE UserID = @UserID ORDER BY User_Role";
+                    var roles = await db.QueryAsync<string>(rolesSql, new { UserID = user.UserID });
+                    user.AssignedRoles = roles.ToList();
+                }
+                return user;
             }
             catch (Exception ex)
             {
@@ -194,14 +229,14 @@ namespace DataAccessLibrary.DAC.Setup
                     INSERT INTO Users (
                         UserName, Password, FullUserName, EmpID, InActive,
                         UserManagement, ChangePassword,
-                        CompanyMainLink, FinancialMainLink, PayrollMainLink, ExportMainLink, StockMainLink, ProductionMainLink, DashBoardMainLink, QMSMainLink, FixedAssetsMainLink, SamplingMainLink, HelpMainLink, OpenCommandCenter,
+                        CompanyMainLink, FinancialMainLink, PayrollMainLink, ExportMainLink, StockMainLink, ProductionMainLink, DashBoardMainLink, QMSMainLink, FixedAssetsMainLink, SamplingMainLink, HelpMainLink, IntraOfficeMainLink, OpenCommandCenter,
                         RestrictedItemProfile, GeneralInfoItemProfile, ProcessesItemProfile, WeightItemProfile, PriceItemProfile, ReferencesItemProfile, PictureItemProfile, RMItemProfile, ShipInfoItemProfile, RestrictCompanyCatalogEditing,
                         AuthorizeVouchers, AuthorizeIssuance, PostMakerBill, ChangeRateonIssuance, ChangeRateMakerAssign, MakerBill_EditRate, HideRateMakerAssign, AddEditCustomerComplaint, EditFollowUp, CloseCAPA,
                         BackupData, RestoreData, HicoVisible, AddProdPlan, ShowTips
                     ) VALUES (
                         @UserName, @Password, @FullUserName, @EmpID, @InActive,
                         @UserManagement, @ChangePassword,
-                        @CompanyMainLink, @FinancialMainLink, @PayrollMainLink, @ExportMainLink, @StockMainLink, @ProductionMainLink, @DashBoardMainLink, @QMSMainLink, @FixedAssetsMainLink, @SamplingMainLink, @HelpMainLink, @OpenCommandCenter,
+                        @CompanyMainLink, @FinancialMainLink, @PayrollMainLink, @ExportMainLink, @StockMainLink, @ProductionMainLink, @DashBoardMainLink, @QMSMainLink, @FixedAssetsMainLink, @SamplingMainLink, @HelpMainLink, @IntraOfficeMainLink, @OpenCommandCenter,
                         @RestrictedItemProfile, @GeneralInfoItemProfile, @ProcessesItemProfile, @WeightItemProfile, @PriceItemProfile, @ReferencesItemProfile, @PictureItemProfile, @RMItemProfile, @ShipInfoItemProfile, @RestrictCompanyCatalogEditing,
                         @AuthorizeVouchers, @AuthorizeIssuance, @PostMakerBill, @ChangeRateonIssuance, @ChangeRateMakerAssign, @MakerBill_EditRate, @HideRateMakerAssign, @AddEditCustomerComplaint, @EditFollowUp, @CloseCAPA,
                         @BackupData, @RestoreData, @HicoVisible, @AddProdPlan, @ShowTips
@@ -241,6 +276,7 @@ namespace DataAccessLibrary.DAC.Setup
                         FixedAssetsMainLink = @FixedAssetsMainLink,
                         SamplingMainLink = @SamplingMainLink,
                         HelpMainLink = @HelpMainLink,
+                        IntraOfficeMainLink = @IntraOfficeMainLink,
                         OpenCommandCenter = @OpenCommandCenter,
                         RestrictedItemProfile = @RestrictedItemProfile,
                         GeneralInfoItemProfile = @GeneralInfoItemProfile,
@@ -372,6 +408,17 @@ namespace DataAccessLibrary.DAC.Setup
                     "SELECT UserID FROM Users WHERE UserName = @NewUserName",
                     new { NewUserName = newUserName }
                 );
+
+                if (newId > 0)
+                {
+                    const string copyRolesSql = @"
+                        DELETE FROM Users_User_Roles WHERE UserID = @TargetUserId;
+                        INSERT INTO Users_User_Roles (UserID, User_Role)
+                        SELECT @TargetUserId, User_Role
+                        FROM Users_User_Roles
+                        WHERE UserID = @SourceUserId;";
+                    await db.ExecuteAsync(copyRolesSql, new { SourceUserId = fromUserId, TargetUserId = newId });
+                }
 
                 if (newId > 0 && (!string.IsNullOrWhiteSpace(password) || !string.IsNullOrWhiteSpace(fullUserName)))
                 {

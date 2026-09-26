@@ -24,12 +24,20 @@ namespace Impulse.Pages.Setups.Users
         [Inject]
         protected NavigationManager NavigationManager { get; set; } = default!;
 
+        [Inject]
+        protected DataAccessLibrary.Interface.Setup.IUserRoleDataAccess UserRoleDataAccess { get; set; } = default!;
+
         protected List<UserModel> AllUsers { get; set; } = new();
         protected List<UserModel> FilteredUsers { get; set; } = new();
+        protected List<UserRoleModel> AvailableRoles { get; set; } = new();
         protected string SearchQuery { get; set; } = string.Empty;
         protected string StatusFilter { get; set; } = "all";
+        protected string RoleFilter { get; set; } = "all";
         protected bool IsLoading { get; set; } = true;
         protected bool IsSyncing { get; set; } = false;
+
+        // Manage Roles Modal State
+        protected bool IsManageRolesOpen { get; set; } = false;
 
         // Modal States
         protected bool IsModalOpen { get; set; } = false;
@@ -51,6 +59,7 @@ namespace Impulse.Pages.Setups.Users
             try
             {
                 IsLoading = true;
+                AvailableRoles = await UserRoleDataAccess.GetAllRolesAsync();
                 AllUsers = await UserService.GetUsersAsync();
                 ApplyFilter();
             }
@@ -96,6 +105,11 @@ namespace Impulse.Pages.Setups.Users
                 query = query.Where(u => u.InActive);
             }
 
+            if (!string.IsNullOrEmpty(RoleFilter) && RoleFilter != "all")
+            {
+                query = query.Where(u => u.AssignedRoles != null && u.AssignedRoles.Any(r => string.Equals(r, RoleFilter, StringComparison.OrdinalIgnoreCase)));
+            }
+
             FilteredUsers = query.ToList();
         }
 
@@ -109,8 +123,37 @@ namespace Impulse.Pages.Setups.Users
         {
             SearchQuery = string.Empty;
             StatusFilter = "all";
+            RoleFilter = "all";
             ApplyFilter();
             return Task.CompletedTask;
+        }
+
+        protected void OpenManageRolesModal()
+        {
+            IsManageRolesOpen = true;
+        }
+
+        protected void CloseManageRolesModal(bool changed)
+        {
+            IsManageRolesOpen = false;
+        }
+
+        protected async Task HandleRolesChanged()
+        {
+            await LoadUsersAsync();
+        }
+
+        protected string GetRoleBadgeClass(string role)
+        {
+            return (role?.ToLowerInvariant()) switch
+            {
+                "stock" => "bg-purple-subtle text-purple border",
+                "ppc" => "bg-info-subtle text-info-emphasis border border-info-subtle",
+                "purchaser" or "purchase" => "bg-warning-subtle text-warning-emphasis border border-warning-subtle",
+                "production" or "factory" => "bg-danger-subtle text-danger border border-danger-subtle",
+                "accounts" or "finance" => "bg-primary-subtle text-primary border border-primary-subtle",
+                _ => "bg-secondary-subtle text-secondary border border-secondary-subtle"
+            };
         }
 
         protected void HandleSearchKeyUp(KeyboardEventArgs e)

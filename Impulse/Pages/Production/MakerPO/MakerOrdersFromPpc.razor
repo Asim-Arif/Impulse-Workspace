@@ -1,0 +1,444 @@
+@page "/production/maker-orders"
+@page "/production/maker-orders/{OrderNo}"
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.ViewModels.Production
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <!-- Page Header & Action Bar -->
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom pb-2 mb-2">
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="NavigateBack" title="Go Back">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark">
+                            <i class="fas fa-industry text-primary me-2"></i>Maker Purchase Orders (From PPC Planning)
+                        </h5>
+                        <small class="text-muted">Review planned item purchases and generate official Maker POs & Issuance Slips</small>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    @if (OrderHeader != null && PlannedLines.Any(l => l.IsSelected && !l.IsPosted))
+                    {
+                        <button class="btn btn-primary btn-sm px-3 shadow-sm" @onclick="GenerateAllPOsAsync" disabled="@IsSaving">
+                            @if (IsSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                <span>Generating POs...</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-layer-group me-1"></i>
+                                <span>Generate All POs</span>
+                            }
+                        </button>
+                    }
+
+                    @if (PlannedLines.Any(l => l.IsPosted))
+                    {
+                        var postedPoNumbers = PlannedLines.Where(l => l.IsPosted && !string.IsNullOrWhiteSpace(l.MasterPONo))
+                                                         .Select(l => l.MasterPONo!)
+                                                         .Distinct()
+                                                         .ToList();
+                        @foreach (var poNo in postedPoNumbers)
+                        {
+                            <button class="btn btn-outline-success btn-sm px-2" @onclick="() => PrintMasterPoAsync(poNo)" title="Print Issuance Slip for Master PO #@poNo">
+                                <i class="fas fa-print me-1"></i>Print PO #@poNo
+                            </button>
+                        }
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(EffectiveOrderNo))
+                    {
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="() => LoadOrderDataAsync(EffectiveOrderNo)" disabled="@IsLoading" title="Refresh">
+                            <i class="fas fa-sync-alt @(IsLoading ? "fa-spin" : "")"></i>
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <!-- Order Selector & Issuance Defaults Controls -->
+            <div class="row g-2 align-items-center" style="position: relative !important; z-index: 9999 !important;">
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold text-secondary mb-1">
+                        <i class="fas fa-search me-1"></i>Select Customer Order
+                    </label>
+                    <BlazoredTypeahead SearchMethod="SearchOrdersAsync"
+                                       TValue="PpcMakerPoOrderHeaderDto"
+                                       TItem="PpcMakerPoOrderHeaderDto"
+                                       Value="SelectedOrderLookup"
+                                       ValueChanged="OnOrderSelected"
+                                       ValueExpression="@(() => SelectedOrderLookup)"
+                                       Placeholder="Search Order # or Customer..."
+                                       MaximumSuggestions="1000"
+                                       MinimumLength="0">
+                        <SelectedTemplate Context="ord">
+                            <strong>#@ord.OrderNo</strong> - @ord.CustomerName
+                        </SelectedTemplate>
+                        <ResultTemplate Context="ord">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>#@ord.OrderNo</strong> - @ord.CustomerName
+                                </div>
+                                <div>
+                                    @if (ord.PendingPurchaseLinesCount > 0)
+                                    {
+                                        <span class="badge bg-warning text-dark" style="font-size: 0.72rem;">@ord.PendingPurchaseLinesCount Pending</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-success" style="font-size: 0.72rem;">All Fulfilled</span>
+                                    }
+                                </div>
+                            </div>
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold text-secondary mb-1">
+                        <i class="fas fa-user-tag me-1"></i>Issued By (Employee)
+                    </label>
+                    <BlazoredTypeahead SearchMethod="SearchEmployeesAsync"
+                                       @bind-Value="SelectedIssEmp"
+                                       Placeholder="Select issuing employee..."
+                                       MaximumSuggestions="1000"
+                                       MinimumLength="0">
+                        <SelectedTemplate Context="emp">
+                            @emp.DisplayText
+                        </SelectedTemplate>
+                        <ResultTemplate Context="emp">
+                            <div>@emp.DisplayText</div>
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold text-secondary mb-1">
+                        <i class="fas fa-user-check me-1"></i>Checked / Counted By
+                    </label>
+                    <BlazoredTypeahead SearchMethod="SearchEmployeesAsync"
+                                       @bind-Value="SelectedCountedBy"
+                                       Placeholder="Select checker employee..."
+                                       MaximumSuggestions="1000"
+                                       MinimumLength="0">
+                        <SelectedTemplate Context="emp">
+                            @emp.DisplayText
+                        </SelectedTemplate>
+                        <ResultTemplate Context="emp">
+                            <div>@emp.DisplayText</div>
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold text-secondary mb-1">
+                        <i class="fas fa-cubes me-1"></i>Default Steel Type
+                    </label>
+                    <select class="form-select form-select-sm" @bind="SelectedSteelTypeId">
+                        @foreach (var st in SteelTypes)
+                        {
+                            <option value="@st.SteelID">@st.SteelType</option>
+                        }
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="text-muted mt-2">Loading planned purchase orders...</p>
+        </div>
+    }
+    else if (OrderHeader == null)
+    {
+        <div class="card border-0 shadow-sm text-center py-5" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+            <div class="card-body">
+                <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                <h6 class="text-muted">No Customer Order Selected</h6>
+                <p class="text-secondary small">Please select an authorized order from the search dropdown above to view and process planned Maker POs.</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Order Context Summary Card -->
+        <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+            <div class="card-body py-2 px-3">
+                <div class="row g-2 align-items-center">
+                    <div class="col-md-3">
+                        <div class="text-secondary small">Customer</div>
+                        <div class="fw-bold text-dark fs-6">@OrderHeader.CustomerName</div>
+                        <small class="text-muted">Code: @OrderHeader.CustCode | PO: @(OrderHeader.CustomerPoNo ?? "N/A")</small>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-secondary small">Order Date</div>
+                        <div class="fw-semibold">@OrderHeader.OrderDate.ToString("dd MMM yyyy")</div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-secondary small">Delivery Date</div>
+                        <div class="fw-semibold text-danger">@(OrderHeader.DeliveryDate.HasValue ? OrderHeader.DeliveryDate.Value.ToString("dd MMM yyyy") : "N/A")</div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-secondary small">Total Planned Purchase Qty</div>
+                        <div class="fw-bold fs-6 text-primary">@OrderHeader.TotalPlannedPurchaseQty pcs</div>
+                    </div>
+                    <div class="col-md-3 text-end">
+                        <div class="text-secondary small mb-1">Fulfillment Status</div>
+                        @if (OrderHeader.PendingPurchaseLinesCount == 0)
+                        {
+                            <span class="badge bg-success-subtle text-success border border-success px-3 py-1 fs-6">
+                                <i class="fas fa-check-circle me-1"></i>All POs Generated
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-warning-subtle text-warning border border-warning px-3 py-1 fs-6">
+                                <i class="fas fa-clock me-1"></i>@OrderHeader.PendingPurchaseLinesCount of @OrderHeader.TotalPurchaseLinesCount Lines Pending
+                            </span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (!PlannedLines.Any())
+        {
+            <div class="card border-0 shadow-sm text-center py-4" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+                <div class="card-body">
+                    <i class="fas fa-info-circle fa-2x text-info mb-2"></i>
+                    <p class="mb-0 text-muted">No purchase split rows have been planned for Order #@OrderHeader.OrderNo by PPC.</p>
+                </div>
+            </div>
+        }
+        else
+        {
+            <!-- Grouping planned items by Maker -->
+            var makerGroups = PlannedLines.GroupBy(l => l.VendID).OrderBy(g => g.Key == 0 ? 1 : 0).ThenBy(g => g.First().MakerName);
+
+            @foreach (var group in makerGroups)
+            {
+                var isUnassigned = group.Key <= 0;
+                var makerName = isUnassigned ? "Unassigned Maker(s)" : group.First().MakerName;
+                var groupLines = group.ToList();
+                var pendingCount = groupLines.Count(l => !l.IsPosted);
+                var postedCount = groupLines.Count(l => l.IsPosted);
+                var totalQty = groupLines.Sum(l => l.PurchaseQty);
+
+                <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; position: relative !important; z-index: 1 !important;">
+                    <div class="card-body p-3">
+                        <!-- Maker Card Header -->
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom pb-2 mb-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge @(isUnassigned ? "bg-danger" : "bg-primary") p-2">
+                                    <i class="fas @(isUnassigned ? "fa-exclamation-triangle" : "fa-user-cog")"></i>
+                                </span>
+                                <div>
+                                    <h6 class="mb-0 fw-bold text-dark">@makerName</h6>
+                                    <small class="text-muted">
+                                        Total Items: <strong>@groupLines.Count</strong> | Total Qty: <strong>@totalQty pcs</strong>
+                                    </small>
+                                </div>
+                            </div>
+
+                            <div class="d-flex align-items-center gap-2">
+                                @if (isUnassigned)
+                                {
+                                    <span class="badge bg-danger-subtle text-danger border border-danger">
+                                        <i class="fas fa-exclamation-circle me-1"></i>Maker Required
+                                    </span>
+                                }
+                                else if (pendingCount > 0)
+                                {
+                                    <button class="btn btn-success btn-sm px-3 shadow-sm" @onclick="() => GenerateForMakerAsync(group.Key)" disabled="@IsSaving">
+                                        @if (IsSaving)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                            <span>Processing...</span>
+                                        }
+                                        else
+                                        {
+                                            <i class="fas fa-file-invoice me-1"></i>
+                                            <span>Generate PO for @makerName (@pendingCount)</span>
+                                        }
+                                    </button>
+                                }
+                                else
+                                {
+                                    var groupPoNo = groupLines.FirstOrDefault(l => !string.IsNullOrWhiteSpace(l.MasterPONo))?.MasterPONo;
+                                    <span class="badge bg-success-subtle text-success border border-success px-3 py-1 fs-6">
+                                        <i class="fas fa-check-circle me-1"></i>Master PO #@groupPoNo Issued
+                                    </span>
+                                    if (!string.IsNullOrWhiteSpace(groupPoNo))
+                                    {
+                                        <button class="btn btn-outline-success btn-sm py-0 px-2" @onclick="() => PrintMasterPoAsync(groupPoNo)" title="Print Issuance Slip">
+                                            <i class="fas fa-print me-1"></i>Print Slip
+                                        </button>
+                                    }
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Table of Items under this Maker -->
+                        <div class="table-responsive" style="position: relative !important; z-index: 1 !important;">
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                    <tr>
+                                        <th style="width: 40px;" class="text-center">
+                                            <input type="checkbox" class="form-check-input"
+                                                   checked="@(groupLines.All(l => l.IsSelected))"
+                                                   @onchange="@((ChangeEventArgs e) => {
+                                                       bool isChecked = (bool)(e.Value ?? false);
+                                                       foreach (var l in groupLines.Where(x => !x.IsPosted)) l.IsSelected = isChecked;
+                                                   })" />
+                                        </th>
+                                        <th>Item Code / Description</th>
+                                        <th>Process</th>
+                                        @if (isUnassigned)
+                                        {
+                                            <th style="width: 240px;">Assign Maker</th>
+                                        }
+                                        <th class="text-center" style="width: 100px;">PO Qty</th>
+                                        <th style="width: 120px;">Rate (PKR)</th>
+                                        <th style="width: 140px;">Return Date</th>
+                                        <th style="width: 110px;">Batch #</th>
+                                        <th style="width: 150px;">Status / Master PO</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var line in groupLines)
+                                    {
+                                        <tr class="@(line.IsPosted ? "table-light text-muted" : "")">
+                                            <td class="text-center">
+                                                @if (!line.IsPosted)
+                                                {
+                                                    <input type="checkbox" class="form-check-input" @bind="line.IsSelected" />
+                                                }
+                                                else
+                                                {
+                                                    <i class="fas fa-check-circle text-success" title="Issued"></i>
+                                                }
+                                            </td>
+                                            <td>
+                                                <div class="fw-bold text-dark">@line.CompItemID</div>
+                                                <small class="text-muted">@line.ItemName</small>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-secondary-subtle text-secondary border">@line.ProcessName</span>
+                                            </td>
+
+                                            @if (isUnassigned)
+                                            {
+                                                <td>
+                                                    <BlazoredTypeahead SearchMethod="SearchMakersAsync"
+                                                                       TValue="MakerPOLookupModel"
+                                                                       TItem="MakerPOLookupModel"
+                                                                       ValueChanged="@((MakerPOLookupModel m) => OnMakerSelectedForLine(line, m))"
+                                                                       Placeholder="Choose Maker..."
+                                                                       MaximumSuggestions="1000"
+                                                                       MinimumLength="0">
+                                                        <SelectedTemplate Context="m">
+                                                            @m.VenderName
+                                                        </SelectedTemplate>
+                                                        <ResultTemplate Context="m">
+                                                            <div>@m.DisplayText</div>
+                                                        </ResultTemplate>
+                                                    </BlazoredTypeahead>
+                                                </td>
+                                            }
+
+                                            <!-- PO Quantity: STRICTLY LOCKED / READONLY as required -->
+                                            <td class="text-center">
+                                                <span class="badge bg-light text-dark border px-2 py-1 fw-bold fs-6 font-monospace" title="Quantity locked from PPC allocation">
+                                                    @line.PurchaseQty
+                                                </span>
+                                            </td>
+
+                                            <td>
+                                                @if (!line.IsPosted)
+                                                {
+                                                    <input type="number" class="form-control form-control-sm text-end font-monospace"
+                                                           @bind="line.PurchaseRate" step="0.5" min="0" />
+                                                }
+                                                else
+                                                {
+                                                    <span class="font-monospace">@line.PurchaseRate.ToString("N2")</span>
+                                                }
+                                            </td>
+
+                                            <td>
+                                                @if (!line.IsPosted)
+                                                {
+                                                    <input type="date" class="form-control form-control-sm"
+                                                           @bind="line.ReturnDT" />
+                                                }
+                                                else
+                                                {
+                                                    <span>@line.ReturnDT.ToString("dd/MM/yyyy")</span>
+                                                }
+                                            </td>
+
+                                            <td>
+                                                @if (!line.IsPosted)
+                                                {
+                                                    <input type="text" class="form-control form-control-sm text-uppercase"
+                                                           @bind="line.BatchNo" maxlength="20" />
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-light text-secondary border">@line.BatchNo</span>
+                                                }
+                                            </td>
+
+                                            <td>
+                                                @if (line.IsPosted)
+                                                {
+                                                    <div class="d-flex align-items-center gap-1">
+                                                        <span class="badge bg-success-subtle text-success border border-success" title="Generated on @(line.IssuedAt?.ToString("g"))">
+                                                            <i class="fas fa-check me-1"></i>#@line.MasterPONo
+                                                        </span>
+                                                        <button class="btn btn-sm btn-link p-0 text-success" @onclick="() => PrintMasterPoAsync(line.MasterPONo!)" title="Print Slip">
+                                                            <i class="fas fa-print"></i>
+                                                        </button>
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-warning-subtle text-warning border border-warning">
+                                                        <i class="fas fa-clock me-1"></i>Pending PO
+                                                    </span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    }
+</div>
+
+<style>
+    /* Prevent BlazoredTypeahead disabled and layout overflow clipping */
+    .blazored-typeahead {
+        height: 35px !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__controls {
+        height: 35px !important;
+    }
+    .blazored-typeahead__input {
+        font-size: 0.88rem !important;
+        padding: 4px 8px !important;
+    }
+</style>

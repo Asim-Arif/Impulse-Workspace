@@ -121,6 +121,7 @@ namespace DataAccessLibrary.DAC.Production
                     if (string.IsNullOrWhiteSpace(lineLotNo) || lineLotNo == "0")
                     {
                         lineLotNo = await _sequenceDataAccess.GetNextMainLotNoAsync(header.DT);
+                        line.LotNo = lineLotNo;
 
                         // Insert into Lots_List
                         string insertLotSql = @"INSERT INTO Lots_List (LotNo, ItemID, Lot_Type, Reference_LotNo, Batch_No, Mill_Certificate_No)

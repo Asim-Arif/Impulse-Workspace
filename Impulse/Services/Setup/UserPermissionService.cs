@@ -112,7 +112,7 @@ namespace Impulse.Services.Setup
                 "fixedassets" => _currentUserModel.FixedAssetsMainLink,
                 "sampling" => _currentUserModel.SamplingMainLink,
                 "help" => _currentUserModel.HelpMainLink,
-                "office" or "intraoffice" => true, // IntraOffice module permissions can also be extended
+                "office" or "intraoffice" => _currentUserModel.IntraOfficeMainLink,
                 _ => true
             };
         }
@@ -143,7 +143,76 @@ namespace Impulse.Services.Setup
             ["PrdReceiveLot"] = new[] { "ReceiveLot" },
             ["PrdReceivingList"] = new[] { "ReceivingList" },
             ["PrdMakerPO"] = new[] { "MakerPO" },
-            ["PrdMakerPOList"] = new[] { "MakerPOList" }
+            ["PrdMakerPOList"] = new[] { "MakerPOList" },
+
+            // Export Aliases (mapping Blazor Exp* IDs to legacy database MenuOptions OptionIDs and vice-versa)
+            ["ExpOrderList"] = new[] { "OrderList", "OrderListCustomers", "OrderListStock" },
+            ["OrderList"] = new[] { "ExpOrderList" },
+            ["OrderListCustomers"] = new[] { "ExpOrderList" },
+            ["OrderListStock"] = new[] { "ExpOrderList" },
+
+            ["ExpOrderEntry"] = new[] { "NewOrder", "OrderList" },
+            ["NewOrder"] = new[] { "ExpOrderEntry" },
+
+            ["ExpCustomer"] = new[] { "FCustomers", "Customers", "CmpCustomerList", "OrderList", "NewOrder" },
+            ["FCustomers"] = new[] { "ExpCustomer" },
+
+            ["ExpQuotationList"] = new[] { "QuotationList" },
+            ["QuotationList"] = new[] { "ExpQuotationList" },
+
+            ["ExpAdvancePayment"] = new[] { "AdvancePayments" },
+            ["AdvancePayments"] = new[] { "ExpAdvancePayment" },
+
+            ["ExpOrderItemList"] = new[] { "OrderItemList" },
+            ["OrderItemList"] = new[] { "ExpOrderItemList" },
+
+            ["ExpCustomerItemBalances"] = new[] { "OrderItemBalances" },
+            ["OrderItemBalances"] = new[] { "ExpCustomerItemBalances" },
+
+            ["ExpArticlewiseShipped"] = new[] { "ArticleWiseStatus" },
+            ["ArticleWiseStatus"] = new[] { "ExpArticlewiseShipped" },
+
+            ["ExpProforma"] = new[] { "NewProforma", "PInvoiceList" },
+            ["NewProforma"] = new[] { "ExpProforma" },
+
+            ["ExpProformaList"] = new[] { "PInvoiceList", "NewProforma" },
+            ["PInvoiceList"] = new[] { "ExpProformaList" },
+
+            ["ExpCustomInvoice"] = new[] { "CustomInvoice", "NewCustomInvoice" },
+            ["CustomInvoice"] = new[] { "ExpCustomInvoice" },
+
+            ["ExpNewCustomInvoice"] = new[] { "NewCustomInvoice", "CustomInvoice" },
+            ["NewCustomInvoice"] = new[] { "ExpNewCustomInvoice" },
+
+            ["ExpCustomPaymentStatus"] = new[] { "CustPayStatus", "RecCustPay" },
+            ["CustPayStatus"] = new[] { "ExpCustomPaymentStatus" },
+
+            ["ExpReceiveCustomPayment"] = new[] { "RecCustPay", "CustPayStatus" },
+            ["RecCustPay"] = new[] { "ExpReceiveCustomPayment" },
+
+            ["ExpCommercialInvoice"] = new[] { "ComInvoice" },
+            ["ComInvoice"] = new[] { "ExpCommercialInvoice" },
+
+            ["ExpBankInvoice"] = new[] { "PrintInvoice" },
+            ["PrintInvoice"] = new[] { "ExpBankInvoice" },
+
+            ["ExpPackingList"] = new[] { "CustomLabels", "PrintInnerLabels", "ComPackingList", "CustomPackingList", "PrintLabels", "PrintPList", "NewPackingListM" },
+            ["CustomLabels"] = new[] { "ExpPackingList" },
+            ["PrintInnerLabels"] = new[] { "ExpPackingList" },
+            ["ComPackingList"] = new[] { "ExpPackingList" },
+            ["CustomPackingList"] = new[] { "ExpPackingList" },
+            ["PrintLabels"] = new[] { "ExpPackingList" },
+            ["PrintPList"] = new[] { "ExpPackingList" },
+            ["NewPackingListM"] = new[] { "ExpPackingList" },
+
+            ["ExpShippingInstructions"] = new[] { "CustomShipping" },
+            ["CustomShipping"] = new[] { "ExpShippingInstructions" },
+
+            ["ExpValuationForm"] = new[] { "PrintValuationForm" },
+            ["PrintValuationForm"] = new[] { "ExpValuationForm" },
+
+            ["ExpCommercialCovering"] = new[] { "ComCovering" },
+            ["ComCovering"] = new[] { "ExpCommercialCovering" }
         };
 
         public bool HasOptionAccess(string optionId)
@@ -229,6 +298,12 @@ namespace Impulse.Services.Setup
             ["export/proformas/new-proforma"] = ("Export", "ExpProforma"),
             ["export/proformas/proforma-list"] = ("Export", "ExpProformaList"),
             ["export/receive-custom-payment"] = ("Export", "ExpReceiveCustomPayment"),
+            ["export/statistics"] = ("Export", null),
+            ["export/statistics/articlewise-demand"] = ("Export", "StatArticleWiesOrders"),
+            ["export/statistics/articlewise-sales"] = ("Export", "StatArticleWiesSales"),
+            ["export/statistics/itemwise-export-performance"] = ("Export", "StatExportPerformanceReport"),
+            ["export/statistics/total-demand"] = ("Export", "StatTotalDemand"),
+            ["export/statistics/total-export"] = ("Export", "StatTotalExport"),
             ["intraoffice/health"] = ("Setup", "IntraOfficeHealth"),
             ["newrm"] = ("Stock", "StkNewRM"),
             ["newvendor"] = ("Stock", "StkNewVendor"),

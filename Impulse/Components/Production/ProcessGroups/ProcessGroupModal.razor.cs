@@ -24,6 +24,7 @@ namespace Impulse.Components.Production.ProcessGroups
         public LookupItemInt? SelectedProcess { get; set; }
         public bool NewStepScanning { get; set; } = false;
         public string NewStepHubName { get; set; } = string.Empty;
+        public List<string> AvailableHubNames { get; set; } = new();
 
         public bool IsSaving { get; set; } = false;
 
@@ -32,7 +33,21 @@ namespace Impulse.Components.Production.ProcessGroups
             if (IsOpen)
             {
                 await LoadProcessesLookupAsync();
+                await LoadHubNamesLookupAsync();
             }
+        }
+
+        public async Task LoadHubNamesLookupAsync()
+        {
+            try
+            {
+                AvailableHubNames = await ProcessGroupService.GetHubNamesAsync();
+                if (string.IsNullOrEmpty(NewStepHubName) && AvailableHubNames.Any())
+                {
+                    NewStepHubName = AvailableHubNames.First();
+                }
+            }
+            catch { }
         }
 
         public async Task LoadProcessesLookupAsync()

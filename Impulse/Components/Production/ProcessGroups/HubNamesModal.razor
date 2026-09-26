@@ -1,0 +1,97 @@
+@using Impulse.Services.Production
+
+@if (IsOpen)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0, 0, 0, 0.5); z-index: 100060; font-family: 'Calibri', 'Segoe UI', sans-serif;">
+        <div class="modal-dialog modal-dialog-centered modal-md">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-primary text-white py-2 px-3">
+                    <h6 class="modal-title fw-bold mb-0" style="font-size: 1.05rem;">
+                        <i class="fas fa-layer-group me-2"></i> Manage Master Hub Names
+                    </h6>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body p-3">
+
+                    <!-- Add New Hub Name Toolbar -->
+                    <div class="p-3 bg-light rounded-3 border mb-3">
+                        <label class="form-label form-label-sm fw-bold text-secondary mb-1" style="font-size: 0.85rem;">
+                            New Hub Name / Identifier <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-group input-group-sm">
+                            <input type="text"
+                                   class="form-control fw-bold"
+                                   placeholder="e.g. 6, Hub A, Polishing Station..."
+                                   @bind="NewHubName"
+                                   @onkeyup="@(e => { if (e.Key == "Enter") AddHub(); })" />
+                            <button type="button" class="btn btn-primary fw-bold px-3" @onclick="AddHub" disabled="@(string.IsNullOrWhiteSpace(NewHubName) || IsProcessing)">
+                                <i class="fas fa-plus me-1"></i> Add
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Hub Names Master List -->
+                    <div class="table-responsive border rounded-3" style="max-height: 45vh; overflow-y: auto;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                <tr>
+                                    <th style="width: 60px;" class="text-center">#</th>
+                                    <th>Hub Name / Value</th>
+                                    <th style="width: 80px;" class="text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (IsLoading)
+                                {
+                                    <tr>
+                                        <td colspan="3" class="text-center py-4 text-muted">
+                                            <span class="spinner-border spinner-border-sm me-1"></span> Loading hub names...
+                                        </td>
+                                    </tr>
+                                }
+                                else if (!HubNames.Any())
+                                {
+                                    <tr>
+                                        <td colspan="3" class="text-center py-4 text-muted">
+                                            No hub names configured yet. Add your first hub above.
+                                        </td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    int idx = 1;
+                                    @foreach (var hub in HubNames)
+                                    {
+                                        <tr>
+                                            <td class="text-center fw-bold text-muted">@(idx++)</td>
+                                            <td class="fw-bold text-dark">
+                                                <span class="badge bg-secondary me-2">Hub</span>
+                                                @hub
+                                            </td>
+                                            <td class="text-center">
+                                                <button type="button"
+                                                        class="btn btn-link btn-sm p-1 text-danger"
+                                                        title="Delete Hub"
+                                                        disabled="@IsProcessing"
+                                                        @onclick="() => DeleteHub(hub)">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+                <div class="modal-footer py-2 px-3 bg-light d-flex justify-content-between">
+                    <small class="text-muted">Total Hubs: @HubNames.Count</small>
+                    <button type="button" class="btn btn-sm btn-secondary px-3" @onclick="CloseModal">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

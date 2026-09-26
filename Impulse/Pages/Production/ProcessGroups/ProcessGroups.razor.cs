@@ -29,6 +29,13 @@ namespace Impulse.Pages.Production.ProcessGroups
         public ProcessGroupDto? GroupForEdit { get; set; }
         public bool IsCopyMode { get; set; } = false;
 
+        // Hub Names Modal State
+        public bool ShowHubNamesModal { get; set; } = false;
+
+        // Supervisors Modal State
+        public bool ShowSupervisorsModal { get; set; } = false;
+        public ProcessGroupListItem? GroupForSupervisors { get; set; }
+
         // Cascade Modal
         public bool ShowCascadeModal { get; set; } = false;
         public ProcessGroupListItem? GroupForCascade { get; set; }
@@ -283,6 +290,24 @@ namespace Impulse.Pages.Production.ProcessGroups
             }
         }
 
+        public void OpenHubNamesModal()
+        {
+            ShowHubNamesModal = true;
+        }
+
+        public void OpenSupervisorsModal(ProcessGroupListItem g)
+        {
+            if (g == null) return;
+            GroupForSupervisors = g;
+            ShowSupervisorsModal = true;
+        }
+
+        public void OnSupervisorsSaved()
+        {
+            ShowSupervisorsModal = false;
+            GroupForSupervisors = null;
+        }
+
         // Context Menu Handlers
         public void ContextNew(ItemClickEventArgs args) => OpenCreateModal();
 
@@ -292,6 +317,15 @@ namespace Impulse.Pages.Production.ProcessGroups
             if (ContextRowItem != null)
             {
                 await OpenEditModal(ContextRowItem);
+            }
+        }
+
+        public void ContextAssignSupervisors(ItemClickEventArgs args)
+        {
+            ResolveRowItem(args);
+            if (ContextRowItem != null)
+            {
+                OpenSupervisorsModal(ContextRowItem);
             }
         }
 

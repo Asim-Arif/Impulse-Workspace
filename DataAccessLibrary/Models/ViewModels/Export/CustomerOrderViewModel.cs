@@ -26,6 +26,9 @@ namespace DataAccessLibrary.Models.ViewModels.Export
         public int OrderRevisionNo { get; set; } = 0;
         public DateTime OrderRevisionDT { get; set; } = DateTime.Today;
         public string Packaging_Weight { get; set; } = string.Empty;
+        public bool Authorized { get; set; } = false;
+        public string? AuthorizedBy { get; set; }
+        public DateTime? AuthorizedDT { get; set; }
 
         // Child collection for grid rows
         public List<CustomerOrderItemViewModel> OrderItems { get; set; } = new();

@@ -46,12 +46,13 @@ namespace DataAccessLibrary.DAC.IntraOffice
                         e.Phone1 AS CellNo,
                         COALESCE(p.Status, 0) AS Status,
                         COALESCE(p.LastSeen, GETUTCDATE()) AS LastSeen,
-                        1 AS IsActive
+                        CASE WHEN ISNULL(u.InActive, 0) = 0 THEN 1 ELSE 0 END AS IsActive
                     FROM Users u
                     LEFT JOIN Employees e ON u.EmpID = e.empid
                     LEFT JOIN Departments d ON e.deptid = d.deptid
                     LEFT JOIN UserPresences p ON u.UserName = p.UserId
-                    WHERE (@Search IS NULL OR u.UserName LIKE @SearchParam OR e.name LIKE @SearchParam OR e.Designation LIKE @SearchParam OR d.name LIKE @SearchParam)
+                    WHERE ISNULL(u.InActive, 0) = 0
+                      AND (@Search IS NULL OR u.UserName LIKE @SearchParam OR u.FullUserName LIKE @SearchParam OR e.name LIKE @SearchParam OR e.Designation LIKE @SearchParam OR d.name LIKE @SearchParam)
                     ORDER BY u.UserName";
 
                 var searchParam = string.IsNullOrWhiteSpace(search) ? null : $"%{search.Trim()}%";
@@ -83,7 +84,7 @@ namespace DataAccessLibrary.DAC.IntraOffice
                         e.Phone1 AS CellNo,
                         COALESCE(p.Status, 0) AS Status,
                         COALESCE(p.LastSeen, GETUTCDATE()) AS LastSeen,
-                        1 AS IsActive
+                        CASE WHEN ISNULL(u.InActive, 0) = 0 THEN 1 ELSE 0 END AS IsActive
                     FROM Users u
                     LEFT JOIN Employees e ON u.EmpID = e.empid
                     LEFT JOIN Departments d ON e.deptid = d.deptid
@@ -627,19 +628,55 @@ namespace DataAccessLibrary.DAC.IntraOffice
                     SELECT 
                         t.Id, t.Title, t.Description, t.AssignedTo, u.FullUserName AS AssigneeName, e.Designation AS AssigneeDesignation,
                         t.AssignedBy, bu.FullUserName AS AssignerName, t.DepartmentId, d.name AS DepartmentName,
-                        t.Priority, t.Status, t.DueDate, t.WhatsAppMessageSent, t.CreatedAt, t.UpdatedAt, t.CompletedAt
+                        t.Priority, t.Status, t.DueDate, t.WhatsAppMessageSent, t.EmailMessageSent, t.IsRead,
+                        t.AdditionalAssigneeIds, t.AssignedToNames, t.StartedAt,
+                        t.CreatedAt, t.UpdatedAt, t.CompletedAt,
+                        t.SourceEntityType, t.SourceEntityRefId, t.TargetRole, t.CompletedBy, t.ActionUrl
                     FROM TaskItems t
                     LEFT JOIN Users u ON t.AssignedTo = u.UserName
                     LEFT JOIN Employees e ON u.EmpID = e.empid
                     LEFT JOIN Users bu ON t.AssignedBy = bu.UserName
                     LEFT JOIN Departments d ON t.DepartmentId = d.deptid
-                    WHERE (@AssignedTo IS NULL OR t.AssignedTo = @AssignedTo)
+                    WHERE (@AssignedTo IS NULL 
+                           OR t.AssignedTo = @AssignedTo 
+                           OR EXISTS (SELECT 1 FROM Task_Assignees ta WHERE ta.TaskID = t.Id AND (ta.UserName = @AssignedTo OR CAST(ta.UserID AS NVARCHAR(50)) = @AssignedTo))
+                           OR EXISTS (SELECT 1 FROM Task_Roles tr INNER JOIN Users_User_Roles uur ON tr.RoleName = uur.User_Role INNER JOIN Users ru ON uur.UserID = ru.UserID WHERE tr.TaskID = t.Id AND (ru.UserName = @AssignedTo OR CAST(ru.UserID AS NVARCHAR(50)) = @AssignedTo))
+                           OR (t.TargetRole IS NOT NULL AND EXISTS (SELECT 1 FROM Users_User_Roles uur2 INNER JOIN Users ru2 ON uur2.UserID = ru2.UserID WHERE uur2.User_Role = t.TargetRole AND (ru2.UserName = @AssignedTo OR CAST(ru2.UserID AS NVARCHAR(50)) = @AssignedTo)))
+                           OR (t.AdditionalAssigneeIds IS NOT NULL AND (',' + t.AdditionalAssigneeIds + ',') LIKE '%,' + @AssignedTo + ',%'))
                       AND (@AssignedBy IS NULL OR t.AssignedBy = @AssignedBy)
                       AND (@DeptId IS NULL OR t.DepartmentId = @DeptId)
                       AND (@Status IS NULL OR t.Status = @Status)
                     ORDER BY t.Priority DESC, t.DueDate ASC, t.CreatedAt DESC";
 
                 var tasks = (await db.QueryAsync<TaskItem>(sql, new { AssignedTo = assignedTo, AssignedBy = assignedBy, DeptId = departmentId, Status = (int?)status })).ToList();
+                if (tasks.Count > 0)
+                {
+                    var taskIds = tasks.Select(t => t.Id).ToList();
+                    var assigneesSql = @"
+                        SELECT ta.TaskID, ta.UserID, ta.UserName, COALESCE(u.FullUserName, e.name, ta.UserName) AS FullUserName, ta.AssignedAt
+                        FROM Task_Assignees ta
+                        LEFT JOIN Users u ON ta.UserID = u.UserID
+                        LEFT JOIN Employees e ON u.EmpID = e.empid
+                        WHERE ta.TaskID IN @TaskIds";
+                    var allAssignees = (await db.QueryAsync<TaskAssignee>(assigneesSql, new { TaskIds = taskIds })).ToList();
+                    var assigneeMap = allAssignees.GroupBy(a => a.TaskId).ToDictionary(g => g.Key, g => g.ToList());
+
+                    var rolesSql = "SELECT TaskID, RoleName FROM Task_Roles WHERE TaskID IN @TaskIds";
+                    var allRoles = (await db.QueryAsync<(int TaskId, string RoleName)>(rolesSql, new { TaskIds = taskIds })).ToList();
+                    var roleMap = allRoles.GroupBy(r => r.TaskId).ToDictionary(g => g.Key, g => g.Select(r => r.RoleName).ToList());
+
+                    foreach (var t in tasks)
+                    {
+                        if (assigneeMap.TryGetValue(t.Id, out var aList))
+                        {
+                            t.Assignees = aList;
+                        }
+                        if (roleMap.TryGetValue(t.Id, out var rList))
+                        {
+                            t.TargetRoles = rList;
+                        }
+                    }
+                }
                 return tasks;
             }
             catch (Exception ex)
@@ -658,7 +695,10 @@ namespace DataAccessLibrary.DAC.IntraOffice
                     SELECT 
                         t.Id, t.Title, t.Description, t.AssignedTo, u.FullUserName AS AssigneeName, e.Designation AS AssigneeDesignation,
                         t.AssignedBy, bu.FullUserName AS AssignerName, t.DepartmentId, d.name AS DepartmentName,
-                        t.Priority, t.Status, t.DueDate, t.WhatsAppMessageSent, t.CreatedAt, t.UpdatedAt, t.CompletedAt
+                        t.Priority, t.Status, t.DueDate, t.WhatsAppMessageSent, t.EmailMessageSent, t.IsRead,
+                        t.AdditionalAssigneeIds, t.AssignedToNames, t.StartedAt,
+                        t.CreatedAt, t.UpdatedAt, t.CompletedAt,
+                        t.SourceEntityType, t.SourceEntityRefId, t.TargetRole, t.CompletedBy, t.ActionUrl
                     FROM TaskItems t
                     LEFT JOIN Users u ON t.AssignedTo = u.UserName
                     LEFT JOIN Employees e ON u.EmpID = e.empid
@@ -668,6 +708,17 @@ namespace DataAccessLibrary.DAC.IntraOffice
 
                 var task = await db.QueryFirstOrDefaultAsync<TaskItem>(sql, new { Id = taskId });
                 if (task == null) return null;
+
+                var assigneesSql = @"
+                    SELECT ta.TaskID, ta.UserID, ta.UserName, COALESCE(u.FullUserName, e.name, ta.UserName) AS FullUserName, ta.AssignedAt
+                    FROM Task_Assignees ta
+                    LEFT JOIN Users u ON ta.UserID = u.UserID
+                    LEFT JOIN Employees e ON u.EmpID = e.empid
+                    WHERE ta.TaskID = @TaskId";
+                task.Assignees = (await db.QueryAsync<TaskAssignee>(assigneesSql, new { TaskId = taskId })).ToList();
+
+                var rolesSql = "SELECT RoleName FROM Task_Roles WHERE TaskID = @TaskId";
+                task.TargetRoles = (await db.QueryAsync<string>(rolesSql, new { TaskId = taskId })).ToList();
 
                 var commentSql = @"
                     SELECT tc.Id, tc.TaskId, tc.UserId, u.UserName, u.FullUserName, tc.Content, tc.CreatedAt
@@ -695,11 +746,86 @@ namespace DataAccessLibrary.DAC.IntraOffice
             {
                 using var db = CreateConnection();
                 var sql = @"
-                    INSERT INTO TaskItems (Title, Description, AssignedTo, AssignedBy, DepartmentId, Priority, Status, DueDate, WhatsAppMessageSent, CreatedAt)
-                    VALUES (@Title, @Description, @AssignedTo, @AssignedBy, @DepartmentId, @Priority, @Status, @DueDate, @WhatsAppMessageSent, GETUTCDATE());
+                    INSERT INTO TaskItems (
+                        Title, Description, AssignedTo, AssignedBy, DepartmentId, Priority, Status, DueDate, 
+                        WhatsAppMessageSent, EmailMessageSent, CreatedAt, AdditionalAssigneeIds, AssignedToNames,
+                        SourceEntityType, SourceEntityRefId, TargetRole, CompletedBy, ActionUrl
+                    )
+                    VALUES (
+                        @Title, @Description, @AssignedTo, @AssignedBy, @DepartmentId, @Priority, @Status, @DueDate, 
+                        @WhatsAppMessageSent, @EmailMessageSent, GETUTCDATE(), @AdditionalAssigneeIds, @AssignedToNames,
+                        @SourceEntityType, @SourceEntityRefId, @TargetRole, @CompletedBy, @ActionUrl
+                    );
                     SELECT CAST(SCOPE_IDENTITY() AS INT);";
 
                 var taskId = await db.ExecuteScalarAsync<int>(sql, task);
+                task.Id = taskId;
+
+                // Sync assignees to Task_Assignees child table
+                var assigneeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (task.Assignees != null)
+                {
+                    foreach (var a in task.Assignees)
+                    {
+                        if (!string.IsNullOrWhiteSpace(a.UserName)) assigneeNames.Add(a.UserName.Trim());
+                    }
+                }
+                if (!string.IsNullOrWhiteSpace(task.AssignedTo))
+                {
+                    assigneeNames.Add(task.AssignedTo.Trim());
+                }
+                if (!string.IsNullOrWhiteSpace(task.AdditionalAssigneeIds))
+                {
+                    foreach (var part in task.AdditionalAssigneeIds.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        if (!string.IsNullOrWhiteSpace(part)) assigneeNames.Add(part.Trim());
+                    }
+                }
+
+                if (assigneeNames.Count > 0)
+                {
+                    var usersSql = "SELECT UserID, UserName FROM Users WHERE UserName IN @Names OR CAST(UserID AS NVARCHAR(50)) IN @Names";
+                    var userRows = (await db.QueryAsync<(int UserID, string UserName)>(usersSql, new { Names = assigneeNames.ToList() })).ToList();
+
+                    if (userRows.Count > 0)
+                    {
+                        var insertAssigneeSql = @"
+                            IF NOT EXISTS (SELECT 1 FROM Task_Assignees WHERE TaskID = @TaskId AND UserID = @UserId)
+                            BEGIN
+                                INSERT INTO Task_Assignees (TaskID, UserID, UserName, AssignedAt)
+                                VALUES (@TaskId, @UserId, @UserName, GETDATE())
+                            END";
+
+                        foreach (var u in userRows)
+                        {
+                            await db.ExecuteAsync(insertAssigneeSql, new { TaskId = taskId, UserId = u.UserID, UserName = u.UserName });
+                        }
+                    }
+                }
+
+                // Sync roles to Task_Roles child table
+                var rolesToInsert = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (!string.IsNullOrWhiteSpace(task.TargetRole)) rolesToInsert.Add(task.TargetRole.Trim());
+                if (task.TargetRoles != null)
+                {
+                    foreach (var r in task.TargetRoles)
+                    {
+                        if (!string.IsNullOrWhiteSpace(r)) rolesToInsert.Add(r.Trim());
+                    }
+                }
+                if (rolesToInsert.Count > 0)
+                {
+                    var insertRoleSql = @"
+                        IF NOT EXISTS (SELECT 1 FROM Task_Roles WHERE TaskID = @TaskId AND RoleName = @RoleName)
+                        BEGIN
+                            INSERT INTO Task_Roles (TaskID, RoleName, AssignedAt)
+                            VALUES (@TaskId, @RoleName, GETDATE())
+                        END";
+                    foreach (var r in rolesToInsert)
+                    {
+                        await db.ExecuteAsync(insertRoleSql, new { TaskId = taskId, RoleName = r });
+                    }
+                }
 
                 if (task.Attachments != null && task.Attachments.Any())
                 {
@@ -761,6 +887,156 @@ namespace DataAccessLibrary.DAC.IntraOffice
             {
                 _logger.LogError(ex, "Error adding comment to task {TaskId}", comment.TaskId);
                 return 0;
+            }
+        }
+
+        public async Task<List<TaskDueMonitoringDto>> GetTasksPending70PercentDueWarningAsync()
+        {
+            try
+            {
+                using var db = CreateConnection();
+                const string sql = @"
+                    SELECT 
+                        t.Id, t.Title, t.Description, t.AssignedTo, t.AssignedBy, t.Priority, t.Status,
+                        t.DueDate, t.CreatedAt, t.SourceEntityType, t.SourceEntityRefId, t.TargetRole,
+                        t.ActionUrl, ISNULL(t.DueWarningSent, 0) AS DueWarningSent, ISNULL(t.OverdueWarningSent, 0) AS OverdueWarningSent
+                    FROM TaskItems t
+                    WHERE t.Status IN (0, 1)
+                      AND t.DueDate IS NOT NULL
+                      AND t.DueDate > t.CreatedAt
+                      AND ISNULL(t.DueWarningSent, 0) = 0
+                      AND GETUTCDATE() >= DATEADD(second, CAST(DATEDIFF(second, t.CreatedAt, t.DueDate) * 0.70 AS INT), t.CreatedAt)
+                      AND GETUTCDATE() < t.DueDate;";
+
+                var tasks = (await db.QueryAsync<TaskDueMonitoringDto>(sql)).ToList();
+                if (tasks.Any())
+                {
+                    var taskIds = tasks.Select(t => t.Id).ToList();
+                    const string assigneesSql = "SELECT TaskID, UserName FROM Task_Assignees WHERE TaskID IN @TaskIds;";
+                    var assignees = await db.QueryAsync<(int TaskID, string UserName)>(assigneesSql, new { TaskIds = taskIds });
+                    var grouped = assignees.GroupBy(a => a.TaskID).ToDictionary(g => g.Key, g => g.Select(x => x.UserName).ToList());
+
+                    foreach (var t in tasks)
+                    {
+                        if (grouped.TryGetValue(t.Id, out var userList))
+                        {
+                            t.AssigneeUserNames = userList;
+                        }
+                    }
+                }
+                return tasks;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching tasks pending 70% due warning");
+                return new List<TaskDueMonitoringDto>();
+            }
+        }
+
+        public async Task<List<TaskDueMonitoringDto>> GetTasksPendingOverdueAlertAsync()
+        {
+            try
+            {
+                using var db = CreateConnection();
+                const string sql = @"
+                    SELECT 
+                        t.Id, t.Title, t.Description, t.AssignedTo, t.AssignedBy, t.Priority, t.Status,
+                        t.DueDate, t.CreatedAt, t.SourceEntityType, t.SourceEntityRefId, t.TargetRole,
+                        t.ActionUrl, ISNULL(t.DueWarningSent, 0) AS DueWarningSent, ISNULL(t.OverdueWarningSent, 0) AS OverdueWarningSent
+                    FROM TaskItems t
+                    WHERE t.Status IN (0, 1)
+                      AND t.DueDate IS NOT NULL
+                      AND GETUTCDATE() >= t.DueDate
+                      AND ISNULL(t.OverdueWarningSent, 0) = 0;";
+
+                var tasks = (await db.QueryAsync<TaskDueMonitoringDto>(sql)).ToList();
+                if (tasks.Any())
+                {
+                    var taskIds = tasks.Select(t => t.Id).ToList();
+                    const string assigneesSql = "SELECT TaskID, UserName FROM Task_Assignees WHERE TaskID IN @TaskIds;";
+                    var assignees = await db.QueryAsync<(int TaskID, string UserName)>(assigneesSql, new { TaskIds = taskIds });
+                    var grouped = assignees.GroupBy(a => a.TaskID).ToDictionary(g => g.Key, g => g.Select(x => x.UserName).ToList());
+
+                    foreach (var t in tasks)
+                    {
+                        if (grouped.TryGetValue(t.Id, out var userList))
+                        {
+                            t.AssigneeUserNames = userList;
+                        }
+                    }
+                }
+                return tasks;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching tasks pending overdue alert");
+                return new List<TaskDueMonitoringDto>();
+            }
+        }
+
+        public async Task<bool> MarkDueWarningSentAsync(int taskId)
+        {
+            try
+            {
+                using var db = CreateConnection();
+                const string sql = "UPDATE TaskItems SET DueWarningSent = 1, UpdatedAt = GETUTCDATE() WHERE Id = @TaskId;";
+                var rows = await db.ExecuteAsync(sql, new { TaskId = taskId });
+                return rows > 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error marking DueWarningSent for task {TaskId}", taskId);
+                return false;
+            }
+        }
+
+        public async Task<bool> MarkOverdueWarningSentAsync(int taskId)
+        {
+            try
+            {
+                using var db = CreateConnection();
+                const string sql = "UPDATE TaskItems SET OverdueWarningSent = 1, UpdatedAt = GETUTCDATE() WHERE Id = @TaskId;";
+                var rows = await db.ExecuteAsync(sql, new { TaskId = taskId });
+                return rows > 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error marking OverdueWarningSent for task {TaskId}", taskId);
+                return false;
+            }
+        }
+
+        public async Task<List<string>> GetHubSupervisorsForLotTaskAsync(string lotNo, string hubName)
+        {
+            try
+            {
+                using var db = CreateConnection();
+                const string sql = @"
+                    SELECT DISTINCT pghs.UserName
+                    FROM Lots_List l
+                    INNER JOIN ItemProcessGroups ipg ON l.ItemID = ipg.ItemID
+                    INNER JOIN ProcessGroup_Hub_Supervisors pghs ON ipg.PG_RefID = pghs.GroupID
+                    INNER JOIN Users u ON pghs.UserID = u.UserID
+                    WHERE l.LotNo = @LotNo 
+                      AND pghs.Hub_Name = @HubName
+                      AND COALESCE(u.InActive, 0) = 0;";
+
+                var users = (await db.QueryAsync<string>(sql, new { LotNo = lotNo, HubName = hubName })).ToList();
+                if (!users.Any())
+                {
+                    const string fallbackSql = @"
+                        SELECT DISTINCT pghs.UserName
+                        FROM ProcessGroup_Hub_Supervisors pghs
+                        INNER JOIN Users u ON pghs.UserID = u.UserID
+                        WHERE pghs.Hub_Name = @HubName AND COALESCE(u.InActive, 0) = 0;";
+                    users = (await db.QueryAsync<string>(fallbackSql, new { HubName = hubName })).ToList();
+                }
+                return users;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error resolving hub supervisors for Lot [{LotNo}], Hub [{HubName}]", lotNo, hubName);
+                return new List<string>();
             }
         }
 

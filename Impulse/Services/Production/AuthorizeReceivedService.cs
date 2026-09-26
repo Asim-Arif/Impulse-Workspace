@@ -1,17 +1,27 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using DataAccessLibrary.Interface.Production;
 using DataAccessLibrary.Models.ViewModels.Production;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace Impulse.Services.Production
 {
     public class AuthorizeReceivedService : IAuthorizeReceivedService
     {
         private readonly IAuthorizeReceivedDataAccess _dataAccess;
+        private readonly IHubWorkflowOrchestrator _hubOrchestrator;
+        private readonly ILogger<AuthorizeReceivedService> _logger;
 
-        public AuthorizeReceivedService(IAuthorizeReceivedDataAccess dataAccess)
+        public AuthorizeReceivedService(
+            IAuthorizeReceivedDataAccess dataAccess,
+            IHubWorkflowOrchestrator hubOrchestrator,
+            ILogger<AuthorizeReceivedService> logger)
         {
             _dataAccess = dataAccess;
+            _hubOrchestrator = hubOrchestrator;
+            _logger = logger;
         }
 
         public Task<List<PendingAuthorizeReceivedItemModel>> GetPendingAuthorizeReceivedItemsAsync(AuthorizeReceivedFilterModel filter)
@@ -44,9 +54,44 @@ namespace Impulse.Services.Production
             return _dataAccess.GetMakersAsync();
         }
 
-        public Task<bool> SaveAuthorizationAsync(List<PendingAuthorizeReceivedItemModel> items, string inspectorEmpId, string userName, string machineName, int userId)
+        public async Task<bool> SaveAuthorizationAsync(List<PendingAuthorizeReceivedItemModel> items, string inspectorEmpId, string userName, string machineName, int userId)
         {
-            return _dataAccess.SaveAuthorizationAsync(items, inspectorEmpId, userName, machineName, userId);
+            bool success = await _dataAccess.SaveAuthorizationAsync(items, inspectorEmpId, userName, machineName, userId);
+
+            if (success && items != null && items.Any())
+            {
+                try
+                {
+                    var distinctAuthorizedLots = items
+                        .Where(i => i.IsChecked && !string.IsNullOrWhiteSpace(i.LotNo))
+                        .GroupBy(i => new { i.LotNo, i.ProcessID, i.ItemCode })
+                        .Select(g => new
+                        {
+                            LotNo = g.Key.LotNo,
+                            ProcessID = g.Key.ProcessID,
+                            ItemCode = g.Key.ItemCode,
+                            OrderNo = g.FirstOrDefault()?.OrderNo ?? "",
+                            TotalRcvdQty = g.Sum(x => x.RcvdQty)
+                        });
+
+                    foreach (var lot in distinctAuthorizedLots)
+                    {
+                        await _hubOrchestrator.HandleLotReceivingHubTransitionAsync(
+                            lot.LotNo,
+                            lot.ProcessID,
+                            lot.ItemCode,
+                            lot.OrderNo,
+                            lot.TotalRcvdQty,
+                            userName);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error executing Hub transition workflow after SaveAuthorizationAsync for User [{UserName}]", userName);
+                }
+            }
+
+            return success;
         }
     }
 }

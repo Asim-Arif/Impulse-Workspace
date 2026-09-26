@@ -21,19 +21,39 @@ namespace DataAccessLibrary.Models.IntraOffice
         public bool WhatsAppMessageSent { get; set; } = false;
         public bool EmailMessageSent { get; set; } = false;
         public bool IsRead { get; set; } = false;
+        public bool DueWarningSent { get; set; } = false;
+        public bool OverdueWarningSent { get; set; } = false;
         public string? AdditionalAssigneeIds { get; set; }
         public string? AssignedToNames { get; set; }
         public DateTime? StartedAt { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }
         public DateTime? CompletedAt { get; set; }
+        public string? CompletedBy { get; set; }
+
+        // Workflow Engine Metadata
+        public string? SourceEntityType { get; set; }
+        public string? SourceEntityRefId { get; set; }
+        public string? TargetRole { get; set; }
+        public List<string> TargetRoles { get; set; } = new List<string>();
+        public string? ActionUrl { get; set; }
 
         public IntraUserProfile? Assignee => !string.IsNullOrEmpty(AssignedTo) ? new IntraUserProfile { UserName = AssignedTo, FullUserName = AssigneeName, Designation = AssigneeDesignation } : null;
         public IntraUserProfile? Assigner => !string.IsNullOrEmpty(AssignedBy) ? new IntraUserProfile { UserName = AssignedBy, FullUserName = AssignerName } : null;
 
+        public List<TaskAssignee> Assignees { get; set; } = new List<TaskAssignee>();
         public List<TaskComment> Comments { get; set; } = new List<TaskComment>();
         public List<TaskAttachment> Attachments { get; set; } = new List<TaskAttachment>();
         public List<TaskStatusHistory> StatusHistories { get; set; } = new List<TaskStatusHistory>();
+    }
+
+    public class TaskAssignee
+    {
+        public int TaskId { get; set; }
+        public int UserId { get; set; }
+        public string UserName { get; set; } = string.Empty;
+        public string? FullUserName { get; set; }
+        public DateTime AssignedAt { get; set; } = DateTime.UtcNow;
     }
 
     public class TaskStatusHistory
@@ -72,5 +92,25 @@ namespace DataAccessLibrary.Models.IntraOffice
         public long FileSize { get; set; }
         public string? ContentType { get; set; }
         public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
+    }
+
+    public class TaskDueMonitoringDto
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public string? AssignedTo { get; set; }
+        public string AssignedBy { get; set; } = string.Empty;
+        public int Priority { get; set; }
+        public int Status { get; set; }
+        public DateTime? DueDate { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string? SourceEntityType { get; set; }
+        public string? SourceEntityRefId { get; set; }
+        public string? TargetRole { get; set; }
+        public string? ActionUrl { get; set; }
+        public bool DueWarningSent { get; set; }
+        public bool OverdueWarningSent { get; set; }
+        public List<string> AssigneeUserNames { get; set; } = new();
     }
 }

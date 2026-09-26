@@ -336,6 +336,15 @@ namespace Impulse.Services.IntraOffice
 
         public async Task<TaskItem> CreateTaskAsync(TaskItem task, bool sendWhatsApp = true, IEnumerable<IBrowserFile>? attachments = null, bool sendEmail = true, List<string>? allAssigneeIds = null)
         {
+            if (string.IsNullOrEmpty(task.AdditionalAssigneeIds) && allAssigneeIds != null && allAssigneeIds.Count > 1)
+            {
+                var additional = allAssigneeIds.Where(a => !string.Equals(a, task.AssignedTo, StringComparison.OrdinalIgnoreCase)).ToList();
+                if (additional.Any())
+                {
+                    task.AdditionalAssigneeIds = string.Join(",", additional);
+                }
+            }
+
             var id = await _intra.CreateTaskAsync(task);
             task.Id = id;
 
@@ -366,15 +375,18 @@ namespace Impulse.Services.IntraOffice
 
                 if (sendWhatsApp)
                 {
-                    try
+                    _ = Task.Run(async () =>
                     {
-                        var userProfile = await _intra.GetUserProfileAsync(assigneeId);
-                        if (!string.IsNullOrEmpty(userProfile?.CellNo))
+                        try
                         {
-                            task.WhatsAppMessageSent = await _whatsApp.SendTaskNotificationAsync(userProfile.CellNo, task.Title, userProfile.FullName ?? assigneeId, task.Priority.ToString(), null, task.Description);
+                            var userProfile = await _intra.GetUserProfileAsync(assigneeId);
+                            if (!string.IsNullOrEmpty(userProfile?.CellNo))
+                            {
+                                await _whatsApp.SendTaskNotificationAsync(userProfile.CellNo, task.Title, userProfile.FullName ?? assigneeId, task.Priority.ToString(), null, task.Description);
+                            }
                         }
-                    }
-                    catch { }
+                        catch { }
+                    });
                 }
             }
 
