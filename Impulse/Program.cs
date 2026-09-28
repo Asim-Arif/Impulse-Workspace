@@ -343,6 +343,8 @@ builder.Services.AddScoped<DataAccessLibrary.Interface.Dashboard.IProductionPlan
 builder.Services.AddScoped<Impulse.Services.Dashboard.IProductionPlanningDashboardService, Impulse.Services.Dashboard.ProductionPlanningDashboardService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Dashboard.ICommandCenterDashboardDataAccess, DataAccessLibrary.DAC.Dashboard.CommandCenterDashboardDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Dashboard.ICommandCenterDashboardService, Impulse.Services.Dashboard.CommandCenterDashboardService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IOrderManagementDataAccess, DataAccessLibrary.DAC.Production.OrderManagementDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IOrderManagementService, Impulse.Services.Production.OrderManagementService>();
 
 builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IPpcOrderPlanningDataAccess, DataAccessLibrary.DAC.Production.PpcOrderPlanningDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Production.IPpcOrderPlanningService, Impulse.Services.Production.PpcOrderPlanningService>();

@@ -188,7 +188,8 @@ namespace Impulse.Pages.Production.Processes
                 Insp_RefID = proc.Insp_RefID,
                 Fix_Maker_RefID = proc.Fix_Maker_RefID,
                 InspectionProcess = proc.InspectionProcess ?? false,
-                BillingProcessID = proc.BillingProcessID
+                BillingProcessID = proc.BillingProcessID,
+                EstimatedMinutes = proc.EstimatedMinutes
             };
 
             SelectedMaker = proc.Fix_Maker_RefID.HasValue

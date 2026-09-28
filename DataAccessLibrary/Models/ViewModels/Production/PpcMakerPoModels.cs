@@ -27,6 +27,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string ProcessName { get; set; } = string.Empty;
         public int VendID { get; set; }
         public string MakerName { get; set; } = string.Empty;
+        public MakerPOLookupModel? SelectedMaker { get; set; }
         
         // PO Qty locked strictly matching PPC
         public int PurchaseQty { get; set; }
@@ -70,5 +71,16 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string? ErrorMessage { get; set; }
         public List<string> GeneratedMasterPoNumbers { get; set; } = new();
         public int TotalRowsCreated { get; set; }
+    }
+
+    public class ProcessHubSupervisorMappingDto
+    {
+        public string ItemID { get; set; } = string.Empty;
+        public int ProcessID { get; set; }
+        public string ProcessName { get; set; } = string.Empty;
+        public string Hub_Name { get; set; } = string.Empty;
+        public int? UserID { get; set; }
+        public string? UserName { get; set; }
+        public string? EmployeeName { get; set; }
     }
 }

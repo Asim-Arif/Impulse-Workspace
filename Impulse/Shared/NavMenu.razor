@@ -10,7 +10,7 @@
 @inject IFavouriteService FavouriteService
 @inject Radzen.NotificationService NotificationService
 
-<div class="sidebar @(IsSidebarCollapsed ? "collapsed" : "")">
+<div class="sidebar @(IsSidebarCollapsed ? "collapsed" : "") @(IsMobileNavOpen ? "mobile-open" : "")">
     <div class="sidebar-header p-3 bg-transparent">
         <a class="navbar-brand fw-bold" href="">
             <strong>Impulse</strong>
@@ -740,6 +740,9 @@
                         <SecureNavLink class="nav-link" href="/production" Module="Production">
                             <i class="fas fa-gauge me-2"></i> Production Dashboard
                         </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/order-management" Module="Production">
+                            <i class="fas fa-stream me-2 text-warning"></i> Order Management
+                        </SecureNavLink>
                         <SecureNavLink class="nav-link" href="/production/order-planning" Module="Production">
                             <i class="fas fa-clipboard-check me-2 text-info"></i> PPC Order Planning
                         </SecureNavLink>
@@ -839,6 +842,9 @@
 @code {
     [Parameter]
     public bool IsSidebarCollapsed { get; set; }
+
+    [Parameter]
+    public bool IsMobileNavOpen { get; set; }
 
     [Parameter]
     public EventCallback OnToggleSidebar { get; set; }

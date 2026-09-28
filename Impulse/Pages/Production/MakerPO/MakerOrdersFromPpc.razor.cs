@@ -162,6 +162,10 @@ namespace Impulse.Pages.Production.MakerPO
                     {
                         line.SteelType_RefID = SelectedSteelTypeId.Value;
                     }
+                    if (line.VendID > 0)
+                    {
+                        line.SelectedMaker = AllMakers.FirstOrDefault(m => m.VendID == line.VendID);
+                    }
                 }
 
                 SelectedOrderLookup = ActiveOrdersWithPurchases.FirstOrDefault(o => o.OrderNo.Equals(orderNo, StringComparison.OrdinalIgnoreCase))
@@ -396,6 +400,7 @@ namespace Impulse.Pages.Production.MakerPO
 
         public void OnMakerSelectedForLine(PpcMakerPoItemRowDto line, MakerPOLookupModel? selectedMaker)
         {
+            line.SelectedMaker = selectedMaker;
             if (selectedMaker != null)
             {
                 line.VendID = (int)selectedMaker.VendID;

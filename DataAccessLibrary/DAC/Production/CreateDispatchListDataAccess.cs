@@ -340,14 +340,15 @@ namespace DataAccessLibrary.DAC.Production
                         long lDLDC_EntryID = await db.ExecuteScalarAsync<long>("SELECT MAX(EntryID) FROM DispatchListDetail_Inners", transaction: tx);
 
                         await db.ExecuteAsync(@"
-                            INSERT INTO DispatchListDetail_VRD (DLD_RefID, DLDC_RefID, VRD_RefID, Qty)
-                            VALUES (@DLD_RefID, @DLDC_RefID, @VRD_RefID, @Qty)",
+                            INSERT INTO DispatchListDetail_VRD (DLD_RefID, DLDC_RefID, VRD_RefID, Qty, EntryDT, AddedBy)
+                            VALUES (@DLD_RefID, @DLDC_RefID, @VRD_RefID, @Qty, GETDATE(), @AddedBy)",
                             new
                             {
                                 DLD_RefID = dldRefId,
                                 DLDC_RefID = lDLDC_EntryID,
                                 VRD_RefID = item.VRD_EntryID,
-                                Qty = (int)item.Qty
+                                Qty = (int)item.Qty,
+                                AddedBy = request.UserName
                             }, tx);
 
                         await db.ExecuteAsync(@"
@@ -355,6 +356,68 @@ namespace DataAccessLibrary.DAC.Production
                             SET IssQty = IssQty + @Qty
                             WHERE EntryID = @VRD_EntryID",
                             new { Qty = item.Qty, VRD_EntryID = item.VRD_EntryID }, tx);
+                    }
+
+                    // Collect distinct lots being added to dispatch to auto-close their tasks
+                    var lotNumbers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var item in newLines)
+                    {
+                        if (!string.IsNullOrWhiteSpace(item.LotNo))
+                        {
+                            var parts = item.LotNo.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                            foreach (var p in parts)
+                            {
+                                if (!string.IsNullOrWhiteSpace(p)) lotNumbers.Add(p.Trim());
+                            }
+                        }
+                    }
+
+                    var vrdIds = newLines.Select(x => x.VRD_EntryID).Where(id => id > 0).Distinct().ToList();
+                    if (vrdIds.Any())
+                    {
+                        var dbLots = await db.QueryAsync<string>(
+                            "SELECT DISTINCT LotNo FROM VendRcvdDetail WHERE EntryID IN @VrdIds AND ISNULL(LotNo, '') <> ''",
+                            new { VrdIds = vrdIds }, tx);
+                        foreach (var l in dbLots)
+                        {
+                            if (!string.IsNullOrWhiteSpace(l)) lotNumbers.Add(l.Trim());
+                        }
+                    }
+
+                    if (lotNumbers.Any())
+                    {
+                        const string closeTaskSql = @"
+                            UPDATE TaskItems
+                            SET Status = 2,
+                                CompletedAt = GETUTCDATE(),
+                                CompletedBy = @CompletedBy,
+                                UpdatedAt = GETUTCDATE()
+                            WHERE Status <> 2
+                              AND (
+                                  (SourceEntityType = 'LotDispatch' AND SourceEntityRefId = @LotNo + ':Dispatch')
+                                  OR (SourceEntityType = 'Lot' AND SourceEntityRefId = @LotNo AND Title LIKE '%Dispatch%')
+                                  OR (SourceEntityRefId = @LotNo + ':Dispatch')
+                              );";
+
+                        const string markNotifSql = @"
+                            UPDATE AppNotifications
+                            SET IsRead = 1
+                            WHERE IsRead = 0
+                              AND (ActionUrl LIKE '%' + @LotNo + '%' OR Title LIKE '%' + @LotNo + '%' OR Message LIKE '%' + @LotNo + '%');";
+
+                        foreach (var lotNo in lotNumbers)
+                        {
+                            await db.ExecuteAsync(closeTaskSql, new
+                            {
+                                CompletedBy = request.UserName,
+                                LotNo = lotNo
+                            }, tx);
+
+                            await db.ExecuteAsync(markNotifSql, new
+                            {
+                                LotNo = lotNo
+                            }, tx);
+                        }
                     }
                 }
 

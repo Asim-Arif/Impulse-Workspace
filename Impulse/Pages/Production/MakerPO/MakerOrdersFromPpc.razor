@@ -339,7 +339,9 @@
                                                     <BlazoredTypeahead SearchMethod="SearchMakersAsync"
                                                                        TValue="MakerPOLookupModel"
                                                                        TItem="MakerPOLookupModel"
+                                                                       Value="line.SelectedMaker"
                                                                        ValueChanged="@((MakerPOLookupModel m) => OnMakerSelectedForLine(line, m))"
+                                                                       ValueExpression="@(() => line.SelectedMaker)"
                                                                        Placeholder="Choose Maker..."
                                                                        MaximumSuggestions="1000"
                                                                        MinimumLength="0">

@@ -48,5 +48,10 @@ namespace Impulse.Services.Production
         {
             return _dataAccess.SkipProcessAsync(itemCode, currentProcessId, newProcessId, lotNo);
         }
+
+        public Task<List<EmployeeLookupModel>> GetEmployeesWithCapacityAsync(int processId)
+        {
+            return _dataAccess.GetEmployeesWithCapacityAsync(processId);
+        }
     }
 }

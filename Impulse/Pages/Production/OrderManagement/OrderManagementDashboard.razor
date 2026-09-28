@@ -1,0 +1,976 @@
+@page "/production/order-management"
+@using DataAccessLibrary.Models.ViewModels.Production
+@using Impulse.Services.Production
+
+<style>
+    .order-mgmt-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 12px;
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+    }
+    .kpi-stat-box {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 12px 14px;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .kpi-stat-box:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+    }
+    .kpi-icon-square {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.15rem;
+    }
+    .table-selectable-row {
+        cursor: pointer;
+        transition: background-color 0.12s ease;
+    }
+    .table-selectable-row:hover {
+        background-color: #f1f5f9 !important;
+    }
+    .table-row-active {
+        background-color: #eff6ff !important;
+        border-left: 4px solid #2563eb !important;
+    }
+    .pill-badge {
+        padding: 4px 10px;
+        border-radius: 9999px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        text-transform: capitalize;
+    }
+    .pill-completed {
+        background-color: #d1fae5;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+    }
+    .pill-inprogress {
+        background-color: #dbeafe;
+        color: #1e40af;
+        border: 1px solid #bfdbfe;
+    }
+    .pill-staging {
+        background-color: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fde68a;
+    }
+    .pill-overdue {
+        background-color: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fca5a5;
+    }
+    .pill-muted {
+        background-color: #f1f5f9;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+    }
+    .nav-tab-pill {
+        border: none;
+        background: transparent;
+        padding: 8px 16px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #64748b;
+        border-bottom: 3px solid transparent;
+        transition: all 0.2s ease;
+    }
+    .nav-tab-pill:hover {
+        color: #0f172a;
+    }
+    .nav-tab-pill.active {
+        color: #2563eb;
+        border-bottom: 3px solid #2563eb;
+        background: rgba(37, 99, 235, 0.05);
+    }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+
+    <!-- TOP SECTION: Title, KPI Stat Boxes & Vibrant Graphical Donut Charts -->
+    <div class="row g-3 mb-3">
+        <!-- Left: Quick KPI Cards & Header -->
+        <div class="col-xl-6 col-lg-6">
+            <div class="order-mgmt-card p-3 h-100 d-flex flex-column justify-content-between">
+                <div>
+                    <div class="d-flex align-items-center justify-content-between pb-2 mb-2 border-bottom">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="kpi-icon-square bg-primary text-white shadow-sm">
+                                <i class="fas fa-chart-pie"></i>
+                            </div>
+                            <div>
+                                <h4 class="fw-bold mb-0 text-dark">Order Management Dashboard</h4>
+                                <div class="text-muted small">Live 10-Stage Visual Tracking • Production Progress • Stations • Dispatch</div>
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 shadow-sm" @onclick="RefreshOrdersAsync" disabled="@IsLoadingOrders">
+                            <i class="fas fa-sync-alt @(IsLoadingOrders ? "fa-spin" : "")"></i>
+                            <span>Refresh</span>
+                        </button>
+                    </div>
+
+                    <!-- 4 Metric Stat Boxes -->
+                    <div class="row g-2 pt-1">
+                        <div class="col-6">
+                            <div class="kpi-stat-box">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <div class="text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Total Orders</div>
+                                        <h3 class="fw-bold mb-0 text-dark">@Metrics.TotalOrders</h3>
+                                    </div>
+                                    <div class="kpi-icon-square bg-light text-primary">
+                                        <i class="fas fa-folder-open"></i>
+                                    </div>
+                                </div>
+                                <div class="small text-muted mt-1" style="font-size: 0.75rem;">@Metrics.TotalOrderedPcs.ToString("N0") Total Ordered Pcs</div>
+                            </div>
+                        </div>
+
+                        <div class="col-6">
+                            <div class="kpi-stat-box">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <div class="text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Floor WIP</div>
+                                        <h3 class="fw-bold mb-0 text-primary">@Metrics.InProgressOrders</h3>
+                                    </div>
+                                    <div class="kpi-icon-square bg-primary bg-opacity-10 text-primary">
+                                        <i class="fas fa-cogs"></i>
+                                    </div>
+                                </div>
+                                <div class="small text-muted mt-1" style="font-size: 0.75rem;">Avg Progress: <strong class="text-dark">@Metrics.AverageProgressPct%</strong></div>
+                            </div>
+                        </div>
+
+                        <div class="col-6">
+                            <div class="kpi-stat-box">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <div class="text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Delayed / Due</div>
+                                        <h3 class="fw-bold mb-0 @(Metrics.OverdueOrders > 0 ? "text-danger" : "text-success")">@Metrics.OverdueOrders</h3>
+                                    </div>
+                                    <div class="kpi-icon-square bg-danger bg-opacity-10 text-danger">
+                                        <i class="fas fa-exclamation-circle"></i>
+                                    </div>
+                                </div>
+                                <div class="small text-muted mt-1" style="font-size: 0.75rem;">Urgent delivery deadlines</div>
+                            </div>
+                        </div>
+
+                        <div class="col-6">
+                            <div class="kpi-stat-box">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <div class="text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Completed</div>
+                                        <h3 class="fw-bold mb-0 text-success">@Metrics.CompletedOrders</h3>
+                                    </div>
+                                    <div class="kpi-icon-square bg-success bg-opacity-10 text-success">
+                                        <i class="fas fa-check-circle"></i>
+                                    </div>
+                                </div>
+                                <div class="small text-muted mt-1" style="font-size: 0.75rem;">@Metrics.TotalDispatchedPcs.ToString("N0") Pcs Dispatched</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Overall Volume Fulfillment Bar -->
+                <div class="pt-2 mt-2 border-top">
+                    <div class="d-flex justify-content-between small text-muted mb-1" style="font-size: 0.76rem;">
+                        <span>Production & Dispatch Ratio:</span>
+                        <span><strong class="text-success">@Metrics.TotalDispatchedPcs.ToString("N0")</strong> of @Metrics.TotalOrderedPcs.ToString("N0") Pcs</span>
+                    </div>
+                    <div style="height: 10px; background-color: #e2e8f0; border-radius: 9999px; overflow: hidden; display: flex;">
+                        <div style="height: 100%; width: @(Metrics.TotalOrderedPcs > 0 ? Math.Min(100, (Metrics.TotalDispatchedPcs * 100.0 / Metrics.TotalOrderedPcs)) : 0)%; background-color: #10b981;" title="Dispatched"></div>
+                        <div style="height: 100%; width: @(Metrics.TotalOrderedPcs > 0 ? Math.Min(100, ((Metrics.TotalProducedPcs - Metrics.TotalDispatchedPcs) * 100.0 / Metrics.TotalOrderedPcs)) : 0)%; background-color: #3b82f6;" title="WIP Ready"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: 2 Colorful SVG Graphical Donut Charts -->
+        <div class="col-xl-6 col-lg-6">
+            <div class="row g-3 h-100">
+                <!-- Chart 1: Order Lifecycle Status -->
+                <div class="col-sm-6">
+                    <div class="order-mgmt-card p-3 h-100 d-flex flex-column justify-content-between text-center">
+                        <div class="d-flex align-items-center justify-content-between border-bottom pb-1 mb-2">
+                            <span class="fw-bold small text-dark"><i class="fas fa-pie-chart text-primary me-1"></i> Orders Status</span>
+                            <span class="badge bg-light text-secondary border font-monospace" style="font-size: 0.7rem;">@Orders.Count Total</span>
+                        </div>
+                        
+                        <!-- Rich Native SVG Donut Chart with Guaranteed Crisp Colors -->
+                        <div class="position-relative mx-auto my-1" style="width: 140px; height: 140px;">
+                            <svg width="140" height="140" viewBox="0 0 120 120" style="transform: rotate(-90deg);">
+                                <circle cx="60" cy="60" r="44" fill="transparent" stroke="#f1f5f9" stroke-width="16" />
+                                @foreach (var slice in OrderStatusSlices)
+                                {
+                                    <circle cx="60" cy="60" r="44" fill="transparent"
+                                            stroke="@slice.Color" stroke-width="16"
+                                            stroke-dasharray="@($"{slice.DashArray:F2} {276.46 - slice.DashArray:F2}")"
+                                            stroke-dashoffset="@($"{slice.DashOffset:F2}")" />
+                                }
+                            </svg>
+                            <!-- Center Label -->
+                            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none;">
+                                <div style="font-weight: 800; font-size: 1.25rem; color: #0f172a; line-height: 1.1;">@Orders.Count</div>
+                                <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; font-weight: 600;">Orders</div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex flex-wrap justify-content-center gap-2 pt-2 border-top" style="font-size: 0.72rem;">
+                            @foreach (var c in OrderStatusChartData)
+                            {
+                                <span class="d-inline-flex align-items-center gap-1">
+                                    <span style="display:inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: @c.Color;"></span>
+                                    <span>@c.Category: <strong>@c.Value</strong></span>
+                                </span>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chart 2: Manufacturing Volume Mix -->
+                <div class="col-sm-6">
+                    <div class="order-mgmt-card p-3 h-100 d-flex flex-column justify-content-between text-center">
+                        <div class="d-flex align-items-center justify-content-between border-bottom pb-1 mb-2">
+                            <span class="fw-bold small text-dark"><i class="fas fa-boxes text-info me-1"></i> Volume (Pieces)</span>
+                            <span class="badge bg-light text-secondary border font-monospace" style="font-size: 0.7rem;">@Metrics.TotalOrderedPcs.ToString("N0") Pcs</span>
+                        </div>
+                        
+                        <!-- Rich Native SVG Donut Chart with Guaranteed Crisp Colors -->
+                        <div class="position-relative mx-auto my-1" style="width: 140px; height: 140px;">
+                            <svg width="140" height="140" viewBox="0 0 120 120" style="transform: rotate(-90deg);">
+                                <circle cx="60" cy="60" r="44" fill="transparent" stroke="#f1f5f9" stroke-width="16" />
+                                @foreach (var slice in VolumeSlices)
+                                {
+                                    <circle cx="60" cy="60" r="44" fill="transparent"
+                                            stroke="@slice.Color" stroke-width="16"
+                                            stroke-dasharray="@($"{slice.DashArray:F2} {276.46 - slice.DashArray:F2}")"
+                                            stroke-dashoffset="@($"{slice.DashOffset:F2}")" />
+                                }
+                            </svg>
+                            <!-- Center Label -->
+                            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none;">
+                                <div style="font-weight: 800; font-size: 1.05rem; color: #059669; line-height: 1.1;">@Metrics.TotalProducedPcs.ToString("N0")</div>
+                                <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; font-weight: 600;">Produced</div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex flex-wrap justify-content-center gap-2 pt-2 border-top" style="font-size: 0.72rem;">
+                            @foreach (var v in VolumeChartData)
+                            {
+                                <span class="d-inline-flex align-items-center gap-1">
+                                    <span style="display:inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: @v.Color;"></span>
+                                    <span>@v.Category: <strong>@v.Value.ToString("N0")</strong></span>
+                                </span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FILTER BAR -->
+    <div class="order-mgmt-card p-2 px-3 mb-3">
+        <div class="row g-2 align-items-center">
+            <div class="col-lg-3 col-md-4">
+                <label class="form-label small fw-bold text-secondary mb-1">Customer</label>
+                <select class="form-select form-select-sm shadow-none" value="@Filter.CustCode" @onchange="OnCustomerChanged">
+                    @foreach (var c in Customers)
+                    {
+                        <option value="@c.Id">@c.Name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-lg-2 col-md-3">
+                <label class="form-label small fw-bold text-secondary mb-1">Date Range</label>
+                <select class="form-select form-select-sm shadow-none" value="@Filter.DateRangeType" @onchange="OnDateRangeTypeChanged">
+                    <option value="0">All Time</option>
+                    <option value="1">Last 30 Days</option>
+                    <option value="2">Last 90 Days</option>
+                    <option value="3">This Year</option>
+                    <option value="4">Custom Range</option>
+                </select>
+            </div>
+
+            @if (Filter.DateRangeType == 4)
+            {
+                <div class="col-lg-3 col-md-5">
+                    <label class="form-label small fw-bold text-secondary mb-1">Custom Range</label>
+                    <div class="input-group input-group-sm">
+                        <input type="date" class="form-control" @bind="Filter.FromDate" />
+                        <span class="input-group-text">to</span>
+                        <input type="date" class="form-control" @bind="Filter.ToDate" />
+                        <button class="btn btn-primary" type="button" @onclick="RefreshOrdersAsync"><i class="fas fa-search"></i></button>
+                    </div>
+                </div>
+            }
+
+            <div class="col-lg-3 col-md-5">
+                <label class="form-label small fw-bold text-secondary mb-1">Search Order / Ref #</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white text-muted border-end-0"><i class="fas fa-search"></i></span>
+                    <input type="text" class="form-control border-start-0 shadow-none" placeholder="e.g. 598, SO-2026..." 
+                           @bind="Filter.SearchText" @bind:event="oninput" @onkeydown="OnSearchKeyDown" />
+                    @if (!string.IsNullOrEmpty(Filter.SearchText))
+                    {
+                        <button class="btn btn-outline-secondary" type="button" @onclick="() => { Filter.SearchText = string.Empty; RefreshOrdersAsync(); }">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <div class="col-lg-4 col-md-12 d-flex align-items-center gap-1 mt-auto pt-2">
+                <span class="small fw-bold text-secondary me-2">Status:</span>
+                <button type="button" class="btn btn-sm @(Filter.StatusFilter == "All" ? "btn-dark" : "btn-outline-secondary") px-2 py-0" style="font-size: 0.78rem;" @onclick='() => SetStatusFilter("All")'>All</button>
+                <button type="button" class="btn btn-sm @(Filter.StatusFilter == "InProgress" ? "btn-primary" : "btn-outline-secondary") px-2 py-0" style="font-size: 0.78rem;" @onclick='() => SetStatusFilter("InProgress")'>In-Progress</button>
+                <button type="button" class="btn btn-sm @(Filter.StatusFilter == "Completed" ? "btn-success" : "btn-outline-secondary") px-2 py-0" style="font-size: 0.78rem;" @onclick='() => SetStatusFilter("Completed")'>Completed</button>
+                <button type="button" class="btn btn-sm @(Filter.StatusFilter == "Overdue" ? "btn-danger" : "btn-outline-secondary") px-2 py-0" style="font-size: 0.78rem;" @onclick='() => SetStatusFilter("Overdue")'>Delayed</button>
+                <button type="button" class="btn btn-sm btn-link text-decoration-none text-muted ms-auto" style="font-size: 0.78rem;" @onclick="ResetFiltersAsync">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN SIDE-BY-SIDE SPLIT ROW: Customer Orders (Left) & Order Items (Right) -->
+    <div class="row g-3 mb-3">
+
+        <!-- 1. LEFT SIDE: Customer Orders (Resized & Side-by-Side) -->
+        <div class="col-xl-5 col-lg-5">
+            <div class="order-mgmt-card p-3 h-100">
+                <div class="d-flex align-items-center justify-content-between pb-2 mb-2 border-bottom">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fas fa-list-check text-primary"></i>
+                        <h5 class="fw-bold text-dark mb-0">Customer Orders</h5>
+                        <span class="badge bg-light text-secondary border font-monospace">@Orders.Count</span>
+                    </div>
+                    <span class="text-muted small" style="font-size: 0.75rem;"><i class="fas fa-hand-pointer text-primary me-1"></i>Click to select</span>
+                </div>
+
+                @if (IsLoadingOrders)
+                {
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-spinner fa-spin fa-2x mb-2 text-primary"></i>
+                        <div>Loading Orders...</div>
+                    </div>
+                }
+                else if (!Orders.Any())
+                {
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-inbox fa-3x mb-2 text-secondary opacity-50"></i>
+                        <div>No orders found.</div>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.75rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                <tr>
+                                    <th>Order #</th>
+                                    <th>Customer</th>
+                                    <th class="text-center">Qty</th>
+                                    <th style="min-width: 140px;">Progress</th>
+                                    <th class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var ord in Orders)
+                                {
+                                    bool isSelected = SelectedOrder?.OrderNo == ord.OrderNo;
+                                    <tr class="table-selectable-row @(isSelected ? "table-row-active" : "")" @onclick="() => SelectOrderAsync(ord)">
+                                        <td class="fw-bold text-dark">
+                                            <div class="d-flex align-items-center gap-1">
+                                                @if (isSelected)
+                                                {
+                                                    <i class="fas fa-play text-primary" style="font-size: 0.65rem;"></i>
+                                                }
+                                                <span>@ord.OrderNo</span>
+                                            </div>
+                                            <div class="text-muted" style="font-size: 0.7rem;">@ord.DT.ToString("yyyy-MM-dd")</div>
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold text-dark text-truncate" style="max-width: 120px;" title="@ord.CustCode (@ord.Country)">@ord.CustCode</div>
+                                            <div class="small @(ord.IsOverdue ? "text-danger fw-bold" : "text-muted")" style="font-size: 0.7rem;">
+                                                Due: @(ord.DeliveryDT.HasValue ? ord.DeliveryDT.Value.ToString("yyyy-MM-dd") : "-")
+                                            </div>
+                                        </td>
+                                        <td class="text-center fw-bold text-dark">
+                                            @ord.TotalOrderQty.ToString("N0")
+                                        </td>
+                                        <td>
+                                            <!-- Visual Progress Bar with Stripes & Dynamic Color (<20% Red, >=100% Green, Else Blue) -->
+                                            <div class="d-flex align-items-center gap-2" style="min-width: 130px;">
+                                                <div style="flex-grow: 1; height: 12px; background-color: #e2e8f0; border-radius: 9999px; overflow: hidden; position: relative; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);">
+                                                    <div style="height: 100%; border-radius: 9999px; width: @(Math.Min(100, Math.Max(ord.ProgressPct > 0 ? 5 : 0, ord.ProgressPct)))%; background: @GetProgressBarStyle(ord.ProgressPct); transition: width 0.6s ease;"></div>
+                                                </div>
+                                                <span style="font-weight: 700; font-size: 0.8rem; color: #1e293b; min-width: 35px; text-align: right;">@ord.ProgressPct%</span>
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="pill-badge @ord.StatusBadgeCss" style="font-size: 0.7rem;">
+                                                @ord.StatusText
+                                            </span>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- 2. RIGHT SIDE: Order Items (Matches Reference Screenshot Layout) -->
+        <div class="col-xl-7 col-lg-7">
+            <div class="order-mgmt-card p-3 h-100">
+                <div class="d-flex align-items-center justify-content-between pb-2 mb-2 border-bottom">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fas fa-boxes-stacked text-info"></i>
+                        <h5 class="fw-bold text-dark mb-0">
+                            Order Items
+                            @if (SelectedOrder != null)
+                            {
+                                <span class="text-primary fs-6 ms-1">• Order #@SelectedOrder.OrderNo (@SelectedOrder.CustCode)</span>
+                            }
+                        </h5>
+                        <span class="badge bg-light text-secondary border font-monospace">@OrderItems.Count</span>
+                    </div>
+                    <span class="text-muted small" style="font-size: 0.75rem;"><i class="fas fa-hand-pointer text-info me-1"></i>Select item to view lower details</span>
+                </div>
+
+                @if (IsLoadingItems)
+                {
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-spinner fa-spin fa-2x mb-2 text-info"></i>
+                        <div>Loading Items for Order #@SelectedOrder?.OrderNo...</div>
+                    </div>
+                }
+                else if (SelectedOrder == null)
+                {
+                    <div class="text-center py-5 text-muted">
+                        <i class="fas fa-arrow-left fa-2x mb-2 text-primary"></i>
+                        <div>Select an order from the left to view its items and visual progress.</div>
+                    </div>
+                }
+                else if (!OrderItems.Any())
+                {
+                    <div class="text-center py-5 text-muted">
+                        <div>No items found for Order #@SelectedOrder.OrderNo.</div>
+                    </div>
+                }
+                else
+                {
+                    <!-- Layout Matching User's Reference Screenshot -->
+                    <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.75rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                <tr>
+                                    <th style="min-width: 120px;">Sales Order / Customer</th>
+                                    <th style="min-width: 180px;">Product / Batch</th>
+                                    <th class="text-center" style="width: 80px;">Ordered Qty</th>
+                                    <th class="text-center" style="width: 130px;">Produced / Remaining</th>
+                                    <th style="min-width: 160px;">Visual Progress</th>
+                                    <th style="width: 95px;">Deadline</th>
+                                    <th class="text-center" style="width: 90px;">Packaging</th>
+                                    <th class="text-center" style="width: 110px;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in OrderItems)
+                                {
+                                    bool isItemSelected = SelectedItem?.ID == item.ID;
+                                    <tr class="table-selectable-row @(isItemSelected ? "table-row-active" : "")" @onclick="() => SelectItemAsync(item)">
+                                        <td>
+                                            <div class="fw-bold text-dark">@item.OrderNo</div>
+                                            <div class="text-muted small" style="font-size: 0.72rem;">@SelectedOrder?.CustCode</div>
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold text-dark text-truncate" style="max-width: 220px;" title="@item.ItemName">@item.ItemName</div>
+                                            <div class="d-flex align-items-center gap-1 mt-1">
+                                                <span class="text-muted small font-monospace" style="font-size: 0.72rem;">@item.ItemCode</span>
+                                                <span class="badge bg-light text-dark border font-monospace" style="font-size: 0.68rem; padding: 2px 4px;">Batch: @item.BatchNo</span>
+                                            </div>
+                                            @if (item.HasPpcPlan)
+                                            {
+                                                <div class="d-flex flex-wrap align-items-center gap-1 mt-1" style="font-size: 0.7rem;">
+                                                    <span class="text-secondary fw-semibold">Plan:</span>
+                                                    @if (item.PlannedPurchaseQty > 0)
+                                                    {
+                                                        <span class="badge bg-primary text-white font-monospace" style="font-size: 0.65rem; padding: 2px 4px;" title="Planned Purchase Order">
+                                                            <i class="fas fa-shopping-cart me-1"></i>PO: @item.PlannedPurchaseQty.ToString("N0")
+                                                        </span>
+                                                    }
+                                                    @if (item.PlannedStockQty > 0)
+                                                    {
+                                                        <span class="badge bg-warning text-dark font-monospace" style="font-size: 0.65rem; padding: 2px 4px;" title="Planned From Stock">
+                                                            <i class="fas fa-warehouse me-1"></i>Stock: @item.PlannedStockQty.ToString("N0")
+                                                            @if (item.StockAdjustedQty > 0)
+                                                            {
+                                                                <span class="text-success fw-bold"> (@item.StockAdjustedQty.ToString("N0") issued)</span>
+                                                            }
+                                                        </span>
+                                                    }
+                                                    @if (item.PlannedProductionQty > 0)
+                                                    {
+                                                        <span class="badge bg-info text-white font-monospace" style="font-size: 0.65rem; padding: 2px 4px;" title="Planned In-House Production">
+                                                            <i class="fas fa-industry me-1"></i>Prod: @item.PlannedProductionQty.ToString("N0")
+                                                        </span>
+                                                    }
+                                                </div>
+                                            }
+                                        </td>
+                                        <td class="text-center fw-bold fs-6 text-dark">
+                                            @item.OrderedQty.ToString("N0")
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="fw-bold text-success" style="font-size: 0.85rem;">@item.ProducedQty.ToString("N0") produced</div>
+                                            <div class="text-muted small" style="font-size: 0.72rem;">@item.RemainingQty.ToString("N0") remaining</div>
+                                        </td>
+                                        <td>
+                                            <!-- Visual Progress Bar with Repeating Diagonal Stripes (<20% Red, >=100% Green, Else Blue) -->
+                                            <div class="d-flex align-items-center gap-2" style="min-width: 150px;">
+                                                <div style="flex-grow: 1; height: 14px; background-color: #e2e8f0; border-radius: 9999px; overflow: hidden; position: relative; box-shadow: inset 0 1px 2px rgba(0,0,0,0.12);">
+                                                    <div style="height: 100%; border-radius: 9999px; width: @(Math.Min(100, Math.Max(item.ProgressPct > 0 ? 5 : 0, item.ProgressPct)))%; background: @GetProgressBarStyle(item.ProgressPct); transition: width 0.6s ease;"></div>
+                                                </div>
+                                                <span style="font-weight: 700; font-size: 0.85rem; color: #1e293b; min-width: 38px; text-align: right;">@item.ProgressPct%</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            @if (item.DeliveryDT.HasValue && item.DeliveryDT.Value.Year > 1900)
+                                            {
+                                                <span class="@(item.IsOverdue ? "text-danger fw-bold" : "text-dark")" style="font-size: 0.82rem;">
+                                                    @item.DeliveryDT.Value.ToString("yyyy-MM-dd")
+                                                </span>
+                                            }
+                                            else if (SelectedOrder?.DeliveryDT.HasValue == true && SelectedOrder.DeliveryDT.Value.Year > 1900)
+                                            {
+                                                <span class="@(SelectedOrder.IsOverdue ? "text-danger fw-bold" : "text-dark")" style="font-size: 0.82rem;">
+                                                    @SelectedOrder.DeliveryDT.Value.ToString("yyyy-MM-dd")
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">-</span>
+                                            }
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="pill-badge @item.PackagingBadgeCss">
+                                                @(string.IsNullOrEmpty(item.Packaging) ? "InProgress" : item.Packaging)
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="pill-badge @item.StageBadgeCss">
+                                                @item.CurrentStageName
+                                            </span>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- LOWER SECTION: Fulfillment & Execution Tables (Purchase Orders, Running Lots, Stock Allocations, Dispatch) -->
+    @if (SelectedItem != null)
+    {
+        <div class="order-mgmt-card p-3">
+            <div class="d-flex flex-wrap align-items-center justify-content-between border-bottom pb-2 mb-3 gap-2">
+                <div class="d-flex align-items-center gap-1">
+                    <button class="nav-tab-pill @(ActiveTab == 1 && !ShowAllDetailsTogether ? "active" : "")" @onclick="() => { ActiveTab = 1; ShowAllDetailsTogether = false; }">
+                        <i class="fas fa-industry me-1"></i> Purchase Orders
+                        <span class="badge @(ActiveTab == 1 ? "bg-primary" : "bg-light text-dark") ms-1 rounded-pill">@ItemPOs.Count</span>
+                    </button>
+                    <button class="nav-tab-pill @(ActiveTab == 2 && !ShowAllDetailsTogether ? "active" : "")" @onclick="() => { ActiveTab = 2; ShowAllDetailsTogether = false; }">
+                        <i class="fas fa-cogs me-1"></i> Running Lots
+                        <span class="badge @(ActiveTab == 2 ? "bg-primary" : "bg-light text-dark") ms-1 rounded-pill">@ItemLots.Count</span>
+                    </button>
+                    <button class="nav-tab-pill @(ActiveTab == 4 && !ShowAllDetailsTogether ? "active" : "")" @onclick="() => { ActiveTab = 4; ShowAllDetailsTogether = false; }">
+                        <i class="fas fa-boxes-stacked me-1"></i> Stock Allocations
+                        <span class="badge @(ActiveTab == 4 ? "bg-primary" : "bg-light text-dark") ms-1 rounded-pill">@ItemStockAdjustments.Count</span>
+                    </button>
+                    <button class="nav-tab-pill @(ActiveTab == 3 && !ShowAllDetailsTogether ? "active" : "")" @onclick="() => { ActiveTab = 3; ShowAllDetailsTogether = false; }">
+                        <i class="fas fa-truck-loading me-1"></i> Dispatch & Invoicing
+                        <span class="badge @(ActiveTab == 3 ? "bg-primary" : "bg-light text-dark") ms-1 rounded-pill">@ItemDispatches.Count</span>
+                    </button>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm @(ShowAllDetailsTogether ? "btn-primary" : "btn-outline-secondary")" style="font-size: 0.78rem;" @onclick="ToggleDetailView">
+                        <i class="fas @(ShowAllDetailsTogether ? "fa-table-cells" : "fa-bars") me-1"></i>
+                        @(ShowAllDetailsTogether ? "Showing All 4 Tables" : "Show All Tables Together")
+                    </button>
+                    <span class="text-muted small">
+                        Product: <strong class="text-dark">@SelectedItem.ItemCode</strong>
+                        @if (!string.IsNullOrEmpty(SelectedItem.CompItemCode) && !SelectedItem.CompItemCode.Equals(SelectedItem.ItemCode, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <span class="badge bg-light text-secondary border font-monospace ms-1">@SelectedItem.CompItemCode</span>
+                        }
+                        (@SelectedItem.ItemName)
+                    </span>
+                </div>
+            </div>
+
+            @if (IsLoadingDetails)
+            {
+                <div class="text-center py-4 text-muted">
+                    <i class="fas fa-spinner fa-spin fa-2x mb-2 text-primary"></i>
+                    <div>Loading execution details for @SelectedItem.ItemCode...</div>
+                </div>
+            }
+            else
+            {
+                <!-- TABLE 1: Purchase Orders -->
+                @if (ShowAllDetailsTogether || ActiveTab == 1)
+                {
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h6 class="fw-bold text-dark mb-0"><i class="fas fa-industry text-primary me-2"></i>Purchase Orders Fulfillment</h6>
+                            <span class="text-muted small">(@ItemPOs.Count purchase orders issued)</span>
+                        </div>
+                        @if (!ItemPOs.Any())
+                        {
+                            <div class="p-3 bg-light rounded text-center text-muted small">
+                                No Purchase Orders currently recorded for this item.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.75rem; text-transform: uppercase;">
+                                        <tr>
+                                            <th>PO Receipt #</th>
+                                            <th>Supplier / Maker</th>
+                                            <th>Process</th>
+                                            <th class="text-center">Issued Qty</th>
+                                            <th class="text-center">Received Qty</th>
+                                            <th class="text-center">Balance</th>
+                                            <th style="min-width: 150px;">PO Progress</th>
+                                            <th>Return Target</th>
+                                            <th class="text-center">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var po in ItemPOs)
+                                        {
+                                            <tr>
+                                                <td class="fw-bold text-dark font-monospace">
+                                                    <div>@po.POReceiptID</div>
+                                                    @if (!string.IsNullOrEmpty(po.MasterPONo))
+                                                    {
+                                                        <div class="text-primary small fw-semibold" style="font-size: 0.72rem;">PO: @po.MasterPONo</div>
+                                                    }
+                                                </td>
+                                                <td><span class="fw-semibold">@po.VenderName</span></td>
+                                                <td><span class="badge bg-light text-dark border">@po.ProcessName</span></td>
+                                                <td class="text-center">@po.IssQty.ToString("N0")</td>
+                                                <td class="text-center fw-bold text-success">@po.RcvdQty.ToString("N0")</td>
+                                                <td class="text-center fw-bold @(po.Balance > 0 ? "text-danger" : "text-muted")">@po.Balance.ToString("N0")</td>
+                                                <td>
+                                                    <!-- Visual Progress Bar (<20% Red, >=100% Green, Else Blue) -->
+                                                    <div class="d-flex align-items-center gap-2" style="min-width: 130px;">
+                                                        <div style="flex-grow: 1; height: 12px; background-color: #e2e8f0; border-radius: 9999px; overflow: hidden; position: relative;">
+                                                            <div style="height: 100%; border-radius: 9999px; width: @(Math.Min(100, Math.Max(po.ProgressPct > 0 ? 5 : 0, po.ProgressPct)))%; background: @GetProgressBarStyle(po.ProgressPct);"></div>
+                                                        </div>
+                                                        <span style="font-weight: 700; font-size: 0.8rem; color: #1e293b; min-width: 35px; text-align: right;">@po.ProgressPct%</span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    @(po.ReturnDT.HasValue ? po.ReturnDT.Value.ToString("yyyy-MM-dd") : "-")
+                                                </td>
+                                                <td class="text-center">
+                                                    <span class="pill-badge @(po.StatusText == "Fulfilled" ? "pill-completed" : po.StatusText == "Partial" ? "pill-inprogress" : "pill-muted")">
+                                                        @po.StatusText
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <!-- TABLE 2: Running Lots -->
+                @if (ShowAllDetailsTogether || ActiveTab == 2)
+                {
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h6 class="fw-bold text-dark mb-0"><i class="fas fa-cogs text-info me-2"></i>Active Floor Production Lots</h6>
+                            <span class="text-muted small">(@ItemLots.Count active lots in sequence)</span>
+                        </div>
+                        @if (!ItemLots.Any())
+                        {
+                            <div class="p-3 bg-light rounded text-center text-muted small">
+                                No active running lots currently on the manufacturing floor for this item.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.75rem; text-transform: uppercase;">
+                                        <tr>
+                                            <th>Lot No</th>
+                                            <th>Current Process</th>
+                                            <th>Station / Maker</th>
+                                            <th class="text-center">Lot Qty</th>
+                                            <th class="text-center">Process Step</th>
+                                            <th style="min-width: 150px;">Process Completion</th>
+                                            <th>Last Activity</th>
+                                            <th class="text-center">Type</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var lot in ItemLots)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <span class="badge px-2 py-1 font-monospace" style="background-color: #2196F3; color: #ffffff; font-weight: 700; border-radius: 4px;">
+                                                        @lot.LotNo
+                                                    </span>
+                                                </td>
+                                                <td class="fw-semibold text-dark">@lot.ProcessName</td>
+                                                <td>@lot.MakerName</td>
+                                                <td class="text-center fw-bold text-success">@lot.Qty.ToString("N0")</td>
+                                                <td class="text-center">
+                                                    <span class="badge bg-light text-dark border">
+                                                        Step @lot.CurrentSeqNo of @lot.TotalSeqNo
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <!-- Visual Progress Bar (<20% Red, >=100% Green, Else Blue) -->
+                                                    <div class="d-flex align-items-center gap-2" style="min-width: 130px;">
+                                                        <div style="flex-grow: 1; height: 12px; background-color: #e2e8f0; border-radius: 9999px; overflow: hidden; position: relative;">
+                                                            <div style="height: 100%; border-radius: 9999px; width: @(Math.Min(100, Math.Max(lot.ProgressPct > 0 ? 5 : 0, lot.ProgressPct)))%; background: @GetProgressBarStyle(lot.ProgressPct);"></div>
+                                                        </div>
+                                                        <span style="font-weight: 700; font-size: 0.8rem; color: #1e293b; min-width: 35px; text-align: right;">@lot.ProgressPct%</span>
+                                                    </div>
+                                                </td>
+                                                <td class="text-muted">
+                                                    @(lot.LastActivityDT.HasValue ? lot.LastActivityDT.Value.ToString("yyyy-MM-dd HH:mm") : "-")
+                                                </td>
+                                                <td class="text-center">
+                                                    @if (lot.ReWorkLot)
+                                                    {
+                                                        <span class="badge bg-warning text-dark">Rework</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-light text-secondary border">Standard</span>
+                                                    }
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <!-- TABLE 4: Stock Allocations (Issued from Warehouse with Designated Starting Process) -->
+                @if (ShowAllDetailsTogether || ActiveTab == 4)
+                {
+                    <div class="@(ShowAllDetailsTogether ? "mb-4" : "")">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h6 class="fw-bold text-dark mb-0">
+                                <i class="fas fa-boxes-stacked text-warning me-2"></i>Stock Allocations (Warehouse Adjustments)
+                            </h6>
+                            <span class="text-muted small">(@ItemStockAdjustments.Count stock allocation records)</span>
+                        </div>
+                        @if (!ItemStockAdjustments.Any())
+                        {
+                            <div class="p-3 bg-light rounded text-center text-muted small">
+                                No warehouse stock adjustments recorded for this order item.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.75rem; text-transform: uppercase;">
+                                        <tr>
+                                            <th>Adjustment #</th>
+                                            <th class="text-center">Adjusted Qty</th>
+                                            <th>Generated Lot #</th>
+                                            <th>Starting Process (Proceeding Station)</th>
+                                            <th>Shelf / Location</th>
+                                            <th>Adjusted By</th>
+                                            <th>Adjustment Date / Time</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var s in ItemStockAdjustments)
+                                        {
+                                            <tr>
+                                                <td class="fw-bold text-dark">#@s.EntryID</td>
+                                                <td class="text-center fw-bold text-primary">@s.Qty.ToString("N0")</td>
+                                                <td>
+                                                    @if (!string.IsNullOrEmpty(s.LotNo))
+                                                    {
+                                                        <span class="badge px-2 py-1 font-monospace" style="background-color: #2196F3; color: #ffffff; font-weight: 700; border-radius: 4px;">
+                                                            @s.LotNo
+                                                        </span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted small">Pending Lot Generation</span>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    @if (!string.IsNullOrEmpty(s.StartingProcessName))
+                                                    {
+                                                        <span class="badge bg-light text-dark border fw-semibold">
+                                                            <i class="fas fa-play text-warning me-1"></i>@s.StartingProcessName
+                                                        </span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted">-</span>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    @if (s.Shelf_RefID > 0)
+                                                    {
+                                                        <span class="badge bg-light text-secondary border font-monospace">@s.Shelf_RefID</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted">-</span>
+                                                    }
+                                                </td>
+                                                <td class="text-muted small">@s.UserName</td>
+                                                <td>
+                                                    @if (s.DTEntry.HasValue)
+                                                    {
+                                                        <span class="text-dark"><i class="far fa-clock text-primary me-1"></i>@s.DTEntry.Value.ToString("yyyy-MM-dd HH:mm")</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted">-</span>
+                                                    }
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <!-- TABLE 3: Dispatch & Invoicing -->
+                @if (ShowAllDetailsTogether || ActiveTab == 3)
+                {
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h6 class="fw-bold text-dark mb-0"><i class="fas fa-truck-loading text-success me-2"></i>Dispatch Packaging & Invoicing Records</h6>
+                            <span class="text-muted small">(@ItemDispatches.Count staged dispatch entries)</span>
+                        </div>
+                        @if (!ItemDispatches.Any())
+                        {
+                            <div class="p-3 bg-light rounded text-center text-muted small">
+                                No dispatch list entries or invoice lines recorded yet for this item.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.75rem; text-transform: uppercase;">
+                                        <tr>
+                                            <th>Dispatch List No</th>
+                                            <th class="text-center">Carton #</th>
+                                            <th class="text-center">Inner #</th>
+                                            <th>Lot No</th>
+                                            <th class="text-center">Dispatched Qty</th>
+                                            <th>Added To Dispatch (Date/Time)</th>
+                                            <th>Added By</th>
+                                            <th class="text-center">Dispatch Status</th>
+                                            <th>Commercial Invoice #</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var d in ItemDispatches)
+                                        {
+                                            <tr>
+                                                <td class="fw-bold text-dark">@d.DispatchListNo</td>
+                                                <td class="text-center">
+                                                    @if (d.CartonNo > 0)
+                                                    {
+                                                        <span class="badge bg-warning text-dark px-2 py-1 fw-bold">Carton @d.CartonNo</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted">-</span>
+                                                    }
+                                                </td>
+                                                <td class="text-center text-muted">@d.InnerNo</td>
+                                                <td>
+                                                    <span class="badge bg-secondary font-monospace">@d.LotNo</span>
+                                                </td>
+                                                <td class="text-center fw-bold text-primary">@d.Qty.ToString("N0")</td>
+                                                <td>
+                                                    @if (d.EntryDT.HasValue)
+                                                    {
+                                                        <span class="text-dark fw-semibold"><i class="far fa-clock text-primary me-1"></i>@d.EntryDT.Value.ToString("yyyy-MM-dd HH:mm")</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted">Legacy Entry</span>
+                                                    }
+                                                </td>
+                                                <td class="text-muted small">@d.AddedBy</td>
+                                                <td class="text-center">
+                                                    <span class="pill-badge @(d.Finalyzed ? "pill-completed" : "pill-staging")">
+                                                        @(d.Finalyzed ? "Finalized" : "Staged (Draft)")
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    @if (!string.IsNullOrEmpty(d.InvoiceNo))
+                                                    {
+                                                        <div>
+                                                            <span class="badge bg-success text-white"><i class="fas fa-file-invoice me-1"></i>@d.InvoiceNo</span>
+                                                        </div>
+                                                        @if (d.InvoiceDate.HasValue && d.InvoiceDate.Value.Year > 1900)
+                                                        {
+                                                            <div class="text-muted small mt-1" style="font-size: 0.7rem;">@d.InvoiceDate.Value.ToString("yyyy-MM-dd")</div>
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted small">Pending Billing</span>
+                                                    }
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                }
+            }
+        </div>
+    }
+
+</div>

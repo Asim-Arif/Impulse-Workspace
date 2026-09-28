@@ -11,15 +11,23 @@
 @inject SecurityService SecurityService
 @inject IDBHelperService DB
 @inject Radzen.NotificationService NotificationService
+@inject NavigationManager NavigationManager
 
 <PageTitle>Impulse ERP</PageTitle>
 
 <div class="layout">
     <div class="sidebar-container">
-        <NavMenu IsSidebarCollapsed="@isSidebarCollapsed" OnToggleSidebar="ToggleSidebar" />
+        <NavMenu IsSidebarCollapsed="@isSidebarCollapsed" IsMobileNavOpen="@isMobileNavOpen" OnToggleSidebar="ToggleSidebar" />
     </div>
+    @if (isMobileNavOpen)
+    {
+        <div class="sidebar-backdrop d-lg-none" @onclick="CloseMobileNav"></div>
+    }
     <main class="@(isSidebarCollapsed ? "collapsed" : "")">
-        <div class="top-row px-0 auth">
+        <div class="top-row px-0 auth d-flex align-items-center">
+            <button type="button" class="mobile-nav-toggle d-lg-none ms-2" @onclick="ToggleMobileNav" title="Toggle Navigation">
+                <i class="fas fa-bars fs-5"></i>
+            </button>
             <LoginDisplay />
         </div>
         @* <article class="content px-4"> *@
@@ -129,6 +137,7 @@
     private bool isVisible;
     private string loadingMessage = "";
     private bool isSidebarCollapsed = false;
+    private bool isMobileNavOpen = false;
 
     private DateRangeModal rangeModal;
     private DateSingleModal singleModal;
@@ -144,6 +153,7 @@
         LoadingService.OnLoadingStateChanged += HandleLoading;
         ReportManager.OnRequestReport += HandleReportRequest;
         SecurityService.OnPasswordRequest += ShowPrompt;
+        NavigationManager.LocationChanged += HandleLocationChanged;
     }
     private void HandleLoading(bool visible, string message)
     {
@@ -157,6 +167,16 @@
         ReportManager.OnRequestReport -= HandleReportRequest;
         LoadingService.OnLoadingStateChanged -= HandleLoading;
         SecurityService.OnPasswordRequest -= ShowPrompt;
+        NavigationManager.LocationChanged -= HandleLocationChanged;
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        if (isMobileNavOpen)
+        {
+            isMobileNavOpen = false;
+            InvokeAsync(StateHasChanged);
+        }
     }
     private async void HandleReportRequest(string key, IDictionary<string, object>? extraArgs)
     {
@@ -839,30 +859,31 @@
 
     private void ToggleSidebar()
     {
-        isSidebarCollapsed = !isSidebarCollapsed;
-        Console.WriteLine($"Sidebar collapsed: {isSidebarCollapsed}"); // Debug state
+        if (isMobileNavOpen)
+        {
+            isMobileNavOpen = false;
+        }
+        else
+        {
+            isSidebarCollapsed = !isSidebarCollapsed;
+        }
+    }
+
+    private void ToggleMobileNav()
+    {
+        isMobileNavOpen = !isMobileNavOpen;
+    }
+
+    private void CloseMobileNav()
+    {
+        isMobileNavOpen = false;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            try
-            {
-                // Get window width after render when JS interop is available
-                var windowWidth = await JSRuntime.InvokeAsync<int>("getWindowWidth");
-                //Console.WriteLine($"Window width: {windowWidth}"); // Debug window width
-                if (windowWidth <= 991)
-                {
-                    isSidebarCollapsed = true; // Collapse sidebar on mobile
-                    StateHasChanged(); // Trigger re-render
-                }
-            }
-            catch (Exception ex)
-            {
-                // Handle potential JS interop errors
-                Console.WriteLine($"JS Interop error: {ex.Message}");
-            }
+            await Task.CompletedTask;
         }
     }
 }

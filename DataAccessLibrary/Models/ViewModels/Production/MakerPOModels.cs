@@ -42,7 +42,11 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string EmpID { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string Designation { get; set; } = string.Empty;
-        public string DisplayText => $"[{EmpID}] {Name} ({Designation})";
+        public decimal Capacity { get; set; }
+        public decimal Balance { get; set; }
+        public string DisplayText => Capacity > 0 || Balance > 0
+            ? $"[{EmpID}] {Name} (Cap: {Capacity:N0}, Bal: {Balance:N0}) - {Designation}"
+            : $"[{EmpID}] {Name} ({Designation})";
     }
 
     public class IssuableOrderItemModel

@@ -51,6 +51,7 @@ namespace Impulse.Pages.Production.LotIssuance
         public List<AvailableLotIssuanceItemModel> StagedItems { get; set; } = new List<AvailableLotIssuanceItemModel>();
 
         public List<EmployeeLookupModel> AvailableEmployees { get; set; } = new List<EmployeeLookupModel>();
+        public List<EmployeeLookupModel> AllEmployees { get; set; } = new List<EmployeeLookupModel>();
         public EmployeeLookupModel? SelectedWorker { get; set; }
         public EmployeeLookupModel? SelectedCountedBy { get; set; }
 
@@ -80,7 +81,24 @@ namespace Impulse.Pages.Production.LotIssuance
         protected override async Task OnInitializedAsync()
         {
             Processes = await LotIssuanceService.GetProcessesAsync();
-            AvailableEmployees = await MakerPOService.GetEmployeesAsync();
+            AllEmployees = await MakerPOService.GetEmployeesAsync();
+            AvailableEmployees = new List<EmployeeLookupModel>(AllEmployees);
+        }
+
+        private async Task LoadEmployeesForProcessAsync(int processId)
+        {
+            if (processId > 0)
+            {
+                AvailableEmployees = await LotIssuanceService.GetEmployeesWithCapacityAsync(processId);
+                if (SelectedWorker != null)
+                {
+                    SelectedWorker = AvailableEmployees.FirstOrDefault(e => e.EmpID == SelectedWorker.EmpID) ?? SelectedWorker;
+                }
+            }
+            else
+            {
+                AvailableEmployees = new List<EmployeeLookupModel>(AllEmployees);
+            }
         }
 
         public async Task OnProcessChangedAsync(ChangeEventArgs e)
@@ -94,6 +112,11 @@ namespace Impulse.Pages.Production.LotIssuance
                 if (SelectedProcessID > 0)
                 {
                     AvailableMakers = await LotIssuanceService.GetMakersForProcessAsync(SelectedProcessID);
+                    await LoadEmployeesForProcessAsync(SelectedProcessID);
+                }
+                else
+                {
+                    await LoadEmployeesForProcessAsync(0);
                 }
             }
         }
@@ -123,6 +146,20 @@ namespace Impulse.Pages.Production.LotIssuance
                 AvailableEmployees.Where(e => (e.Name != null && e.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase))
                                            || (e.EmpID != null && e.EmpID.Contains(searchText, StringComparison.OrdinalIgnoreCase))
                                            || (e.Designation != null && e.Designation.Contains(searchText, StringComparison.OrdinalIgnoreCase))));
+        }
+
+        public Task<IEnumerable<EmployeeLookupModel>> SearchCountedByEmployees(string searchText)
+        {
+            if (AllEmployees == null || !AllEmployees.Any())
+                return Task.FromResult(Enumerable.Empty<EmployeeLookupModel>());
+
+            if (string.IsNullOrWhiteSpace(searchText))
+                return Task.FromResult<IEnumerable<EmployeeLookupModel>>(AllEmployees);
+
+            return Task.FromResult<IEnumerable<EmployeeLookupModel>>(
+                AllEmployees.Where(e => (e.Name != null && e.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                                     || (e.EmpID != null && e.EmpID.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                                     || (e.Designation != null && e.Designation.Contains(searchText, StringComparison.OrdinalIgnoreCase))));
         }
 
         public async Task HandleLotSearchKeyUp(KeyboardEventArgs e)
@@ -214,6 +251,7 @@ namespace Impulse.Pages.Production.LotIssuance
                 {
                     SelectedProcessID = firstItem.TargetProcessID;
                     AvailableMakers = await LotIssuanceService.GetMakersForProcessAsync(SelectedProcessID);
+                    await LoadEmployeesForProcessAsync(SelectedProcessID);
                 }
 
                 if (!string.IsNullOrWhiteSpace(firstItem.BatchNo))
@@ -283,6 +321,7 @@ namespace Impulse.Pages.Production.LotIssuance
             ForgingProvided = false;
             SteelProvided = false;
             StagedItems.Clear();
+            AvailableEmployees = new List<EmployeeLookupModel>(AllEmployees);
         }
 
         public async Task SaveLotIssuance()

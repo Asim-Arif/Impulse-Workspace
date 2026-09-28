@@ -13,5 +13,6 @@ namespace Impulse.Services.Production
         Task<long> SaveLotIssuanceAsync(CreateLotIssuanceHeaderModel header, List<CreateLotIssuanceLineModel> lines, string userName, int userId, string machineName);
         Task<List<ProcessPOLookupModel>> GetSubsequentProcessesForSkipAsync(string itemCode, int currentProcessId, bool isReworkLot, int repairType);
         Task<bool> SkipProcessAsync(string itemCode, int currentProcessId, int newProcessId, string lotNo);
+        Task<List<EmployeeLookupModel>> GetEmployeesWithCapacityAsync(int processId);
     }
 }

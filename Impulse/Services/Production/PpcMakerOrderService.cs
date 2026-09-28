@@ -94,6 +94,87 @@ namespace Impulse.Services.Production
                 {
                     _logger.LogError(ex, "Failed to complete workflow task for Purchaser on Order #{OrderNo}", request.OrderNo);
                 }
+
+                // ── 2. Create Tasks & Notifications for Hub Supervisors (Process -> Hub) ──
+                try
+                {
+                    var generatedLines = request.Lines.Where(l => !string.IsNullOrWhiteSpace(l.MasterPONo)).ToList();
+                    if (!generatedLines.Any())
+                    {
+                        generatedLines = request.Lines.Where(l => l.IsSelected).ToList();
+                    }
+
+                    if (generatedLines.Any())
+                    {
+                        var itemIds = generatedLines.Select(l => l.CompItemID).Distinct();
+                        var procIds = generatedLines.Select(l => l.ProcessID).Distinct();
+                        var hubMappings = await _dataAccess.GetProcessHubSupervisorsAsync(itemIds, procIds);
+
+                        // Attach Hub info and Supervisors to each generated line
+                        var lineHubDetails = generatedLines.Select(line =>
+                        {
+                            var matchingHubs = hubMappings
+                                .Where(m => m.ItemID.Equals(line.CompItemID, StringComparison.OrdinalIgnoreCase) && m.ProcessID == line.ProcessID)
+                                .ToList();
+
+                            string hubName = matchingHubs.FirstOrDefault(m => !string.IsNullOrWhiteSpace(m.Hub_Name))?.Hub_Name ?? "Production";
+                            string procName = matchingHubs.FirstOrDefault(m => !string.IsNullOrWhiteSpace(m.ProcessName))?.ProcessName ?? line.ProcessName;
+                            var supervisorUsers = matchingHubs
+                                .Where(m => !string.IsNullOrWhiteSpace(m.UserName))
+                                .Select(m => m.UserName!.Trim())
+                                .Distinct(StringComparer.OrdinalIgnoreCase)
+                                .ToList();
+
+                            string masterPo = !string.IsNullOrWhiteSpace(line.MasterPONo)
+                                ? line.MasterPONo
+                                : result.GeneratedMasterPoNumbers.FirstOrDefault() ?? "PO";
+
+                            return new
+                            {
+                                Line = line,
+                                MasterPoNo = masterPo,
+                                HubName = hubName,
+                                ProcessName = procName,
+                                Supervisors = supervisorUsers
+                            };
+                        }).ToList();
+
+                        // Group by (MasterPoNo, HubName) so supervisors get a unified, consolidated notification per Hub
+                        var hubGroups = lineHubDetails.GroupBy(x => new { x.MasterPoNo, x.HubName, Maker = x.Line.MakerName });
+
+                        foreach (var group in hubGroups)
+                        {
+                            var targetUserNames = group.SelectMany(x => x.Supervisors)
+                                .Distinct(StringComparer.OrdinalIgnoreCase)
+                                .ToList();
+
+                            int totalQty = group.Sum(x => x.Line.PurchaseQty);
+                            var minReturnDt = group.Min(x => x.Line.ReturnDT);
+                            var summaryItems = string.Join("\n", group.Select(x => $"• {x.Line.CompItemID}: {x.Line.PurchaseQty:N0} pcs at [{x.ProcessName}]"));
+
+                            await _workflowTaskEngine.CreateRoleTaskAsync(new WorkflowTaskCreateRequest
+                            {
+                                SourceEntityType = "MakerPO",
+                                SourceEntityRefId = $"{group.Key.MasterPoNo}_Hub{group.Key.HubName}",
+                                TargetRole = "HubSupervisor",
+                                TargetUserNames = targetUserNames,
+                                Title = $"Maker PO #{group.Key.MasterPoNo} (Hub {group.Key.HubName}): Order #{request.OrderNo}",
+                                Description = $"Maker PO #{group.Key.MasterPoNo} ({totalQty:N0} pcs across {group.Count()} item(s)) generated with {group.Key.Maker} for Hub {group.Key.HubName} on Customer Order #{request.OrderNo}.\n{summaryItems}\nExpected Return Date: {minReturnDt:dd-MMM-yyyy}.\nPlease monitor delivery and receiving for your hub station.",
+                                ActionUrl = $"/production/maker-orders?orderNo={request.OrderNo}",
+                                Priority = 2, // High
+                                DueDate = minReturnDt > DateTime.Today ? minReturnDt : DateTime.Today.AddDays(7),
+                                CreatedBy = request.UserName
+                            });
+
+                            _logger.LogInformation("Hub supervisor task dispatched for Master PO #{PoNo} Hub {Hub} targeting {UserCount} supervisors",
+                                group.Key.MasterPoNo, group.Key.HubName, targetUserNames.Count);
+                        }
+                    }
+                }
+                catch (Exception hubEx)
+                {
+                    _logger.LogError(hubEx, "Failed to dispatch Hub supervisor tasks for generated POs on Order #{OrderNo}", request.OrderNo);
+                }
             }
 
             return result;

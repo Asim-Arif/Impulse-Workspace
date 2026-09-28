@@ -237,6 +237,7 @@ namespace DataAccessLibrary.DAC.Production
 
                     foreach (var line in group)
                     {
+                        line.MasterPONo = currentMasterPoNo;
                         lastHeaderNo++;
                         string headerReceiptId = $"M-ISU-{dtFormatted}{lastHeaderNo}";
 
@@ -419,6 +420,35 @@ namespace DataAccessLibrary.DAC.Production
                 result.ErrorMessage = ex.Message;
                 return result;
             }
+        }
+
+        public async Task<List<ProcessHubSupervisorMappingDto>> GetProcessHubSupervisorsAsync(IEnumerable<string> itemIds, IEnumerable<int> processIds)
+        {
+            var itemList = itemIds.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
+            var procList = processIds.Where(x => x > 0).Distinct().ToList();
+            if (!itemList.Any() || !procList.Any()) return new List<ProcessHubSupervisorMappingDto>();
+
+            using var conn = CreateConnection();
+            const string sql = @"
+                SELECT 
+                    i.ItemID,
+                    pgp.Process_RefID AS ProcessID,
+                    p.Description AS ProcessName,
+                    pgp.Hub_Name,
+                    s.UserID,
+                    s.UserName,
+                    ISNULL(u.EmpID, '') AS EmpID,
+                    ISNULL(e.Name, u.UserName) AS EmployeeName
+                FROM Items i
+                LEFT JOIN ItemProcessGroups ipg ON i.ItemID = ipg.ItemID
+                INNER JOIN ProcessGroupsProcesses pgp ON COALESCE(ipg.PG_RefID, i.GroupID) = pgp.Group_RefID
+                INNER JOIN Processes p ON pgp.Process_RefID = p.ProcessID
+                LEFT JOIN ProcessGroup_Hub_Supervisors s ON pgp.Group_RefID = s.GroupID AND pgp.Hub_Name = s.Hub_Name
+                LEFT JOIN Users u ON s.UserID = u.UserID
+                LEFT JOIN Employees e ON u.EmpID = e.EmpID
+                WHERE i.ItemID IN @ItemIds AND pgp.Process_RefID IN @ProcessIds";
+
+            return (await conn.QueryAsync<ProcessHubSupervisorMappingDto>(sql, new { ItemIds = itemList, ProcessIds = procList })).ToList();
         }
     }
 }

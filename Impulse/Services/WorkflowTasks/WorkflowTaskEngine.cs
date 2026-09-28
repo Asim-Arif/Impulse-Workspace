@@ -358,7 +358,7 @@ namespace Impulse.Services.WorkflowTasks
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error authorizing customer order #{OrderNo}", orderNo);
-                return false;
+                throw;
             }
         }
     }

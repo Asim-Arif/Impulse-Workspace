@@ -334,5 +334,34 @@ namespace DataAccessLibrary.DAC.Production
 
             return rows > 0;
         }
+
+        public async Task<List<EmployeeLookupModel>> GetEmployeesWithCapacityAsync(int processId)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            string sql = @"
+                SELECT 
+                    e.EmpID, 
+                    e.Name, 
+                    ISNULL(e.Designation, '') AS Designation,
+                    ISNULL(t.TargetQty, 0) AS Capacity,
+                    ISNULL(b.BalanceQty, 0) AS Balance
+                FROM Employees e
+                LEFT JOIN (
+                    SELECT EmpID, ISNULL(SUM(Qty), 0) AS TargetQty
+                    FROM EmpDailyTargets
+                    WHERE ProcessID = @ProcessID
+                    GROUP BY EmpID
+                ) t ON e.EmpID = t.EmpID
+                LEFT JOIN (
+                    SELECT IssEmpID, ISNULL(SUM(Qty), 0) AS BalanceQty
+                    FROM VRunningLots_Simple
+                    WHERE ProcessID = @ProcessID AND ISNULL(IssEmpID, '') <> ''
+                    GROUP BY IssEmpID
+                ) b ON e.EmpID = b.IssEmpID
+                WHERE ISNULL(e.Active, 1) = 1
+                ORDER BY e.Name";
+
+            return (await db.QueryAsync<EmployeeLookupModel>(sql, new { ProcessID = processId })).ToList();
+        }
     }
 }

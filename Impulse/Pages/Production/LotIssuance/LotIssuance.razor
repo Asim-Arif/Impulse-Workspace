@@ -83,9 +83,9 @@
             </div>
 
             <!-- SECTION 1: LOT NO SEARCH & HEADER CONTROLS -->
-            <div class="card mb-3 border" style="background:#f8f9fb; border-radius:8px;">
-                <div class="card-body py-3">
-                    <div class="row g-3 align-items-center">
+            <div class="card mb-3 border" style="background:#f8f9fb; border-radius:8px; position: relative !important; z-index: 100 !important;">
+                <div class="card-body py-3" style="overflow: visible !important;">
+                    <div class="row g-3 align-items-center" style="position: relative !important; z-index: 1000 !important;">
                         
                         <!-- 1. Lot No Search Input (First Control) -->
                         <div class="col-12 col-sm-auto">
@@ -170,7 +170,7 @@
                     </div>
 
                     <!-- SECOND ROW: WORKER, COUNTED BY & CHECKBOX OPTIONS -->
-                    <div class="row g-3 align-items-center mt-1 pt-2 border-top">
+                    <div class="row g-3 align-items-center mt-1 pt-2 border-top" style="position: relative !important; z-index: 9999 !important;">
                         <!-- Single Worker (Saved in VendIssued.IssEmpID) -->
                         <div class="col-md-4">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
@@ -179,6 +179,55 @@
                             <BlazoredTypeahead SearchMethod="SearchEmployees"
                                                @bind-Value="SelectedWorker"
                                                Placeholder="Select factory worker..."
+                                               EnableDropDown="true"
+                                               MinimumLength="0"
+                                               MaximumSuggestions="1000">
+                                <SelectedTemplate Context="e">
+                                    @if (e != null)
+                                    {
+                                        @if (!string.IsNullOrEmpty(e.EmpID) && e.EmpID != "0") { <text>[@e.EmpID] </text> }@e.Name
+                                        <text> (Cap: @e.Capacity.ToString("N0"), Bal: @e.Balance.ToString("N0"))</text>
+                                    }
+                                </SelectedTemplate>
+                                <ResultTemplate Context="e">
+                                    @if (e != null)
+                                    {
+                                        var isOverCapacity = (e.Balance + TotalIssuanceQty) > e.Capacity;
+                                        <div class="d-flex justify-content-between align-items-center w-100 @(isOverCapacity ? "text-danger fw-bold" : "")">
+                                            <span>
+                                                @if (!string.IsNullOrEmpty(e.EmpID) && e.EmpID != "0")
+                                                {
+                                                    <strong class="@(isOverCapacity ? "text-danger" : "text-primary") me-1">[@e.EmpID]</strong>
+                                                }
+                                                @e.Name
+                                                <span class="ms-1 badge @(isOverCapacity ? "bg-danger text-white" : "bg-light text-secondary border")" style="font-size:0.72rem;">
+                                                    Cap: @e.Capacity.ToString("N0"), Bal: @e.Balance.ToString("N0")
+                                                </span>
+                                            </span>
+                                            <small class="@(isOverCapacity ? "text-danger fw-semibold" : "text-muted")">@(string.IsNullOrEmpty(e.Designation) ? "" : e.Designation)</small>
+                                        </div>
+                                    }
+                                </ResultTemplate>
+                            </BlazoredTypeahead>
+                            @if (SelectedWorker != null && (SelectedWorker.Balance + TotalIssuanceQty) > SelectedWorker.Capacity)
+                            {
+                                <div class="alert alert-danger py-1 px-2 mt-1 mb-0 d-flex align-items-center" style="font-size:0.76rem; border-radius:6px;">
+                                    <i class="fas fa-exclamation-triangle text-danger me-2"></i>
+                                    <div>
+                                        <strong>Capacity Warning:</strong> Current Bal (@SelectedWorker.Balance.ToString("N0")) + Lot Qty (@TotalIssuanceQty.ToString("N0")) = <strong>@((SelectedWorker.Balance + TotalIssuanceQty).ToString("N0")) pcs</strong>, exceeding capacity (@SelectedWorker.Capacity.ToString("N0") pcs) by <span class="badge bg-danger">@((SelectedWorker.Balance + TotalIssuanceQty - SelectedWorker.Capacity).ToString("N0")) pcs</span>.
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Counted By Employee (Saved in VendIssdDetail.CountedBy) -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
+                                Counted By
+                            </label>
+                            <BlazoredTypeahead SearchMethod="SearchCountedByEmployees"
+                                               @bind-Value="SelectedCountedBy"
+                                               Placeholder="Select counted by..."
                                                EnableDropDown="true"
                                                MinimumLength="0"
                                                MaximumSuggestions="1000">
@@ -197,32 +246,6 @@
                             </BlazoredTypeahead>
                         </div>
 
-                        <!-- Counted By Employee (Saved in VendIssdDetail.CountedBy) -->
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
-                                Counted By
-                            </label>
-                            <BlazoredTypeahead SearchMethod="SearchEmployees"
-                                               @bind-Value="SelectedCountedBy"
-                                               Placeholder="Select counted by..."
-                                               EnableDropDown="true"
-                                               MinimumLength="0"
-                                               MaximumSuggestions="1000">
-                                <SelectedTemplate Context="e">
-                                    @if (e != null)
-                                    {
-                                        @if (!string.IsNullOrEmpty(e.EmpID) && e.EmpID != "0") { <text>[@e.EmpID] </text> }@e.Name
-                                    }
-                                </SelectedTemplate>
-                                <ResultTemplate Context="e">
-                                    @if (e != null)
-                                    {
-                                        @if (!string.IsNullOrEmpty(e.EmpID) && e.EmpID != "0") { <text>[@e.EmpID] </text> }@e.Name
-                                    }
-                                </ResultTemplate>
-                            </BlazoredTypeahead>
-                        </div>
-
                         <!-- Reset Button -->
                         <div class="col-md-4 text-end align-self-end">
                             <button type="button" class="btn btn-sm btn-outline-secondary px-3" @onclick="ClearForm">
@@ -232,7 +255,7 @@
                     </div>
 
                     <!-- THIRD ROW: CHECKBOX OPTIONS -->
-                    <div class="row g-3 align-items-center mt-1 pt-2 border-top">
+                    <div class="row g-3 align-items-center mt-1 pt-2 border-top" style="position: relative !important; z-index: 10 !important;">
                         <div class="col-auto">
                             <div class="form-check form-check-inline">
                                 <input class="form-check-input" type="checkbox" id="chkSampleProvided" @bind="SampleProvided" />
@@ -270,13 +293,13 @@
             </div>
 
             <!-- SECTION 2: STAGED ISSUANCE ITEMS GRID -->
-            <div class="card mb-3 border" style="background:#ffffff; border-radius:8px;">
+            <div class="card mb-3 border" style="background:#ffffff; border-radius:8px; position: relative !important; z-index: 1 !important;">
                 <div class="card-header py-2 bg-light fw-bold text-secondary d-flex align-items-center justify-content-between" style="font-size:0.85rem; border-radius:8px 8px 0 0;">
                     <span><i class="fas fa-boxes-stacked me-1 text-primary"></i> Staged Items for Lot Issuance (@StagedItems.Count)</span>
                     <span class="badge bg-primary fs-6">Total Issuance Qty: @TotalIssuanceQty.ToString("N0")</span>
                 </div>
                 <div class="card-body p-0">
-                    <div class="table-responsive" style="max-height: 380px;">
+                    <div class="table-responsive" style="max-height: 380px; position: relative !important; z-index: 1 !important;">
                         <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
                             <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase;">
                                 <tr>

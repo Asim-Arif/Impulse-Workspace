@@ -12,5 +12,6 @@ namespace DataAccessLibrary.Interface.Production
         Task<List<PpcMakerPoItemRowDto>> GetPpcPurchasesForOrderAsync(string orderNo);
         Task<List<MakerPOLookupModel>> GetAllMakersAsync();
         Task<GenerateMakerPoResult> GenerateMakerPosAsync(GenerateMakerPoRequest request);
+        Task<List<ProcessHubSupervisorMappingDto>> GetProcessHubSupervisorsAsync(IEnumerable<string> itemIds, IEnumerable<int> processIds);
     }
 }

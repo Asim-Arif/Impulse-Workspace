@@ -204,16 +204,19 @@ END
 GO
 
 -- 8. TASKITEMS WORKFLOW METADATA COLUMNS
-IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('TaskItems') AND name = 'SourceEntityType')
+
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('TaskItems') AND name = 'DueWarningSent')
 BEGIN
-    ALTER TABLE [dbo].[TaskItems] ADD [SourceEntityType] NVARCHAR(50) NULL;
-    ALTER TABLE [dbo].[TaskItems] ADD [SourceEntityRefId] NVARCHAR(100) NULL;
-    ALTER TABLE [dbo].[TaskItems] ADD [TargetRole] NVARCHAR(50) NULL;
-    ALTER TABLE [dbo].[TaskItems] ADD [CompletedBy] NVARCHAR(100) NULL;
-    ALTER TABLE [dbo].[TaskItems] ADD [ActionUrl] NVARCHAR(300) NULL;
-    CREATE NONCLUSTERED INDEX [IX_TaskItems_SourceEntity] ON [dbo].[TaskItems]([SourceEntityType], [SourceEntityRefId]);
-    CREATE NONCLUSTERED INDEX [IX_TaskItems_TargetRole_Status] ON [dbo].[TaskItems]([TargetRole], [Status]);
-    PRINT 'Added workflow columns to TaskItems';
+    ALTER TABLE [dbo].[TaskItems] ADD [DueWarningSent] BIT NOT NULL CONSTRAINT [DF_TaskItems_DueWarningSent] DEFAULT 0;
+    PRINT 'Added column DueWarningSent to TaskItems';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('TaskItems') AND name = 'OverdueWarningSent')
+BEGIN
+    ALTER TABLE [dbo].[TaskItems] ADD [OverdueWarningSent] BIT NOT NULL CONSTRAINT [DF_TaskItems_OverdueWarningSent] DEFAULT 0;
+    PRINT 'Added column OverdueWarningSent to TaskItems';
 END
 GO
 
@@ -351,6 +354,150 @@ BEGIN
     CREATE NONCLUSTERED INDEX [IX_PpcHubSchedules_Order_Item] 
         ON [dbo].[PPC_Order_Item_Hub_Schedules] ([OrderNo], [ItemID]);
     PRINT 'Created table: PPC_Order_Item_Hub_Schedules';
+END
+GO
+
+-- 13. CUSTOMER ORDERS AUTHORIZATION COLUMNS
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('FCustomerOrders') AND name = 'Authorized')
+BEGIN
+    ALTER TABLE [dbo].[FCustomerOrders] ADD [Authorized] BIT NOT NULL CONSTRAINT [DF_FCustomerOrders_Authorized] DEFAULT 0;
+    PRINT 'Added column Authorized to FCustomerOrders';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('FCustomerOrders') AND name = 'AuthorizedBy')
+BEGIN
+    ALTER TABLE [dbo].[FCustomerOrders] ADD [AuthorizedBy] VARCHAR(50) NULL;
+    PRINT 'Added column AuthorizedBy to FCustomerOrders';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('FCustomerOrders') AND name = 'AuthorizedDT')
+BEGIN
+    ALTER TABLE [dbo].[FCustomerOrders] ADD [AuthorizedDT] DATETIME NULL;
+    PRINT 'Added column AuthorizedDT to FCustomerOrders';
+END
+GO
+
+-- 14. TASK COMMENTS TABLE (FOR WORKFLOW AUDIT TRAIL)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TaskComments')
+BEGIN
+    CREATE TABLE [dbo].[TaskComments] (
+        [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [TaskId] INT NOT NULL,
+        [UserId] NVARCHAR(100) NOT NULL,
+        [Content] NVARCHAR(MAX) NOT NULL,
+        [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+        CONSTRAINT [FK_TaskComments_TaskItems] FOREIGN KEY ([TaskId]) REFERENCES [dbo].[TaskItems]([Id]) ON DELETE CASCADE
+    );
+    CREATE NONCLUSTERED INDEX [IX_TaskComments_TaskId] ON [dbo].[TaskComments] ([TaskId]);
+    PRINT 'Created table: TaskComments';
+END
+GO
+
+-- 15. ENSURE WORKFLOW ROLES EXIST IN USER_ROLES
+IF NOT EXISTS (SELECT 1 FROM [dbo].[User_Roles] WHERE [RoleName] = 'Director')
+BEGIN
+    INSERT INTO [dbo].[User_Roles] ([RoleName]) VALUES ('Director');
+    PRINT 'Inserted role: Director';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[User_Roles] WHERE [RoleName] = 'PPC')
+BEGIN
+    INSERT INTO [dbo].[User_Roles] ([RoleName]) VALUES ('PPC');
+    PRINT 'Inserted role: PPC';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[User_Roles] WHERE [RoleName] = 'Dispatch')
+BEGIN
+    INSERT INTO [dbo].[User_Roles] ([RoleName]) VALUES ('Dispatch');
+    PRINT 'Inserted role: Dispatch';
+END
+GO
+
+-- 16. UPDATE VFORDLIST VIEW WITH AUTHORIZATION COLUMNS
+IF EXISTS (SELECT 1 FROM sys.views WHERE name = 'VFOrderList')
+BEGIN
+    EXEC('
+    ALTER VIEW [dbo].[VFOrderList]
+    AS
+    SELECT     dbo.FCustomerOrders.OrderNo, dbo.FCustomerOrders.DT, dbo.FCustomerOrders.CustCode, dbo.FCustomerOrders.Country, dbo.F_OrderAmt(dbo.FCustomerOrders.OrderNo, 0) AS OrderAmt, 
+                          dbo.ForeignCustomers.Curr, dbo.VFOrderTotalQty.TotalInvQty, dbo.VFOrderTotalQty.TotalOrderQty, dbo.FCustomerOrders.DeliveryDT, dbo.FCustomerOrders.CompanyRefID, 
+                          dbo.Companies.CompanyName, dbo.VUnshippedOrderList.OrderNo AS UnshippedOrderNo, TotalShipped.TotalShippedQty, dbo.VCurrencyExchangeRates.ExchRate, 
+                          dbo.FCustomerOrders.InternalRefNo, ROUND(dbo.VFOrderTotalQty.TotalWeight, 2) AS TotalWeight, TotalShipped.TotalShippedAmt, ISNULL(dbo.FCustomerFinalOrders.Cancelled, 0) AS Cancelled, 
+                          TotalQuantities.TotalArticles, dbo.FCustomerFinalOrders.Remarks, TotalShipped.ShippedItemCount, TotalShipped.ShippedItemQty, TotalShipped.PartiallyShippedItemCount, 
+                          TotalShipped.PartiallyShippedItemQty, TotalShipped.TotalBalanceQty, dbo.FCustomerOrders.OrderType, T1.TotalPlannedQty, dbo.FCustomerOrders.OrderPlanApproved
+                          ,dbo.ForeignCustomers.LateOrderAlerts
+                          ,ISNULL(dbo.FCustomerOrders.Authorized, 0) AS Authorized
+                          ,dbo.FCustomerOrders.AuthorizedBy
+                          ,dbo.FCustomerOrders.AuthorizedDT
+    FROM         dbo.FCustomerOrders INNER JOIN
+                          dbo.ForeignCustomers ON dbo.FCustomerOrders.CustCode = dbo.ForeignCustomers.CustCode AND dbo.FCustomerOrders.Country = dbo.ForeignCustomers.Country INNER JOIN
+                          dbo.VFOrderTotalQty ON dbo.FCustomerOrders.OrderNo = dbo.VFOrderTotalQty.OrderNo INNER JOIN
+                          dbo.Companies ON dbo.FCustomerOrders.CompanyRefID = dbo.Companies.EntryID LEFT OUTER JOIN
+                          dbo.VUnshippedOrderList ON dbo.FCustomerOrders.OrderNo = dbo.VUnshippedOrderList.OrderNo INNER JOIN
+                              (SELECT     OrderNo, SUM(Qty) AS TotalOrderQty, COUNT(*) AS TotalArticles
+                                FROM          dbo.FOrderItems
+                                GROUP BY OrderNo) AS TotalQuantities ON dbo.FCustomerOrders.OrderNo = TotalQuantities.OrderNo LEFT OUTER JOIN
+                          dbo.FCustomerFinalOrders ON dbo.FCustomerOrders.OrderNo = dbo.FCustomerFinalOrders.OrderNo LEFT OUTER JOIN
+                              (SELECT     OrderNo, SUM(ShippedQty) AS TotalShippedQty, SUM(ShippedQty * Price) AS TotalShippedAmt, SUM(CASE WHEN ShippedQty >= Qty THEN 1 ELSE 0 END) AS ShippedItemCount, 
+                                                       SUM(CASE WHEN ShippedQty >= Qty THEN ShippedQty ELSE 0 END) AS ShippedItemQty, SUM(CASE WHEN ShippedQty > 0 AND ShippedQty < Qty THEN 1 ELSE 0 END) 
+                                                       AS PartiallyShippedItemCount, SUM(CASE WHEN ShippedQty > 0 AND ShippedQty < Qty THEN ShippedQty ELSE 0 END) AS PartiallyShippedItemQty, 
+                                                       SUM(CASE WHEN ShippedQty >= Qty THEN 0 ELSE Qty - ShippedQty END) AS TotalBalanceQty
+                                FROM          dbo.VFOrderItemswithShippedQty
+                                WHERE      (CompItemCode IN
+                                                           (SELECT     ItemID
+                                                             FROM          dbo.Items))
+                                GROUP BY OrderNo) AS TotalShipped ON dbo.FCustomerOrders.OrderNo = TotalShipped.OrderNo LEFT OUTER JOIN
+                          dbo.VCurrencyExchangeRates ON dbo.ForeignCustomers.Curr = dbo.VCurrencyExchangeRates.Currency LEFT OUTER JOIN
+                              (SELECT     OrderNo, SUM(Qty) AS TotalPlannedQty
+                                FROM          dbo.OrderPlanningDetails
+                                GROUP BY OrderNo) AS T1 ON dbo.FCustomerOrders.OrderNo = T1.OrderNo
+    ');
+    PRINT 'Updated view: VFOrderList with Authorized columns';
+END
+GO
+
+-- 17. PROCESSES ESTIMATE COMPLETION TIME IN MINUTES
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Processes') AND name = 'EstimatedMinutes')
+BEGIN
+    ALTER TABLE [dbo].[Processes] ADD [EstimatedMinutes] INT NOT NULL CONSTRAINT [DF_Processes_EstimatedMinutes] DEFAULT 0;
+    PRINT 'Added column EstimatedMinutes to Processes';
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.views WHERE name = 'VProcesses')
+BEGIN
+    EXEC('
+    ALTER VIEW dbo.VProcesses
+    AS
+    SELECT     dbo.Processes.ProcessID, dbo.Processes.SNO, dbo.Processes.Description, dbo.Processes.Supervisor, dbo.Processes.Operation, dbo.Processes.AuthRequired, 
+                          dbo.Processes.Code, dbo.Processes.ProcessNameUrdu, dbo.Processes.Insp_RefID, dbo.Processes.Fix_Maker_RefID, dbo.Makers.VenderName, 
+                          dbo.InspectionProcesses.Code AS Insp_Code, dbo.InspectionProcesses.ProcessName AS Insp_ProcessName, 
+                          dbo.InspectionProcesses.ProcessNameUrdu AS Insp_ProcessNameUrdu, dbo.Processes.InspectionProcess, dbo.Processes.ProcessNameUrduOther, 
+                          dbo.Processes.BillingProcessID,
+                          ISNULL(dbo.Processes.EstimatedMinutes, 0) AS EstimatedMinutes
+    FROM         dbo.Processes LEFT OUTER JOIN
+                          dbo.InspectionProcesses ON dbo.Processes.Insp_RefID = dbo.InspectionProcesses.EntryID LEFT OUTER JOIN
+                          dbo.Makers ON dbo.Processes.Fix_Maker_RefID = dbo.Makers.VendID
+    ');
+    PRINT 'Updated view: VProcesses with EstimatedMinutes';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('DispatchListDetail_VRD') AND name = 'EntryDT')
+BEGIN
+    ALTER TABLE DispatchListDetail_VRD ADD EntryDT DATETIME NULL CONSTRAINT DF_DispatchListDetail_VRD_EntryDT DEFAULT GETDATE();
+    PRINT 'Added EntryDT to DispatchListDetail_VRD';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('DispatchListDetail_VRD') AND name = 'AddedBy')
+BEGIN
+    ALTER TABLE DispatchListDetail_VRD ADD AddedBy VARCHAR(50) NULL;
+    PRINT 'Added AddedBy to DispatchListDetail_VRD';
 END
 GO
 

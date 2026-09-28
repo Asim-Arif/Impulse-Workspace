@@ -46,7 +46,8 @@ namespace DataAccessLibrary.DAC.Production
                     ISNULL(vp.Insp_ProcessNameUrdu, '') AS Insp_ProcessNameUrdu,
                     vp.InspectionProcess,
                     vp.BillingProcessID,
-                    ISNULL(bp.Description, '') AS BillingProcessName
+                    ISNULL(bp.Description, '') AS BillingProcessName,
+                    ISNULL(vp.EstimatedMinutes, 0) AS EstimatedMinutes
                 FROM VProcesses vp
                 LEFT JOIN Processes bp ON vp.BillingProcessID = bp.ProcessID
                 WHERE ISNULL(vp.InspectionProcess, 0) = @IsInsp
@@ -73,7 +74,8 @@ namespace DataAccessLibrary.DAC.Production
                     Insp_RefID,
                     Fix_Maker_RefID,
                     ISNULL(InspectionProcess, 0) AS InspectionProcess,
-                    BillingProcessID
+                    BillingProcessID,
+                    ISNULL(EstimatedMinutes, 0) AS EstimatedMinutes
                 FROM Processes
                 WHERE ProcessID = @ProcessID";
 
@@ -105,11 +107,11 @@ namespace DataAccessLibrary.DAC.Production
                 INSERT INTO Processes (
                     SNo, Description, Supervisor, Operation, AuthRequired, Code,
                     ProcessNameUrdu, Insp_RefID, Fix_Maker_RefID, InspectionProcess,
-                    ProcessNameUrduOther, BillingProcessID
+                    ProcessNameUrduOther, BillingProcessID, EstimatedMinutes
                 ) VALUES (
                     @SNo, @Description, @Supervisor, @Operation, @AuthRequired, @Code,
                     @ProcessNameUrdu, @Insp_RefID, @Fix_Maker_RefID, @InspectionProcess,
-                    @ProcessNameUrduOther, @BillingProcessID
+                    @ProcessNameUrduOther, @BillingProcessID, @EstimatedMinutes
                 );
                 SELECT CAST(SCOPE_IDENTITY() AS INT);";
 
@@ -126,7 +128,8 @@ namespace DataAccessLibrary.DAC.Production
                 Fix_Maker_RefID = model.Fix_Maker_RefID,
                 InspectionProcess = model.InspectionProcess,
                 ProcessNameUrduOther = model.ProcessNameUrduOther ?? string.Empty,
-                BillingProcessID = model.BillingProcessID
+                BillingProcessID = model.BillingProcessID,
+                EstimatedMinutes = model.EstimatedMinutes
             });
         }
 
@@ -144,7 +147,8 @@ namespace DataAccessLibrary.DAC.Production
                     Insp_RefID = @Insp_RefID,
                     Fix_Maker_RefID = @Fix_Maker_RefID,
                     ProcessNameUrduOther = @ProcessNameUrduOther,
-                    BillingProcessID = @BillingProcessID
+                    BillingProcessID = @BillingProcessID,
+                    EstimatedMinutes = @EstimatedMinutes
                 WHERE ProcessID = @ProcessID";
 
             int rows = await db.ExecuteAsync(updateSql, new
@@ -159,7 +163,8 @@ namespace DataAccessLibrary.DAC.Production
                 Insp_RefID = model.Insp_RefID,
                 Fix_Maker_RefID = model.Fix_Maker_RefID,
                 ProcessNameUrduOther = model.ProcessNameUrduOther ?? string.Empty,
-                BillingProcessID = model.BillingProcessID
+                BillingProcessID = model.BillingProcessID,
+                EstimatedMinutes = model.EstimatedMinutes
             });
 
             return rows > 0;

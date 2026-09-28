@@ -18,6 +18,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public int? Fix_Maker_RefID { get; set; }
         public bool InspectionProcess { get; set; } = false;
         public int? BillingProcessID { get; set; }
+        public int EstimatedMinutes { get; set; } = 0;
         public bool IsSelected { get; set; }
     }
 
@@ -41,6 +42,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public bool? InspectionProcess { get; set; }
         public int? BillingProcessID { get; set; }
         public string BillingProcessName { get; set; } = string.Empty;
+        public int EstimatedMinutes { get; set; } = 0;
 
         public string OperationName => Operation switch
         {

@@ -87,7 +87,7 @@
                     </div>
 
                     <!-- Operation Scope -->
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
                             Operation Scope <span class="text-danger">*</span>
                         </label>
@@ -109,8 +109,20 @@
                         </select>
                     </div>
 
+                    <!-- Estimate Completion Time (Minutes) -->
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
+                            <i class="fas fa-stopwatch text-primary me-1"></i> Est. Time (Mins)
+                        </label>
+                        <input type="number"
+                               min="0"
+                               class="form-control form-control-sm text-end fw-bold"
+                               placeholder="e.g. 120"
+                               @bind="CurrentProcess.EstimatedMinutes" />
+                    </div>
+
                     <!-- Fix Contractor (Maker) -->
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
                             <i class="fas fa-industry text-primary me-1"></i> Fixed Contractor / Maker
                         </label>
@@ -278,6 +290,7 @@
                             <th style="min-width: 220px;">@(ShowUrduDescription ? "پروسیس کا نام (Urdu Name)" : "Process Name")</th>
                             <th style="min-width: 200px;">Detailed Description</th>
                             <th style="width: 130px;" class="text-center">Operation</th>
+                            <th style="width: 110px;" class="text-center">Est. Time</th>
                             <th style="min-width: 180px;">Fix Contractor</th>
                             <th style="width: 100px;" class="text-center">Auth. Req.</th>
                             <th style="min-width: 180px;">Insp. Process</th>
@@ -288,7 +301,7 @@
                         @if (IsLoading)
                         {
                             <tr>
-                                <td colspan="8" class="text-center py-5 text-muted">
+                                <td colspan="9" class="text-center py-5 text-muted">
                                     <span class="spinner-border spinner-border-sm me-1" role="status"></span> Loading processes...
                                 </td>
                             </tr>
@@ -296,7 +309,7 @@
                         else if (!FilteredProcesses.Any())
                         {
                             <tr>
-                                <td colspan="8" class="text-center py-5 text-muted">
+                                <td colspan="9" class="text-center py-5 text-muted">
                                     <i class="fas fa-inbox fa-2x d-block mb-2 text-secondary opacity-50"></i>
                                     No processes found matching the search criteria.
                                 </td>
@@ -337,6 +350,18 @@
                                         else
                                         {
                                             <span class="badge bg-info text-dark px-2">Both</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        @if (proc.EstimatedMinutes > 0)
+                                        {
+                                            <span class="badge bg-light text-primary border fw-semibold" title="@proc.EstimatedMinutes minutes">
+                                                <i class="fas fa-stopwatch me-1"></i>@proc.EstimatedMinutes m
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">&mdash;</span>
                                         }
                                     </td>
                                     <td>

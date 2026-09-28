@@ -48,6 +48,8 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public int CartonNo { get; set; } = 0;
         public string LotNo { get; set; } = string.Empty;
         public string OrderNo { get; set; } = string.Empty;
+        public DateTime? EntryDT { get; set; }
+        public string? AddedBy { get; set; }
         public bool IsExisting => InnerEntryID > 0;
         public bool IsSelected { get; set; }
     }
