@@ -345,6 +345,10 @@ builder.Services.AddScoped<DataAccessLibrary.Interface.Dashboard.ICommandCenterD
 builder.Services.AddScoped<Impulse.Services.Dashboard.ICommandCenterDashboardService, Impulse.Services.Dashboard.CommandCenterDashboardService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IOrderManagementDataAccess, DataAccessLibrary.DAC.Production.OrderManagementDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Production.IOrderManagementService, Impulse.Services.Production.OrderManagementService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IOrderLotsTrackingDataAccess, DataAccessLibrary.DAC.Production.OrderLotsTrackingDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IOrderLotsTrackingService, Impulse.Services.Production.OrderLotsTrackingService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IEmployeePerformanceDataAccess, DataAccessLibrary.DAC.Production.EmployeePerformanceDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Production.IEmployeePerformanceService, Impulse.Services.Production.EmployeePerformanceService>();
 
 builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IPpcOrderPlanningDataAccess, DataAccessLibrary.DAC.Production.PpcOrderPlanningDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Production.IPpcOrderPlanningService, Impulse.Services.Production.PpcOrderPlanningService>();

@@ -23,6 +23,10 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public int ProcessID { get; set; }
         public string Description { get; set; } = string.Empty;  // Process description
 
+        // Hub & Supervisor
+        public string? Hub_Name { get; set; }
+        public string? Supervisors { get; set; }
+
         // Article
         public string ItemCode { get; set; } = string.Empty;
         public string ItemName { get; set; } = string.Empty;

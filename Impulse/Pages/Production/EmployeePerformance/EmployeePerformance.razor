@@ -1,0 +1,523 @@
+@page "/production/employee-performance"
+@using DataAccessLibrary.Models.ViewModels.Production
+
+<style>
+    .order-mgmt-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 12px;
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+    }
+    .kpi-stat-box {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 12px 14px;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .kpi-stat-box:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+    }
+    .kpi-icon-square {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.15rem;
+    }
+    .pill-badge {
+        padding: 4px 10px;
+        border-radius: 9999px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+
+    <!-- TOP TITLE & REFRESH BAR -->
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="kpi-icon-square bg-primary text-white shadow-sm">
+                        <i class="fas fa-user-check"></i>
+                    </div>
+                    <div>
+                        <h4 class="fw-bold mb-0 text-dark">Worker Capacity & Performance</h4>
+                        <div class="text-muted small">Daily Targets vs Lot Production Utilization • Assigned, Completed, Delayed & Overdue Tracking</div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 shadow-sm" @onclick="LoadDataAsync" disabled="@IsLoading">
+                        <i class="fas fa-sync-alt @(IsLoading ? "fa-spin" : "")"></i>
+                        <span>Refresh</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI STATS CARDS -->
+    <div class="row g-2 mb-3">
+        <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="kpi-stat-box h-100 shadow-sm d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-muted small fw-semibold text-uppercase">Workers Active</span>
+                    <h3 class="fw-bold mb-0 text-dark">@DashboardData.TotalWorkers.ToString("N0")</h3>
+                    <small class="text-secondary fw-semibold">@DashboardData.WorkingDaysInPeriod Working Days</small>
+                </div>
+                <div class="kpi-icon-square bg-light text-primary border">
+                    <i class="fas fa-users"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="kpi-stat-box h-100 shadow-sm d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-muted small fw-semibold text-uppercase">Assigned Qty</span>
+                    <h3 class="fw-bold mb-0 text-primary">@DashboardData.TotalAssignedQty.ToString("N0")</h3>
+                    <small class="text-primary fw-semibold">Issued in Period</small>
+                </div>
+                <div class="kpi-icon-square bg-primary-subtle text-primary border border-primary-subtle">
+                    <i class="fas fa-arrow-circle-right"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="kpi-stat-box h-100 shadow-sm d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-muted small fw-semibold text-uppercase">Completed Qty</span>
+                    <h3 class="fw-bold mb-0 text-success">@DashboardData.TotalCompletedQty.ToString("N0")</h3>
+                    <small class="text-success fw-semibold">Received Back</small>
+                </div>
+                <div class="kpi-icon-square bg-success-subtle text-success border border-success-subtle">
+                    <i class="fas fa-check-double"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="kpi-stat-box h-100 shadow-sm d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-muted small fw-semibold text-uppercase">Active Floor WIP</span>
+                    <h3 class="fw-bold mb-0 text-warning">@DashboardData.TotalActiveWipQty.ToString("N0")</h3>
+                    <small class="text-warning fw-semibold">In Hand Balance</small>
+                </div>
+                <div class="kpi-icon-square bg-warning-subtle text-warning border border-warning-subtle">
+                    <i class="fas fa-boxes-packing"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="kpi-stat-box h-100 shadow-sm d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-muted small fw-semibold text-uppercase">Overall Utilization</span>
+                    <h3 class="fw-bold mb-0 @(DashboardData.OverallUtilizationPct >= 100 ? "text-danger" : DashboardData.OverallUtilizationPct >= 75 ? "text-success" : "text-primary")">
+                        @DashboardData.OverallUtilizationPct%
+                    </h3>
+                    <small class="text-secondary fw-semibold">Target Fulfillment</small>
+                </div>
+                <div class="kpi-icon-square bg-light text-success border">
+                    <i class="fas fa-tachometer-alt"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="kpi-stat-box h-100 shadow-sm d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-muted small fw-semibold text-uppercase">Overdue Lots</span>
+                    <h3 class="fw-bold mb-0 @(DashboardData.TotalOverdueLots > 0 ? "text-danger" : "text-muted")">
+                        @DashboardData.TotalOverdueLots.ToString("N0")
+                    </h3>
+                    <small class="@(DashboardData.TotalOverdueLots > 0 ? "text-danger fw-semibold" : "text-muted")">
+                        @(DashboardData.TotalOverdueLots > 0 ? "Past Return Due" : "All On Track")
+                    </small>
+                </div>
+                <div class="kpi-icon-square bg-danger-subtle text-danger border border-danger-subtle">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FILTERS TOOLBAR -->
+    <div class="order-mgmt-card p-3 mb-3">
+        <div class="row g-2 align-items-end">
+            <!-- Date Preset -->
+            <div class="col-lg-2 col-md-4">
+                <label class="form-label form-label-sm fw-bold text-secondary mb-1">
+                    <i class="fas fa-calendar-alt me-1"></i> Period
+                </label>
+                <select class="form-select form-select-sm" @bind="Filter.DateRangeType" @bind:after="OnDatePresetChanged">
+                    <option value="0">Today</option>
+                    <option value="1">This Week</option>
+                    <option value="2">Last 15 Days</option>
+                    <option value="3">This Month</option>
+                    <option value="4">Last 30 Days</option>
+                    <option value="5">Custom Range</option>
+                </select>
+            </div>
+
+            <!-- Department Filter -->
+            <div class="col-lg-3 col-md-4">
+                <label class="form-label form-label-sm fw-bold text-secondary mb-1">
+                    <i class="fas fa-building me-1"></i> Department
+                </label>
+                <select class="form-select form-select-sm" 
+                        value="@(Filter.DepartmentId?.ToString() ?? "")" 
+                        @onchange="@(async e => {
+                            int? deptId = int.TryParse(e.Value?.ToString(), out int val) && val > 0 ? val : null;
+                            await OnDepartmentChanged(deptId);
+                        })">
+                    <option value="">-- All Departments --</option>
+                    @foreach (var d in Departments)
+                    {
+                        <option value="@d.DeptID">@d.DeptName</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Process Filter -->
+            <div class="col-lg-3 col-md-4">
+                <label class="form-label form-label-sm fw-bold text-secondary mb-1">
+                    <i class="fas fa-cogs me-1"></i> Process
+                </label>
+                <select class="form-select form-select-sm" 
+                        value="@(Filter.ProcessId?.ToString() ?? "")" 
+                        @onchange="@(async e => {
+                            Filter.ProcessId = int.TryParse(e.Value?.ToString(), out int val) && val > 0 ? val : null;
+                            await OnFilterChanged();
+                        })">
+                    <option value="">-- All Processes --</option>
+                    @foreach (var p in Processes)
+                    {
+                        <option value="@p.ProcessID">@p.Description</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Employee Filter -->
+            <div class="col-lg-2 col-md-6">
+                <label class="form-label form-label-sm fw-bold text-secondary mb-1">
+                    <i class="fas fa-user me-1"></i> Employee
+                </label>
+                <select class="form-select form-select-sm" 
+                        value="@(Filter.EmpId ?? "")" 
+                        @onchange="@(async e => {
+                            Filter.EmpId = string.IsNullOrWhiteSpace(e.Value?.ToString()) ? null : e.Value.ToString();
+                            await OnFilterChanged();
+                        })">
+                    <option value="">-- All Employees --</option>
+                    @foreach (var emp in Employees)
+                    {
+                        <option value="@emp.EmpID">@emp.DisplayText</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Status Filter -->
+            <div class="col-lg-2 col-md-6">
+                <label class="form-label form-label-sm fw-bold text-secondary mb-1">
+                    <i class="fas fa-filter me-1"></i> Status
+                </label>
+                <select class="form-select form-select-sm" @bind="Filter.StatusFilter" @bind:after="OnFilterChanged">
+                    <option value="0">All Workers</option>
+                    <option value="1">Overloaded (>100% Load)</option>
+                    <option value="2">Has Overdue Lots</option>
+                    <option value="3">Optimal (75% - 100%)</option>
+                </select>
+            </div>
+        </div>
+
+        @if (Filter.DateRangeType == 5)
+        {
+            <div class="d-flex align-items-center gap-2 pt-2 mt-2 border-top">
+                <span class="small fw-semibold text-secondary">From:</span>
+                <input type="date" class="form-control form-control-sm" style="max-width: 150px;" @bind="Filter.DtFrom" @bind:after="OnFilterChanged" />
+                <span class="small fw-semibold text-secondary">To:</span>
+                <input type="date" class="form-control form-control-sm" style="max-width: 150px;" @bind="Filter.DtTo" @bind:after="OnFilterChanged" />
+                <button class="btn btn-sm btn-outline-secondary ms-auto" @onclick="ResetFiltersAsync">
+                    <i class="fas fa-undo me-1"></i> Reset
+                </button>
+            </div>
+        }
+    </div>
+
+    <!-- EMPLOYEES DATA TABLE -->
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-secondary small fw-bold"><i class="fas fa-search me-1"></i> Search:</span>
+            <input type="text" class="form-control form-control-sm shadow-sm" style="min-width: 280px;" 
+                   @bind="ClientSearchTerm" @bind:event="oninput" 
+                   placeholder="Filter by Name, ID, Designation, Dept, Process..." />
+        </div>
+        <span class="badge bg-secondary">Showing: @FilteredEmployees.Count Workers</span>
+    </div>
+
+    <div class="table-responsive rounded-3 shadow-sm border bg-white" style="max-height: 60vh; overflow-y: auto;">
+        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                <tr>
+                    <th style="width: 40px;">#</th>
+                    <th>Worker Details</th>
+                    <th>Dept & Process</th>
+                    <th class="text-end">Daily Target</th>
+                    <th class="text-end">Period Capacity</th>
+                    <th class="text-end">Assigned Qty</th>
+                    <th class="text-end">Completed Qty</th>
+                    <th class="text-end">Active WIP</th>
+                    <th style="min-width: 150px;">Capacity vs Utilization</th>
+                    <th class="text-center">On-Time %</th>
+                    <th class="text-center">Overdue</th>
+                    <th class="text-center">Status</th>
+                    <th class="text-center" style="width: 80px;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (IsLoading)
+                {
+                    <tr>
+                        <td colspan="13" class="text-center py-5 text-muted">
+                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div> Loading Worker Performance Data...
+                        </td>
+                    </tr>
+                }
+                else if (!FilteredEmployees.Any())
+                {
+                    <tr>
+                        <td colspan="13" class="text-center py-5 text-muted">
+                            <i class="fas fa-info-circle me-1 fa-lg"></i> No worker performance records found.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    int index = 1;
+                    @foreach (var emp in FilteredEmployees)
+                    {
+                        var currentEmp = emp;
+                        <tr style="cursor: pointer;" @onclick="() => OpenLotsModalAsync(currentEmp)">
+                            <td class="text-secondary small">@(index++)</td>
+                            <td>
+                                <div class="fw-bold text-dark">
+                                    <span class="text-primary me-1">[@currentEmp.EmpID]</span>@currentEmp.EmployeeName
+                                </div>
+                                <div class="small text-muted">@currentEmp.Designation</div>
+                            </td>
+                            <td>
+                                <div class="fw-semibold text-dark">@currentEmp.DepartmentName</div>
+                                <div class="small text-secondary">@currentEmp.PrimaryProcessName</div>
+                            </td>
+                            <td class="text-end">
+                                <span class="fw-bold text-dark">@currentEmp.DailyCapacity.ToString("N0")</span>
+                                @if (currentEmp.OvertimeDailyCapacity > 0)
+                                {
+                                    <div class="small text-muted">+@currentEmp.OvertimeDailyCapacity.ToString("N0") OT</div>
+                                }
+                            </td>
+                            <td class="text-end fw-semibold text-secondary">
+                                @currentEmp.PeriodCapacity.ToString("N0")
+                            </td>
+                            <td class="text-end">
+                                <span class="fw-bold text-primary">@currentEmp.AssignedQty.ToString("N0")</span>
+                                <div class="small text-muted">@currentEmp.AssignedLotsCount @(currentEmp.AssignedLotsCount == 1 ? "Lot" : "Lots")</div>
+                            </td>
+                            <td class="text-end">
+                                <span class="fw-bold text-success">@currentEmp.CompletedQty.ToString("N0")</span>
+                                <div class="small text-muted">@currentEmp.CompletedLotsCount @(currentEmp.CompletedLotsCount == 1 ? "Lot" : "Lots")</div>
+                            </td>
+                            <td class="text-end">
+                                <span class="fw-bold @(currentEmp.ActiveBalanceQty > 0 ? "text-warning" : "text-muted")">
+                                    @currentEmp.ActiveBalanceQty.ToString("N0")
+                                </span>
+                                @if (currentEmp.ActiveLotsCount > 0)
+                                {
+                                    <div class="small text-muted">@currentEmp.ActiveLotsCount In-Hand</div>
+                                }
+                            </td>
+                            <td>
+                                <!-- CAPACITY VS UTILIZATION PROGRESS BAR -->
+                                <div class="d-flex align-items-center justify-content-between mb-1 small">
+                                    <span class="fw-semibold text-secondary" style="font-size: 0.74rem;">
+                                        @currentEmp.CompletedQty.ToString("N0") / @currentEmp.PeriodCapacity.ToString("N0") pcs
+                                    </span>
+                                    <span class="fw-bold @(currentEmp.UtilizationPct >= 100 ? "text-danger" : currentEmp.UtilizationPct >= 75 ? "text-success" : "text-primary")" style="font-size: 0.76rem;">
+                                        @currentEmp.UtilizationPct%
+                                    </span>
+                                </div>
+                                <div class="progress" style="height: 7px; border-radius: 4px;">
+                                    <div class="progress-bar @GetCapacityBarClass(currentEmp.UtilizationPct)" 
+                                         role="progressbar" 
+                                         style="width: @Math.Min(100.0, currentEmp.UtilizationPct)%;" 
+                                         aria-valuenow="@currentEmp.UtilizationPct" 
+                                         aria-valuemin="0" 
+                                         aria-valuemax="100">
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <span class="fw-bold @(currentEmp.OnTimeCompletionRate >= 90 ? "text-success" : currentEmp.OnTimeCompletionRate >= 70 ? "text-warning" : "text-danger")">
+                                    @currentEmp.OnTimeCompletionRate%
+                                </span>
+                                @if (currentEmp.DelayedLotsCount > 0)
+                                {
+                                    <div class="small text-danger" style="font-size: 0.72rem;">@currentEmp.DelayedLotsCount Delayed</div>
+                                }
+                            </td>
+                            <td class="text-center">
+                                @if (currentEmp.OverdueLotsCount > 0)
+                                {
+                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle fw-bold">
+                                        <i class="fas fa-exclamation-triangle me-1"></i>@currentEmp.OverdueLotsCount
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">-</span>
+                                }
+                            </td>
+                            <td class="text-center">
+                                <span class="badge @currentEmp.PerformanceStatusBadgeClass" style="font-size: 0.74rem;">
+                                    @currentEmp.PerformanceStatus
+                                </span>
+                            </td>
+                            <td class="text-center" @onclick:stopPropagation="true">
+                                <button class="btn btn-sm btn-outline-primary py-0 px-2" 
+                                        title="View Assigned Lots"
+                                        @onclick="() => OpenLotsModalAsync(currentEmp)">
+                                    <i class="fas fa-list-check me-1"></i>Lots
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- LOTS DRILL-DOWN MODAL -->
+@if (ShowLotsModal && SelectedEmployeeForModal != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5); z-index: 1050;">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header py-2 px-3 bg-light border-bottom">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="kpi-icon-square bg-primary text-white" style="width: 32px; height: 32px; font-size: 0.95rem;">
+                            <i class="fas fa-boxes-stacked"></i>
+                        </div>
+                        <div>
+                            <h5 class="modal-title fw-bold mb-0 text-dark">
+                                Lots Assigned to [@SelectedEmployeeForModal.EmpID] @SelectedEmployeeForModal.EmployeeName
+                            </h5>
+                            <span class="small text-muted">
+                                @SelectedEmployeeForModal.Designation • @SelectedEmployeeForModal.DepartmentName • Daily Target: @SelectedEmployeeForModal.DailyCapacity.ToString("N0") pcs
+                            </span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" @onclick="CloseLotsModal"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="text-secondary small fw-bold"><i class="fas fa-search me-1"></i> Filter:</span>
+                            <input type="text" class="form-control form-control-sm" style="max-width: 250px;" 
+                                   @bind="LotsSearchTerm" @bind:event="oninput" 
+                                   placeholder="Filter lots by LotNo, Order, Article..." />
+                        </div>
+                        <span class="badge bg-secondary">Total: @FilteredEmployeeLots.Count Lots</span>
+                    </div>
+
+                    @if (IsLoadingLotsModal)
+                    {
+                        <div class="text-center py-5 text-muted">
+                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div> Loading employee lots...
+                        </div>
+                    }
+                    else if (!FilteredEmployeeLots.Any())
+                    {
+                        <div class="text-center py-5 text-muted">
+                            <i class="fas fa-info-circle me-1 fa-lg"></i> No lots found for this worker in the selected period.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive rounded-3 border">
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.76rem; text-transform: uppercase;">
+                                    <tr>
+                                        <th style="width: 35px;">#</th>
+                                        <th>Lot No</th>
+                                        <th>Order No</th>
+                                        <th>Article / Item</th>
+                                        <th>Process</th>
+                                        <th>Issued Date</th>
+                                        <th>Return Due Date</th>
+                                        <th class="text-end">Issued Qty</th>
+                                        <th class="text-end">Rcvd Qty</th>
+                                        <th class="text-end">Balance (WIP)</th>
+                                        <th class="text-center">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @{ int lotIndex = 1; }
+                                    @foreach (var lot in FilteredEmployeeLots)
+                                    {
+                                        <tr>
+                                            <td class="text-secondary small">@(lotIndex++)</td>
+                                            <td>
+                                                <span class="badge" style="background-color: #0891b2; color: #ffffff;">@lot.LotNo</span>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-primary text-white">@lot.OrderNo</span>
+                                            </td>
+                                            <td>
+                                                <div class="fw-semibold text-dark">@lot.ItemCode</div>
+                                                <div class="small text-muted text-truncate" style="max-width: 200px;">@lot.ItemName</div>
+                                            </td>
+                                            <td>@lot.ProcessName</td>
+                                            <td>@(lot.IssDT?.ToString("dd-MMM-yyyy") ?? "-")</td>
+                                            <td>
+                                                @if (lot.ReturnDT.HasValue)
+                                                {
+                                                    <span class="@(lot.IsOverdue ? "text-danger fw-bold" : "text-dark")">
+                                                        @lot.ReturnDT.Value.ToString("dd-MMM-yyyy")
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                            </td>
+                                            <td class="text-end fw-semibold">@lot.IssQty.ToString("N0")</td>
+                                            <td class="text-end fw-semibold text-success">@lot.RcvdQty.ToString("N0")</td>
+                                            <td class="text-end fw-bold @(lot.BalanceQty > 0 ? "text-warning" : "text-muted")">
+                                                @lot.BalanceQty.ToString("N0")
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge @lot.StatusBadgeClass" style="font-size: 0.74rem;">
+                                                    @lot.Status
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer py-2 px-3 bg-light border-top">
+                    <button type="button" class="btn btn-sm btn-secondary" @onclick="CloseLotsModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

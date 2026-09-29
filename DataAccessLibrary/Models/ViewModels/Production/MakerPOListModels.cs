@@ -15,6 +15,8 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string RecieptID { get; set; } = string.Empty;
         public DateTime? DT { get; set; }
         public string Description { get; set; } = string.Empty; // Process description
+        public string? Hub_Name { get; set; }
+        public string? Supervisors { get; set; }
 
         public string ItemID { get; set; } = string.Empty;
         public string ItemName { get; set; } = string.Empty;

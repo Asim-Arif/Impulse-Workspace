@@ -91,7 +91,7 @@ namespace Impulse.Pages.Production.OrderManagement
             try
             {
                 Orders = await OrderService.GetOrdersAsync(Filter);
-                Metrics = await OrderService.GetOrderSummaryMetricsAsync(Filter);
+                Metrics = OrderService.CalculateOrderSummaryMetrics(Orders);
                 UpdateChartData();
 
                 // Auto-select first order if none selected or if previous selected is no longer in list

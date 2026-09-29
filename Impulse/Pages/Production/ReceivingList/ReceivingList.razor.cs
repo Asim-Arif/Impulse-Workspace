@@ -140,6 +140,8 @@ namespace Impulse.Pages.Production.ReceivingList
                     (i.VenderName != null && i.VenderName.ToLower().Contains(term)) ||
                     (i.RecieptID != null && i.RecieptID.ToLower().Contains(term)) ||
                     (i.Description != null && i.Description.ToLower().Contains(term)) ||
+                    (i.Hub_Name != null && i.Hub_Name.ToLower().Contains(term)) ||
+                    (i.Supervisors != null && i.Supervisors.ToLower().Contains(term)) ||
                     (i.FullArticle != null && i.FullArticle.ToLower().Contains(term)) ||
                     (i.LotNo != null && i.LotNo.ToLower().Contains(term)) ||
                     (i.MasterPONo != null && i.MasterPONo.ToLower().Contains(term)) ||

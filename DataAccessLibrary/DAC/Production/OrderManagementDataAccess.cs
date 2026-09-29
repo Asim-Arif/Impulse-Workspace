@@ -44,32 +44,42 @@ namespace DataAccessLibrary.DAC.Production
 
             var sb = new StringBuilder(@"
                 SELECT 
-                    ol.OrderNo,
-                    ol.InternalRefNo,
-                    ol.DT,
-                    ol.CustCode,
-                    ol.Country,
-                    ol.DeliveryDT,
-                    ISNULL(ol.TotalOrderQty, 0) AS TotalOrderQty,
-                    ISNULL(ol.TotalPlannedQty, 0) AS TotalPlannedQty,
-                    ISNULL(ol.TotalShippedQty, 0) AS TotalShippedQty,
-                    ISNULL(ol.TotalArticles, 0) AS TotalArticles,
-                    ISNULL(ol.Authorized, 0) AS Authorized,
-                    ISNULL(ol.OrderPlanApproved, 0) AS OrderPlanApproved
-                FROM VFOrderList ol
+                    co.OrderNo,
+                    co.InternalRefNo,
+                    co.DT,
+                    co.CustCode,
+                    co.Country,
+                    co.DeliveryDT,
+                    ISNULL(items.TotalOrderQty, 0) AS TotalOrderQty,
+                    ISNULL(pln.TotalPlannedQty, 0) AS TotalPlannedQty,
+                    0 AS TotalShippedQty,
+                    ISNULL(items.TotalArticles, 0) AS TotalArticles,
+                    ISNULL(co.Authorized, 0) AS Authorized,
+                    ISNULL(co.OrderPlanApproved, 0) AS OrderPlanApproved
+                FROM FCustomerOrders co WITH (NOLOCK)
+                LEFT JOIN (
+                    SELECT OrderNo, SUM(Qty) AS TotalOrderQty, COUNT(1) AS TotalArticles
+                    FROM FOrderItems WITH (NOLOCK)
+                    GROUP BY OrderNo
+                ) items ON co.OrderNo = items.OrderNo
+                LEFT JOIN (
+                    SELECT OrderNo, SUM(Qty) AS TotalPlannedQty
+                    FROM OrderPlanningDetails WITH (NOLOCK)
+                    GROUP BY OrderNo
+                ) pln ON co.OrderNo = pln.OrderNo
                 WHERE 1 = 1");
 
             var p = new DynamicParameters();
 
             if (!string.IsNullOrWhiteSpace(filter.CustCode))
             {
-                sb.Append(" AND ol.CustCode = @CustCode");
+                sb.Append(" AND co.CustCode = @CustCode");
                 p.Add("@CustCode", filter.CustCode);
             }
 
             if (!string.IsNullOrWhiteSpace(filter.SearchText))
             {
-                sb.Append(" AND (ol.OrderNo LIKE @Search OR ol.InternalRefNo LIKE @Search)");
+                sb.Append(" AND (co.OrderNo LIKE @Search OR co.InternalRefNo LIKE @Search)");
                 p.Add("@Search", $"%{filter.SearchText.Trim()}%");
             }
 
@@ -77,29 +87,29 @@ namespace DataAccessLibrary.DAC.Production
             switch (filter.DateRangeType)
             {
                 case 1: // Last 30 Days
-                    sb.Append(" AND ol.DT >= DATEADD(day, -30, GETDATE())");
+                    sb.Append(" AND co.DT >= DATEADD(day, -30, GETDATE())");
                     break;
                 case 2: // Last 90 Days
-                    sb.Append(" AND ol.DT >= DATEADD(day, -90, GETDATE())");
+                    sb.Append(" AND co.DT >= DATEADD(day, -90, GETDATE())");
                     break;
                 case 3: // This Year
-                    sb.Append(" AND YEAR(ol.DT) = YEAR(GETDATE())");
+                    sb.Append(" AND YEAR(co.DT) = YEAR(GETDATE())");
                     break;
                 case 4: // Custom Range
                     if (filter.FromDate.HasValue)
                     {
-                        sb.Append(" AND ol.DT >= @FromDate");
+                        sb.Append(" AND co.DT >= @FromDate");
                         p.Add("@FromDate", filter.FromDate.Value.Date);
                     }
                     if (filter.ToDate.HasValue)
                     {
-                        sb.Append(" AND ol.DT <= @ToDate");
+                        sb.Append(" AND co.DT <= @ToDate");
                         p.Add("@ToDate", filter.ToDate.Value.Date.AddDays(1).AddTicks(-1));
                     }
                     break;
             }
 
-            sb.Append(" ORDER BY ol.DT DESC");
+            sb.Append(" ORDER BY co.DT DESC");
 
             var orders = (await db.QueryAsync<CustomerOrderHeaderDto>(sb.ToString(), p)).ToList();
 
@@ -109,12 +119,18 @@ namespace DataAccessLibrary.DAC.Production
             // Fetch high-level stage info for these orders
             var orderNos = orders.Select(x => x.OrderNo).Take(200).ToList();
 
-            // 1. Shipped / Invoiced quantities
+            // 1. Shipped / Invoiced quantities (direct base tables seek)
             var shippedMap = (await db.QueryAsync<(string OrderNo, int ShippedQty)>(@"
-                SELECT OrderNo, SUM(ShippedQty) AS ShippedQty
-                FROM VFOrderItems
-                WHERE OrderNo IN @OrderNos
-                GROUP BY OrderNo", new { OrderNos = orderNos }))
+                SELECT 
+                    foi.OrderNo, 
+                    ISNULL(SUM(cii.Qty), 0) AS ShippedQty
+                FROM FOrderItems foi WITH (NOLOCK)
+                INNER JOIN FProformaOrders fpo WITH (NOLOCK) ON foi.ID = fpo.OrderEntryID
+                INNER JOIN CustomInvoiceItems cii WITH (NOLOCK) ON fpo.EntryID = cii.RefID
+                INNER JOIN CustomInvoice ci WITH (NOLOCK) ON cii.CustomInvoice = ci.CustomInvoice
+                WHERE ci.GatePassDT IS NOT NULL
+                  AND foi.OrderNo IN @OrderNos
+                GROUP BY foi.OrderNo", new { OrderNos = orderNos }))
                 .ToDictionary(x => x.OrderNo, x => x.ShippedQty, StringComparer.OrdinalIgnoreCase);
 
             // 2. Dispatched quantities
@@ -126,32 +142,91 @@ namespace DataAccessLibrary.DAC.Production
                 GROUP BY vrd.OrderNo", new { OrderNos = orderNos }))
                 .ToDictionary(x => x.OrderNo, x => x.DispatchedQty, StringComparer.OrdinalIgnoreCase);
 
-            // 3. Produced / Final QC quantities
+            // 3. Produced / Final Finished quantities (NextProcessID IS NULL means lot production is complete)
             var producedMap = (await db.QueryAsync<(string OrderNo, int ProducedQty)>(@"
                 SELECT vrd.OrderNo, ISNULL(SUM(vrd.RcvdQty), 0) AS ProducedQty
                 FROM VendRcvdDetail vrd
-                INNER JOIN Processes p ON vrd.ProcessID = p.ProcessID
                 WHERE vrd.OrderNo IN @OrderNos 
-                  AND (p.Description LIKE '%Ready-Finish%' OR p.Description LIKE '%Job Card Close%' OR p.Description LIKE '%Final QC%')
+                  AND (vrd.NextProcessID IS NULL OR vrd.NextProcessID = 0)
                 GROUP BY vrd.OrderNo", new { OrderNos = orderNos }))
                 .ToDictionary(x => x.OrderNo, x => x.ProducedQty, StringComparer.OrdinalIgnoreCase);
 
-            // 4. Running lots details for orders
+            // 4. Running lots details for orders (optimized direct query with index seek)
             var runningLots = (await db.QueryAsync<dynamic>(@"
-                SELECT 
-                    rl.OrderNo,
-                    ISNULL(rl.Qty, 0) AS Qty,
-                    COALESCE(currPgp.SeqNo, CAST(rl.SNO AS INT), 1) AS CurrentSeqNo,
-                    COALESCE(totPgp.TotalSteps, CAST(rl.MaxSno AS INT), 1) AS TotalSeqNo
-                FROM VRunningLots_Simple rl
-                LEFT JOIN ItemProcessGroups ipg ON rl.ItemCode = ipg.ItemID
-                LEFT JOIN ProcessGroupsProcesses currPgp ON ipg.PG_RefID = currPgp.Group_RefID AND rl.ProcessID = currPgp.Process_RefID
-                LEFT JOIN (
+                ;WITH ProcessStepCounts AS (
                     SELECT Group_RefID, COUNT(1) AS TotalSteps
-                    FROM ProcessGroupsProcesses
+                    FROM ProcessGroupsProcesses WITH (NOLOCK)
                     GROUP BY Group_RefID
-                ) totPgp ON ipg.PG_RefID = totPgp.Group_RefID
-                WHERE rl.OrderNo IN @OrderNos", new { OrderNos = orderNos }))
+                ),
+                OrderLots AS (
+                    -- 1. Lots issued to maker and currently in process
+                    SELECT 
+                        vid.OrderNo,
+                        vid.ItemCode,
+                        vid.LotNo,
+                        vid.RcvProcessID AS ProcessID,
+                        (vid.IssQty - vid.RcvdQty) AS Qty,
+                        ip.SNO
+                    FROM VendIssdDetail vid WITH (NOLOCK)
+                    LEFT JOIN ItemProcesses ip WITH (NOLOCK) ON vid.ItemCode = ip.ItemID AND vid.RcvProcessID = ip.ProcessID
+                    WHERE vid.OrderNo IN @OrderNos
+                      AND vid.LotNo <> '0'
+                      AND vid.IssQty > vid.RcvdQty
+                      AND NOT EXISTS (
+                          SELECT 1 FROM VendRcvdDetail vrd WITH (NOLOCK) 
+                          WHERE vrd.Issue_RefID = vid.EntryID AND vrd.OrderNo = vid.OrderNo
+                      )
+                      AND NOT EXISTS (
+                          SELECT 1 FROM Lots_Closed lc WITH (NOLOCK) 
+                          WHERE lc.LotNo = vid.LotNo
+                      )
+
+                    UNION ALL
+
+                    -- 2. Lots received from maker but waiting for next process
+                    SELECT 
+                        vrd.OrderNo,
+                        vrd.ItemCode,
+                        vrd.LotNo,
+                        vrd.ProcessID,
+                        (vrd.RcvdQty - vrd.IssQty - ISNULL(vrd.Wastage, 0) - ISNULL(vrd.ReWorkQty, 0)) AS Qty,
+                        ip.SNO
+                    FROM VendRcvdDetail vrd WITH (NOLOCK)
+                    LEFT JOIN ItemProcesses ip WITH (NOLOCK) ON vrd.ItemCode = ip.ItemID AND vrd.ProcessID = ip.ProcessID
+                    WHERE vrd.OrderNo IN @OrderNos
+                      AND vrd.LotNo <> '0'
+                      AND (vrd.RcvdQty - vrd.IssQty - ISNULL(vrd.Wastage, 0) - ISNULL(vrd.ReWorkQty, 0)) > 0
+                      AND (vrd.NextProcessID IS NOT NULL AND vrd.NextProcessID <> 0)
+                      AND ISNULL(vrd.Opening_RefID, 0) = 0
+                      AND NOT EXISTS (
+                          SELECT 1 FROM VendIssdDetail vid WITH (NOLOCK) 
+                          WHERE vid.Rcvd_RefID = vrd.EntryID AND vid.OrderNo = vrd.OrderNo
+                      )
+                      AND NOT EXISTS (
+                          SELECT 1 FROM Lots_Closed lc WITH (NOLOCK) 
+                          WHERE lc.LotNo = vrd.LotNo
+                      )
+                ),
+                LotSteps AS (
+                    SELECT 
+                        ol.OrderNo,
+                        ol.ItemCode,
+                        ol.LotNo,
+                        ol.ProcessID,
+                        ol.Qty,
+                        ol.SNO,
+                        MAX(ol.SNO) OVER (PARTITION BY ol.LotNo) AS MaxSno
+                    FROM OrderLots ol
+                )
+                SELECT 
+                    ls.OrderNo,
+                    ISNULL(ls.Qty, 0) AS Qty,
+                    COALESCE(currPgp.SeqNo, CAST(ls.SNO AS INT), 1) AS CurrentSeqNo,
+                    COALESCE(psc.TotalSteps, CAST(ls.MaxSno AS INT), 1) AS TotalSeqNo
+                FROM LotSteps ls
+                LEFT JOIN ItemProcessGroups ipg WITH (NOLOCK) ON ls.ItemCode = ipg.ItemID
+                LEFT JOIN ProcessGroupsProcesses currPgp WITH (NOLOCK) ON ipg.PG_RefID = currPgp.Group_RefID AND ls.ProcessID = currPgp.Process_RefID
+                LEFT JOIN ProcessStepCounts psc ON ipg.PG_RefID = psc.Group_RefID", new { OrderNos = orderNos }))
                 .GroupBy(x => (string)x.OrderNo, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
 
@@ -178,6 +253,7 @@ namespace DataAccessLibrary.DAC.Production
             {
                 int orderQty = Math.Max(1, ord.TotalOrderQty);
                 shippedMap.TryGetValue(ord.OrderNo, out int shippedQty);
+                ord.TotalShippedQty = shippedQty;
                 dispatchedMap.TryGetValue(ord.OrderNo, out int dispQty);
                 producedMap.TryGetValue(ord.OrderNo, out int prodQty);
                 runningLots.TryGetValue(ord.OrderNo, out var ordLots);
@@ -289,9 +365,10 @@ namespace DataAccessLibrary.DAC.Production
             return orders;
         }
 
-        public async Task<OrderSummaryCardDto> GetOrderSummaryMetricsAsync(OrderManagementFilter filter)
+        public OrderSummaryCardDto CalculateOrderSummaryMetrics(List<CustomerOrderHeaderDto> orders)
         {
-            var orders = await GetOrdersAsync(filter);
+            if (orders == null || !orders.Any())
+                return new OrderSummaryCardDto();
 
             return new OrderSummaryCardDto
             {
@@ -302,8 +379,14 @@ namespace DataAccessLibrary.DAC.Production
                 TotalOrderedPcs = orders.Sum(x => x.TotalOrderQty),
                 TotalProducedPcs = orders.Sum(x => (int)(x.TotalOrderQty * (x.ProgressPct / 100.0))),
                 TotalDispatchedPcs = orders.Sum(x => x.TotalShippedQty),
-                AverageProgressPct = orders.Any() ? Math.Round(orders.Average(x => x.ProgressPct), 1) : 0
+                AverageProgressPct = Math.Round(orders.Average(x => x.ProgressPct), 1)
             };
+        }
+
+        public async Task<OrderSummaryCardDto> GetOrderSummaryMetricsAsync(OrderManagementFilter filter)
+        {
+            var orders = await GetOrdersAsync(filter);
+            return CalculateOrderSummaryMetrics(orders);
         }
 
         public async Task<List<OrderItemProgressDto>> GetOrderItemsAsync(string orderNo)
@@ -315,21 +398,31 @@ namespace DataAccessLibrary.DAC.Production
 
             const string itemsSql = @"
                 SELECT 
-                    oi.ID,
-                    oi.OrderNo,
-                    oi.ItemCode,
-                    oi.CompItemCode,
-                    oi.ItemName,
-                    oi.Description,
-                    ISNULL(oi.Qty, 0) AS OrderedQty,
-                    ISNULL(oi.ShippedQty, 0) AS DispatchedQty,
-                    oi.DeliveryDT,
-                    ISNULL(oi.Packaging, '') AS Packaging,
-                    ISNULL(oi.Quality, '') AS Quality,
-                    ISNULL(oi.GroupID, 0) AS GroupID
-                FROM VFOrderItems oi
-                WHERE oi.OrderNo = @OrderNo
-                ORDER BY oi.ID ASC";
+                    foi.ID,
+                    foi.OrderNo,
+                    foi.ItemCode,
+                    foi.CompItemCode,
+                    ISNULL(i.ItemName, foi.ItemCode) AS ItemName,
+                    ISNULL(i.Description, '') AS Description,
+                    ISNULL(foi.Qty, 0) AS OrderedQty,
+                    ISNULL(shipped.ShippedQty, 0) AS DispatchedQty,
+                    foi.DeliveryDT,
+                    ISNULL(co.Packaging, '') AS Packaging,
+                    ISNULL(foi.Quality, ISNULL(co.Quality, '')) AS Quality,
+                    ISNULL(i.GroupID, 0) AS GroupID
+                FROM FOrderItems foi WITH (NOLOCK)
+                INNER JOIN FCustomerOrders co WITH (NOLOCK) ON foi.OrderNo = co.OrderNo
+                LEFT JOIN Items i WITH (NOLOCK) ON foi.CompItemCode = i.ItemID
+                LEFT JOIN (
+                    SELECT fpo.OrderEntryID, ISNULL(SUM(cii.Qty), 0) AS ShippedQty
+                    FROM FProformaOrders fpo WITH (NOLOCK)
+                    INNER JOIN CustomInvoiceItems cii WITH (NOLOCK) ON fpo.EntryID = cii.RefID
+                    INNER JOIN CustomInvoice ci WITH (NOLOCK) ON cii.CustomInvoice = ci.CustomInvoice
+                    WHERE ci.GatePassDT IS NOT NULL
+                    GROUP BY fpo.OrderEntryID
+                ) shipped ON foi.ID = shipped.OrderEntryID
+                WHERE foi.OrderNo = @OrderNo
+                ORDER BY foi.ID ASC";
 
             var items = (await db.QueryAsync<OrderItemProgressDto>(itemsSql, new { OrderNo = orderNo })).ToList();
 
@@ -352,14 +445,13 @@ namespace DataAccessLibrary.DAC.Production
                         CompItemCode = item.CompItemCode?.Trim() 
                     }) ?? 0;
 
-                // Finished / Ready in production
+                // Finished / Ready in production (NextProcessID IS NULL means lot production is complete)
                 int vrdProduced = await db.ExecuteScalarAsync<int?>(@"
                     SELECT ISNULL(SUM(vrd.RcvdQty), 0)
                     FROM VendRcvdDetail vrd
-                    INNER JOIN Processes p ON vrd.ProcessID = p.ProcessID
                     WHERE (vrd.OrderNo = @OrderNo OR vrd.OrderNo = @CleanOrderNo)
                       AND (vrd.ItemCode = @ItemCode OR (@CompItemCode IS NOT NULL AND @CompItemCode <> '' AND vrd.ItemCode = @CompItemCode))
-                      AND (p.Description LIKE '%Ready-Finish%' OR p.Description LIKE '%Job Card Close%' OR p.Description LIKE '%Final QC%')",
+                      AND (vrd.NextProcessID IS NULL OR vrd.NextProcessID = 0)",
                     new { 
                         OrderNo = orderNo.Trim(), 
                         CleanOrderNo = orderNo.Trim().StartsWith("SO-") ? orderNo.Trim().Substring(3) : orderNo.Trim(),
@@ -371,23 +463,81 @@ namespace DataAccessLibrary.DAC.Production
                 if (item.DispatchedQty == 0 && vrdDispatched > 0)
                     item.DispatchedQty = vrdDispatched;
 
-                // Running lots progressing through factory processes
                 var itemLots = (await db.QueryAsync<dynamic>(@"
-                    SELECT 
-                        rl.LotNo,
-                        ISNULL(rl.Qty, 0) AS Qty,
-                        COALESCE(currPgp.SeqNo, CAST(rl.SNO AS INT), 1) AS CurrentSeqNo,
-                        COALESCE(totPgp.TotalSteps, CAST(rl.MaxSno AS INT), 1) AS TotalSeqNo
-                    FROM VRunningLots_Simple rl
-                    LEFT JOIN ItemProcessGroups ipg ON rl.ItemCode = ipg.ItemID
-                    LEFT JOIN ProcessGroupsProcesses currPgp ON ipg.PG_RefID = currPgp.Group_RefID AND rl.ProcessID = currPgp.Process_RefID
-                    LEFT JOIN (
+                    ;WITH ProcessStepCounts AS (
                         SELECT Group_RefID, COUNT(1) AS TotalSteps
-                        FROM ProcessGroupsProcesses
+                        FROM ProcessGroupsProcesses WITH (NOLOCK)
                         GROUP BY Group_RefID
-                    ) totPgp ON ipg.PG_RefID = totPgp.Group_RefID
-                    WHERE (rl.OrderNo = @OrderNo OR rl.OrderNo = @CleanOrderNo)
-                      AND (rl.ItemCode = @ItemCode OR (@CompItemCode IS NOT NULL AND @CompItemCode <> '' AND rl.ItemCode = @CompItemCode))",
+                    ),
+                    OrderLots AS (
+                        SELECT 
+                            vid.OrderNo,
+                            vid.ItemCode,
+                            vid.LotNo,
+                            vid.RcvProcessID AS ProcessID,
+                            (vid.IssQty - vid.RcvdQty) AS Qty,
+                            ip.SNO
+                        FROM VendIssdDetail vid WITH (NOLOCK)
+                        LEFT JOIN ItemProcesses ip WITH (NOLOCK) ON vid.ItemCode = ip.ItemID AND vid.RcvProcessID = ip.ProcessID
+                        WHERE (vid.OrderNo = @OrderNo OR vid.OrderNo = @CleanOrderNo)
+                          AND (vid.ItemCode = @ItemCode OR (@CompItemCode IS NOT NULL AND @CompItemCode <> '' AND vid.ItemCode = @CompItemCode))
+                          AND vid.LotNo <> '0'
+                          AND vid.IssQty > vid.RcvdQty
+                          AND NOT EXISTS (
+                              SELECT 1 FROM VendRcvdDetail vrd WITH (NOLOCK) 
+                              WHERE vrd.Issue_RefID = vid.EntryID AND (vrd.OrderNo = @OrderNo OR vrd.OrderNo = @CleanOrderNo)
+                          )
+                          AND NOT EXISTS (
+                              SELECT 1 FROM Lots_Closed lc WITH (NOLOCK) 
+                              WHERE lc.LotNo = vid.LotNo
+                          )
+
+                        UNION ALL
+
+                        SELECT 
+                            vrd.OrderNo,
+                            vrd.ItemCode,
+                            vrd.LotNo,
+                            vrd.ProcessID,
+                            (vrd.RcvdQty - vrd.IssQty - ISNULL(vrd.Wastage, 0) - ISNULL(vrd.ReWorkQty, 0)) AS Qty,
+                            ip.SNO
+                        FROM VendRcvdDetail vrd WITH (NOLOCK)
+                        LEFT JOIN ItemProcesses ip WITH (NOLOCK) ON vrd.ItemCode = ip.ItemID AND vrd.ProcessID = ip.ProcessID
+                        WHERE (vrd.OrderNo = @OrderNo OR vrd.OrderNo = @CleanOrderNo)
+                          AND (vrd.ItemCode = @ItemCode OR (@CompItemCode IS NOT NULL AND @CompItemCode <> '' AND vrd.ItemCode = @CompItemCode))
+                          AND vrd.LotNo <> '0'
+                          AND (vrd.RcvdQty - vrd.IssQty - ISNULL(vrd.Wastage, 0) - ISNULL(vrd.ReWorkQty, 0)) > 0
+                          AND (vrd.NextProcessID IS NOT NULL AND vrd.NextProcessID <> 0)
+                          AND ISNULL(vrd.Opening_RefID, 0) = 0
+                          AND NOT EXISTS (
+                              SELECT 1 FROM VendIssdDetail vid WITH (NOLOCK) 
+                              WHERE vid.Rcvd_RefID = vrd.EntryID AND (vid.OrderNo = @OrderNo OR vid.OrderNo = @CleanOrderNo)
+                          )
+                          AND NOT EXISTS (
+                              SELECT 1 FROM Lots_Closed lc WITH (NOLOCK) 
+                              WHERE lc.LotNo = vrd.LotNo
+                          )
+                    ),
+                    LotSteps AS (
+                        SELECT 
+                            ol.OrderNo,
+                            ol.ItemCode,
+                            ol.LotNo,
+                            ol.ProcessID,
+                            ol.Qty,
+                            ol.SNO,
+                            MAX(ol.SNO) OVER (PARTITION BY ol.LotNo) AS MaxSno
+                        FROM OrderLots ol
+                    )
+                    SELECT 
+                        ls.LotNo,
+                        ISNULL(ls.Qty, 0) AS Qty,
+                        COALESCE(currPgp.SeqNo, CAST(ls.SNO AS INT), 1) AS CurrentSeqNo,
+                        COALESCE(psc.TotalSteps, CAST(ls.MaxSno AS INT), 1) AS TotalSeqNo
+                    FROM LotSteps ls
+                    LEFT JOIN ItemProcessGroups ipg WITH (NOLOCK) ON ls.ItemCode = ipg.ItemID
+                    LEFT JOIN ProcessGroupsProcesses currPgp WITH (NOLOCK) ON ipg.PG_RefID = currPgp.Group_RefID AND ls.ProcessID = currPgp.Process_RefID
+                    LEFT JOIN ProcessStepCounts psc ON ipg.PG_RefID = psc.Group_RefID",
                     new { 
                         OrderNo = orderNo.Trim(), 
                         CleanOrderNo = orderNo.Trim().StartsWith("SO-") ? orderNo.Trim().Substring(3) : orderNo.Trim(),
@@ -600,48 +750,112 @@ namespace DataAccessLibrary.DAC.Production
 
             using IDbConnection db = new SqlConnection(ConnectionString);
 
-            var sb = new StringBuilder(@"
-                SELECT 
-                    rl.LotNo,
-                    rl.ItemCode,
-                    rl.OrderNo,
-                    rl.ProcessID,
-                    ISNULL(p.Description, rl.Description) AS ProcessName,
-                    ISNULL(rl.Qty, 0) AS Qty,
-                    COALESCE(currPgp.SeqNo, CAST(rl.SNO AS INT), 1) AS CurrentSeqNo,
-                    COALESCE(totPgp.TotalSteps, CAST(rl.MaxSno AS INT), 1) AS TotalSeqNo,
-                    rl.DT AS LastActivityDT,
-                    ISNULL(m.VenderName, 'In-House Production') AS MakerName,
-                    ISNULL(rl.ReWorkLot, 0) AS ReWorkLot
-                FROM VRunningLots_Simple rl
-                LEFT JOIN Processes p ON rl.ProcessID = p.ProcessID
-                LEFT JOIN Makers m ON rl.VendID = m.VendID
-                LEFT JOIN ItemProcessGroups ipg ON rl.ItemCode = ipg.ItemID
-                LEFT JOIN ProcessGroupsProcesses currPgp ON ipg.PG_RefID = currPgp.Group_RefID AND rl.ProcessID = currPgp.Process_RefID
-                LEFT JOIN (
-                    SELECT Group_RefID, COUNT(1) AS TotalSteps
-                    FROM ProcessGroupsProcesses
-                    GROUP BY Group_RefID
-                ) totPgp ON ipg.PG_RefID = totPgp.Group_RefID
-                WHERE (rl.OrderNo = @OrderNo OR rl.OrderNo = @CleanOrderNo)");
-
             var p = new DynamicParameters();
             p.Add("@OrderNo", orderNo.Trim());
             p.Add("@CleanOrderNo", orderNo.Trim().StartsWith("SO-") ? orderNo.Trim().Substring(3) : orderNo.Trim());
+            p.Add("@ItemCode", string.IsNullOrWhiteSpace(itemCode) ? null : itemCode.Trim());
+            p.Add("@CompItemCode", string.IsNullOrWhiteSpace(compItemCode) ? null : compItemCode.Trim());
 
-            if (!string.IsNullOrWhiteSpace(itemCode))
-            {
-                sb.Append(@" AND (
-                    rl.ItemCode = @ItemCode 
-                    OR (@CompItemCode IS NOT NULL AND @CompItemCode <> '' AND rl.ItemCode = @CompItemCode)
-                )");
-                p.Add("@ItemCode", itemCode.Trim());
-                p.Add("@CompItemCode", compItemCode?.Trim());
-            }
+            var sql = @"
+                ;WITH ProcessStepCounts AS (
+                    SELECT Group_RefID, COUNT(1) AS TotalSteps
+                    FROM ProcessGroupsProcesses WITH (NOLOCK)
+                    GROUP BY Group_RefID
+                ),
+                OrderLots AS (
+                    -- 1. Lots issued to maker and currently in process
+                    SELECT 
+                        vid.OrderNo,
+                        vid.ItemCode,
+                        vid.LotNo,
+                        vid.RcvProcessID AS ProcessID,
+                        vi.VendID,
+                        vi.DT AS LastActivityDT,
+                        ISNULL(vid.ReWorkLot, 0) AS ReWorkLot,
+                        (vid.IssQty - vid.RcvdQty) AS Qty,
+                        ip.SNO
+                    FROM VendIssdDetail vid WITH (NOLOCK)
+                    INNER JOIN VendIssued vi WITH (NOLOCK) ON vid.RefID = vi.EntryID
+                    LEFT JOIN ItemProcesses ip WITH (NOLOCK) ON vid.ItemCode = ip.ItemID AND vid.RcvProcessID = ip.ProcessID
+                    WHERE (vid.OrderNo = @OrderNo OR vid.OrderNo = @CleanOrderNo)
+                      AND (@ItemCode IS NULL OR vid.ItemCode = @ItemCode OR (@CompItemCode IS NOT NULL AND vid.ItemCode = @CompItemCode))
+                      AND vid.LotNo <> '0'
+                      AND vid.IssQty > vid.RcvdQty
+                      AND NOT EXISTS (
+                          SELECT 1 FROM VendRcvdDetail vrd WITH (NOLOCK) 
+                          WHERE vrd.Issue_RefID = vid.EntryID AND (vrd.OrderNo = @OrderNo OR vrd.OrderNo = @CleanOrderNo)
+                      )
+                      AND NOT EXISTS (
+                          SELECT 1 FROM Lots_Closed lc WITH (NOLOCK) 
+                          WHERE lc.LotNo = vid.LotNo
+                      )
 
-            sb.Append(" ORDER BY rl.SNO DESC, rl.LotNo ASC");
+                    UNION ALL
 
-            return (await db.QueryAsync<ItemRunningLotDto>(sb.ToString(), p)).ToList();
+                    -- 2. Lots received from maker but waiting for next process
+                    SELECT 
+                        vrd.OrderNo,
+                        vrd.ItemCode,
+                        vrd.LotNo,
+                        vrd.ProcessID,
+                        vr.VendID,
+                        vr.DT AS LastActivityDT,
+                        ISNULL(vrd.ReWorkLot, 0) AS ReWorkLot,
+                        (vrd.RcvdQty - vrd.IssQty - ISNULL(vrd.Wastage, 0) - ISNULL(vrd.ReWorkQty, 0)) AS Qty,
+                        ip.SNO
+                    FROM VendRcvdDetail vrd WITH (NOLOCK)
+                    INNER JOIN VendReceived vr WITH (NOLOCK) ON vrd.RefID = vr.EntryID
+                    LEFT JOIN ItemProcesses ip WITH (NOLOCK) ON vrd.ItemCode = ip.ItemID AND vrd.ProcessID = ip.ProcessID
+                    WHERE (vrd.OrderNo = @OrderNo OR vrd.OrderNo = @CleanOrderNo)
+                      AND (@ItemCode IS NULL OR vrd.ItemCode = @ItemCode OR (@CompItemCode IS NOT NULL AND vrd.ItemCode = @CompItemCode))
+                      AND vrd.LotNo <> '0'
+                      AND (vrd.RcvdQty - vrd.IssQty - ISNULL(vrd.Wastage, 0) - ISNULL(vrd.ReWorkQty, 0)) > 0
+                      AND (vrd.NextProcessID IS NOT NULL AND vrd.NextProcessID <> 0)
+                      AND ISNULL(vrd.Opening_RefID, 0) = 0
+                      AND NOT EXISTS (
+                          SELECT 1 FROM VendIssdDetail vid WITH (NOLOCK) 
+                          WHERE vid.Rcvd_RefID = vrd.EntryID AND (vid.OrderNo = @OrderNo OR vid.OrderNo = @CleanOrderNo)
+                      )
+                      AND NOT EXISTS (
+                          SELECT 1 FROM Lots_Closed lc WITH (NOLOCK) 
+                          WHERE lc.LotNo = vrd.LotNo
+                      )
+                ),
+                LotSteps AS (
+                    SELECT 
+                        ol.OrderNo,
+                        ol.ItemCode,
+                        ol.LotNo,
+                        ol.ProcessID,
+                        ol.VendID,
+                        ol.LastActivityDT,
+                        ol.ReWorkLot,
+                        ol.Qty,
+                        ol.SNO,
+                        MAX(ol.SNO) OVER (PARTITION BY ol.LotNo) AS MaxSno
+                    FROM OrderLots ol
+                )
+                SELECT 
+                    ls.LotNo,
+                    ls.ItemCode,
+                    ls.OrderNo,
+                    ls.ProcessID,
+                    ISNULL(p.Description, '') AS ProcessName,
+                    ISNULL(ls.Qty, 0) AS Qty,
+                    COALESCE(currPgp.SeqNo, CAST(ls.SNO AS INT), 1) AS CurrentSeqNo,
+                    COALESCE(psc.TotalSteps, CAST(ls.MaxSno AS INT), 1) AS TotalSeqNo,
+                    ls.LastActivityDT,
+                    ISNULL(m.VenderName, 'In-House Production') AS MakerName,
+                    ISNULL(ls.ReWorkLot, 0) AS ReWorkLot
+                FROM LotSteps ls
+                LEFT JOIN Processes p WITH (NOLOCK) ON ls.ProcessID = p.ProcessID
+                LEFT JOIN Makers m WITH (NOLOCK) ON ls.VendID = m.VendID
+                LEFT JOIN ItemProcessGroups ipg WITH (NOLOCK) ON ls.ItemCode = ipg.ItemID
+                LEFT JOIN ProcessGroupsProcesses currPgp WITH (NOLOCK) ON ipg.PG_RefID = currPgp.Group_RefID AND ls.ProcessID = currPgp.Process_RefID
+                LEFT JOIN ProcessStepCounts psc ON ipg.PG_RefID = psc.Group_RefID
+                ORDER BY ls.SNO DESC, ls.LotNo ASC";
+
+            return (await db.QueryAsync<ItemRunningLotDto>(sql, p)).ToList();
         }
 
         public async Task<List<ItemDispatchDetailDto>> GetItemDispatchDetailsAsync(string orderNo, string itemCode, string? compItemCode = null)

@@ -45,6 +45,19 @@ namespace Impulse.Services.Production
             }
         }
 
+        public OrderSummaryCardDto CalculateOrderSummaryMetrics(List<CustomerOrderHeaderDto> orders)
+        {
+            try
+            {
+                return _dataAccess.CalculateOrderSummaryMetrics(orders);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error calculating order summary metrics from orders");
+                return new OrderSummaryCardDto();
+            }
+        }
+
         public async Task<OrderSummaryCardDto> GetOrderSummaryMetricsAsync(OrderManagementFilter filter)
         {
             try

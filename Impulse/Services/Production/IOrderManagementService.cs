@@ -8,6 +8,7 @@ namespace Impulse.Services.Production
     {
         Task<List<LookupItemString>> GetCustomersAsync();
         Task<List<CustomerOrderHeaderDto>> GetOrdersAsync(OrderManagementFilter filter);
+        OrderSummaryCardDto CalculateOrderSummaryMetrics(List<CustomerOrderHeaderDto> orders);
         Task<OrderSummaryCardDto> GetOrderSummaryMetricsAsync(OrderManagementFilter filter);
         Task<List<OrderItemProgressDto>> GetOrderItemsAsync(string orderNo);
         Task<List<ItemPurchaseOrderDto>> GetItemPurchaseOrdersAsync(string orderNo, string itemCode, string? compItemCode = null);

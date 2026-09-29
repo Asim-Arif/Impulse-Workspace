@@ -189,6 +189,7 @@
                             <th>Receipt ID</th>
                             <th>Date</th>
                             <th>Process</th>
+                            <th>Hub / Supervisor</th>
                             <th>Article</th>
                             <th class="text-end">Rcvd Qty</th>
                             <th class="text-end">Wastage</th>
@@ -204,7 +205,7 @@
                         @if (IsLoading)
                         {
                             <tr>
-                                <td colspan="14" class="text-center py-4 text-muted">
+                                <td colspan="15" class="text-center py-4 text-muted">
                                     <div class="spinner-border spinner-border-sm text-success me-2" role="status"></div> Loading Receiving List...
                                 </td>
                             </tr>
@@ -212,7 +213,7 @@
                         else if (!FilteredItems.Any())
                         {
                             <tr>
-                                <td colspan="14" class="text-center py-4 text-muted">
+                                <td colspan="15" class="text-center py-4 text-muted">
                                     <i class="fas fa-info-circle me-1"></i> No receiving records found matching filters.
                                 </td>
                             </tr>
@@ -235,6 +236,20 @@
                                     <td><span class="badge bg-light text-dark border">@currentItem.RecieptID</span></td>
                                     <td>@(currentItem.DT?.ToString("dd-MMM-yyyy"))</td>
                                     <td>@currentItem.Description</td>
+                                    <td>
+                                        @if (!string.IsNullOrWhiteSpace(currentItem.Hub_Name))
+                                        {
+                                            <div class="fw-semibold text-dark">@currentItem.Hub_Name</div>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(currentItem.Supervisors))
+                                        {
+                                            <div class="small text-muted" style="font-size: 0.78rem;">@currentItem.Supervisors</div>
+                                        }
+                                        @if (string.IsNullOrWhiteSpace(currentItem.Hub_Name) && string.IsNullOrWhiteSpace(currentItem.Supervisors))
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
                                     <td>@currentItem.FullArticle</td>
                                     <td class="text-end fw-bold">@currentItem.RcvdQty.ToString("N0")</td>
                                     <td class="text-end">@(currentItem.WastageTotal > 0 ? currentItem.WastageTotal.ToString("N0") : "")</td>
