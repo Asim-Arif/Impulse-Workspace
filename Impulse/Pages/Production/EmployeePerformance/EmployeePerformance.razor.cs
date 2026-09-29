@@ -159,7 +159,7 @@ namespace Impulse.Pages.Production.EmployeePerformance
             await LoadDataAsync();
         }
 
-        public async Task OnDepartmentChanged(int? deptId)
+        public async Task OnDepartmentChanged(string? deptId)
         {
             Filter.DepartmentId = deptId;
             Employees = await PerformanceService.GetEmployeesLookupAsync(deptId);

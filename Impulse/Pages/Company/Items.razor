@@ -6,23 +6,23 @@
 
 <PageTitle>Company Items</PageTitle>
 
-<div class="container-fluid py-2" style="font-family: 'Outfit', 'Segoe UI', sans-serif;">
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
     <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; min-height: 80vh;">
         <div class="card-body pt-3">
             
             <!-- ── Toolbar: Filters + Actions ── -->
-            <div class="row g-2 mb-3 align-items-end">
+            <div class="row g-2 mb-3 align-items-end" style="position: relative; z-index: 9999;">
                 
                 <!-- Title -->
                 <div class="col-auto d-flex align-items-end pb-1">
-                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis text-nowrap">
                         <i class="fas fa-boxes-stacked text-primary me-2"></i>
                         Company Items
                     </h5>
                 </div>
 
                 <!-- Group Filter -->
-                <div class="col-md-2">
+                <div class="col-sm-6 col-md-3 col-xl-2">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Item Group</label>
                     <BlazoredTypeahead SearchMethod="SearchGroups"
                                        EnableDropDown="true"
@@ -44,7 +44,7 @@
                 </div>
 
                 <!-- Category Filter -->
-                <div class="col-md-2">
+                <div class="col-sm-6 col-md-3 col-xl-2">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Category</label>
                     <BlazoredTypeahead SearchMethod="SearchCategories"
                                        EnableDropDown="true"
@@ -66,7 +66,7 @@
                 </div>
 
                 <!-- Main Group Filter -->
-                <div class="col-md-2">
+                <div class="col-sm-6 col-md-3 col-xl-2">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Main Group</label>
                     <BlazoredTypeahead SearchMethod="SearchMainGroups"
                                        EnableDropDown="true"
@@ -88,7 +88,7 @@
                 </div>
 
                 <!-- Search -->
-                <div class="col-md-2">
+                <div class="col-sm-6 col-md-3 col-xl-2">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Search</label>
                     <input type="text" class="form-control form-control-sm" placeholder="Search ID, Name..." value="@searchText" @oninput="OnSearchInput" />
                 </div>
@@ -106,17 +106,17 @@
                 </div>
 
                 <!-- Action Buttons -->
-                <div class="col d-flex align-items-end justify-content-end gap-2 pb-1">
-                    <button type="button" class="btn btn-success btn-sm fw-semibold" @onclick="NavigateToNewItem" title="Add New Item">
+                <div class="col-auto ms-auto d-flex align-items-end justify-content-end gap-2 pb-1">
+                    <button type="button" class="btn btn-success btn-sm fw-semibold text-nowrap" @onclick="NavigateToNewItem" title="Add New Item">
                         <i class="fas fa-plus me-1"></i> Add Item
                     </button>
-                    <button type="button" class="btn btn-outline-primary btn-sm fw-semibold" @onclick="() => EditItem(null)" disabled="@(highlightedItem == null)" title="Edit Selected Item">
+                    <button type="button" class="btn btn-outline-primary btn-sm fw-semibold text-nowrap" @onclick="() => EditItem(null)" disabled="@(highlightedItem == null)" title="Edit Selected Item">
                         <i class="fas fa-pencil-alt me-1"></i> Edit Item
                     </button>
                     <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => RefreshList(null)" title="Refresh List">
                         <i class="fas fa-sync-alt"></i>
                     </button>
-                    <button type="button" class="btn btn-primary btn-sm" @onclick="OpenToolbarOptions" title="More Options">
+                    <button type="button" class="btn btn-primary btn-sm text-nowrap" @onclick="OpenToolbarOptions" title="More Options">
                         <i class="fas fa-ellipsis-v me-1"></i> Options
                     </button>
                 </div>
@@ -148,26 +148,26 @@
                     else
                     {
                         <ContextMenuProvider Id="itemsContextMenuProvider">
-                            <div class="table-responsive border rounded-3" style="background:#fff; max-height: 60vh; overflow-y:auto;">
-                                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
-                                    <thead class="table-light sticky-top">
+                            <div class="table-responsive border rounded-3" style="position: relative; z-index: 1; background:#fff; max-height: 60vh; overflow: auto;">
+                                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem; min-width: 1200px;">
+                                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
                                         <tr>
-                                            <th>Item No.</th>
-                                            <th>Item Group</th>
-                                            <th>Description</th>
-                                            <th>Size</th>
-                                            <th class="text-end">Fin. Weight</th>
-                                            <th class="text-end">Stock</th>
-                                            <th>Unit</th>
-                                            <th class="text-end">Cost</th>
-                                            <th class="text-end">Value</th>
-                                            <th class="text-end">FOB SKT</th>
-                                            <th class="text-end">FOB Top</th>
-                                            <th>Type</th>
-                                            <th>Tip Size</th>
-                                            <th>Fin. Quality</th>
-                                            <th class="text-end">ReOrder</th>
-                                            <th class="text-end">PU</th>
+                                            <th class="text-nowrap" style="width: 110px;">Item No.</th>
+                                            <th class="text-nowrap" style="width: 170px;">Item Group</th>
+                                            <th style="min-width: 220px; max-width: 320px;">Description</th>
+                                            <th class="text-nowrap" style="width: 90px;">Size</th>
+                                            <th class="text-end text-nowrap" style="width: 90px;">Fin. Weight</th>
+                                            <th class="text-end text-nowrap" style="width: 75px;">Stock</th>
+                                            <th class="text-nowrap" style="width: 60px;">Unit</th>
+                                            <th class="text-end text-nowrap" style="width: 80px;">Cost</th>
+                                            <th class="text-end text-nowrap" style="width: 85px;">Value</th>
+                                            <th class="text-end text-nowrap" style="width: 80px;">FOB SKT</th>
+                                            <th class="text-end text-nowrap" style="width: 80px;">FOB Top</th>
+                                            <th class="text-nowrap" style="width: 75px;">Type</th>
+                                            <th class="text-nowrap" style="width: 75px;">Tip Size</th>
+                                            <th class="text-nowrap" style="width: 90px;">Fin. Quality</th>
+                                            <th class="text-end text-nowrap" style="width: 75px;">ReOrder</th>
+                                            <th class="text-end text-nowrap" style="width: 55px;">PU</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -190,22 +190,26 @@
                                                                     CssClass="@(isSelected ? "table-primary fw-semibold" : "")"
                                                                     @onclick="() => SelectItem(item)"
                                                                     @ondblclick="() => EditItemRow(item)">
-                                                    <td class="font-monospace text-primary">@item.ItemID</td>
-                                                    <td>@item.ItemGroup</td>
-                                                    <td>@item.ItemName</td>
-                                                    <td>@item.ItemSize @item.SizeUnit</td>
-                                                    <td class="text-end">@item.FinishedWeight.ToString("N3")</td>
-                                                    <td class="text-end fw-bold @(item.InHand < item.ReorderPoint ? "text-danger" : "text-success")">@item.InHand.ToString("N0")</td>
-                                                    <td>@item.Unit</td>
-                                                    <td class="text-end">@item.PriceForCost.ToString("C2")</td>
-                                                    <td class="text-end fw-bold">@((item.InHand * item.PriceForCost).ToString("C2"))</td>
-                                                    <td class="text-end">@item.ExWorks.ToString("N2")</td>
-                                                    <td class="text-end">@item.ExWorksTop.ToString("N2")</td>
-                                                    <td>@item.Type</td>
-                                                    <td>@item.TipSize</td>
-                                                    <td>@item.FinQuality</td>
-                                                    <td class="text-end">@item.ReorderPoint.ToString("N0")</td>
-                                                    <td class="text-end">@item.FixedPackingUnit.ToString("N0")</td>
+                                                    <td class="font-monospace text-primary text-nowrap" style="width: 110px;">@item.ItemID</td>
+                                                    <td class="text-nowrap" style="max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="@item.ItemGroup">@item.ItemGroup</td>
+                                                    <td style="max-width: 320px;">
+                                                        <div style="max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="@item.ItemName">
+                                                            @item.ItemName
+                                                        </div>
+                                                    </td>
+                                                    <td class="text-nowrap">@item.ItemSize @item.SizeUnit</td>
+                                                    <td class="text-end text-nowrap">@item.FinishedWeight.ToString("N3")</td>
+                                                    <td class="text-end fw-bold text-nowrap @(item.InHand < item.ReorderPoint ? "text-danger" : "text-success")">@item.InHand.ToString("N0")</td>
+                                                    <td class="text-nowrap">@item.Unit</td>
+                                                    <td class="text-end text-nowrap">@item.PriceForCost.ToString("C2")</td>
+                                                    <td class="text-end fw-bold text-nowrap">@((item.InHand * item.PriceForCost).ToString("C2"))</td>
+                                                    <td class="text-end text-nowrap">@item.ExWorks.ToString("N2")</td>
+                                                    <td class="text-end text-nowrap">@item.ExWorksTop.ToString("N2")</td>
+                                                    <td class="text-nowrap">@item.Type</td>
+                                                    <td class="text-nowrap">@item.TipSize</td>
+                                                    <td class="text-nowrap">@item.FinQuality</td>
+                                                    <td class="text-end text-nowrap">@item.ReorderPoint.ToString("N0")</td>
+                                                    <td class="text-end text-nowrap">@item.FixedPackingUnit.ToString("N0")</td>
                                                 </ContextMenuTrigger>
                                             }
                                         }
@@ -215,26 +219,83 @@
                         </ContextMenuProvider>
 
                         <!-- Paging Info & Controls -->
-                        <div class="d-flex justify-content-between align-items-center mt-3">
+                        <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
                             <div class="text-muted" style="font-size: 0.85rem;">
-                                Showing @(((currentPage - 1) * pageSize) + 1) to @Math.Min(currentPage * pageSize, totalCount) of @totalCount items
+                                Showing @(((currentPage - 1) * pageSize) + 1) to @Math.Min(currentPage * pageSize, totalCount) of @totalCount.ToString("N0") items
                             </div>
                             @if (totalPages > 1)
                             {
                                 <nav aria-label="Items Page Navigation">
                                     <ul class="pagination pagination-sm mb-0">
+                                        <!-- First Page -->
                                         <li class="page-item @(currentPage == 1 ? "disabled" : "")">
-                                            <button class="page-link" @onclick="() => GoToPage(currentPage - 1)">Previous</button>
+                                            <button class="page-link" @onclick="() => GoToPage(1)" title="First Page">
+                                                <i class="fas fa-angle-double-left"></i>
+                                            </button>
                                         </li>
-                                        @for (int idx = 1; idx <= totalPages; idx++)
-                                        {
-                                            var pageNumber = idx;
-                                            <li class="page-item @(currentPage == pageNumber ? "active" : "")">
-                                                <button class="page-link" @onclick="() => GoToPage(pageNumber)">@pageNumber</button>
-                                            </li>
+                                        <!-- Previous Page -->
+                                        <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                                            <button class="page-link" @onclick="() => GoToPage(currentPage - 1)" title="Previous Page">
+                                                <i class="fas fa-angle-left"></i>
+                                            </button>
+                                        </li>
+
+                                        @{
+                                            int window = 2;
+                                            int startPage = Math.Max(1, currentPage - window);
+                                            int endPage = Math.Min(totalPages, currentPage + window);
+
+                                            if (currentPage <= window + 1)
+                                            {
+                                                endPage = Math.Min(totalPages, 1 + (window * 2));
+                                            }
+                                            else if (currentPage >= totalPages - window)
+                                            {
+                                                startPage = Math.Max(1, totalPages - (window * 2));
+                                            }
+
+                                            if (startPage > 1)
+                                            {
+                                                <li class="page-item">
+                                                    <button class="page-link" @onclick="() => GoToPage(1)">1</button>
+                                                </li>
+                                                if (startPage > 2)
+                                                {
+                                                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                                                }
+                                            }
+
+                                            for (int idx = startPage; idx <= endPage; idx++)
+                                            {
+                                                var pageNumber = idx;
+                                                <li class="page-item @(currentPage == pageNumber ? "active" : "")">
+                                                    <button class="page-link" @onclick="() => GoToPage(pageNumber)">@pageNumber</button>
+                                                </li>
+                                            }
+
+                                            if (endPage < totalPages)
+                                            {
+                                                if (endPage < totalPages - 1)
+                                                {
+                                                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                                                }
+                                                <li class="page-item">
+                                                    <button class="page-link" @onclick="() => GoToPage(totalPages)">@totalPages</button>
+                                                </li>
+                                            }
                                         }
+
+                                        <!-- Next Page -->
                                         <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
-                                            <button class="page-link" @onclick="() => GoToPage(currentPage + 1)">Next</button>
+                                            <button class="page-link" @onclick="() => GoToPage(currentPage + 1)" title="Next Page">
+                                                <i class="fas fa-angle-right"></i>
+                                            </button>
+                                        </li>
+                                        <!-- Last Page -->
+                                        <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                                            <button class="page-link" @onclick="() => GoToPage(totalPages)" title="Last Page">
+                                                <i class="fas fa-angle-double-right"></i>
+                                            </button>
                                         </li>
                                     </ul>
                                 </nav>
@@ -334,3 +395,21 @@
         <i class="fas fa-industry fa-fw win11-icon"></i> Print Semi-Finished Stock
     </Item>
 </ContextMenu>
+
+<style>
+    /* Keep typeaheads aligned with .form-control-sm (Agents.md §11) */
+    .blazored-typeahead__controls {
+        min-height: 31px !important;
+        height: 31px;
+    }
+
+    .form-control-sm {
+        height: 31px;
+    }
+
+    /* Prevent context menu cutoff (Agents.md §3) */
+    #rowContextMenu, #optionsBarMenu {
+        max-height: 40vh;
+        overflow-y: auto;
+    }
+</style>

@@ -9,7 +9,7 @@ namespace DataAccessLibrary.Interface.Production
     {
         Task<List<DepartmentLookupItem>> GetDepartmentsLookupAsync();
         Task<List<ProcessLookupItem>> GetProcessesLookupAsync();
-        Task<List<PerformanceEmployeeLookupItem>> GetEmployeesLookupAsync(int? deptId = null);
+        Task<List<PerformanceEmployeeLookupItem>> GetEmployeesLookupAsync(string? deptId = null);
         Task<EmployeePerformanceDashboardDto> GetPerformanceDashboardAsync(EmployeePerformanceFilter filter);
         Task<List<EmployeeLotDetailDto>> GetEmployeeLotsDetailAsync(string empId, DateTime dtFrom, DateTime dtTo);
     }

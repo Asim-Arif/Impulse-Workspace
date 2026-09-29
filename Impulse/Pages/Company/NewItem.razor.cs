@@ -6,12 +6,27 @@ namespace Impulse.Pages.Company
 {
     public partial class NewItem
     {
-        // ── Route parameter ──────────────────────────────────────────────────
+        // ── Route & Query parameters ─────────────────────────────────────────
         [Parameter]
         public string? ItemId { get; set; }
 
         [Parameter]
         public string? CopyFromId { get; set; }
+
+        [Parameter]
+        [SupplyParameterFromQuery(Name = "id")]
+        public string? QueryItemId { get; set; }
+
+        [Parameter]
+        [SupplyParameterFromQuery(Name = "copyFrom")]
+        public string? QueryCopyFromId { get; set; }
+
+        [Parameter]
+        [SupplyParameterFromQuery(Name = "returnUrl")]
+        public string? ReturnUrl { get; set; }
+
+        public string? EffectiveItemId => !string.IsNullOrWhiteSpace(QueryItemId) ? QueryItemId : ItemId;
+        public string? EffectiveCopyFromId => !string.IsNullOrWhiteSpace(QueryCopyFromId) ? QueryCopyFromId : CopyFromId;
 
         // ── Injected services ────────────────────────────────────────────────
         [Inject] public IItemService ItemService { get; set; } = default!;
@@ -34,7 +49,7 @@ namespace Impulse.Pages.Company
 
         public string ActiveTab { get; set; } = "GeneralInfo";
         public bool IsSaving { get; set; }
-        public bool IsAdd => string.IsNullOrEmpty(ItemId);
+        public bool IsAdd => string.IsNullOrEmpty(EffectiveItemId);
 
         // ── Lifecycle ────────────────────────────────────────────────────────
 
@@ -42,35 +57,48 @@ namespace Impulse.Pages.Company
         {
             await LoadLookups();
 
-            if (!string.IsNullOrEmpty(CopyFromId))
+            var effectiveCopyFrom = EffectiveCopyFromId;
+            var effectiveItemId = EffectiveItemId;
+
+            if (!string.IsNullOrEmpty(effectiveCopyFrom) && effectiveCopyFrom.Contains('%'))
             {
-                var existing = await ItemService.GetItemByIdAsync(CopyFromId);
+                try { effectiveCopyFrom = Uri.UnescapeDataString(effectiveCopyFrom); } catch { }
+            }
+            if (!string.IsNullOrEmpty(effectiveItemId) && effectiveItemId.Contains('%'))
+            {
+                try { effectiveItemId = Uri.UnescapeDataString(effectiveItemId); } catch { }
+            }
+
+            if (!string.IsNullOrEmpty(effectiveCopyFrom))
+            {
+                var existing = await ItemService.GetItemByIdAsync(effectiveCopyFrom);
                 if (existing != null)
                 {
                     Item = existing;
                     Item.ItemID = string.Empty;
                     Item.ItemName = $"{existing.ItemName} (Copy)";
-                    Item.Processes = await ItemService.GetItemProcessesAsync(CopyFromId);
+                    var copySourceId = existing.ItemID;
+                    Item.Processes = await ItemService.GetItemProcessesAsync(copySourceId);
                     foreach (var p in Item.Processes)
                     {
                         p.EntryID = null;
                     }
-                    Item.CatalogRefs = await ItemService.GetItemCatalogRefsAsync(CopyFromId);
+                    Item.CatalogRefs = await ItemService.GetItemCatalogRefsAsync(copySourceId);
                     foreach (var cr in Item.CatalogRefs)
                     {
                         cr.EntryID = null;
                     }
-                    Item.RMComponents = await ItemService.GetItemRMComponentsAsync(CopyFromId);
+                    Item.RMComponents = await ItemService.GetItemRMComponentsAsync(copySourceId);
                     foreach (var rc in Item.RMComponents)
                     {
                         rc.EntryID = null;
                     }
-                    Item.LookAlikes = await ItemService.GetItemLookAlikesAsync(CopyFromId);
+                    Item.LookAlikes = await ItemService.GetItemLookAlikesAsync(copySourceId);
                     foreach (var l in Item.LookAlikes)
                     {
                         l.EntryID = null;
                     }
-                    Item.SetDetails = await ItemService.GetItemSetDetailsAsync(CopyFromId);
+                    Item.SetDetails = await ItemService.GetItemSetDetailsAsync(copySourceId);
                     foreach (var s in Item.SetDetails)
                     {
                         s.EntryID = null;
@@ -84,7 +112,7 @@ namespace Impulse.Pages.Company
                     {
                         Severity = Radzen.NotificationSeverity.Info,
                         Summary = "Item Copied",
-                        Detail = $"Details copied from '{CopyFromId}'. Enter a new Item Code and save.",
+                        Detail = $"Details copied from '{copySourceId}'. Enter a new Item Code and save.",
                         Duration = 5000
                     });
                 }
@@ -94,23 +122,24 @@ namespace Impulse.Pages.Company
                     {
                         Severity = Radzen.NotificationSeverity.Error,
                         Summary = "Not Found",
-                        Detail = $"Source item '{CopyFromId}' was not found.",
+                        Detail = $"Source item '{effectiveCopyFrom}' was not found.",
                         Duration = 4000
                     });
-                    NavigationManager.NavigateTo("/company/items");
+                    NavigationManager.NavigateTo(!string.IsNullOrWhiteSpace(ReturnUrl) ? ReturnUrl : "/company/items");
                 }
             }
-            else if (!IsAdd)
+            else if (!IsAdd && !string.IsNullOrEmpty(effectiveItemId))
             {
-                var existing = await ItemService.GetItemByIdAsync(ItemId!);
+                var existing = await ItemService.GetItemByIdAsync(effectiveItemId);
                 if (existing != null)
                 {
                     Item = existing;
-                    Item.Processes    = await ItemService.GetItemProcessesAsync(ItemId!);
-                    Item.CatalogRefs  = await ItemService.GetItemCatalogRefsAsync(ItemId!);
-                    Item.RMComponents = await ItemService.GetItemRMComponentsAsync(ItemId!);
-                    Item.LookAlikes   = await ItemService.GetItemLookAlikesAsync(ItemId!);
-                    Item.SetDetails   = await ItemService.GetItemSetDetailsAsync(ItemId!);
+                    var resolvedId = existing.ItemID;
+                    Item.Processes    = await ItemService.GetItemProcessesAsync(resolvedId);
+                    Item.CatalogRefs  = await ItemService.GetItemCatalogRefsAsync(resolvedId);
+                    Item.RMComponents = await ItemService.GetItemRMComponentsAsync(resolvedId);
+                    Item.LookAlikes   = await ItemService.GetItemLookAlikesAsync(resolvedId);
+                    Item.SetDetails   = await ItemService.GetItemSetDetailsAsync(resolvedId);
 
                     SelectedCategory  = Categories.FirstOrDefault(c => c.CatID       == Item.CatID);
                     SelectedItemGroup = ItemGroups.FirstOrDefault(g => g.ID          == Item.GroupID);
@@ -122,10 +151,10 @@ namespace Impulse.Pages.Company
                     {
                         Severity = Radzen.NotificationSeverity.Error,
                         Summary  = "Not Found",
-                        Detail   = $"Item '{ItemId}' was not found.",
+                        Detail   = $"Item '{effectiveItemId}' was not found.",
                         Duration = 4000
                     });
-                    NavigationManager.NavigateTo("/company/items");
+                    NavigationManager.NavigateTo(!string.IsNullOrWhiteSpace(ReturnUrl) ? ReturnUrl : "/company/items");
                 }
             }
         }
@@ -282,7 +311,7 @@ namespace Impulse.Pages.Company
                         Detail   = $"Item '{Item.ItemID}' saved successfully.",
                         Duration = 3000
                     });
-                    NavigationManager.NavigateTo("/company/items");
+                    NavigationManager.NavigateTo(!string.IsNullOrWhiteSpace(ReturnUrl) ? ReturnUrl : "/company/items");
                 }
                 else
                 {
@@ -301,6 +330,6 @@ namespace Impulse.Pages.Company
             }
         }
 
-        public void Cancel() => NavigationManager.NavigateTo("/company/items");
+        public void Cancel() => NavigationManager.NavigateTo(!string.IsNullOrWhiteSpace(ReturnUrl) ? ReturnUrl : "/company/items");
     }
 }

@@ -8,7 +8,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public int DateRangeType { get; set; } = 3; // 0=Today, 1=This Week, 2=Last 15d, 3=This Month, 4=Last 30d, 5=Custom
         public DateTime DtFrom { get; set; } = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
         public DateTime DtTo { get; set; } = DateTime.Today;
-        public int? DepartmentId { get; set; }
+        public string? DepartmentId { get; set; }
         public int? ProcessId { get; set; }
         public string? EmpId { get; set; }
         public int StatusFilter { get; set; } = 0; // 0=All, 1=Overloaded, 2=Has Overdue, 3=Optimal
@@ -128,7 +128,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
 
     public class DepartmentLookupItem
     {
-        public int DeptID { get; set; }
+        public string DeptID { get; set; } = string.Empty;
         public string DeptName { get; set; } = string.Empty;
     }
 

@@ -152,11 +152,11 @@ namespace DataAccessLibrary.DAC.Company
                         ItemPic, TechnicalDrawing,
                         ItemGroup, Category AS CategoryName, MainGroupName
                     FROM VItems
-                    WHERE ItemID = @ItemID";
-                var item = await db.QuerySingleOrDefaultAsync<ItemDto>(sql, new { ItemID = itemId });
+                    WHERE ItemID = @ItemID OR (LTRIM(RTRIM(ItemID)) = LTRIM(RTRIM(@ItemID)) AND @ItemID <> '')";
+                var item = await db.QueryFirstOrDefaultAsync<ItemDto>(sql, new { ItemID = itemId });
                 if (item != null)
                 {
-                    var fam = await GetItemProcessFamilyInternalAsync(db, itemId);
+                    var fam = await GetItemProcessFamilyInternalAsync(db, item.ItemID);
                     item.ProcessGroupID = fam.GroupId;
                     item.ProcessFamily = fam.GroupName;
 

@@ -30,7 +30,7 @@ namespace DataAccessLibrary.DAC.Production
         public async Task<List<DepartmentLookupItem>> GetDepartmentsLookupAsync()
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
-            const string sql = "SELECT deptid AS DeptID, name AS DeptName FROM Departments ORDER BY name ASC";
+            const string sql = "SELECT deptid AS DeptID, name AS DeptName FROM Departments WHERE ISNULL(deptid, '') <> '' ORDER BY name ASC";
             return (await db.QueryAsync<DepartmentLookupItem>(sql)).ToList();
         }
 
@@ -41,17 +41,17 @@ namespace DataAccessLibrary.DAC.Production
             return (await db.QueryAsync<ProcessLookupItem>(sql)).ToList();
         }
 
-        public async Task<List<PerformanceEmployeeLookupItem>> GetEmployeesLookupAsync(int? deptId = null)
+        public async Task<List<PerformanceEmployeeLookupItem>> GetEmployeesLookupAsync(string? deptId = null)
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
             const string sql = @"
                 SELECT EmpID, Name, ISNULL(Designation, '') AS Designation 
                 FROM Employees 
                 WHERE ISNULL(Active, 1) = 1 
-                  AND (@DeptID IS NULL OR deptid = @DeptID)
+                  AND (@DeptID IS NULL OR @DeptID = '' OR deptid = @DeptID)
                 ORDER BY Name ASC";
 
-            return (await db.QueryAsync<PerformanceEmployeeLookupItem>(sql, new { DeptID = deptId })).ToList();
+            return (await db.QueryAsync<PerformanceEmployeeLookupItem>(sql, new { DeptID = string.IsNullOrWhiteSpace(deptId) ? null : deptId })).ToList();
         }
 
         public async Task<EmployeePerformanceDashboardDto> GetPerformanceDashboardAsync(EmployeePerformanceFilter filter)
@@ -67,7 +67,7 @@ namespace DataAccessLibrary.DAC.Production
 
             p.Add("@DtFrom", dtFrom);
             p.Add("@DtTo", dtTo);
-            p.Add("@DeptID", filter.DepartmentId);
+            p.Add("@DeptID", string.IsNullOrWhiteSpace(filter.DepartmentId) ? null : filter.DepartmentId);
             p.Add("@ProcessID", filter.ProcessId);
             p.Add("@EmpID", filter.EmpId);
 
@@ -163,7 +163,7 @@ namespace DataAccessLibrary.DAC.Production
                 LEFT JOIN EmpActiveWip w ON e.EmpID = w.EmpID
                 WHERE ISNULL(e.Active, 1) = 1
                   AND (ISNULL(t.DailyCapacity, 0) > 0 OR ISNULL(a.AssignedQty, 0) > 0 OR ISNULL(w.ActiveBalanceQty, 0) > 0 OR ISNULL(c.CompletedQty, 0) > 0)
-                  AND (@DeptID IS NULL OR e.deptid = @DeptID)
+                  AND (@DeptID IS NULL OR @DeptID = '' OR e.deptid = @DeptID)
                   AND (@EmpID IS NULL OR @EmpID = '' OR e.EmpID = @EmpID)
                 ORDER BY e.Name ASC";
 

@@ -309,7 +309,7 @@ namespace Impulse.Pages.Company
 
         private void NavigateToNewItem()
         {
-            NavigationManager.NavigateTo("/company/new-item");
+            NavigationManager.NavigateTo($"/company/new-item?returnUrl={Uri.EscapeDataString(NavigationManager.Uri)}");
         }
 
         private void NewCategory(ItemClickEventArgs? e = null)
@@ -331,7 +331,7 @@ namespace Impulse.Pages.Company
         private void EditItemRow(CompanyItemModel item)
         {
             highlightedItem = item;
-            NavigationManager.NavigateTo($"/company/new-item/{Uri.EscapeDataString(item.ItemID)}");
+            NavigationManager.NavigateTo($"/company/new-item?id={Uri.EscapeDataString(item.ItemID)}&returnUrl={Uri.EscapeDataString(NavigationManager.Uri)}");
         }
 
         private void DeleteItem(ItemClickEventArgs? e = null)
@@ -353,7 +353,7 @@ namespace Impulse.Pages.Company
                 NotificationService.ShowWarning("No item selected", "Please select an item to copy.");
                 return;
             }
-            NavigationManager.NavigateTo($"/company/new-item/copy/{Uri.EscapeDataString(item.ItemID)}");
+            NavigationManager.NavigateTo($"/company/new-item?copyFrom={Uri.EscapeDataString(item.ItemID)}&returnUrl={Uri.EscapeDataString(NavigationManager.Uri)}");
         }
 
         private async Task ToggleActive(ItemClickEventArgs? e = null)

@@ -221,18 +221,75 @@
                             {
                                 <nav aria-label="RM Page Navigation">
                                     <ul class="pagination pagination-sm mb-0">
+                                        <!-- First Page -->
                                         <li class="page-item @(currentPage == 1 ? "disabled" : "")">
-                                            <button class="page-link" @onclick="() => GoToPage(currentPage - 1)">Previous</button>
+                                            <button class="page-link" @onclick="() => GoToPage(1)" title="First Page">
+                                                <i class="fas fa-angle-double-left"></i>
+                                            </button>
                                         </li>
-                                        @for (int idx = 1; idx <= totalPages; idx++)
-                                        {
-                                            var pageNumber = idx;
-                                            <li class="page-item @(currentPage == pageNumber ? "active" : "")">
-                                                <button class="page-link" @onclick="() => GoToPage(pageNumber)">@pageNumber</button>
-                                            </li>
+                                        <!-- Previous Page -->
+                                        <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                                            <button class="page-link" @onclick="() => GoToPage(currentPage - 1)" title="Previous Page">
+                                                <i class="fas fa-angle-left"></i>
+                                            </button>
+                                        </li>
+
+                                        @{
+                                            int window = 2;
+                                            int startPage = Math.Max(1, currentPage - window);
+                                            int endPage = Math.Min(totalPages, currentPage + window);
+
+                                            if (currentPage <= window + 1)
+                                            {
+                                                endPage = Math.Min(totalPages, 1 + (window * 2));
+                                            }
+                                            else if (currentPage >= totalPages - window)
+                                            {
+                                                startPage = Math.Max(1, totalPages - (window * 2));
+                                            }
+
+                                            if (startPage > 1)
+                                            {
+                                                <li class="page-item">
+                                                    <button class="page-link" @onclick="() => GoToPage(1)">1</button>
+                                                </li>
+                                                if (startPage > 2)
+                                                {
+                                                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                                                }
+                                            }
+
+                                            for (int idx = startPage; idx <= endPage; idx++)
+                                            {
+                                                var pageNumber = idx;
+                                                <li class="page-item @(currentPage == pageNumber ? "active" : "")">
+                                                    <button class="page-link" @onclick="() => GoToPage(pageNumber)">@pageNumber</button>
+                                                </li>
+                                            }
+
+                                            if (endPage < totalPages)
+                                            {
+                                                if (endPage < totalPages - 1)
+                                                {
+                                                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                                                }
+                                                <li class="page-item">
+                                                    <button class="page-link" @onclick="() => GoToPage(totalPages)">@totalPages</button>
+                                                </li>
+                                            }
                                         }
+
+                                        <!-- Next Page -->
                                         <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
-                                            <button class="page-link" @onclick="() => GoToPage(currentPage + 1)">Next</button>
+                                            <button class="page-link" @onclick="() => GoToPage(currentPage + 1)" title="Next Page">
+                                                <i class="fas fa-angle-right"></i>
+                                            </button>
+                                        </li>
+                                        <!-- Last Page -->
+                                        <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                                            <button class="page-link" @onclick="() => GoToPage(totalPages)" title="Last Page">
+                                                <i class="fas fa-angle-double-right"></i>
+                                            </button>
                                         </li>
                                     </ul>
                                 </nav>

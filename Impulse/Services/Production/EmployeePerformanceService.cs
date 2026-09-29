@@ -44,7 +44,7 @@ namespace Impulse.Services.Production
             }
         }
 
-        public async Task<List<PerformanceEmployeeLookupItem>> GetEmployeesLookupAsync(int? deptId = null)
+        public async Task<List<PerformanceEmployeeLookupItem>> GetEmployeesLookupAsync(string? deptId = null)
         {
             try
             {
