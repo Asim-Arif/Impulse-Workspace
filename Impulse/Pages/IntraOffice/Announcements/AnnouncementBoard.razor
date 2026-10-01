@@ -175,7 +175,7 @@
             </div>
             
             <div class="form-group">
-                <label class="form-label">Attachments & Voice Notes <span class="text-danger">*</span></label>
+                <label class="form-label">Attachments & Voice Notes</label>
                 <div class="d-flex gap-8 align-items-center mb-2">
                     <label for="ann-file-input" class="btn btn-outline-secondary btn-sm mb-0" style="cursor: pointer;">
                         <i class="bi bi-paperclip"></i> Add Files
@@ -185,7 +185,7 @@
                     </button>
                     <InputFile id="ann-file-input" @ref="fileInput" OnChange="HandleFileSelected" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg" style="display: none;" multiple />
                 </div>
-                <div class="text-muted" style="font-size: 0.8rem;">Required: At least one file or voice note. Allowed files: PDF, Word, Excel, JPEG.</div>
+                <div class="text-muted" style="font-size: 0.8rem;">Optional: Attach files or voice notes. Allowed files: PDF, Word, Excel, JPEG.</div>
                 
                 @if (pendingAttachments.Any())
                 {
@@ -283,6 +283,8 @@
     {
         if (currentUser == null) return;
         await AnnouncementService.AcknowledgeAnnouncementAsync(id, currentUser.Id);
+        announcements = await AnnouncementService.GetActiveAnnouncementsAsync();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task ShowCreateModal()
@@ -388,12 +390,6 @@
     private async Task CreateAnnouncement()
     {
         if (string.IsNullOrWhiteSpace(newTitle) || currentUser == null) return;
-        
-        if (!pendingAttachments.Any())
-        {
-            await JS.InvokeVoidAsync("alert", "At least one attachment or voice note is required.");
-            return;
-        }
 
         var ann = new Announcement
         {
@@ -410,6 +406,7 @@
         showCreateModal = false;
         pendingAttachments.Clear();
         announcements = await AnnouncementService.GetActiveAnnouncementsAsync();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task TogglePin(int id)

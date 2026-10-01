@@ -1023,7 +1023,7 @@
                 }
             }
 
-            allChannels = await ChannelService.GetAllChannelsAsync();
+            allChannels = await ChannelService.GetUserChannelsAsync(userId ?? "");
             NotificationService.OnNotificationReceived += HandleLiveNotification;
         }
         catch (Exception ex)
@@ -1036,7 +1036,8 @@
     {
         if (currentChannel != null && notif.Category == NotificationCategory.Message)
         {
-            if (notif.ActionUrl == $"/chat/{currentChannel.Id}" || notif.ActionUrl?.StartsWith($"/chat/{currentChannel.Id}") == true)
+            if (notif.ActionUrl == $"/chat/{currentChannel.Id}" || notif.ActionUrl?.StartsWith($"/chat/{currentChannel.Id}") == true ||
+                notif.ActionUrl == $"/office/chat/{currentChannel.Id}" || notif.ActionUrl?.StartsWith($"/office/chat/{currentChannel.Id}") == true)
             {
                 await InvokeAsync(async () =>
                 {

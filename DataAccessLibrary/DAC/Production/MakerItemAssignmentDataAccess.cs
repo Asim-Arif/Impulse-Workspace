@@ -21,12 +21,14 @@ namespace DataAccessLibrary.DAC.Production
         }
 
         private string ConnectionString => _config.GetConnectionString("DefaultConnection")
+            ?? _config.GetConnectionString("ImpulseConnection")
+            ?? _config.GetConnectionString("ImpulseDatabase")
             ?? throw new InvalidOperationException("DefaultConnection configuration string is missing.");
 
         public async Task<List<MakerLookupModel>> GetActiveMakersAsync()
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
-            string sql = @"SELECT VendID, VendID1, VenderName 
+            string sql = @"SELECT CAST(VendID AS bigint) AS VendID, VendID1, VenderName 
                            FROM VMakers 
                            WHERE ISNULL(Active, 1) = 1 
                            ORDER BY VenderName";
@@ -60,12 +62,20 @@ namespace DataAccessLibrary.DAC.Production
         public async Task<List<AssignedMakerItemModel>> GetAssignedItemsAsync(long vendId, int processId)
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
-            string sql = @"SELECT EntryID, VendID, ProcessID, ItemID, ItemName, ISNULL(Description, '') AS Description, 
-                                  ISNULL(Rate, 0) AS Rate, ISNULL(AssignedUnit, '') AS AssignedUnit, 
-                                  ISNULL(Remarks, '') AS Remarks, ISNULL(MakerDescription, '') AS MakerDescription
-                           FROM VMakerAssItems
-                           WHERE VendID = @VendId AND ProcessID = @ProcessId
-                           ORDER BY ItemName";
+            string sql = @"SELECT CAST(v.EntryID AS bigint) AS EntryID, 
+                                  CAST(v.VendID AS bigint) AS VendID, 
+                                  v.ProcessID, 
+                                  v.ItemID, 
+                                  v.ItemName, 
+                                  ISNULL(v.Description, '') AS Description, 
+                                  CAST(ISNULL(v.Rate, 0) AS decimal(18, 4)) AS Rate, 
+                                  ISNULL(v.AssignedUnit, '') AS AssignedUnit, 
+                                  ISNULL(v.Remarks, '') AS Remarks, 
+                                  ISNULL(i.MakerDescription, '') AS MakerDescription
+                           FROM VMakerAssItems v
+                           LEFT OUTER JOIN Items i ON v.ItemID = i.ItemID
+                           WHERE v.VendID = @VendId AND v.ProcessID = @ProcessId
+                           ORDER BY v.ItemName";
 
             return (await db.QueryAsync<AssignedMakerItemModel>(sql, new { VendId = vendId, ProcessId = processId })).ToList();
         }
@@ -138,7 +148,12 @@ namespace DataAccessLibrary.DAC.Production
         public async Task<List<ItemRevisionHistoryModel>> GetItemRevisionHistoryAsync(long entryId)
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
-            string sql = @"SELECT EntryID, VAI_RefID, Rate, ISNULL(UserName, '') AS UserName, DTEntry, ISNULL(Remarks, '') AS Remarks 
+            string sql = @"SELECT CAST(EntryID AS bigint) AS EntryID, 
+                                  CAST(VAI_RefID AS bigint) AS VAI_RefID, 
+                                  CAST(ISNULL(Rate, 0) AS decimal(18, 4)) AS Rate, 
+                                  ISNULL(UserName, '') AS UserName, 
+                                  DTEntry, 
+                                  ISNULL(Remarks, '') AS Remarks 
                            FROM VendAssItems_Revisions 
                            WHERE VAI_RefID = @EntryId 
                            ORDER BY EntryID DESC";

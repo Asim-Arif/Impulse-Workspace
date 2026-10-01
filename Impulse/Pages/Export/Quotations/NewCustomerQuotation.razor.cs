@@ -96,7 +96,11 @@ namespace Impulse.Pages.Export.Quotations
                 FinishingQualities = await CustomerOrderService.GetFinishingQualitiesAsync();
                 Banks = await BankListDataAccess.GetBankList();
 
-                if (Companies.Any()) SelectedCompany = Companies.First();
+                if (Companies.Any())
+                {
+                    SelectedCompany = Companies.First();
+                    Quotation.CompanyRefID = SelectedCompany.EntryID;
+                }
             }
             catch (Exception ex)
             {
@@ -149,10 +153,7 @@ namespace Impulse.Pages.Export.Quotations
         public void OnCompanySelected(CompanyLookupModel? company)
         {
             SelectedCompany = company;
-            if (company != null)
-            {
-                Quotation.CompanyRefID = company.EntryID;
-            }
+            Quotation.CompanyRefID = company?.EntryID ?? 0;
         }
 
         public async Task<IEnumerable<CustomerLookupModel>> SearchCustomers(string searchText)
@@ -396,6 +397,11 @@ namespace Impulse.Pages.Export.Quotations
 
         private async Task<bool> SaveInternal()
         {
+            if (SelectedCompany != null)
+            {
+                Quotation.CompanyRefID = SelectedCompany.EntryID;
+            }
+
             if (string.IsNullOrWhiteSpace(Quotation.CustCode))
             {
                 NotificationService.Notify(new Radzen.NotificationMessage { Severity = Radzen.NotificationSeverity.Error, Summary = "Validation", Detail = "Please select a Customer." });

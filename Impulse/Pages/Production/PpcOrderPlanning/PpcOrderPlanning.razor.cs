@@ -30,6 +30,7 @@ namespace Impulse.Pages.Production.PpcOrderPlanning
 
         public bool CanSavePlan =>
             OrderHeader != null &&
+            !OrderHeader.IsPlanned &&
             OrderHeader.Items.Any() &&
             !OrderHeader.Items.Any(i => i.StockQty > i.AvailableInHandStock || i.StockQty < 0) &&
             !OrderHeader.Items.Any(i => i.Purchases.Any(p => p.PurchaseQty <= 0 || p.ProcessID <= 0)) &&
@@ -218,7 +219,7 @@ namespace Impulse.Pages.Production.PpcOrderPlanning
 
         public async Task SavePlanAsync()
         {
-            if (OrderHeader == null || !OrderHeader.Items.Any()) return;
+            if (IsSaving || OrderHeader == null || OrderHeader.IsPlanned || !OrderHeader.Items.Any()) return;
 
             // 1. Validation checks
             foreach (var item in OrderHeader.Items)

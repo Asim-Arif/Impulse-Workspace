@@ -37,7 +37,17 @@
                             <i class="bi @(channel.IsPrivate ? "bi-lock-fill" : "bi-hash")"></i>
                         </div>
                         <div>
-                            <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-heading);">@channel.Name</div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span style="font-weight: 700; font-size: 1.05rem; color: var(--text-heading);">#@channel.Name</span>
+                                @if (channel.IsPrivate)
+                                {
+                                    <span class="badge bg-warning text-dark border border-warning" style="font-size: 0.68rem; font-weight: 600;"><i class="fas fa-lock me-1"></i>Private</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size: 0.68rem; font-weight: 600;"><i class="fas fa-globe me-1"></i>Public</span>
+                                }
+                            </div>
                             <div class="text-muted" style="font-size: 0.8rem;">@(channel.MemberCount > 0 ? channel.MemberCount : (channel.Members?.Count ?? 0)) members</div>
                         </div>
                     </div>
@@ -64,31 +74,179 @@
 {
     <div class="modal-backdrop fade show"></div>
     <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 580px;">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
                 <div class="modal-header border-bottom">
                     <h5 class="modal-title fw-bold"><i class="bi bi-hash me-1 text-primary"></i> Create New Channel</h5>
-                    <button type="button" class="btn-close" @onclick="() => showCreateModal = false"></button>
+                    <button type="button" class="btn-close" @onclick="CloseCreateModal"></button>
                 </div>
 
                 <div class="modal-body p-4">
                     <div class="form-group mb-3">
-                        <label class="form-label">Channel Name</label>
+                        <label class="form-label fw-semibold text-secondary" style="font-size: 0.88rem;">Channel Name <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" @bind="newChannelName" placeholder="e.g. project-alpha" />
                     </div>
                     <div class="form-group mb-3">
-                        <label class="form-label">Description</label>
-                        <textarea class="form-control" @bind="newChannelDesc" placeholder="What is this channel about?" rows="3"></textarea>
+                        <label class="form-label fw-semibold text-secondary" style="font-size: 0.88rem;">Description</label>
+                        <textarea class="form-control" @bind="newChannelDesc" placeholder="What is this channel about?" rows="2"></textarea>
                     </div>
-                    <div class="form-group mb-0 d-flex align-items-center gap-2">
-                        <input type="checkbox" id="privateChCheck" @bind="newChannelPrivate" />
-                        <label class="form-label mb-0" for="privateChCheck" style="cursor: pointer;">Private Channel</label>
+                    
+                    <!-- Privacy Option Cards -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary" style="font-size: 0.88rem;">Channel Privacy <span class="text-danger">*</span></label>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <div class="p-3 rounded-3 border text-center h-100 position-relative @(!newChannelPrivate ? "border-primary bg-primary-subtle shadow-sm" : "border-light-subtle bg-light")" 
+                                     style="cursor: pointer; transition: all 0.2s;" 
+                                     @onclick="() => SetPrivacy(false)">
+                                    <div class="d-flex align-items-center justify-content-center gap-2 mb-1">
+                                        <i class="fas fa-globe @(!newChannelPrivate ? "text-primary" : "text-muted")" style="font-size: 1.15rem;"></i>
+                                        <span class="fw-bold @(!newChannelPrivate ? "text-primary" : "text-dark")" style="font-size: 0.92rem;">Public Channel</span>
+                                    </div>
+                                    <div class="text-muted" style="font-size: 0.75rem; line-height: 1.3;">
+                                        Open & visible to all company members
+                                    </div>
+                                    @if (!newChannelPrivate)
+                                    {
+                                        <div class="position-absolute top-0 end-0 p-1 me-1 text-primary" style="font-size: 0.8rem;">
+                                            <i class="fas fa-check-circle"></i>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="p-3 rounded-3 border text-center h-100 position-relative @(newChannelPrivate ? "border-warning bg-warning-subtle shadow-sm" : "border-light-subtle bg-light")" 
+                                     style="cursor: pointer; transition: all 0.2s;" 
+                                     @onclick="() => SetPrivacy(true)">
+                                    <div class="d-flex align-items-center justify-content-center gap-2 mb-1">
+                                        <i class="fas fa-lock @(newChannelPrivate ? "text-warning" : "text-muted")" style="font-size: 1.15rem;"></i>
+                                        <span class="fw-bold @(newChannelPrivate ? "text-dark" : "text-dark")" style="font-size: 0.92rem;">Private Channel</span>
+                                    </div>
+                                    <div class="text-muted" style="font-size: 0.75rem; line-height: 1.3;">
+                                        Restricted: only creator & selected users
+                                    </div>
+                                    @if (newChannelPrivate)
+                                    {
+                                        <div class="position-absolute top-0 end-0 p-1 me-1 text-warning" style="font-size: 0.8rem;">
+                                            <i class="fas fa-check-circle"></i>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
                     </div>
+
+                    @if (!newChannelPrivate)
+                    {
+                        <div class="alert alert-info py-2 px-3 mb-0 small d-flex align-items-center gap-2" style="font-size: 0.8rem; border-radius: 8px;">
+                            <i class="fas fa-info-circle text-info fs-6"></i>
+                            <span>This public channel will be <strong>available and visible to everyone</strong>. No user selection needed.</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="p-3 rounded-3 border" style="background-color: #f8fafc; border-color: #e2e8f0 !important;">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label fw-bold mb-0 text-dark" style="font-size: 0.88rem;">
+                                    <i class="fas fa-user-shield text-warning me-1"></i> Authorized Users (Access List)
+                                </label>
+                                @if (selectedUserIds.Any())
+                                {
+                                    <span class="badge bg-primary text-white" style="font-size: 0.75rem;">
+                                        @selectedUserIds.Count user@(selectedUserIds.Count == 1 ? "" : "s") authorized
+                                    </span>
+                                }
+                            </div>
+                            <div class="text-muted small mb-2" style="font-size: 0.78rem;">
+                                Please select the users who will have access. Only the creator (@(currentUser?.FullName ?? "you")) and the authorized users selected below will be able to see or join this private channel.
+                            </div>
+
+                            <!-- Selected Users Chips -->
+                            @if (selectedUserIds.Any())
+                            {
+                                <div class="d-flex flex-wrap gap-1 mb-2 p-2 bg-white rounded border">
+                                    @foreach (var uid in selectedUserIds)
+                                    {
+                                        var u = allUsers.FirstOrDefault(x => string.Equals(x.UserName, uid, StringComparison.OrdinalIgnoreCase) || string.Equals(x.Id, uid, StringComparison.OrdinalIgnoreCase));
+                                        <span class="badge bg-primary text-white d-inline-flex align-items-center gap-1 py-1 px-2" style="font-size: 0.78rem; font-weight: 500;">
+                                            <i class="fas fa-user-check"></i>
+                                            <span>@(u != null ? (!string.IsNullOrEmpty(u.FullUserName) && !string.Equals(u.FullUserName, u.UserName, StringComparison.OrdinalIgnoreCase) ? $"{u.UserName} ({u.FullUserName})" : u.UserName) : uid)</span>
+                                            <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.5rem;" @onclick="() => ToggleUserSelection(uid)"></button>
+                                        </span>
+                                    }
+                                    <div class="d-flex align-items-center gap-2 ms-auto">
+                                        <button type="button" class="btn btn-link btn-sm text-danger text-decoration-none p-0" style="font-size: 0.75rem;" @onclick="ClearSelectedUsers">
+                                            Clear all
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+
+                            <!-- User Dropdown Picker -->
+                            <div class="dropdown position-relative">
+                                <button class="btn btn-outline-secondary w-100 text-start d-flex justify-content-between align-items-center bg-white btn-sm" type="button" @onclick="() => showUserDropdown = !showUserDropdown" style="border-color: #cbd5e1; height: 35px;">
+                                    <span class="text-truncate" style="font-size: 0.85rem;">
+                                        @if (!selectedUserIds.Any())
+                                        {
+                                            <span class="text-muted"><i class="fas fa-user-plus me-1 text-primary"></i> Click to select employees to grant access...</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="fw-semibold text-primary"><i class="fas fa-check-double me-1"></i> @selectedUserIds.Count employee@(selectedUserIds.Count == 1 ? "" : "s") authorized</span>
+                                        }
+                                    </span>
+                                    <i class="fas fa-chevron-down text-muted small"></i>
+                                </button>
+                                @if (showUserDropdown)
+                                {
+                                    <div class="dropdown-menu show w-100 shadow-lg p-2" style="max-height: 230px; overflow-y: auto; z-index: 1060; border: 1px solid #cbd5e1; position: absolute; top: 100%; left: 0;">
+                                        <div class="d-flex gap-2 px-1 pb-2 border-bottom mb-2">
+                                            <input type="text" class="form-control form-control-sm" placeholder="Search employees..." @bind="userSearchFilter" @bind:event="oninput" @onclick:stopPropagation />
+                                            <button type="button" class="btn btn-xs btn-outline-primary text-nowrap" style="font-size: 0.75rem; padding: 2px 6px;" @onclick="SelectAllUsers" @onclick:stopPropagation>
+                                                Select All
+                                            </button>
+                                        </div>
+                                        @if (FilteredUsers.Any())
+                                        {
+                                            @foreach (var u in FilteredUsers)
+                                            {
+                                                var isSelected = selectedUserIds.Contains(u.UserName) || selectedUserIds.Contains(u.Id);
+                                                <div class="dropdown-item d-flex align-items-center gap-2 py-1 px-2 rounded @(isSelected ? "bg-primary-subtle fw-semibold text-primary" : "")" 
+                                                     style="cursor: pointer;"
+                                                     @onclick="() => ToggleUserSelection(u.UserName)" @onclick:stopPropagation>
+                                                    <input type="checkbox" class="form-check-input mt-0" checked="@isSelected" style="pointer-events: none;" />
+                                                    <div class="d-flex flex-column" style="line-height: 1.2;">
+                                                        <div class="d-flex align-items-center gap-1">
+                                                            <span class="fw-semibold text-dark" style="font-size: 0.85rem;">@u.UserName</span>
+                                                            @if (!string.IsNullOrEmpty(u.FullUserName) && !string.Equals(u.FullUserName, u.UserName, StringComparison.OrdinalIgnoreCase))
+                                                            {
+                                                                 <span class="text-secondary small">(@u.FullUserName)</span>
+                                                            }
+                                                        </div>
+                                                        @if (!string.IsNullOrEmpty(u.DepartmentName))
+                                                        {
+                                                            <small class="text-muted" style="font-size: 0.72rem;">@u.DepartmentName</small>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <div class="p-2 text-muted small text-center">No matching employees found</div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
                 </div>
 
                 <div class="modal-footer border-top bg-light">
-                    <button type="button" class="btn btn-secondary" @onclick="() => showCreateModal = false">Cancel</button>
-                    <button type="button" class="btn btn-primary" @onclick="CreateChannel">Create Channel</button>
+                    <button type="button" class="btn btn-secondary btn-sm" @onclick="CloseCreateModal">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm fw-bold px-3" @onclick="CreateChannel" disabled="@(string.IsNullOrWhiteSpace(newChannelName))">
+                        <i class="fas fa-plus-circle me-1"></i> Create Channel
+                    </button>
                 </div>
             </div>
         </div>
@@ -97,47 +255,149 @@
 
 @code {
     private IntraUserProfile? currentUser;
+    private string currentUserId = "";
     private List<Channel>? channels;
+    private List<IntraUserProfile> allUsers = new();
+    private HashSet<string> selectedUserIds = new(StringComparer.OrdinalIgnoreCase);
     private string searchQuery = "";
     private bool showCreateModal;
     private string newChannelName = "";
     private string newChannelDesc = "";
-    private bool newChannelPrivate;
+    private bool newChannelPrivate = false;
+    private bool showUserDropdown;
+    private string userSearchFilter = "";
 
     private IEnumerable<Channel> FilteredChannels =>
         channels?.Where(c => string.IsNullOrEmpty(searchQuery) ||
             c.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)) ?? Enumerable.Empty<Channel>();
 
+    private IEnumerable<IntraUserProfile> FilteredUsers =>
+        string.IsNullOrWhiteSpace(userSearchFilter)
+            ? allUsers
+            : allUsers.Where(u =>
+                (u.UserName != null && u.UserName.Contains(userSearchFilter, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrEmpty(u.FullUserName) && u.FullUserName.Contains(userSearchFilter, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrEmpty(u.DepartmentName) && u.DepartmentName.Contains(userSearchFilter, StringComparison.OrdinalIgnoreCase))
+            );
+
+    private void SetPrivacy(bool isPrivate)
+    {
+        newChannelPrivate = isPrivate;
+        if (isPrivate)
+        {
+            showUserDropdown = true;
+        }
+        else
+        {
+            selectedUserIds.Clear();
+            showUserDropdown = false;
+        }
+    }
+
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
-        var userId = user.Identity?.Name ?? "";
-        if (!string.IsNullOrEmpty(userId))
+        currentUserId = user.Identity?.Name ?? "";
+        if (!string.IsNullOrEmpty(currentUserId))
         {
-            currentUser = await IntraOfficeService.GetUserProfileAsync(userId);
+            currentUser = await IntraOfficeService.GetUserProfileAsync(currentUserId);
+            if (currentUser == null)
+            {
+                currentUser = new IntraUserProfile { UserName = currentUserId, FullUserName = currentUserId };
+            }
         }
-        channels = await ChannelService.GetAllChannelsAsync();
+        await LoadChannels();
+
+        var rawUsers = await IntraOfficeService.GetActiveUsersAsync();
+        allUsers = rawUsers.Where(u => u.IsActive).OrderBy(u => u.UserName).ToList();
+    }
+
+    private async Task LoadChannels()
+    {
+        if (!string.IsNullOrEmpty(currentUserId))
+        {
+            channels = await ChannelService.GetUserChannelsAsync(currentUserId);
+        }
+        else
+        {
+            channels = await ChannelService.GetAllChannelsAsync();
+        }
+    }
+
+    private void ToggleUserSelection(string userId)
+    {
+        if (selectedUserIds.Contains(userId))
+        {
+            selectedUserIds.Remove(userId);
+        }
+        else
+        {
+            selectedUserIds.Add(userId);
+        }
+    }
+
+    private void SelectAllUsers()
+    {
+        foreach (var u in FilteredUsers)
+        {
+            selectedUserIds.Add(u.UserName);
+        }
+    }
+
+    private void ClearSelectedUsers()
+    {
+        selectedUserIds.Clear();
+    }
+
+    private void CloseCreateModal()
+    {
+        showCreateModal = false;
+        newChannelName = "";
+        newChannelDesc = "";
+        newChannelPrivate = false;
+        selectedUserIds.Clear();
+        userSearchFilter = "";
+        showUserDropdown = false;
     }
 
     private async Task CreateChannel()
     {
-        if (string.IsNullOrWhiteSpace(newChannelName) || currentUser == null) return;
+        if (string.IsNullOrWhiteSpace(newChannelName)) return;
+
+        var creatorId = currentUser?.Id ?? currentUserId;
+        if (string.IsNullOrEmpty(creatorId)) return;
 
         var channel = new Channel
         {
             Name = newChannelName.Trim(),
             Description = newChannelDesc,
             IsPrivate = newChannelPrivate,
-            CreatedBy = currentUser.Id
+            CreatedBy = creatorId
         };
 
-        var created = await ChannelService.CreateChannelAsync(channel);
-        await ChannelService.AddMemberAsync(created.Id, currentUser.Id, true);
-        showCreateModal = false;
-        newChannelName = "";
-        newChannelDesc = "";
-        newChannelPrivate = false;
-        channels = await ChannelService.GetAllChannelsAsync();
+        var memberList = new List<string>();
+        if (newChannelPrivate)
+        {
+            memberList.AddRange(selectedUserIds);
+        }
+
+        var created = await ChannelService.CreateChannelAsync(channel, memberList);
+        await ChannelService.AddMemberAsync(created.Id, creatorId, true);
+
+        // Also ensure all selected members are added
+        if (newChannelPrivate)
+        {
+            foreach (var uid in selectedUserIds)
+            {
+                if (!string.Equals(uid, creatorId, StringComparison.OrdinalIgnoreCase))
+                {
+                    await ChannelService.AddMemberAsync(created.Id, uid, false);
+                }
+            }
+        }
+
+        CloseCreateModal();
+        await LoadChannels();
     }
 }

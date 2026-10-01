@@ -106,6 +106,10 @@ namespace Impulse.Pages.Export.Orders
                 Order.DeliveryDT = DateTime.Today.AddMonths(2);
                 Order.OrderRevisionDT = DateTime.Today;
                 Order.OrderRevisionNo = 0;
+                if (SelectedCompany != null)
+                {
+                    Order.CompanyRefID = SelectedCompany.EntryID;
+                }
                 await RefreshInternalRef();
             }
         }
@@ -142,7 +146,11 @@ namespace Impulse.Pages.Export.Orders
                 Qualities = await CustomerOrderService.GetQualitiesAsync();
                 FinishingQualities = await CustomerOrderService.GetFinishingQualitiesAsync();
 
-                if (Companies.Any()) SelectedCompany = Companies.First();
+                if (Companies.Any())
+                {
+                    SelectedCompany = Companies.First();
+                    Order.CompanyRefID = SelectedCompany.EntryID;
+                }
             }
             catch (Exception ex)
             {
@@ -165,9 +173,9 @@ namespace Impulse.Pages.Export.Orders
         public async Task OnCompanySelected(CompanyLookupModel? company)
         {
             SelectedCompany = company;
+            Order.CompanyRefID = company?.EntryID ?? 0;
             if (company != null)
             {
-                Order.CompanyRefID = company.EntryID;
                 await RefreshInternalRef();
             }
         }
@@ -510,6 +518,23 @@ namespace Impulse.Pages.Export.Orders
 
         public async Task SaveOrderAndClose()
         {
+            if (SelectedCompany != null)
+            {
+                Order.CompanyRefID = SelectedCompany.EntryID;
+            }
+
+            if (Order.CompanyRefID <= 0)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Validation",
+                    Detail = "Please select a valid Company.",
+                    Duration = 4000
+                });
+                return;
+            }
+
             if (string.IsNullOrEmpty(Order.OrderNo))
             {
                 NotificationService.Notify(new Radzen.NotificationMessage
@@ -569,7 +594,11 @@ namespace Impulse.Pages.Export.Orders
 
         public async Task SaveOrderAndStay()
         {
-            if (string.IsNullOrEmpty(Order.OrderNo)) return;
+            if (SelectedCompany != null)
+            {
+                Order.CompanyRefID = SelectedCompany.EntryID;
+            }
+            if (Order.CompanyRefID <= 0 || string.IsNullOrEmpty(Order.OrderNo)) return;
             IsSaving = true;
             try
             {
@@ -605,7 +634,11 @@ namespace Impulse.Pages.Export.Orders
 
         public async Task SaveOrderAndNew()
         {
-            if (string.IsNullOrEmpty(Order.OrderNo)) return;
+            if (SelectedCompany != null)
+            {
+                Order.CompanyRefID = SelectedCompany.EntryID;
+            }
+            if (Order.CompanyRefID <= 0 || string.IsNullOrEmpty(Order.OrderNo)) return;
             IsSaving = true;
             try
             {
@@ -621,6 +654,11 @@ namespace Impulse.Pages.Export.Orders
                         Duration = 3000
                     });
                     Order = new();
+                    if (Companies.Any())
+                    {
+                        SelectedCompany = Companies.First();
+                        Order.CompanyRefID = SelectedCompany.EntryID;
+                    }
                     DeletedItemIds.Clear();
                     SelectedCustomer = null;
                     await RefreshInternalRef();

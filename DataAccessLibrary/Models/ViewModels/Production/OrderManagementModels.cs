@@ -64,6 +64,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
     {
         public int ID { get; set; }
         public string OrderNo { get; set; } = string.Empty;
+        public string InternalRefNo { get; set; } = string.Empty;
         public string ItemCode { get; set; } = string.Empty;
         public string CompItemCode { get; set; } = string.Empty;
         public string ItemName { get; set; } = string.Empty;

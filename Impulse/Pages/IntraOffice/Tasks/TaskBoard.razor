@@ -12,6 +12,7 @@
 @inject IFileService FileService
 @inject IAiService AiService
 @inject IAppNotificationService NotificationService
+@inject Impulse.Services.Setup.IUserPermissionService PermissionService
 
 <div class="topbar">
     <div class="d-flex align-items-center gap-2">
@@ -679,7 +680,7 @@
 
             if (!string.IsNullOrWhiteSpace(filterInitiatedById))
             {
-                q = q.Where(t => t.AssignedBy == filterInitiatedById);
+                q = q.Where(t => string.Equals(t.AssignedBy, filterInitiatedById, StringComparison.OrdinalIgnoreCase));
             }
 
             if (!string.IsNullOrWhiteSpace(filterAssignedToId))
@@ -710,7 +711,13 @@
     {
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
-        isAdmin = user.IsInRole("Admin") || user.IsInRole("Administrator") || string.Equals(user.Identity?.Name, "admin", StringComparison.OrdinalIgnoreCase);
+        await PermissionService.InitializeAsync();
+        isAdmin = PermissionService.IsAdministrator 
+            || user.IsInRole("Admin") 
+            || user.IsInRole("Administrator") 
+            || string.Equals(user.Identity?.Name, "admin", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(user.Identity?.Name, "administrator", StringComparison.OrdinalIgnoreCase)
+            || (user.Identity?.Name?.StartsWith("Admin", StringComparison.OrdinalIgnoreCase) == true);
 
         var userId = user.Identity?.Name
             ?? user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
@@ -907,7 +914,7 @@
         if (task == null || string.IsNullOrWhiteSpace(userId)) return false;
         if (string.Equals(task.AssignedTo, userId, StringComparison.OrdinalIgnoreCase)) return true;
         if (task.Assignees != null && task.Assignees.Any(a => string.Equals(a.UserName, userId, StringComparison.OrdinalIgnoreCase))) return true;
-        if (!string.IsNullOrEmpty(task.AdditionalAssigneeIds) && ("," + task.AdditionalAssigneeIds + ",").Contains("," + userId + ",")) return true;
+        if (!string.IsNullOrEmpty(task.AdditionalAssigneeIds) && ("," + task.AdditionalAssigneeIds + ",").IndexOf("," + userId + ",", StringComparison.OrdinalIgnoreCase) >= 0) return true;
         return false;
     }
 

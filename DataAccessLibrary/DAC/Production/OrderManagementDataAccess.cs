@@ -400,6 +400,7 @@ namespace DataAccessLibrary.DAC.Production
                 SELECT 
                     foi.ID,
                     foi.OrderNo,
+                    ISNULL(co.InternalRefNo, '') AS InternalRefNo,
                     foi.ItemCode,
                     foi.CompItemCode,
                     ISNULL(i.ItemName, foi.ItemCode) AS ItemName,

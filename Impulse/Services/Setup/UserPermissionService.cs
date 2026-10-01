@@ -212,7 +212,16 @@ namespace Impulse.Services.Setup
             ["PrintValuationForm"] = new[] { "ExpValuationForm" },
 
             ["ExpCommercialCovering"] = new[] { "ComCovering" },
-            ["ComCovering"] = new[] { "ExpCommercialCovering" }
+            ["ComCovering"] = new[] { "ExpCommercialCovering" },
+
+            // IntraOffice Aliases
+            ["OfficeAI"] = new[] { "OfficeAiAssistant" },
+            ["OfficeAiAssistant"] = new[] { "OfficeAI" },
+            ["OfficeForms"] = new[] { "OfficeHub", "OfficeTasks", "OfficeChat", "OfficeMessages", "OfficeAnnouncements" },
+            ["OfficeDirectory"] = new[] { "OfficeHub", "OfficeChat" },
+            ["OfficeMinuteTypes"] = new[] { "OfficeMinutes" },
+            ["OfficeTemplates"] = new[] { "OfficeReports", "OfficeLeads" },
+            ["OfficeEmailSettings"] = new[] { "OfficeReports", "OfficeMessages" }
         };
 
         public bool HasOptionAccess(string optionId)
@@ -307,7 +316,9 @@ namespace Impulse.Services.Setup
             ["intraoffice/health"] = ("Setup", "IntraOfficeHealth"),
             ["newrm"] = ("Stock", "StkNewRM"),
             ["newvendor"] = ("Stock", "StkNewVendor"),
-            ["office"] = ("IntraOffice", "OfficeForms"),
+            ["intraoffice"] = ("IntraOffice", null),
+            ["office"] = ("IntraOffice", null),
+            ["office/dashboard"] = ("IntraOffice", null),
             ["office/admin/email-settings"] = ("IntraOffice", "OfficeEmailSettings"),
             ["office/admin/minute-types"] = ("IntraOffice", "OfficeMinuteTypes"),
             ["office/ai-assistant"] = ("IntraOffice", "OfficeAI"),
@@ -322,6 +333,9 @@ namespace Impulse.Services.Setup
             ["office/reports"] = ("IntraOffice", "OfficeReports"),
             ["office/tasks"] = ("IntraOffice", "OfficeTasks"),
             ["office/templates"] = ("IntraOffice", "OfficeTemplates"),
+            ["chat"] = ("IntraOffice", "OfficeChat"),
+            ["messages"] = ("IntraOffice", "OfficeMessages"),
+            ["tasks"] = ("IntraOffice", "OfficeTasks"),
             ["payroll/absent-sheet"] = ("Payroll", "PayAbsentSheet"),
             ["payroll/adjust-deduction-amount"] = ("Payroll", "PayDeductionAdjust"),
             ["payroll/advance-ledger"] = ("Payroll", "PayAdvanceRegister"),
@@ -428,15 +442,17 @@ namespace Impulse.Services.Setup
                 return true;
             }
 
-            // 1.2 Check parameterized subroutes or trailing path segments
-            foreach (var kvp in RoutePermissions)
+            // 1.2 Check parameterized subroutes or trailing path segments (longest matching prefix first)
+            var matchingKvp = RoutePermissions
+                .Where(kvp => cleanPath.StartsWith(kvp.Key + "/", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(kvp => kvp.Key.Length)
+                .FirstOrDefault();
+
+            if (!string.IsNullOrEmpty(matchingKvp.Key))
             {
-                if (cleanPath.StartsWith(kvp.Key + "/", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (!HasModuleAccess(kvp.Value.Module)) return false;
-                    if (!string.IsNullOrEmpty(kvp.Value.OptionId) && !HasOptionAccess(kvp.Value.OptionId)) return false;
-                    return true;
-                }
+                if (!HasModuleAccess(matchingKvp.Value.Module)) return false;
+                if (!string.IsNullOrEmpty(matchingKvp.Value.OptionId) && !HasOptionAccess(matchingKvp.Value.OptionId)) return false;
+                return true;
             }
 
             // 2. Prefix matching for top-level module areas
@@ -453,6 +469,7 @@ namespace Impulse.Services.Setup
                 "company" => HasModuleAccess("Company"),
                 "dashboards" => HasModuleAccess("DashBoard"),
                 "setup" => HasModuleAccess("Setup"),
+                "office" or "intraoffice" => HasModuleAccess("IntraOffice"),
                 _ => true
             };
         }
@@ -583,7 +600,11 @@ namespace Impulse.Services.Setup
                 new() { OptionID = "OfficeMessages", OptionName = "Direct Messages", ModuleName = "IntraOffice" },
                 new() { OptionID = "OfficeLeads", OptionName = "Leads & CRM Pipeline", ModuleName = "IntraOffice" },
                 new() { OptionID = "OfficeReports", OptionName = "CRM Reports", ModuleName = "IntraOffice" },
-                new() { OptionID = "OfficeAiAssistant", OptionName = "AI Assistant", ModuleName = "IntraOffice" }
+                new() { OptionID = "OfficeAiAssistant", OptionName = "AI Assistant", ModuleName = "IntraOffice" },
+                new() { OptionID = "OfficeDirectory", OptionName = "Employee Directory", ModuleName = "IntraOffice" },
+                new() { OptionID = "OfficeTemplates", OptionName = "Email Templates", ModuleName = "IntraOffice" },
+                new() { OptionID = "OfficeMinuteTypes", OptionName = "Minute Types", ModuleName = "IntraOffice" },
+                new() { OptionID = "OfficeEmailSettings", OptionName = "Email & SMTP Settings", ModuleName = "IntraOffice" }
             };
         }
     }

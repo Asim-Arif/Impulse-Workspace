@@ -60,6 +60,33 @@ namespace Impulse.Services.WorkflowTasks
                 var primaryRole = rolesList.FirstOrDefault() ?? request.TargetRole;
                 var roleCaption = rolesList.Count > 0 ? string.Join(" & ", rolesList) : "Assigned Role";
 
+                // Idempotency check: prevent duplicate active (Pending=0, InProgress=1) tasks for the same entity and role
+                if (!string.IsNullOrWhiteSpace(request.SourceEntityType) && !string.IsNullOrWhiteSpace(request.SourceEntityRefId))
+                {
+                    using var checkDb = CreateConnection();
+                    const string existingSql = @"
+                        SELECT TOP 1 Id 
+                        FROM TaskItems 
+                        WHERE SourceEntityType = @SourceEntityType 
+                          AND SourceEntityRefId = @SourceEntityRefId 
+                          AND TargetRole = @TargetRole 
+                          AND Status IN (0, 1)";
+
+                    var existingId = await checkDb.ExecuteScalarAsync<int?>(existingSql, new
+                    {
+                        request.SourceEntityType,
+                        request.SourceEntityRefId,
+                        TargetRole = primaryRole
+                    });
+
+                    if (existingId.HasValue && existingId.Value > 0)
+                    {
+                        _logger.LogInformation("Active workflow task #{TaskId} already exists for {EntityType} #{EntityRef} ({Role}). Skipping duplicate creation and notifications.",
+                            existingId.Value, request.SourceEntityType, request.SourceEntityRefId, primaryRole);
+                        return existingId.Value;
+                    }
+                }
+
                 // Resolve target users for notifications and assignees
                 var targetUserNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 

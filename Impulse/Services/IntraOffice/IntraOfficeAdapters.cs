@@ -15,7 +15,7 @@ namespace Impulse.Services.IntraOffice
         Task<List<Channel>> GetAllChannelsAsync();
         Task<List<Channel>> GetUserChannelsAsync(string userId);
         Task<Channel?> GetChannelByIdAsync(int id);
-        Task<Channel> CreateChannelAsync(Channel channel);
+        Task<Channel> CreateChannelAsync(Channel channel, List<string>? memberUserIds = null);
         Task UpdateChannelAsync(Channel channel);
         Task DeleteChannelAsync(int id);
         Task AddMemberAsync(int channelId, string userId, bool isAdmin = false);
@@ -32,9 +32,9 @@ namespace Impulse.Services.IntraOffice
         public async Task<List<Channel>> GetAllChannelsAsync() => await _intra.GetChannelsForUserAsync("");
         public async Task<List<Channel>> GetUserChannelsAsync(string userId) => await _intra.GetChannelsForUserAsync(userId);
         public async Task<Channel?> GetChannelByIdAsync(int id) => await _intra.GetChannelByIdAsync(id);
-        public async Task<Channel> CreateChannelAsync(Channel channel)
+        public async Task<Channel> CreateChannelAsync(Channel channel, List<string>? memberUserIds = null)
         {
-            var id = await _intra.CreateChannelAsync(channel);
+            var id = await _intra.CreateChannelAsync(channel, memberUserIds);
             channel.Id = id;
             return channel;
         }
@@ -115,22 +115,65 @@ namespace Impulse.Services.IntraOffice
             else if (message.ChannelId.HasValue && message.ChannelId > 0)
             {
                 var channelName = "Discussion";
+                Channel? channel = null;
                 try
                 {
-                    var channel = await _intra.GetChannelByIdAsync(message.ChannelId.Value);
+                    channel = await _intra.GetChannelByIdAsync(message.ChannelId.Value);
                     if (channel != null && !string.IsNullOrEmpty(channel.Name)) channelName = channel.Name;
                 }
                 catch { }
 
-                _ = _notifications.SendNotificationAsync(new AppNotification
+                if (channel != null && channel.IsPrivate)
                 {
-                    Category = NotificationCategory.Message,
-                    Title = $"#{channelName} • {senderName}",
-                    Message = preview,
-                    SenderName = senderName,
-                    TargetUserId = null, // broadcast to all channel participants
-                    ActionUrl = $"/office/chat/{message.ChannelId.Value}"
-                });
+                    // Private channel: ONLY notify channel members + creator (excluding the sender)
+                    var recipientUserIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    if (!string.IsNullOrEmpty(channel.CreatedBy))
+                    {
+                        recipientUserIds.Add(channel.CreatedBy);
+                    }
+                    if (channel.Members != null)
+                    {
+                        foreach (var m in channel.Members)
+                        {
+                            if (!string.IsNullOrEmpty(m.UserId))
+                            {
+                                recipientUserIds.Add(m.UserId);
+                            }
+                        }
+                    }
+
+                    // Exclude sender
+                    if (!string.IsNullOrEmpty(message.SenderId))
+                    {
+                        recipientUserIds.Remove(message.SenderId);
+                    }
+
+                    foreach (var recipientId in recipientUserIds)
+                    {
+                        _ = _notifications.SendNotificationAsync(new AppNotification
+                        {
+                            Category = NotificationCategory.Message,
+                            Title = $"#{channelName} • {senderName}",
+                            Message = preview,
+                            SenderName = senderName,
+                            TargetUserId = recipientId,
+                            ActionUrl = $"/office/chat/{message.ChannelId.Value}"
+                        });
+                    }
+                }
+                else
+                {
+                    // Public channel: broadcast notification to everyone
+                    _ = _notifications.SendNotificationAsync(new AppNotification
+                    {
+                        Category = NotificationCategory.Message,
+                        Title = $"#{channelName} • {senderName}",
+                        Message = preview,
+                        SenderName = senderName,
+                        TargetUserId = null,
+                        ActionUrl = $"/office/chat/{message.ChannelId.Value}"
+                    });
+                }
             }
             return message;
         }
@@ -253,6 +296,7 @@ namespace Impulse.Services.IntraOffice
                 TargetUserId = null, // broadcast to all
                 ActionUrl = "/office/announcements"
             });
+            _onAnnouncementUpdated?.Invoke();
             return announcement;
         }
 
@@ -268,6 +312,7 @@ namespace Impulse.Services.IntraOffice
         public async Task AcknowledgeAnnouncementAsync(int announcementId, string userId)
         {
             await _intra.AcknowledgeAnnouncementAsync(announcementId, userId);
+            _onAnnouncementUpdated?.Invoke();
 
             try
             {
@@ -330,7 +375,7 @@ namespace Impulse.Services.IntraOffice
         }
 
         public async Task<List<TaskItem>> GetAllTasksAsync(int? departmentId = null) => await _intra.GetTasksAsync(departmentId: departmentId?.ToString());
-        public async Task<List<TaskItem>> GetUserTasksAsync(string userId) => await _intra.GetTasksAsync(assignedTo: userId);
+        public async Task<List<TaskItem>> GetUserTasksAsync(string userId) => await _intra.GetTasksAsync(relatedToUser: userId);
         public async Task<List<TaskItem>> GetTasksByStatusAsync(TaskItemStatus status, int? departmentId = null) => await _intra.GetTasksAsync(departmentId: departmentId?.ToString(), status: status);
         public async Task<TaskItem?> GetTaskByIdAsync(int id) => await _intra.GetTaskByIdAsync(id);
 

@@ -109,51 +109,117 @@ namespace Impulse.Pages.Production.MakerItemAssignment
 
         private async Task OnMakerSelectedAsync(MakerLookupModel? maker)
         {
-            _selectedProcess = null;
-            SelectedUnassignedItem = null;
-            Processes.Clear();
-            UnassignedItems.Clear();
-            AssignedItems.Clear();
-
-            if (maker != null)
+            try
             {
-                Processes = await MakerItemAssignmentService.GetMakerAssignedProcessesAsync(maker.VendID);
+                _selectedProcess = null;
+                SelectedUnassignedItem = null;
+                Processes.Clear();
+                UnassignedItems.Clear();
+                AssignedItems.Clear();
+                await InvokeAsync(StateHasChanged);
+
+                if (maker != null)
+                {
+                    Processes = await MakerItemAssignmentService.GetMakerAssignedProcessesAsync(maker.VendID);
+                }
             }
-            await InvokeAsync(StateHasChanged);
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Error Loading Maker Processes",
+                    Detail = ex.Message,
+                    Duration = 6000
+                });
+            }
+            finally
+            {
+                await InvokeAsync(StateHasChanged);
+            }
         }
 
         private async Task OnProcessSelectedAsync(ProcessLookupModel? process)
         {
-            SelectedUnassignedItem = null;
-            UnassignedItems.Clear();
-            AssignedItems.Clear();
-
-            if (SelectedMaker != null && process != null)
+            try
             {
-                await LoadAssignedItemsAsync();
-                await LoadUnassignedItemsAsync();
+                SelectedUnassignedItem = null;
+                UnassignedItems.Clear();
+                AssignedItems.Clear();
+                await InvokeAsync(StateHasChanged);
+
+                if (SelectedMaker != null && process != null)
+                {
+                    await LoadAssignedItemsAsync();
+                    await LoadUnassignedItemsAsync();
+                }
             }
-            await InvokeAsync(StateHasChanged);
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Error Loading Process Data",
+                    Detail = ex.Message,
+                    Duration = 6000
+                });
+            }
+            finally
+            {
+                IsLoadingItems = false;
+                await InvokeAsync(StateHasChanged);
+            }
         }
 
         private async Task LoadAssignedItemsAsync()
         {
             if (SelectedMaker == null || SelectedProcess == null) return;
             IsLoadingItems = true;
+            await InvokeAsync(StateHasChanged);
             try
             {
                 AssignedItems = await MakerItemAssignmentService.GetAssignedItemsAsync(SelectedMaker.VendID, SelectedProcess.ProcessID);
             }
+            catch (Exception ex)
+            {
+                AssignedItems = new List<AssignedMakerItemModel>();
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Error Loading Assigned Items",
+                    Detail = ex.Message,
+                    Duration = 6000
+                });
+            }
             finally
             {
                 IsLoadingItems = false;
+                await InvokeAsync(StateHasChanged);
             }
         }
 
         private async Task LoadUnassignedItemsAsync()
         {
             if (SelectedMaker == null || SelectedProcess == null) return;
-            UnassignedItems = await MakerItemAssignmentService.GetUnassignedItemsAsync(SelectedMaker.VendID, SelectedProcess.ProcessID);
+            try
+            {
+                UnassignedItems = await MakerItemAssignmentService.GetUnassignedItemsAsync(SelectedMaker.VendID, SelectedProcess.ProcessID);
+            }
+            catch (Exception ex)
+            {
+                UnassignedItems = new List<UnassignedItemModel>();
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Error Loading Unassigned Items",
+                    Detail = ex.Message,
+                    Duration = 6000
+                });
+            }
+            finally
+            {
+                await InvokeAsync(StateHasChanged);
+            }
         }
 
         public Task<IEnumerable<MakerLookupModel>> SearchMakers(string searchText)

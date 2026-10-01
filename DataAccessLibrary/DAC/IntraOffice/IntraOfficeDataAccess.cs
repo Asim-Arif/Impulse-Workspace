@@ -142,7 +142,7 @@ namespace DataAccessLibrary.DAC.IntraOffice
                     FROM Channels c
                     LEFT JOIN Departments d ON c.DepartmentId = d.deptid
                     LEFT JOIN Users u ON c.CreatedBy = u.UserName
-                    WHERE c.IsActive = 1 AND (c.IsPrivate = 0 OR EXISTS (SELECT 1 FROM ChannelMembers cm WHERE cm.ChannelId = c.Id AND cm.UserId = @UserId))
+                    WHERE c.IsActive = 1 AND (c.IsPrivate = 0 OR c.CreatedBy = @UserId OR EXISTS (SELECT 1 FROM ChannelMembers cm WHERE cm.ChannelId = c.Id AND cm.UserId = @UserId))
                     ORDER BY c.Name";
 
                 var channels = (await db.QueryAsync<Channel>(sql, new { UserId = userId })).ToList();
@@ -503,9 +503,17 @@ namespace DataAccessLibrary.DAC.IntraOffice
                     var attachSql = "SELECT Id, AnnouncementId, FileName, FilePath, FileSize, ContentType, UploadedAt FROM AnnouncementAttachments WHERE AnnouncementId IN @Ids";
                     var attachments = (await db.QueryAsync<AnnouncementAttachment>(attachSql, new { Ids = aIds })).ToList();
 
+                    var ackSql = @"
+                        SELECT ack.Id, ack.AnnouncementId, ack.UserId, u.UserName, u.FullUserName AS FullName, ack.AcknowledgedAt
+                        FROM AnnouncementAcknowledgments ack
+                        LEFT JOIN Users u ON ack.UserId = u.UserName
+                        WHERE ack.AnnouncementId IN @Ids";
+                    var acks = (await db.QueryAsync<AnnouncementAcknowledgment>(ackSql, new { Ids = aIds })).ToList();
+
                     foreach (var a in announcements)
                     {
                         a.Attachments = attachments.Where(att => att.AnnouncementId == a.Id).ToList();
+                        a.Acknowledgments = acks.Where(ak => ak.AnnouncementId == a.Id).ToList();
                     }
                 }
 
@@ -619,7 +627,7 @@ namespace DataAccessLibrary.DAC.IntraOffice
 
         #region 5. Tasks
 
-        public async Task<List<TaskItem>> GetTasksAsync(string? assignedTo = null, string? assignedBy = null, string? departmentId = null, TaskItemStatus? status = null)
+        public async Task<List<TaskItem>> GetTasksAsync(string? assignedTo = null, string? assignedBy = null, string? departmentId = null, TaskItemStatus? status = null, string? relatedToUser = null)
         {
             try
             {
@@ -637,7 +645,14 @@ namespace DataAccessLibrary.DAC.IntraOffice
                     LEFT JOIN Employees e ON u.EmpID = e.empid
                     LEFT JOIN Users bu ON t.AssignedBy = bu.UserName
                     LEFT JOIN Departments d ON t.DepartmentId = d.deptid
-                    WHERE (@AssignedTo IS NULL 
+                    WHERE (@RelatedToUser IS NULL 
+                           OR t.AssignedBy = @RelatedToUser
+                           OR t.AssignedTo = @RelatedToUser 
+                           OR EXISTS (SELECT 1 FROM Task_Assignees ta0 WHERE ta0.TaskID = t.Id AND (ta0.UserName = @RelatedToUser OR CAST(ta0.UserID AS NVARCHAR(50)) = @RelatedToUser))
+                           OR EXISTS (SELECT 1 FROM Task_Roles tr0 INNER JOIN Users_User_Roles uur0 ON tr0.RoleName = uur0.User_Role INNER JOIN Users ru0 ON uur0.UserID = ru0.UserID WHERE tr0.TaskID = t.Id AND (ru0.UserName = @RelatedToUser OR CAST(ru0.UserID AS NVARCHAR(50)) = @RelatedToUser))
+                           OR (t.TargetRole IS NOT NULL AND EXISTS (SELECT 1 FROM Users_User_Roles uur02 INNER JOIN Users ru02 ON uur02.UserID = ru02.UserID WHERE uur02.User_Role = t.TargetRole AND (ru02.UserName = @RelatedToUser OR CAST(ru02.UserID AS NVARCHAR(50)) = @RelatedToUser)))
+                           OR (t.AdditionalAssigneeIds IS NOT NULL AND (',' + t.AdditionalAssigneeIds + ',') LIKE '%,' + @RelatedToUser + ',%'))
+                      AND (@AssignedTo IS NULL 
                            OR t.AssignedTo = @AssignedTo 
                            OR EXISTS (SELECT 1 FROM Task_Assignees ta WHERE ta.TaskID = t.Id AND (ta.UserName = @AssignedTo OR CAST(ta.UserID AS NVARCHAR(50)) = @AssignedTo))
                            OR EXISTS (SELECT 1 FROM Task_Roles tr INNER JOIN Users_User_Roles uur ON tr.RoleName = uur.User_Role INNER JOIN Users ru ON uur.UserID = ru.UserID WHERE tr.TaskID = t.Id AND (ru.UserName = @AssignedTo OR CAST(ru.UserID AS NVARCHAR(50)) = @AssignedTo))
@@ -648,7 +663,13 @@ namespace DataAccessLibrary.DAC.IntraOffice
                       AND (@Status IS NULL OR t.Status = @Status)
                     ORDER BY t.Priority DESC, t.DueDate ASC, t.CreatedAt DESC";
 
-                var tasks = (await db.QueryAsync<TaskItem>(sql, new { AssignedTo = assignedTo, AssignedBy = assignedBy, DeptId = departmentId, Status = (int?)status })).ToList();
+                var tasks = (await db.QueryAsync<TaskItem>(sql, new { 
+                    RelatedToUser = relatedToUser, 
+                    AssignedTo = assignedTo, 
+                    AssignedBy = assignedBy, 
+                    DeptId = departmentId, 
+                    Status = (int?)status 
+                })).ToList();
                 if (tasks.Count > 0)
                 {
                     var taskIds = tasks.Select(t => t.Id).ToList();

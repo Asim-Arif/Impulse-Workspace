@@ -36,7 +36,7 @@ namespace Impulse.Services.IntraOffice
         public Task<int> CreateAnnouncementAsync(Announcement announcement) => _dataAccess.CreateAnnouncementAsync(announcement);
         public Task<bool> AcknowledgeAnnouncementAsync(int announcementId, string userId) => _dataAccess.AcknowledgeAnnouncementAsync(announcementId, userId);
 
-        public Task<List<TaskItem>> GetTasksAsync(string? assignedTo = null, string? assignedBy = null, string? departmentId = null, TaskItemStatus? status = null) => _dataAccess.GetTasksAsync(assignedTo, assignedBy, departmentId, status);
+        public Task<List<TaskItem>> GetTasksAsync(string? assignedTo = null, string? assignedBy = null, string? departmentId = null, TaskItemStatus? status = null, string? relatedToUser = null) => _dataAccess.GetTasksAsync(assignedTo, assignedBy, departmentId, status, relatedToUser);
         public Task<TaskItem?> GetTaskByIdAsync(int taskId) => _dataAccess.GetTaskByIdAsync(taskId);
         public Task<int> CreateTaskAsync(TaskItem task) => _dataAccess.CreateTaskAsync(task);
         public Task<bool> UpdateTaskStatusAsync(int taskId, TaskItemStatus status) => _dataAccess.UpdateTaskStatusAsync(taskId, status);

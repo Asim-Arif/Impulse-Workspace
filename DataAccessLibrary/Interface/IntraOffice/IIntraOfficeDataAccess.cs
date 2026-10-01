@@ -34,7 +34,7 @@ namespace DataAccessLibrary.Interface.IntraOffice
         Task<bool> AcknowledgeAnnouncementAsync(int announcementId, string userId);
 
         // 5. Tasks
-        Task<List<TaskItem>> GetTasksAsync(string? assignedTo = null, string? assignedBy = null, string? departmentId = null, TaskItemStatus? status = null);
+        Task<List<TaskItem>> GetTasksAsync(string? assignedTo = null, string? assignedBy = null, string? departmentId = null, TaskItemStatus? status = null, string? relatedToUser = null);
         Task<TaskItem?> GetTaskByIdAsync(int taskId);
         Task<int> CreateTaskAsync(TaskItem task);
         Task<bool> UpdateTaskStatusAsync(int taskId, TaskItemStatus status, DateTime? completedAt = null);

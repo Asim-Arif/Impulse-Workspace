@@ -694,11 +694,20 @@
 
         if (notif.Category == NotificationCategory.Message)
         {
-            if (string.IsNullOrEmpty(notif.TargetUserId) || notif.TargetUserId == currentUser.Id)
+            bool isTargetMe = string.IsNullOrEmpty(notif.TargetUserId) ||
+                             string.Equals(notif.TargetUserId, currentUser.Id, StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(notif.TargetUserId, currentUser.UserName, StringComparison.OrdinalIgnoreCase);
+
+            if (isTargetMe)
             {
                 unreadCounts = await MessageService.GetUnreadDirectMessageCountsAsync(currentUser.Id);
 
-                if (!string.IsNullOrEmpty(OtherUserId) && notif.ActionUrl != null && notif.ActionUrl.Contains(OtherUserId))
+                bool isCurrentChat = !string.IsNullOrEmpty(OtherUserId) && (
+                    (notif.ActionUrl != null && notif.ActionUrl.IndexOf(OtherUserId, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    string.Equals(notif.SenderName, OtherUserId, StringComparison.OrdinalIgnoreCase)
+                );
+
+                if (isCurrentChat)
                 {
                     messages = await MessageService.GetDirectMessagesAsync(currentUser.Id, OtherUserId);
                     if (!notif.IsReadReceipt)
