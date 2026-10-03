@@ -23,6 +23,7 @@ namespace Impulse.Services.Setup
         public bool IsAdministrator { get; private set; } = false;
         public int CurrentUserId => _currentUserModel?.UserID ?? 0;
         public string CurrentUserName => _currentUserName;
+        public bool ShowCustomerOrderNo => IsAdministrator || (_currentUserModel != null && _currentUserModel.Show_Customer_Order_No);
 
         public UserPermissionService(
             IUserPermissionDataAccess permissionData,
@@ -119,6 +120,9 @@ namespace Impulse.Services.Setup
 
         private static readonly Dictionary<string, string[]> OptionAliases = new(StringComparer.OrdinalIgnoreCase)
         {
+            // ==========================================
+            // Stock / Inventory Aliases
+            // ==========================================
             ["StkVendorRcvList"] = new[] { "StkVendorReceivingList", "RcvList" },
             ["StkVendorReceivingList"] = new[] { "StkVendorRcvList", "RcvList" },
             ["RcvList"] = new[] { "StkVendorRcvList", "StkVendorReceivingList" },
@@ -139,23 +143,168 @@ namespace Impulse.Services.Setup
             ["StkFinishReceiving"] = new[] { "StkFinishStockReceiving" },
             ["StkFinishStockReceiving"] = new[] { "StkFinishReceiving" },
 
-            ["PrdLotIssuance"] = new[] { "LotIssuance" },
-            ["PrdReceiveLot"] = new[] { "ReceiveLot" },
-            ["PrdReceivingList"] = new[] { "ReceivingList" },
-            ["PrdMakerPO"] = new[] { "MakerPO" },
-            ["PrdMakerPOList"] = new[] { "MakerPOList" },
+            ["StkFinishMovement"] = new[] { "FinishMovement" },
+            ["FinishMovement"] = new[] { "StkFinishMovement" },
 
-            // Export Aliases (mapping Blazor Exp* IDs to legacy database MenuOptions OptionIDs and vice-versa)
+            ["StkFinishItemLedger"] = new[] { "FinishItemLedger" },
+            ["FinishItemLedger"] = new[] { "StkFinishItemLedger" },
+
+            ["StkFinishTransactions"] = new[] { "FinishTransactions" },
+            ["FinishTransactions"] = new[] { "StkFinishTransactions" },
+
+            ["StkSFMovement"] = new[] { "SemiFinishMaterialMovement", "SFMovement" },
+            ["SemiFinishMaterialMovement"] = new[] { "StkSFMovement" },
+            ["SFMovement"] = new[] { "StkSFMovement" },
+
+            ["StkSFTransactions"] = new[] { "SemiFinishTransactions", "SFTransactions" },
+            ["SemiFinishTransactions"] = new[] { "StkSFTransactions" },
+            ["SFTransactions"] = new[] { "StkSFTransactions" },
+
+            ["StkMaterialMovement"] = new[] { "StkRMMovement", "MaterialMovement" },
+            ["StkRMMovement"] = new[] { "StkMaterialMovement", "MaterialMovement" },
+            ["MaterialMovement"] = new[] { "StkMaterialMovement", "StkRMMovement" },
+
+            ["StkRMIssuance"] = new[] { "RMIssuance" },
+            ["RMIssuance"] = new[] { "StkRMIssuance" },
+
+            ["StkRMIssuanceList"] = new[] { "RMIssuanceList" },
+            ["RMIssuanceList"] = new[] { "StkRMIssuanceList" },
+
+            ["StkRMPOList"] = new[] { "RMPOList", "StkNewRMPO" },
+            ["RMPOList"] = new[] { "StkRMPOList" },
+            ["StkNewRMPO"] = new[] { "StkRMPOList", "RMPOList" },
+
+            ["StkRMList"] = new[] { "RMList", "RawMaterialsList" },
+            ["RMList"] = new[] { "StkRMList" },
+
+            ["StkRMGroups"] = new[] { "RMGroups" },
+            ["RMGroups"] = new[] { "StkRMGroups" },
+
+            ["StkNewRM"] = new[] { "NewRM" },
+            ["NewRM"] = new[] { "StkNewRM" },
+
+            ["StkNewVendor"] = new[] { "NewVendor" },
+            ["NewVendor"] = new[] { "StkNewVendor" },
+
+            ["StkVendorList"] = new[] { "VendorList" },
+            ["VendorList"] = new[] { "StkVendorList" },
+
+            ["StkVendorRMAssign"] = new[] { "VendorRMAssign" },
+            ["VendorRMAssign"] = new[] { "StkVendorRMAssign" },
+
+            ["StkMaterialPlacement"] = new[] { "MaterialPlacement" },
+            ["MaterialPlacement"] = new[] { "StkMaterialPlacement" },
+
+            ["StkMaterialPlacementList"] = new[] { "MaterialPlacementList" },
+            ["MaterialPlacementList"] = new[] { "StkMaterialPlacementList" },
+
+            ["StkVendorBilling"] = new[] { "VendorBilling" },
+            ["VendorBilling"] = new[] { "StkVendorBilling" },
+
+            ["StkVendorBillingList"] = new[] { "VendorBillingList" },
+            ["VendorBillingList"] = new[] { "StkVendorBillingList" },
+
+            ["StkChangeBatchLot"] = new[] { "ChangeBatchLot" },
+            ["ChangeBatchLot"] = new[] { "StkChangeBatchLot" },
+
+            ["StkChangeBatchNo"] = new[] { "ChangeBatchNo" },
+            ["ChangeBatchNo"] = new[] { "StkChangeBatchNo" },
+
+            // ==========================================
+            // Production Aliases
+            // ==========================================
+            ["PrdLotIssuance"] = new[] { "LotIssuance" },
+            ["LotIssuance"] = new[] { "PrdLotIssuance" },
+
+            ["PrdReceiveLot"] = new[] { "ReceiveLot" },
+            ["ReceiveLot"] = new[] { "PrdReceiveLot" },
+
+            ["PrdReceivingList"] = new[] { "ReceivingList" },
+            ["ReceivingList"] = new[] { "PrdReceivingList" },
+
+            ["PrdMakerPO"] = new[] { "MakerPO" },
+            ["MakerPO"] = new[] { "PrdMakerPO" },
+
+            ["PrdMakerPOList"] = new[] { "MakerPOList" },
+            ["MakerPOList"] = new[] { "PrdMakerPOList" },
+
+            ["PrdMakerRework"] = new[] { "PrdReWorkIssuance", "ReWorkIssuance" },
+            ["PrdReWorkIssuance"] = new[] { "PrdMakerRework", "ReWorkIssuance" },
+            ["ReWorkIssuance"] = new[] { "PrdMakerRework", "PrdReWorkIssuance" },
+
+            ["PrdAuthReceived"] = new[] { "PrdAuthorizeReceived", "AuthorizeReceived" },
+            ["PrdAuthorizeReceived"] = new[] { "PrdAuthReceived", "AuthorizeReceived" },
+            ["AuthorizeReceived"] = new[] { "PrdAuthReceived", "PrdAuthorizeReceived" },
+
+            ["PrdMakerIssuanceSF"] = new[] { "PrdMakerIssuanceFromSF", "MakerIssuanceFromSF" },
+            ["PrdMakerIssuanceFromSF"] = new[] { "PrdMakerIssuanceSF", "MakerIssuanceFromSF" },
+            ["MakerIssuanceFromSF"] = new[] { "PrdMakerIssuanceSF", "PrdMakerIssuanceFromSF" },
+
+            ["PrdMakerItemAssign"] = new[] { "PrdMakerItemAssignment", "MakerItemAssignment" },
+            ["PrdMakerItemAssignment"] = new[] { "PrdMakerItemAssign", "MakerItemAssignment" },
+            ["MakerItemAssignment"] = new[] { "PrdMakerItemAssign", "PrdMakerItemAssignment" },
+
+            ["PrdNewMaker"] = new[] { "NewMaker" },
+            ["NewMaker"] = new[] { "PrdNewMaker" },
+
+            ["PrdMakerList"] = new[] { "MakerList" },
+            ["MakerList"] = new[] { "PrdMakerList" },
+
+            ["PrdTransferReadyFinish"] = new[] { "PrdTransferToReadyFinishStock", "TransferToReadyFinishStock" },
+            ["PrdTransferToReadyFinishStock"] = new[] { "PrdTransferReadyFinish", "TransferToReadyFinishStock" },
+            ["TransferToReadyFinishStock"] = new[] { "PrdTransferReadyFinish", "PrdTransferToReadyFinishStock" },
+
+            ["PrdItemList"] = new[] { "PrdProductionItemList", "ProductionItemList" },
+            ["PrdProductionItemList"] = new[] { "PrdItemList", "ProductionItemList" },
+            ["ProductionItemList"] = new[] { "PrdItemList", "PrdProductionItemList" },
+
+            ["PrdReceivePO"] = new[] { "ReceivePO", "ReceiveAgainstPO" },
+            ["ReceivePO"] = new[] { "PrdReceivePO" },
+            ["ReceiveAgainstPO"] = new[] { "PrdReceivePO" },
+
+            ["PrdCreateDispatchList"] = new[] { "CreateDispatchList" },
+            ["CreateDispatchList"] = new[] { "PrdCreateDispatchList" },
+
+            ["PrdDispatchList"] = new[] { "DispatchList" },
+            ["DispatchList"] = new[] { "PrdDispatchList" },
+
+            ["PrdMakerBilling"] = new[] { "MakerBilling" },
+            ["MakerBilling"] = new[] { "PrdMakerBilling" },
+
+            ["PrdMakerBillingList"] = new[] { "MakerBillingList" },
+            ["MakerBillingList"] = new[] { "PrdMakerBillingList" },
+
+            ["PrdProcesses"] = new[] { "Processes", "ProcessesSetup" },
+            ["Processes"] = new[] { "PrdProcesses" },
+
+            ["PrdProcessGroups"] = new[] { "ProcessGroups" },
+            ["ProcessGroups"] = new[] { "PrdProcessGroups" },
+
+            ["PrdRepairTypes"] = new[] { "RepairTypes" },
+            ["RepairTypes"] = new[] { "PrdRepairTypes" },
+
+            ["PrdWastageTypes"] = new[] { "WastageTypes" },
+            ["WastageTypes"] = new[] { "PrdWastageTypes" },
+
+            ["PrdStatistics"] = new[] { "ProductionStatistics" },
+            ["ProductionStatistics"] = new[] { "PrdStatistics" },
+
+            // ==========================================
+            // Export Aliases
+            // ==========================================
             ["ExpOrderList"] = new[] { "OrderList", "OrderListCustomers", "OrderListStock" },
             ["OrderList"] = new[] { "ExpOrderList" },
             ["OrderListCustomers"] = new[] { "ExpOrderList" },
             ["OrderListStock"] = new[] { "ExpOrderList" },
 
-            ["ExpOrderEntry"] = new[] { "NewOrder", "OrderList" },
+            ["ExpOrderEntry"] = new[] { "NewOrder", "ExpNewOrder", "OrderList" },
             ["NewOrder"] = new[] { "ExpOrderEntry" },
+            ["ExpNewOrder"] = new[] { "ExpOrderEntry" },
 
-            ["ExpCustomer"] = new[] { "FCustomers", "Customers", "CmpCustomerList", "OrderList", "NewOrder" },
+            ["ExpCustomer"] = new[] { "FCustomers", "Customers", "CmpCustomerList", "ExpForeignCusts", "OrderList", "NewOrder" },
             ["FCustomers"] = new[] { "ExpCustomer" },
+            ["Customers"] = new[] { "ExpCustomer" },
+            ["ExpForeignCusts"] = new[] { "ExpCustomer" },
 
             ["ExpQuotationList"] = new[] { "QuotationList" },
             ["QuotationList"] = new[] { "ExpQuotationList" },
@@ -172,11 +321,13 @@ namespace Impulse.Services.Setup
             ["ExpArticlewiseShipped"] = new[] { "ArticleWiseStatus" },
             ["ArticleWiseStatus"] = new[] { "ExpArticlewiseShipped" },
 
-            ["ExpProforma"] = new[] { "NewProforma", "PInvoiceList" },
+            ["ExpProforma"] = new[] { "NewProforma", "ExpNewPInvoice", "PInvoiceList" },
             ["NewProforma"] = new[] { "ExpProforma" },
+            ["ExpNewPInvoice"] = new[] { "ExpProforma" },
 
-            ["ExpProformaList"] = new[] { "PInvoiceList", "NewProforma" },
+            ["ExpProformaList"] = new[] { "PInvoiceList", "ExpPInvoiceList", "NewProforma" },
             ["PInvoiceList"] = new[] { "ExpProformaList" },
+            ["ExpPInvoiceList"] = new[] { "ExpProformaList" },
 
             ["ExpCustomInvoice"] = new[] { "CustomInvoice", "NewCustomInvoice" },
             ["CustomInvoice"] = new[] { "ExpCustomInvoice" },
@@ -190,13 +341,15 @@ namespace Impulse.Services.Setup
             ["ExpReceiveCustomPayment"] = new[] { "RecCustPay", "CustPayStatus" },
             ["RecCustPay"] = new[] { "ExpReceiveCustomPayment" },
 
-            ["ExpCommercialInvoice"] = new[] { "ComInvoice" },
+            ["ExpCommercialInvoice"] = new[] { "ComInvoice", "ExpComInvoice" },
             ["ComInvoice"] = new[] { "ExpCommercialInvoice" },
+            ["ExpComInvoice"] = new[] { "ExpCommercialInvoice" },
 
-            ["ExpBankInvoice"] = new[] { "PrintInvoice" },
+            ["ExpBankInvoice"] = new[] { "PrintInvoice", "ExpPrintInvoice" },
             ["PrintInvoice"] = new[] { "ExpBankInvoice" },
+            ["ExpPrintInvoice"] = new[] { "ExpBankInvoice" },
 
-            ["ExpPackingList"] = new[] { "CustomLabels", "PrintInnerLabels", "ComPackingList", "CustomPackingList", "PrintLabels", "PrintPList", "NewPackingListM" },
+            ["ExpPackingList"] = new[] { "CustomLabels", "PrintInnerLabels", "ComPackingList", "CustomPackingList", "PrintLabels", "PrintPList", "NewPackingListM", "ExpPackingLabels" },
             ["CustomLabels"] = new[] { "ExpPackingList" },
             ["PrintInnerLabels"] = new[] { "ExpPackingList" },
             ["ComPackingList"] = new[] { "ExpPackingList" },
@@ -204,24 +357,254 @@ namespace Impulse.Services.Setup
             ["PrintLabels"] = new[] { "ExpPackingList" },
             ["PrintPList"] = new[] { "ExpPackingList" },
             ["NewPackingListM"] = new[] { "ExpPackingList" },
+            ["ExpPackingLabels"] = new[] { "ExpPackingList" },
 
-            ["ExpShippingInstructions"] = new[] { "CustomShipping" },
+            ["ExpShippingInstructions"] = new[] { "CustomShipping", "ExpCustomShipping" },
             ["CustomShipping"] = new[] { "ExpShippingInstructions" },
+            ["ExpCustomShipping"] = new[] { "ExpShippingInstructions" },
 
-            ["ExpValuationForm"] = new[] { "PrintValuationForm" },
+            ["ExpValuationForm"] = new[] { "PrintValuationForm", "ExpValuationForm" },
             ["PrintValuationForm"] = new[] { "ExpValuationForm" },
 
-            ["ExpCommercialCovering"] = new[] { "ComCovering" },
+            ["ExpCommercialCovering"] = new[] { "ComCovering", "ExpComCovering" },
             ["ComCovering"] = new[] { "ExpCommercialCovering" },
+            ["ExpComCovering"] = new[] { "ExpCommercialCovering" },
 
-            // IntraOffice Aliases
+            ["StatTotalExport"] = new[] { "TotalExport" },
+            ["TotalExport"] = new[] { "StatTotalExport" },
+
+            ["StatTotalDemand"] = new[] { "TotalDemand" },
+            ["TotalDemand"] = new[] { "StatTotalDemand" },
+
+            ["StatArticleWiesSales"] = new[] { "ArticlewiseSales" },
+            ["ArticlewiseSales"] = new[] { "StatArticleWiesSales" },
+
+            ["StatArticleWiesOrders"] = new[] { "ArticlewiseDemand" },
+            ["ArticlewiseDemand"] = new[] { "StatArticleWiesOrders" },
+
+            ["StatExportPerformanceReport"] = new[] { "ItemwiseExportPerformance" },
+            ["ItemwiseExportPerformance"] = new[] { "StatExportPerformanceReport" },
+
+            // ==========================================
+            // Payroll Aliases
+            // ==========================================
+            ["PayEmpProfile"] = new[] { "PrlEmpList", "EmployeeList", "PrlEmployeeList", "PrlTempEmpList", "PrlEmpListWithSal", "PrlEmpListWithoutSal", "PrintEmpList", "PrlPrintEmpDetails" },
+            ["PrlEmpList"] = new[] { "PayEmpProfile" },
+            ["EmployeeList"] = new[] { "PayEmpProfile" },
+            ["PrlEmployeeList"] = new[] { "PayEmpProfile" },
+
+            ["PayNewEmp"] = new[] { "PrlNewEmp", "NewEmployee" },
+            ["PrlNewEmp"] = new[] { "PayNewEmp" },
+            ["NewEmployee"] = new[] { "PayNewEmp" },
+
+            ["PayDepartment"] = new[] { "PrlDeptList", "DeptList", "PrlNewDept", "NewDept" },
+            ["PrlDeptList"] = new[] { "PayDepartment" },
+            ["DeptList"] = new[] { "PayDepartment" },
+
+            ["PaySalaryCalculation"] = new[] { "PrlEmpSalHistory", "PrlSalaryHistory", "SalaryLedger", "PrlEmpSalaryLedger" },
+            ["PrlEmpSalHistory"] = new[] { "PaySalaryCalculation" },
+            ["PrlSalaryHistory"] = new[] { "PaySalaryCalculation" },
+            ["SalaryLedger"] = new[] { "PaySalaryCalculation" },
+
+            ["PayAttendance"] = new[] { "PrlEmpLedger", "PrlAttendanceLedger", "AttendanceRegister", "EmployeeLedger", "PrlAttendanceStatus" },
+            ["PrlEmpLedger"] = new[] { "PayAttendance" },
+            ["PrlAttendanceLedger"] = new[] { "PayAttendance" },
+            ["EmployeeLedger"] = new[] { "PayAttendance" },
+            ["AttendanceRegister"] = new[] { "PayAttendance" },
+
+            ["PayEmpTransfer"] = new[] { "PrlTransferEmp", "PrlEmpToEmpTransfer", "PrlLTEmpToEmpTransfer" },
+            ["PrlTransferEmp"] = new[] { "PayEmpTransfer" },
+            ["PrlEmpToEmpTransfer"] = new[] { "PayEmpTransfer" },
+
+            ["PayAttendanceManual"] = new[] { "PrlTakeAttendanceEx", "PrlManualAttendance", "TakeAttendance", "PrlTakeAttendance" },
+            ["PrlTakeAttendanceEx"] = new[] { "PayAttendanceManual" },
+            ["TakeAttendance"] = new[] { "PayAttendanceManual", "PayAttendanceAuto", "PayAttendanceMonthly" },
+
+            ["PayOvertimeAuth"] = new[] { "PrlOverTimeEntry", "PrlAuthorizeOvertime", "AddOverTime", "OverTime" },
+            ["PrlOverTimeEntry"] = new[] { "PayOvertimeAuth" },
+            ["AddOverTime"] = new[] { "PayOvertimeAuth" },
+
+            ["PayAttendanceAuto"] = new[] { "PrlTakeAttendanceAuto", "TakeAttendance" },
+            ["PrlTakeAttendanceAuto"] = new[] { "PayAttendanceAuto" },
+
+            ["PayDailyActivity"] = new[] { "PrlDailyActivitySheet", "PrlDailyLeavesReport" },
+            ["PrlDailyActivitySheet"] = new[] { "PayDailyActivity" },
+
+            ["PayLeaves"] = new[] { "PrlLeaves", "PrlEmployeeLeave", "PrlEmpWiseLeaves", "PrlEmpOnLeaves" },
+            ["PrlLeaves"] = new[] { "PayLeaves" },
+            ["PrlEmployeeLeave"] = new[] { "PayLeaves" },
+
+            ["PayAttendanceMonthly"] = new[] { "PrlEditAttendance", "PrlMonthlyAttendance", "TakeAttendance" },
+            ["PrlEditAttendance"] = new[] { "PayAttendanceMonthly" },
+            ["PrlMonthlyAttendance"] = new[] { "PayAttendanceMonthly" },
+
+            ["PayGatePass"] = new[] { "PrlGatePassEntries", "GatePass" },
+            ["PrlGatePassEntries"] = new[] { "PayGatePass" },
+
+            ["PayAdvances"] = new[] { "PrlShortTermLoan", "PrlLongTermLoan", "ShortTermLoan", "LongTermLoan", "PrlAdvanceShort", "PrlAdvanceLong", "AdvancesLedger", "CalculateAdvSal" },
+            ["PrlShortTermLoan"] = new[] { "PayAdvances", "PayLoan" },
+            ["PrlLongTermLoan"] = new[] { "PayAdvances", "PayLoan" },
+            ["ShortTermLoan"] = new[] { "PayAdvances", "PayLoan" },
+            ["LongTermLoan"] = new[] { "PayAdvances", "PayLoan" },
+            ["PrlAdvanceShort"] = new[] { "PayAdvances" },
+
+            ["PayDeductionAdjust"] = new[] { "PrlAdjDeduction", "PrlPerformanceDeductionAmt" },
+            ["PrlAdjDeduction"] = new[] { "PayDeductionAdjust" },
+
+            ["PayAdvanceRegister"] = new[] { "PrlShortTermLoanLedger", "PrlLongTermLoanLedger", "AdvancesLedger", "PrlLoanBalance", "PrlLoanBalanceDateRange", "PrlEmpLoanBalance" },
+            ["PrlShortTermLoanLedger"] = new[] { "PayAdvanceRegister" },
+            ["PrlLongTermLoanLedger"] = new[] { "PayAdvanceRegister" },
+            ["AdvancesLedger"] = new[] { "PayAdvanceRegister", "PayAdvances" },
+
+            ["PayPostFine"] = new[] { "PrlEmpNewFine", "PrlPostFine" },
+            ["PrlEmpNewFine"] = new[] { "PayPostFine" },
+            ["PrlPostFine"] = new[] { "PayPostFine" },
+
+            ["PayFineRegister"] = new[] { "PrlEmpFineLedger" },
+            ["PrlEmpFineLedger"] = new[] { "PayFineRegister" },
+
+            ["PaySalarySheet"] = new[] { "PrlSalarySheetExt", "PrlSalarySheet", "CalculateSalSheet", "SalSheet" },
+            ["PrlSalarySheetExt"] = new[] { "PaySalarySheet" },
+            ["PrlSalarySheet"] = new[] { "PaySalarySheet" },
+            ["CalculateSalSheet"] = new[] { "PaySalarySheet" },
+            ["SalSheet"] = new[] { "PaySalarySheet" },
+
+            ["PayHoldSalary"] = new[] { "PrlHoldSalary" },
+            ["PrlHoldSalary"] = new[] { "PayHoldSalary" },
+
+            ["PayGratuity"] = new[] { "PrlGratuity" },
+            ["PrlGratuity"] = new[] { "PayGratuity" },
+
+            ["PayAbsentSheet"] = new[] { "PrlAbsentSheet" },
+            ["PrlAbsentSheet"] = new[] { "PayAbsentSheet" },
+
+            ["PaySocialSecurity"] = new[] { "PrlSocialSecurity", "SocialSecurity", "PrlContSS" },
+            ["PrlSocialSecurity"] = new[] { "PaySocialSecurity" },
+            ["SocialSecurity"] = new[] { "PaySocialSecurity" },
+
+            ["PayEOBI"] = new[] { "PrlEOBI", "OldAge", "PrlContEOBI" },
+            ["PrlEOBI"] = new[] { "PayEOBI" },
+            ["OldAge"] = new[] { "PayEOBI" },
+
+            ["PayDesignation"] = new[] { "PrlDesignationsList", "Designations" },
+            ["PrlDesignationsList"] = new[] { "PayDesignation" },
+            ["Designations"] = new[] { "PayDesignation" },
+
+            ["PaySettings"] = new[] { "PrlDepartmentSettings", "DeptSettings", "PrlMachineSettings", "PrlBarcodeSettings", "Settings" },
+            ["PrlDepartmentSettings"] = new[] { "PaySettings" },
+            ["DeptSettings"] = new[] { "PaySettings" },
+
+            ["PayPolicies"] = new[] { "PrlPayrollPolicies", "TaxRanges" },
+            ["PrlPayrollPolicies"] = new[] { "PayPolicies" },
+            ["TaxRanges"] = new[] { "PayPolicies" },
+
+            ["PayHolidays"] = new[] { "PrlHolidays", "DefineHolidays" },
+            ["PrlHolidays"] = new[] { "PayHolidays" },
+            ["DefineHolidays"] = new[] { "PayHolidays" },
+
+            ["PayReports"] = new[] { "PrlReports", "PrintEmpCards", "ApplicationForm", "EmpPaySlip", "PrlApplicationForm", "PrlEmpCards" },
+            ["PrlReports"] = new[] { "PayReports" },
+
+            ["PayLoan"] = new[] { "PrlClearLoan", "PrlClearShortTermLoan", "ShortTermLoan", "LongTermLoan" },
+            ["PrlClearLoan"] = new[] { "PayLoan" },
+            ["PrlClearShortTermLoan"] = new[] { "PayLoan" },
+
+            // ==========================================
+            // Company Aliases
+            // ==========================================
+            ["CmpItems"] = new[] { "CompanyCatalog", "CmpCompanyCatalog", "CompanyInfo", "CmpCompanyDetail", "CompanyImportCatalog" },
+            ["CompanyCatalog"] = new[] { "CmpItems", "CmpNewItem", "CmpCompanyCatalog" },
+            ["CmpCompanyCatalog"] = new[] { "CmpItems", "CmpNewItem", "CompanyCatalog" },
+            ["CompanyInfo"] = new[] { "CmpItems", "CmpCompanyDetail" },
+            ["CmpCompanyDetail"] = new[] { "CompanyInfo", "CmpItems" },
+
+            ["CmpNewItem"] = new[] { "NewItem", "CompanyCatalog", "CmpCompanyCatalog" },
+            ["NewItem"] = new[] { "CmpNewItem" },
+
+            ["CmpItemGroups"] = new[] { "GroupList", "AdditionalGroupList", "ItemTypes", "ItemFinishedQuality" },
+            ["GroupList"] = new[] { "CmpItemGroups" },
+            ["AdditionalGroupList"] = new[] { "CmpItemGroups" },
+            ["ItemTypes"] = new[] { "CmpItemGroups" },
+            ["ItemFinishedQuality"] = new[] { "CmpItemGroups" },
+
+            ["CmpPorts"] = new[] { "Ports", "ExpPorts" },
+            ["Ports"] = new[] { "CmpPorts" },
+            ["ExpPorts"] = new[] { "CmpPorts" },
+
+            ["CmpStores"] = new[] { "AddStoresRacksBins", "Stores" },
+            ["AddStoresRacksBins"] = new[] { "CmpStores" },
+            ["Stores"] = new[] { "CmpStores" },
+
+            ["CmpSteelList"] = new[] { "SteelList", "ExpSteelList" },
+            ["SteelList"] = new[] { "CmpSteelList" },
+            ["ExpSteelList"] = new[] { "CmpSteelList" },
+
+            ["CmpExchangeRates"] = new[] { "ExchangeRates", "CmpExchangeRates" },
+            ["ExchangeRates"] = new[] { "CmpExchangeRates" },
+
+            ["CmpCustomerCatalog"] = new[] { "CustomerCatalog", "ExpCustCatalog" },
+            ["CustomerCatalog"] = new[] { "CmpCustomerCatalog" },
+            ["ExpCustCatalog"] = new[] { "CmpCustomerCatalog" },
+
+            ["CmpCustomerList"] = new[] { "FCustomers", "Customers", "ExpCustomer" },
+            ["CmpNewCustomer"] = new[] { "NewCustomer", "FCustomers", "ExpCustomer" },
+
+            // ==========================================
+            // Accounts / Financial Aliases
+            // ==========================================
+            ["AccChartOfAccounts"] = new[] { "ChartOfAccounts" },
+            ["ChartOfAccounts"] = new[] { "AccChartOfAccounts" },
+
+            ["AccPayables"] = new[] { "Payables", "AccountsPayable" },
+            ["AccReceivables"] = new[] { "Receivables", "AccountsReceivable" },
+
+            ["AccExpenseGroups"] = new[] { "ExpenseGroups", "GroupsAccounts" },
+            ["AccChangeAccHeads"] = new[] { "ChangeAccHeads" },
+            ["AccRe-Index"] = new[] { "ReIndex", "FinancialReIndexing" },
+
+            ["BankList"] = new[] { "AccBanks" },
+            ["AccBanks"] = new[] { "BankList" },
+
+            ["AccChqBookDetail"] = new[] { "ChqBookDetail", "BankAccountsChqBooks" },
+
+            ["AccEV"] = new[] { "CashPayment", "CashPaymentVoucher" },
+            ["AccPV"] = new[] { "BankPayment", "BankPaymentVoucher" },
+            ["AccRV"] = new[] { "ReceiptVoucher", "CashReceipt", "BankReceipt" },
+            ["AccJV"] = new[] { "JournalVoucher" },
+
+            ["AccMakerLoan"] = new[] { "MakerLoan", "MakerShortTermLoan", "MakerLongTermLoan" },
+            ["AccMakerLoanLedger"] = new[] { "MakerLoanLedger" },
+            ["AccMakerLoanClearance"] = new[] { "MakerLoanClearance" },
+            ["AccMakerLoanTransfer"] = new[] { "MakerLoanTransfer" },
+            ["AccCustomInvoiceAuth"] = new[] { "CustomInvoiceAuth" },
+
+            ["AccLedger"] = new[] { "Ledger", "DetailedAccountLedger" },
+            ["AccTransactionRegister"] = new[] { "TransactionRegister" },
+            ["AccTBSummary"] = new[] { "TrialBalance", "TBSummary", "AccTBDetail" },
+            ["AccCashBankStatus"] = new[] { "CashBankStatus", "BankBalanceStatement" },
+            ["AccCashBook"] = new[] { "CashBook" },
+
+            // ==========================================
+            // Dashboards, Setup & IntraOffice Aliases
+            // ==========================================
+            ["SetupUsers"] = new[] { "UserManagement", "PrlUserManager" },
+            ["UserManagement"] = new[] { "SetupUsers" },
+            ["PrlUserManager"] = new[] { "SetupUsers" },
+
+            ["DshExecutive"] = new[] { "ExecutiveDashboard" },
+            ["DshCommandCenter"] = new[] { "CommandCenter" },
+            ["DshCommandCenterGrid"] = new[] { "CommandCenterGrid" },
+            ["DshProductionPlanning"] = new[] { "ProductionPlanning" },
+            ["DshProductionPlanningGrid"] = new[] { "ProductionPlanningGrid" },
+
             ["OfficeAI"] = new[] { "OfficeAiAssistant" },
             ["OfficeAiAssistant"] = new[] { "OfficeAI" },
             ["OfficeForms"] = new[] { "OfficeHub", "OfficeTasks", "OfficeChat", "OfficeMessages", "OfficeAnnouncements" },
             ["OfficeDirectory"] = new[] { "OfficeHub", "OfficeChat" },
             ["OfficeMinuteTypes"] = new[] { "OfficeMinutes" },
             ["OfficeTemplates"] = new[] { "OfficeReports", "OfficeLeads" },
-            ["OfficeEmailSettings"] = new[] { "OfficeReports", "OfficeMessages" }
+            ["OfficeEmailSettings"] = new[] { "OfficeReports", "OfficeMessages" },
+            ["IntraOfficeHealth"] = new[] { "Diagnostics", "Health" }
         };
 
         public bool HasOptionAccess(string optionId)

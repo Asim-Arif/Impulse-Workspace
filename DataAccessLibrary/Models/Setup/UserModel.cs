@@ -67,5 +67,6 @@ namespace DataAccessLibrary.Models.Setup
         public bool HicoVisible { get; set; }
         public bool AddProdPlan { get; set; }
         public bool ShowTips { get; set; }
+        public bool Show_Customer_Order_No { get; set; }
     }
 }

@@ -52,16 +52,6 @@
                         <ResultTemplate Context="c"><text>@c.Name</text></ResultTemplate>
                     </BlazoredTypeahead>
                 </div>
-                <div style="min-width:130px; max-width:150px;">
-                    <label class="form-label mb-1 filter-label">Country</label>
-                    <select class="form-select form-select-sm" @bind="Filters.Country">
-                        <option value="0">&lt;All Countries&gt;</option>
-                        @foreach (var c in Countries)
-                        {
-                            <option value="@c.Id">@c.Name</option>
-                        }
-                    </select>
-                </div>
                 <div style="min-width:120px; max-width:130px;">
                     <label class="form-label mb-1 filter-label">Date Range</label>
                     <select class="form-select form-select-sm" @bind="Filters.DateRangeMode" @bind:after="OnDateRangeModeChanged">

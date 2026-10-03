@@ -159,10 +159,6 @@
                                             <th class="text-end text-nowrap" style="width: 90px;">Fin. Weight</th>
                                             <th class="text-end text-nowrap" style="width: 75px;">Stock</th>
                                             <th class="text-nowrap" style="width: 60px;">Unit</th>
-                                            <th class="text-end text-nowrap" style="width: 80px;">Cost</th>
-                                            <th class="text-end text-nowrap" style="width: 85px;">Value</th>
-                                            <th class="text-end text-nowrap" style="width: 80px;">FOB SKT</th>
-                                            <th class="text-end text-nowrap" style="width: 80px;">FOB Top</th>
                                             <th class="text-nowrap" style="width: 75px;">Type</th>
                                             <th class="text-nowrap" style="width: 75px;">Tip Size</th>
                                             <th class="text-nowrap" style="width: 90px;">Fin. Quality</th>
@@ -174,7 +170,7 @@
                                         @if (!pagedItems.Any())
                                         {
                                             <tr>
-                                                <td colspan="16" class="text-center text-muted py-4">No items matched your filters.</td>
+                                                <td colspan="12" class="text-center text-muted py-4">No items matched your filters.</td>
                                             </tr>
                                         }
                                         else
@@ -201,10 +197,6 @@
                                                     <td class="text-end text-nowrap">@item.FinishedWeight.ToString("N3")</td>
                                                     <td class="text-end fw-bold text-nowrap @(item.InHand < item.ReorderPoint ? "text-danger" : "text-success")">@item.InHand.ToString("N0")</td>
                                                     <td class="text-nowrap">@item.Unit</td>
-                                                    <td class="text-end text-nowrap">@item.PriceForCost.ToString("C2")</td>
-                                                    <td class="text-end fw-bold text-nowrap">@((item.InHand * item.PriceForCost).ToString("C2"))</td>
-                                                    <td class="text-end text-nowrap">@item.ExWorks.ToString("N2")</td>
-                                                    <td class="text-end text-nowrap">@item.ExWorksTop.ToString("N2")</td>
                                                     <td class="text-nowrap">@item.Type</td>
                                                     <td class="text-nowrap">@item.TipSize</td>
                                                     <td class="text-nowrap">@item.FinQuality</td>

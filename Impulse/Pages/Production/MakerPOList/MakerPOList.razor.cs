@@ -29,11 +29,56 @@ namespace Impulse.Pages.Production.MakerPOList
 
         public MakerPOListFilter Filter { get; set; } = new MakerPOListFilter();
         public List<MakerPOListItem> AllItems { get; set; } = new List<MakerPOListItem>();
-        public string ClientSearchTerm { get; set; } = string.Empty;
+        private string _clientSearchTerm = string.Empty;
+        public string ClientSearchTerm
+        {
+            get => _clientSearchTerm;
+            set
+            {
+                if (_clientSearchTerm != value)
+                {
+                    _clientSearchTerm = value;
+                    currentPage = 1;
+                }
+            }
+        }
         public string LastReportSql { get; set; } = string.Empty;
         public bool IsLoading { get; set; } = false;
         public HashSet<long> CheckedIds { get; set; } = new HashSet<long>();
         public MakerPOListItem? SelectedItem { get; set; } = null;
+
+        // Paging Parameters
+        private int currentPage = 1;
+        private int pageSize = 50;
+        public int CurrentPage => currentPage;
+        public int PageSize => pageSize;
+        public int TotalCount => FilteredItems.Count;
+        public int TotalPages => Math.Max(1, (int)Math.Ceiling((double)TotalCount / pageSize));
+
+        public List<MakerPOListItem> PagedItems => FilteredItems
+            .Skip((currentPage - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        public void GoToPage(int page)
+        {
+            if (page < 1) page = 1;
+            if (page > TotalPages) page = TotalPages;
+            currentPage = page;
+            StateHasChanged();
+        }
+
+        public void SetPageSize(int size)
+        {
+            pageSize = size;
+            currentPage = 1;
+            StateHasChanged();
+        }
+
+        // Summary Statistics (Calculated across all filtered items)
+        public decimal TotalPOValue => FilteredItems.Sum(i => i.TotalValue);
+        public int TotalAuthorizedCount => FilteredItems.Count(i => i.Authorized);
+        public int TotalUnAuthorizedCount => FilteredItems.Count(i => !i.Authorized);
 
         // Multi-select Typeahead properties
         private IList<LookupItemInt> _selectedMakers = new List<LookupItemInt>();
@@ -209,6 +254,7 @@ namespace Impulse.Pages.Production.MakerPOList
                 AllItems = result.Items;
                 LastReportSql = result.ReportSql;
                 CheckedIds.Clear();
+                currentPage = 1;
             }
             catch (Exception ex)
             {

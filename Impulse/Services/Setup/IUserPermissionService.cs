@@ -10,6 +10,7 @@ namespace Impulse.Services.Setup
         bool IsAdministrator { get; }
         int CurrentUserId { get; }
         string CurrentUserName { get; }
+        bool ShowCustomerOrderNo { get; }
         bool HasModuleAccess(string moduleName);
         bool HasOptionAccess(string optionId);
         bool IsRouteAuthorized(string relativePath);

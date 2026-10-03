@@ -135,7 +135,8 @@ namespace DataAccessLibrary.DAC.Setup
                         COALESCE(u.FixedAssetsMainLink, 0) AS FixedAssetsMainLink,
                         COALESCE(u.SamplingMainLink, 0) AS SamplingMainLink,
                         COALESCE(u.HelpMainLink, 0) AS HelpMainLink,
-                        COALESCE(u.IntraOfficeMainLink, 0) AS IntraOfficeMainLink
+                        COALESCE(u.IntraOfficeMainLink, 0) AS IntraOfficeMainLink,
+                        COALESCE(u.Show_Customer_Order_No, 0) AS Show_Customer_Order_No
                     FROM Users u
                     WHERE u.UserName = @UserName";
 

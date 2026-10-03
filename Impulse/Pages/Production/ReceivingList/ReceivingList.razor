@@ -172,11 +172,39 @@
                 </div>
             </div>
 
-            <!-- Quick Search & Count -->
-            <div class="d-flex align-items-center gap-2 mb-2">
-                <span class="text-secondary small fw-bold"><i class="fas fa-search me-1"></i> Quick Search:</span>
-                <input type="text" class="form-control form-control-sm" style="max-width: 250px;" @bind="ClientSearchTerm" @bind:event="oninput" placeholder="Type to filter list..." />
-                <span class="badge bg-secondary ms-auto">Count: @FilteredItems.Count</span>
+            <!-- Quick Search, Page Size & Summary Badges -->
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="text-secondary small fw-bold"><i class="fas fa-search me-1"></i> Quick Search:</span>
+                    <input type="text" class="form-control form-control-sm" style="max-width: 230px;" @bind="ClientSearchTerm" @bind:event="oninput" placeholder="Type to filter list..." />
+                    
+                    <span class="text-secondary small fw-bold ms-2"><i class="fas fa-list-ol me-1"></i> Per Page:</span>
+                    <select class="form-select form-select-sm" style="width: 85px;" value="@PageSize" @onchange="@((ChangeEventArgs e) => SetPageSize(int.Parse(e.Value?.ToString() ?? "50")))">
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="250">250</option>
+                        <option value="500">500</option>
+                        <option value="1000">1000</option>
+                    </select>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1" style="font-size: 0.78rem;">
+                        <i class="fas fa-cubes me-1"></i> Total Rcvd: <strong>@TotalRcvdQty.ToString("N0")</strong>
+                    </span>
+                    @if (TotalWastageQty > 0)
+                    {
+                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1" style="font-size: 0.78rem;">
+                            <i class="fas fa-trash-alt me-1"></i> Wastage: <strong>@TotalWastageQty.ToString("N0")</strong>
+                        </span>
+                    }
+                    @if (TotalReWorkQty > 0)
+                    {
+                        <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1" style="font-size: 0.78rem;">
+                            <i class="fas fa-redo me-1"></i> Re-Work: <strong>@TotalReWorkQty.ToString("N0")</strong>
+                        </span>
+                    }
+                    <span class="badge bg-secondary ms-1">Records: @TotalCount.ToString("N0")</span>
+                </div>
             </div>
 
             <!-- Data Table -->
@@ -220,8 +248,8 @@
                         }
                         else
                         {
-                            int index = 1;
-                            @foreach (var item in FilteredItems)
+                            int index = ((CurrentPage - 1) * PageSize) + 1;
+                            @foreach (var item in PagedItems)
                             {
                                 var currentItem = item;
                                 bool isSelected = SelectedItem?.VRD_EntryID == currentItem.VRD_EntryID;
@@ -293,6 +321,93 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Paging Info & Controls -->
+            @if (TotalCount > 0)
+            {
+                <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
+                    <div class="text-muted" style="font-size: 0.85rem;">
+                        Showing <strong>@(((CurrentPage - 1) * PageSize) + 1)</strong> to <strong>@Math.Min(CurrentPage * PageSize, TotalCount)</strong> of <strong>@TotalCount.ToString("N0")</strong> records
+                    </div>
+                    @if (TotalPages > 1)
+                    {
+                        <nav aria-label="Receiving List Page Navigation">
+                            <ul class="pagination pagination-sm mb-0">
+                                <!-- First Page -->
+                                <li class="page-item @(CurrentPage == 1 ? "disabled" : "")">
+                                    <button class="page-link" @onclick="() => GoToPage(1)" title="First Page">
+                                        <i class="fas fa-angle-double-left"></i>
+                                    </button>
+                                </li>
+                                <!-- Previous Page -->
+                                <li class="page-item @(CurrentPage == 1 ? "disabled" : "")">
+                                    <button class="page-link" @onclick="() => GoToPage(CurrentPage - 1)" title="Previous Page">
+                                        <i class="fas fa-angle-left"></i>
+                                    </button>
+                                </li>
+
+                                @{
+                                    int window = 2;
+                                    int startPage = Math.Max(1, CurrentPage - window);
+                                    int endPage = Math.Min(TotalPages, CurrentPage + window);
+
+                                    if (CurrentPage <= window + 1)
+                                    {
+                                        endPage = Math.Min(TotalPages, 1 + (window * 2));
+                                    }
+                                    else if (CurrentPage >= TotalPages - window)
+                                    {
+                                        startPage = Math.Max(1, TotalPages - (window * 2));
+                                    }
+
+                                    if (startPage > 1)
+                                    {
+                                        <li class="page-item">
+                                            <button class="page-link" @onclick="() => GoToPage(1)">1</button>
+                                        </li>
+                                        if (startPage > 2)
+                                        {
+                                            <li class="page-item disabled"><span class="page-link">…</span></li>
+                                        }
+                                    }
+
+                                    for (int idx = startPage; idx <= endPage; idx++)
+                                    {
+                                        var pageNumber = idx;
+                                        <li class="page-item @(CurrentPage == pageNumber ? "active" : "")">
+                                            <button class="page-link" @onclick="() => GoToPage(pageNumber)">@pageNumber</button>
+                                        </li>
+                                    }
+
+                                    if (endPage < TotalPages)
+                                    {
+                                        if (endPage < TotalPages - 1)
+                                        {
+                                            <li class="page-item disabled"><span class="page-link">…</span></li>
+                                        }
+                                        <li class="page-item">
+                                            <button class="page-link" @onclick="() => GoToPage(TotalPages)">@TotalPages</button>
+                                        </li>
+                                    }
+                                }
+
+                                <!-- Next Page -->
+                                <li class="page-item @(CurrentPage == TotalPages ? "disabled" : "")">
+                                    <button class="page-link" @onclick="() => GoToPage(CurrentPage + 1)" title="Next Page">
+                                        <i class="fas fa-angle-right"></i>
+                                    </button>
+                                </li>
+                                <!-- Last Page -->
+                                <li class="page-item @(CurrentPage == TotalPages ? "disabled" : "")">
+                                    <button class="page-link" @onclick="() => GoToPage(TotalPages)" title="Last Page">
+                                        <i class="fas fa-angle-double-right"></i>
+                                    </button>
+                                </li>
+                            </ul>
+                        </nav>
+                    }
+                </div>
+            }
 
             <!-- Manual PTC Panel (shown when triggered from context menu) -->
             @if (ShowManualPTCPanel)

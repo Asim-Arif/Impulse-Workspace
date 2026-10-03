@@ -79,6 +79,7 @@ namespace DataAccessLibrary.DAC.Setup
                         COALESCE(u.HicoVisible, 0) AS HicoVisible,
                         COALESCE(u.AddProdPlan, 0) AS AddProdPlan,
                         COALESCE(u.ShowTips, 0) AS ShowTips,
+                        COALESCE(u.Show_Customer_Order_No, 0) AS Show_Customer_Order_No,
                         e.name AS EmployeeName,
                         e.Designation,
                         d.name AS DepartmentName,
@@ -173,6 +174,7 @@ namespace DataAccessLibrary.DAC.Setup
                         COALESCE(u.HicoVisible, 0) AS HicoVisible,
                         COALESCE(u.AddProdPlan, 0) AS AddProdPlan,
                         COALESCE(u.ShowTips, 0) AS ShowTips,
+                        COALESCE(u.Show_Customer_Order_No, 0) AS Show_Customer_Order_No,
                         e.name AS EmployeeName,
                         e.Designation,
                         d.name AS DepartmentName,
@@ -232,14 +234,14 @@ namespace DataAccessLibrary.DAC.Setup
                         CompanyMainLink, FinancialMainLink, PayrollMainLink, ExportMainLink, StockMainLink, ProductionMainLink, DashBoardMainLink, QMSMainLink, FixedAssetsMainLink, SamplingMainLink, HelpMainLink, IntraOfficeMainLink, OpenCommandCenter,
                         RestrictedItemProfile, GeneralInfoItemProfile, ProcessesItemProfile, WeightItemProfile, PriceItemProfile, ReferencesItemProfile, PictureItemProfile, RMItemProfile, ShipInfoItemProfile, RestrictCompanyCatalogEditing,
                         AuthorizeVouchers, AuthorizeIssuance, PostMakerBill, ChangeRateonIssuance, ChangeRateMakerAssign, MakerBill_EditRate, HideRateMakerAssign, AddEditCustomerComplaint, EditFollowUp, CloseCAPA,
-                        BackupData, RestoreData, HicoVisible, AddProdPlan, ShowTips
+                        BackupData, RestoreData, HicoVisible, AddProdPlan, ShowTips, Show_Customer_Order_No
                     ) VALUES (
                         @UserName, @Password, @FullUserName, @EmpID, @InActive,
                         @UserManagement, @ChangePassword,
                         @CompanyMainLink, @FinancialMainLink, @PayrollMainLink, @ExportMainLink, @StockMainLink, @ProductionMainLink, @DashBoardMainLink, @QMSMainLink, @FixedAssetsMainLink, @SamplingMainLink, @HelpMainLink, @IntraOfficeMainLink, @OpenCommandCenter,
                         @RestrictedItemProfile, @GeneralInfoItemProfile, @ProcessesItemProfile, @WeightItemProfile, @PriceItemProfile, @ReferencesItemProfile, @PictureItemProfile, @RMItemProfile, @ShipInfoItemProfile, @RestrictCompanyCatalogEditing,
                         @AuthorizeVouchers, @AuthorizeIssuance, @PostMakerBill, @ChangeRateonIssuance, @ChangeRateMakerAssign, @MakerBill_EditRate, @HideRateMakerAssign, @AddEditCustomerComplaint, @EditFollowUp, @CloseCAPA,
-                        @BackupData, @RestoreData, @HicoVisible, @AddProdPlan, @ShowTips
+                        @BackupData, @RestoreData, @HicoVisible, @AddProdPlan, @ShowTips, @Show_Customer_Order_No
                     );
                     SELECT CAST(SCOPE_IDENTITY() AS INT);";
 
@@ -302,7 +304,8 @@ namespace DataAccessLibrary.DAC.Setup
                         RestoreData = @RestoreData,
                         HicoVisible = @HicoVisible,
                         AddProdPlan = @AddProdPlan,
-                        ShowTips = @ShowTips
+                        ShowTips = @ShowTips,
+                        Show_Customer_Order_No = @Show_Customer_Order_No
                     WHERE UserID = @UserID";
 
                 var rows = await db.ExecuteAsync(sql, user);

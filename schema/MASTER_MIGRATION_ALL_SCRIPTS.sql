@@ -4468,3 +4468,14 @@ GO
 END
 GO
 
+
+
+-- ====================================================================================================
+-- SCRIPT: Users - Show_Customer_Order_No
+-- ====================================================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Users') AND name = 'Show_Customer_Order_No')
+BEGIN
+    ALTER TABLE [dbo].[Users] ADD [Show_Customer_Order_No] BIT NOT NULL CONSTRAINT [DF_Users_Show_Customer_Order_No] DEFAULT (0);
+    PRINT 'Added column Show_Customer_Order_No to Users';
+END
+GO

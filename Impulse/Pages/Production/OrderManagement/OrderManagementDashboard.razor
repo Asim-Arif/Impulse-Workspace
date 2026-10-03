@@ -380,7 +380,7 @@
                         <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
                             <thead class="table-light text-secondary sticky-top" style="font-size: 0.75rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
                                 <tr>
-                                    <th style="min-width: 130px;">Order # / Ref #</th>
+                                    <th style="min-width: 130px;">@(CanShowCustomerOrderNo ? "Order # / Ref #" : "Internal Ref #")</th>
                                     <th>Customer</th>
                                     <th class="text-center">Qty</th>
                                     <th style="min-width: 140px;">Progress</th>
@@ -398,10 +398,17 @@
                                                 {
                                                     <i class="fas fa-play text-primary" style="font-size: 0.65rem;"></i>
                                                 }
-                                                <span class="text-primary">@ord.OrderNo</span>
-                                                @if (!string.IsNullOrWhiteSpace(ord.InternalRefNo))
+                                                @if (CanShowCustomerOrderNo)
                                                 {
-                                                    <span class="badge bg-secondary-subtle text-dark border font-monospace" style="font-size: 0.72rem; font-weight: 600;" title="Internal Reference No">@ord.InternalRefNo</span>
+                                                    <span class="text-primary">@ord.OrderNo</span>
+                                                    @if (!string.IsNullOrWhiteSpace(ord.InternalRefNo))
+                                                    {
+                                                        <span class="badge bg-secondary-subtle text-dark border font-monospace" style="font-size: 0.72rem; font-weight: 600;" title="Internal Reference No">@ord.InternalRefNo</span>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-primary font-monospace">@(!string.IsNullOrWhiteSpace(ord.InternalRefNo) ? ord.InternalRefNo : ord.OrderNo)</span>
                                                 }
                                             </div>
                                             <div class="text-muted" style="font-size: 0.7rem;"><i class="far fa-calendar-alt me-1"></i>@ord.DT.ToString("yyyy-MM-dd")</div>
@@ -448,7 +455,14 @@
                             Order Items
                             @if (SelectedOrder != null)
                             {
-                                <span class="text-primary fs-6 ms-1">• Order #@SelectedOrder.OrderNo @(!string.IsNullOrWhiteSpace(SelectedOrder.InternalRefNo) ? $"({SelectedOrder.InternalRefNo})" : "") (@SelectedOrder.CustCode)</span>
+                                @if (CanShowCustomerOrderNo)
+                                {
+                                    <span class="text-primary fs-6 ms-1">• Order #@SelectedOrder.OrderNo @(!string.IsNullOrWhiteSpace(SelectedOrder.InternalRefNo) ? $"({SelectedOrder.InternalRefNo})" : "") (@SelectedOrder.CustCode)</span>
+                                }
+                                else
+                                {
+                                    <span class="text-primary fs-6 ms-1">• Ref #@(!string.IsNullOrWhiteSpace(SelectedOrder.InternalRefNo) ? SelectedOrder.InternalRefNo : SelectedOrder.OrderNo) (@SelectedOrder.CustCode)</span>
+                                }
                             }
                         </h5>
                         <span class="badge bg-light text-secondary border font-monospace">@OrderItems.Count</span>
@@ -460,7 +474,7 @@
                 {
                     <div class="text-center py-4 text-muted">
                         <i class="fas fa-spinner fa-spin fa-2x mb-2 text-info"></i>
-                        <div>Loading Items for Order #@SelectedOrder?.OrderNo @(!string.IsNullOrWhiteSpace(SelectedOrder?.InternalRefNo) ? $"({SelectedOrder.InternalRefNo})" : "")...</div>
+                        <div>Loading Items for @(CanShowCustomerOrderNo ? $"Order #{SelectedOrder?.OrderNo}" : $"Ref #{(!string.IsNullOrWhiteSpace(SelectedOrder?.InternalRefNo) ? SelectedOrder?.InternalRefNo : SelectedOrder?.OrderNo)}") @(CanShowCustomerOrderNo && !string.IsNullOrWhiteSpace(SelectedOrder?.InternalRefNo) ? $"({SelectedOrder.InternalRefNo})" : "")...</div>
                     </div>
                 }
                 else if (SelectedOrder == null)
@@ -473,7 +487,7 @@
                 else if (!OrderItems.Any())
                 {
                     <div class="text-center py-5 text-muted">
-                        <div>No items found for Order #@SelectedOrder.OrderNo @(!string.IsNullOrWhiteSpace(SelectedOrder.InternalRefNo) ? $"({SelectedOrder.InternalRefNo})" : "").</div>
+                        <div>No items found for @(CanShowCustomerOrderNo ? $"Order #{SelectedOrder.OrderNo}" : $"Ref #{(!string.IsNullOrWhiteSpace(SelectedOrder.InternalRefNo) ? SelectedOrder.InternalRefNo : SelectedOrder.OrderNo)}") @(CanShowCustomerOrderNo && !string.IsNullOrWhiteSpace(SelectedOrder.InternalRefNo) ? $"({SelectedOrder.InternalRefNo})" : "").</div>
                     </div>
                 }
                 else
@@ -483,8 +497,8 @@
                         <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
                             <thead class="table-light text-secondary sticky-top" style="font-size: 0.75rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
                                 <tr>
-                                    <th style="min-width: 140px;">Sales Order / Ref / Cust</th>
-                                    <th style="min-width: 180px;">Product / Batch</th>
+                                    <th style="min-width: 140px;">@(CanShowCustomerOrderNo ? "Sales Order / Ref / Cust" : "Internal Ref / Cust")</th>
+                                    <th style="min-width: 280px;">Product / Batch</th>
                                     <th class="text-center" style="width: 80px;">Ordered Qty</th>
                                     <th class="text-center" style="width: 130px;">Produced / Remaining</th>
                                     <th style="min-width: 160px;">Visual Progress</th>
@@ -500,22 +514,46 @@
                                     <tr class="table-selectable-row @(isItemSelected ? "table-row-active" : "")" @onclick="() => SelectItemAsync(item)">
                                         <td>
                                             <div class="fw-bold text-dark d-flex align-items-center flex-wrap gap-1">
-                                                <span>@item.OrderNo</span>
-                                                @if (!string.IsNullOrWhiteSpace(item.InternalRefNo))
+                                                @if (CanShowCustomerOrderNo)
                                                 {
-                                                    <span class="badge bg-secondary-subtle text-dark border font-monospace" style="font-size: 0.68rem; font-weight: 600;">@item.InternalRefNo</span>
+                                                    <span>@item.OrderNo</span>
+                                                    @if (!string.IsNullOrWhiteSpace(item.InternalRefNo))
+                                                    {
+                                                        <span class="badge bg-secondary-subtle text-dark border font-monospace" style="font-size: 0.68rem; font-weight: 600;">@item.InternalRefNo</span>
+                                                    }
+                                                    else if (SelectedOrder != null && !string.IsNullOrWhiteSpace(SelectedOrder.InternalRefNo))
+                                                    {
+                                                        <span class="badge bg-secondary-subtle text-dark border font-monospace" style="font-size: 0.68rem; font-weight: 600;">@SelectedOrder.InternalRefNo</span>
+                                                    }
                                                 }
-                                                else if (SelectedOrder != null && !string.IsNullOrWhiteSpace(SelectedOrder.InternalRefNo))
+                                                else
                                                 {
-                                                    <span class="badge bg-secondary-subtle text-dark border font-monospace" style="font-size: 0.68rem; font-weight: 600;">@SelectedOrder.InternalRefNo</span>
+                                                    <span class="font-monospace">@(!string.IsNullOrWhiteSpace(item.InternalRefNo) ? item.InternalRefNo : (!string.IsNullOrWhiteSpace(SelectedOrder?.InternalRefNo) ? SelectedOrder.InternalRefNo : item.OrderNo))</span>
                                                 }
                                             </div>
                                             <div class="text-muted small" style="font-size: 0.72rem;">@SelectedOrder?.CustCode</div>
                                         </td>
                                         <td>
-                                            <div class="fw-semibold text-dark text-truncate" style="max-width: 220px;" title="@item.ItemName">@item.ItemName</div>
-                                            <div class="d-flex align-items-center gap-1 mt-1">
-                                                <span class="text-muted small font-monospace" style="font-size: 0.72rem;">@item.ItemCode</span>
+                                            <div class="fw-semibold text-dark" style="font-size: 0.88rem; line-height: 1.35; white-space: normal;" title="@item.ItemName">@item.ItemName</div>
+                                            <div class="d-flex align-items-center flex-wrap gap-1 mt-1">
+                                                @if (!string.IsNullOrWhiteSpace(item.CompItemCode))
+                                                {
+                                                    <span class="badge bg-primary-subtle text-primary border font-monospace" style="font-size: 0.70rem; padding: 2px 5px;" title="Company Item Code (Items.ItemID)">
+                                                        <i class="fas fa-tag me-1"></i>Comp: @item.CompItemCode
+                                                    </span>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(item.ItemCode) && !item.ItemCode.Equals(item.CompItemCode, StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    <span class="badge bg-light text-secondary border font-monospace" style="font-size: 0.70rem; padding: 2px 5px;" title="Customer Item Code (FCustomerCatalog.ItemID)">
+                                                        Cust: @item.ItemCode
+                                                    </span>
+                                                }
+                                                else if (string.IsNullOrWhiteSpace(item.CompItemCode) && !string.IsNullOrWhiteSpace(item.ItemCode))
+                                                {
+                                                    <span class="badge bg-light text-secondary border font-monospace" style="font-size: 0.70rem; padding: 2px 5px;" title="Customer Item Code">
+                                                        Cust: @item.ItemCode
+                                                    </span>
+                                                }
                                                 <span class="badge bg-light text-dark border font-monospace" style="font-size: 0.68rem; padding: 2px 4px;">Batch: @item.BatchNo</span>
                                             </div>
                                             @if (item.HasPpcPlan)
@@ -679,6 +717,7 @@
                                             <th style="min-width: 150px;">PO Progress</th>
                                             <th>Return Target</th>
                                             <th class="text-center">Status</th>
+                                            <th class="text-center" style="width: 80px;">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -713,6 +752,15 @@
                                                     <span class="pill-badge @(po.StatusText == "Fulfilled" ? "pill-completed" : po.StatusText == "Partial" ? "pill-inprogress" : "pill-muted")">
                                                         @po.StatusText
                                                     </span>
+                                                </td>
+                                                <td class="text-center">
+                                                    <button class="btn btn-outline-primary btn-sm px-2 py-0 d-inline-flex align-items-center gap-1"
+                                                            style="font-size: 0.72rem; border-radius: 5px; height: 26px;"
+                                                            title="Print Maker PO (Maker Copy)"
+                                                            @onclick="() => PrintMakerPoMakerCopyAsync(po)">
+                                                        <i class="fas fa-print"></i>
+                                                        <span>Print</span>
+                                                    </button>
                                                 </td>
                                             </tr>
                                         }

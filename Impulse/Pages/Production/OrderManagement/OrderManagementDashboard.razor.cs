@@ -1,4 +1,5 @@
 using DataAccessLibrary.Models.ViewModels.Production;
+using Impulse.Services;
 using Impulse.Services.Production;
 using Microsoft.AspNetCore.Components;
 using Radzen;
@@ -29,8 +30,13 @@ namespace Impulse.Pages.Production.OrderManagement
     public partial class OrderManagementDashboard : ComponentBase
     {
         [Inject] private IOrderManagementService OrderService { get; set; } = default!;
+        [Inject] private IReportNavigationService ReportNavigationService { get; set; } = default!;
         [Inject] private NavigationManager NavManager { get; set; } = default!;
         [Inject] private NotificationService NotificationService { get; set; } = default!;
+        [Inject] private Impulse.Services.Setup.IUserPermissionService PermissionService { get; set; } = default!;
+
+        // Access Controls
+        protected bool CanShowCustomerOrderNo => PermissionService.ShowCustomerOrderNo;
 
         // Filter & KPI Data
         protected OrderManagementFilter Filter { get; set; } = new();
@@ -64,6 +70,7 @@ namespace Impulse.Pages.Production.OrderManagement
 
         protected override async Task OnInitializedAsync()
         {
+            await PermissionService.InitializeAsync();
             await LoadInitialDataAsync();
         }
 
@@ -295,6 +302,52 @@ namespace Impulse.Pages.Production.OrderManagement
             ItemLots.Clear();
             ItemStockAdjustments.Clear();
             ItemDispatches.Clear();
+        }
+
+        protected async Task PrintMakerPoMakerCopyAsync(ItemPurchaseOrderDto po)
+        {
+            if (po == null) return;
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(po.MasterPONo))
+                {
+                    await ReportNavigationService.PrintReportAsync(new ReportRequest
+                    {
+                        ReportName = "IssList.rpt",
+                        SelectionFormula = $"{{VendIssued.MasterPONo}} = '{po.MasterPONo.Trim()}'",
+                        FormulaValues = new Dictionary<string, object> { { "Copy", "'MAKER COPY'" } }
+                    });
+                }
+                else if (po.EntryID > 0)
+                {
+                    await ReportNavigationService.PrintReportAsync(new ReportRequest
+                    {
+                        ReportName = "IssSlip.rpt",
+                        SelectionFormula = $"{{VendIssued.EntryID}} = {po.EntryID}"
+                    });
+                }
+                else
+                {
+                    NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Warning,
+                        Summary = "Print Unavailable",
+                        Detail = "No valid Master PO # or Entry ID found for this purchase order.",
+                        Duration = 3000
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Print Error",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+            }
         }
     }
 }
