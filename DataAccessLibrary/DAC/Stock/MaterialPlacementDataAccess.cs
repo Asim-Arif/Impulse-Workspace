@@ -25,7 +25,7 @@ namespace DataAccessLibrary.DAC.Stock
             using (IDbConnection db = new SqlConnection(_connectionString))
             {
                 var queryBuilder = new System.Text.StringBuilder(
-                    "SELECT EntryID, RcvID, MaterialID, RMName, AccTitle AS VendorName, " +
+                    "SELECT EntryID, RcvID, MaterialID, RMName AS MaterialName, AccTitle AS VendorName, " +
                     "ISNULL(QtyPassed, 0) AS QtyPassed, ISNULL(QtyPlaced, 0) AS QtyPlaced, " +
                     "(ISNULL(QtyPassed, 0) - ISNULL(QtyPlaced, 0)) AS Balance, Unit, " +
                     "CCItem AS IsCCItem, RISD_EntryID, RcvDate " +

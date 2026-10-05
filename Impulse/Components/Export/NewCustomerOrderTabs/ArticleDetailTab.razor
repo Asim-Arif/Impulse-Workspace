@@ -34,6 +34,7 @@
                 <thead class="table-light sticky-top">
                     <tr>
                         <th style="width: 50px;" class="text-center">S.No</th>
+                        <th class="text-center" style="width: 70px;">Auth</th>
                         <th>Cust Item ID</th>
                         <th>Item ID</th>
                         <th>Description</th>
@@ -56,7 +57,7 @@
                     @if (Order.OrderItems == null || !Order.OrderItems.Any())
                     {
                         <tr>
-                            <td colspan="17" class="text-center text-muted py-3">No items added to this order. Use the form below to add items.</td>
+                            <td colspan="18" class="text-center text-muted py-3">No items added to this order. Use the form below to add items.</td>
                         </tr>
                     }
                     else
@@ -67,6 +68,26 @@
                             var currentItem = item;
                             <tr>
                                 <td class="text-center">@item.SortNo</td>
+                                <td class="text-center">
+                                    @if (item.Authorized && item.Qty == item.AuthorizedQty)
+                                    {
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle" title="Authorized: @item.AuthorizedQty @item.Unit by @(item.AuthorizedBy ?? "Director") on @(item.AuthorizedDT?.ToString("dd-MMM-yyyy"))">
+                                            <i class="fas fa-check"></i> Auth
+                                        </span>
+                                    }
+                                    else if (item.AuthorizedQty > 0 && item.Qty != item.AuthorizedQty)
+                                    {
+                                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning" title="Authorized: @item.AuthorizedQty @item.Unit, Current: @item.Qty @item.Unit">
+                                            <i class="fas fa-edit"></i> Delta
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle" title="Pending Director Authorization">
+                                            <i class="fas fa-clock"></i> Pending
+                                        </span>
+                                    }
+                                </td>
                                 <td>@item.ItemCode</td>
                                 <td>@item.CompItemCode</td>
                                 <td>@item.Description</td>
@@ -103,41 +124,67 @@
                 <i class="fas fa-plus-circle me-1 text-primary"></i> Add/Edit Item Row
             </div>
             <div class="card-body py-3">
-                <div class="row g-3">
+                <div class="row g-3" style="position: relative; z-index: 50;">
                     <!-- Cust Item ID selector -->
                     <div class="col-md-3">
                         <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Cust Item ID</label>
-                        <select class="form-select form-select-sm" value="@NewItemInput.ItemCode" @onchange="OnItemCodeSelected">
-                            <option value="">Select Customer Item ID</option>
-                            @foreach (var cat in CatalogItems)
-                            {
-                                <option value="@cat.ItemCode">@cat.ItemCode</option>
-                            }
-                        </select>
+                        <BlazoredTypeahead SearchMethod="SearchCustItemCodes"
+                                           EnableDropDown="true"
+                                           Data="CatalogItems"
+                                           TValue="CustomerOrderItemViewModel"
+                                           TItem="CustomerOrderItemViewModel"
+                                           Value="SelectedCatalogItem"
+                                           ValueChanged="OnItemSelected"
+                                           ValueExpression="@(() => SelectedCatalogItem)"
+                                           Placeholder="Select Cust Item ID"
+                                           MaximumSuggestions="1000">
+                            <SelectedTemplate Context="item">
+                                @item?.ItemCode
+                            </SelectedTemplate>
+                            <ResultTemplate Context="item">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-bold">@item.ItemCode</span>
+                                    @if (!string.IsNullOrEmpty(item.Description))
+                                    {
+                                        <span class="text-muted small ms-2 text-truncate" style="max-width: 200px;">@item.Description</span>
+                                    }
+                                </div>
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
                     </div>
 
                     <!-- Item ID selector -->
                     <div class="col-md-3">
                         <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Item ID</label>
-                        <select class="form-select form-select-sm" value="@NewItemInput.CompItemCode" @onchange="OnCompItemCodeSelected">
-                            <option value="">Select Item ID</option>
-                            @foreach (var cat in CatalogItems)
-                            {
-                                <option value="@cat.CompItemCode">@cat.CompItemCode</option>
-                            }
-                        </select>
+                        <BlazoredTypeahead SearchMethod="SearchCompItemCodes"
+                                           EnableDropDown="true"
+                                           Data="CatalogItems"
+                                           TValue="CustomerOrderItemViewModel"
+                                           TItem="CustomerOrderItemViewModel"
+                                           Value="SelectedCatalogItem"
+                                           ValueChanged="OnItemSelected"
+                                           ValueExpression="@(() => SelectedCatalogItem)"
+                                           Placeholder="Select Item ID"
+                                           MaximumSuggestions="1000">
+                            <SelectedTemplate Context="item">
+                                @item?.CompItemCode
+                            </SelectedTemplate>
+                            <ResultTemplate Context="item">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-bold">@item.CompItemCode</span>
+                                    @if (!string.IsNullOrEmpty(item.Description))
+                                    {
+                                        <span class="text-muted small ms-2 text-truncate" style="max-width: 200px;">@item.Description</span>
+                                    }
+                                </div>
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
                     </div>
 
                     <!-- Description selector -->
                     <div class="col-md-4">
                         <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Description</label>
-                        <select class="form-select form-select-sm" value="@NewItemInput.Description" @onchange="OnDescriptionSelected">
-                            <option value="">Select Description</option>
-                            @foreach (var cat in CatalogItems)
-                            {
-                                <option value="@cat.Description">@cat.Description</option>
-                            }
-                        </select>
+                        <input type="text" class="form-control form-control-sm" readonly style="background: #f0f2f5;" value="@NewItemInput.Description" placeholder="Description" />
                     </div>
 
                     <!-- Finishing Type -->
@@ -300,25 +347,39 @@
         await SelectedQuotationNoChanged.InvokeAsync(SelectedQuotationNo);
     }
 
-    private async Task OnItemCodeSelected(ChangeEventArgs e)
+    private CustomerOrderItemViewModel? SelectedCatalogItem
     {
-        var itemCode = e.Value?.ToString() ?? string.Empty;
-        var match = CatalogItems.FirstOrDefault(c => c.ItemCode == itemCode);
-        await OnCatalogItemChanged.InvokeAsync(match);
+        get => CatalogItems.FirstOrDefault(c => 
+            (!string.IsNullOrEmpty(NewItemInput.CompItemCode) && c.CompItemCode == NewItemInput.CompItemCode) ||
+            (!string.IsNullOrEmpty(NewItemInput.ItemCode) && c.ItemCode == NewItemInput.ItemCode));
+        set
+        {
+        }
     }
 
-    private async Task OnCompItemCodeSelected(ChangeEventArgs e)
+    private async Task<IEnumerable<CustomerOrderItemViewModel>> SearchCustItemCodes(string searchText)
     {
-        var compItemCode = e.Value?.ToString() ?? string.Empty;
-        var match = CatalogItems.FirstOrDefault(c => c.CompItemCode == compItemCode);
-        await OnCatalogItemChanged.InvokeAsync(match);
+        if (string.IsNullOrWhiteSpace(searchText)) return CatalogItems;
+        return await Task.FromResult(CatalogItems.Where(c => 
+            (!string.IsNullOrEmpty(c.ItemCode) && c.ItemCode.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
+            (!string.IsNullOrEmpty(c.Description) && c.Description.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
+            (!string.IsNullOrEmpty(c.CompItemCode) && c.CompItemCode.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+        ).ToList());
     }
 
-    private async Task OnDescriptionSelected(ChangeEventArgs e)
+    private async Task<IEnumerable<CustomerOrderItemViewModel>> SearchCompItemCodes(string searchText)
     {
-        var desc = e.Value?.ToString() ?? string.Empty;
-        var match = CatalogItems.FirstOrDefault(c => c.Description == desc);
-        await OnCatalogItemChanged.InvokeAsync(match);
+        if (string.IsNullOrWhiteSpace(searchText)) return CatalogItems;
+        return await Task.FromResult(CatalogItems.Where(c => 
+            (!string.IsNullOrEmpty(c.CompItemCode) && c.CompItemCode.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
+            (!string.IsNullOrEmpty(c.Description) && c.Description.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
+            (!string.IsNullOrEmpty(c.ItemCode) && c.ItemCode.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+        ).ToList());
+    }
+
+    private async Task OnItemSelected(CustomerOrderItemViewModel? item)
+    {
+        await OnCatalogItemChanged.InvokeAsync(item);
     }
 
     private async Task OnFinishingTypeLocalChanged(ChangeEventArgs e)
@@ -396,3 +457,28 @@
         return words.Trim();
     }
 }
+
+<style>
+    .blazored-typeahead {
+        height: 31px !important;
+        font-size: 0.85rem !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-wrap {
+        height: 100% !important;
+    }
+    .blazored-typeahead__input {
+        height: 29px !important;
+        padding: 2px 8px !important;
+        font-size: 0.85rem !important;
+    }
+    .blazored-typeahead__controls {
+        height: 100% !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.4rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+</style>

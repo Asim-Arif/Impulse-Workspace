@@ -8,6 +8,7 @@ namespace DataAccessLibrary.Models.ViewModels.Stock
         public string RcvID { get; set; }
         public string MaterialID { get; set; }
         public string MaterialName { get; set; }
+        public string RMName { get => MaterialName; set => MaterialName = value; }
         public string VendorName { get; set; }
         public decimal QtyPassed { get; set; }
         public decimal QtyPlaced { get; set; }

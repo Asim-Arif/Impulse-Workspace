@@ -96,7 +96,8 @@
                 <div class="col-md-5">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Unassigned Raw Materials</label>
                     <div class="@(SelectedVendor == null ? "disabled-typeahead-wrapper" : "")">
-                        <BlazoredTypeahead SearchMethod="SearchUnassignedRMs"
+                        <BlazoredTypeahead @key="@($"unassigned-rm-{SelectedVendor?.AccNo ?? ""}")"
+                                           SearchMethod="SearchUnassignedRMs"
                                            @bind-Value="SelectedUnassignedRM"
                                            Placeholder="Select Raw Material..."
                                            EnableDropDown="true"

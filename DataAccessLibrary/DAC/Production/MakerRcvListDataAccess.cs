@@ -318,6 +318,48 @@ namespace DataAccessLibrary.DAC.Production
         }
 
         // ─────────────────────────────────────────────────────────────
+        // MARK AS MOVE TO STORE
+        // Mirrors mnuMarkMoveToStore_Click: INSERT INTO VRD_Mark_Move_To_Store
+        // ─────────────────────────────────────────────────────────────
+        public async Task<(bool Success, string Message)> MarkMoveToStoreAsync(long vrdEntryId, string userName, string machineName)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+
+            // Validation 1: Must be authorized, no next process, balance > 0
+            string eligibilitySql = @"
+                SELECT COUNT(*) 
+                FROM VVendReceivingList 
+                WHERE VRD_EntryID = @VRD_EntryID 
+                  AND NextProcessID IS NULL 
+                  AND (RcvdQty - ISNULL(Wastage, 0) - ISNULL(LostQty, 0)) > IssQty 
+                  AND ReqAuth = 0";
+
+            int eligibleCount = await db.ExecuteScalarAsync<int>(eligibilitySql, new { VRD_EntryID = vrdEntryId });
+            if (eligibleCount == 0)
+            {
+                return (false, "Not Available: Record must have no next process, unissued balance quantity > 0, and be authorized.");
+            }
+
+            // Validation 2: Check if already marked
+            int existingCount = await db.ExecuteScalarAsync<int>(
+                "SELECT COUNT(*) FROM VRD_Mark_Move_To_Store WHERE VRD_EntryID = @VRD_EntryID",
+                new { VRD_EntryID = vrdEntryId });
+
+            if (existingCount > 0)
+            {
+                return (false, "Already Marked: This receiving record is already marked as Move to Store.");
+            }
+
+            // Insert into VRD_Mark_Move_To_Store
+            await db.ExecuteAsync(
+                @"INSERT INTO VRD_Mark_Move_To_Store (VRD_EntryID, UserName, MachineName, DTEntry) 
+                  VALUES (@VRD_EntryID, @UserName, @MachineName, GETDATE())",
+                new { VRD_EntryID = vrdEntryId, UserName = userName, MachineName = machineName });
+
+            return (true, "Successfully marked as Move to Store.");
+        }
+
+        // ─────────────────────────────────────────────────────────────
         // MANUAL PTC NO.
         // Mirrors cmdUpdateManualPTCNo_Click: UPSERT VendRcvdDetail_MoreDetails
         // ─────────────────────────────────────────────────────────────

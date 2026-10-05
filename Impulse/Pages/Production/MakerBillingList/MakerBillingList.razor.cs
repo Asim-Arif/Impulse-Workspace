@@ -195,15 +195,15 @@ namespace Impulse.Pages.Production.MakerBillingList
 
         public async Task PrintBillsListReport()
         {
-            string formula = $"{{MakerPostedBills.DT}} in Date({Filter.DtFrom:yyyy,MM,dd}) to Date({Filter.DtTo:yyyy,MM,dd})";
+            string formula = $"{{VMakerPostedBillsList.DT}} in Date({Filter.DtFrom:yyyy,MM,dd}) to Date({Filter.DtTo:yyyy,MM,dd})";
             if (Filter.VendID > 0)
             {
-                formula += $" and {{MakerPostedBills.VendID}} = {Filter.VendID}";
+                formula += $" and {{VMakerPostedBillsList.VendID}} = {Filter.VendID}";
             }
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
-                ReportName = "MakerPostedBills_Summary.rpt",
+                ReportName = "MakerBillsList.rpt",
                 SelectionFormula = formula,
                 Parameters = new Dictionary<string, object>()
             });

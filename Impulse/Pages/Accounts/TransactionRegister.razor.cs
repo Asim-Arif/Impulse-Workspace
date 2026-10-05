@@ -48,6 +48,10 @@ namespace Impulse.Pages.Accounts
         private List<AccountsReportingModel> LedgerDatafromDB_temp { get; set; } = new List<AccountsReportingModel>();
         private DateTime DtFrom { get; set; } = DateTime.Now;
         private DateTime DtTo { get; set; } = DateTime.Now;
+        private HashSet<string> MakerBillVouchers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private HashSet<string> VendorBillVouchers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private bool IsMakerBillVisible = false;
+        private bool IsVendorBillVisible = false;
 
         private string? StrVoucherType = null;
 
@@ -154,6 +158,7 @@ namespace Impulse.Pages.Accounts
                 var LedgerDataFromDb = await AccountReportingAccess.GetTransactionData(CurrentAccount.DTFrom,CurrentAccount.DTTo, strcond);
                 LedgerDatafromDB = LedgerDataFromDb.ToList();
                 LedgerGroups = LedgerDatafromDB.GroupBy(x => x.VoucherType);
+                await LoadPostedBillsForVouchers();
 
                 StateHasChanged();
 
@@ -393,7 +398,7 @@ namespace Impulse.Pages.Accounts
                 string typeFilter = types.Any()
                     ? $" AND (left({{VLedger.VchrNo}}, 2) in [{string.Join(", ", types)}] or left({{VLedger.VchrNo}}, 3) in [{string.Join(", ", types)}])"
                     : "";
-                string sel = $"{{VLedger.VDate}} in Date({CurrentAccount.DTFrom.Year}, {CurrentAccount.DTFrom.Month}, {CurrentAccount.DTFrom.Day}) to Date({CurrentAccount.DTTo.Year}, {CurrentAccount.DTTo.Month}, {CurrentAccount.DTTo.Day}){typeFilter}";
+                string sel = $"{{VLedger.VDate}} >= #{CurrentAccount.DTFrom:yyyy-MM-dd}# AND {{VLedger.VDate}} <= #{CurrentAccount.DTTo:yyyy-MM-dd}#{typeFilter}";
 
                 var request = new ReportRequest
                 {
@@ -411,6 +416,154 @@ namespace Impulse.Pages.Accounts
             catch (Exception ex)
             {
                 NotificationService.ShowError("Report Error", $"Failed to print register: {ex.Message}");
+            }
+        }
+
+        private async Task LoadPostedBillsForVouchers()
+        {
+            try
+            {
+                MakerBillVouchers.Clear();
+                VendorBillVouchers.Clear();
+
+                var vchrs = LedgerDatafromDB
+                    .Select(x => x.VchrNo)
+                    .Where(v => !string.IsNullOrWhiteSpace(v))
+                    .Distinct()
+                    .ToList();
+
+                if (!vchrs.Any()) return;
+
+                for (int i = 0; i < vchrs.Count; i += 1000)
+                {
+                    var chunk = vchrs.Skip(i).Take(1000).ToList();
+                    var makerList = await IDBHelper.getListasync<string>(
+                        "SELECT DISTINCT VchrNo FROM MakerPostedBills WHERE VchrNo IN @chunk",
+                        new { chunk });
+                    if (makerList != null)
+                    {
+                        foreach (var v in makerList)
+                        {
+                            if (!string.IsNullOrEmpty(v)) MakerBillVouchers.Add(v);
+                        }
+                    }
+
+                    var vendorList = await IDBHelper.getListasync<string>(
+                        "SELECT DISTINCT VchrNo FROM VenderPostedBills WHERE VchrNo IN @chunk",
+                        new { chunk });
+                    if (vendorList != null)
+                    {
+                        foreach (var v in vendorList)
+                        {
+                            if (!string.IsNullOrEmpty(v)) VendorBillVouchers.Add(v);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading posted bills: {ex.Message}");
+            }
+        }
+
+        private async Task OnRowMouseUp(MouseEventArgs e, string? vchrNo)
+        {
+            if (string.IsNullOrEmpty(vchrNo)) return;
+            await CheckBillsForVoucher(vchrNo);
+            StateHasChanged();
+        }
+
+        private async Task OnContextMenuAppearing(MenuAppearingEventArgs e)
+        {
+            var account = e.Data as AccountsReportingModel;
+            if (account != null && !string.IsNullOrEmpty(account.VchrNo))
+            {
+                await CheckBillsForVoucher(account.VchrNo);
+            }
+            else
+            {
+                IsMakerBillVisible = false;
+                IsVendorBillVisible = false;
+            }
+            StateHasChanged();
+        }
+
+        private async Task CheckBillsForVoucher(string vchrNo)
+        {
+            if (string.IsNullOrEmpty(vchrNo))
+            {
+                IsMakerBillVisible = false;
+                IsVendorBillVisible = false;
+                return;
+            }
+
+            try
+            {
+                if (MakerBillVouchers.Contains(vchrNo))
+                {
+                    IsMakerBillVisible = true;
+                }
+                else
+                {
+                    string makerVchr = await IDBHelper.getSingleStringValue("VchrNo", "MakerPostedBills", $"WHERE VchrNo='{vchrNo}'");
+                    IsMakerBillVisible = !string.IsNullOrEmpty(makerVchr);
+                    if (IsMakerBillVisible) MakerBillVouchers.Add(vchrNo);
+                }
+
+                if (VendorBillVouchers.Contains(vchrNo))
+                {
+                    IsVendorBillVisible = true;
+                }
+                else
+                {
+                    string vendorVchr = await IDBHelper.getSingleStringValue("VchrNo", "VenderPostedBills", $"WHERE VchrNo='{vchrNo}'");
+                    IsVendorBillVisible = !string.IsNullOrEmpty(vendorVchr);
+                    if (IsVendorBillVisible) VendorBillVouchers.Add(vchrNo);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error checking bills for voucher {vchrNo}: {ex.Message}");
+            }
+        }
+
+        private async Task PrintMakerBill(ItemClickEventArgs e)
+        {
+            var account = e.Data as AccountsReportingModel;
+            if (account != null && !string.IsNullOrEmpty(account.VchrNo))
+            {
+                try
+                {
+                    await ReportNavigationService.PrintReportAsync(new ReportRequest
+                    {
+                        ReportName = "MakerPostedBillsRcvWise.rpt",
+                        SelectionFormula = $"{{MakerPostedBills.VchrNo}} = '{account.VchrNo}'"
+                    });
+                }
+                catch (Exception ex)
+                {
+                    NotificationService.ShowError("Report Error", $"Failed to print Maker Bill: {ex.Message}");
+                }
+            }
+        }
+
+        private async Task PrintVendorBill(ItemClickEventArgs e)
+        {
+            var account = e.Data as AccountsReportingModel;
+            if (account != null && !string.IsNullOrEmpty(account.VchrNo))
+            {
+                try
+                {
+                    await ReportNavigationService.PrintReportAsync(new ReportRequest
+                    {
+                        ReportName = "VenderPostedBill.rpt",
+                        SelectionFormula = $"{{VenderPostedBills.VchrNo}} = '{account.VchrNo}'"
+                    });
+                }
+                catch (Exception ex)
+                {
+                    NotificationService.ShowError("Report Error", $"Failed to print Vendor Bill: {ex.Message}");
+                }
             }
         }
     }

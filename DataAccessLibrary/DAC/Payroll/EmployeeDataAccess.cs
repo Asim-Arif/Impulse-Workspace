@@ -172,23 +172,69 @@ namespace DataAccessLibrary.DAC.Payroll
             }
         }
 
-        public async Task<string> GetNextEmpIDAsync(string deptId)
+        public async Task<string> GetEmployeePrefixAsync()
         {
             try
             {
                 using (IDbConnection db = new SqlConnection(_connectionString))
                 {
-                    string sql = "SELECT MAX(CAST(SUBSTRING(empid, CHARINDEX('-', empid) + 1, 10) AS INT)) FROM Employees WHERE empid LIKE 'EMR-%'";
-                    var maxId = await db.ExecuteScalarAsync<int?>(sql);
+                    string checkSql = @"
+                        IF COL_LENGTH('Company', 'Employees_Prefix') IS NOT NULL
+                            SELECT TOP 1 Employees_Prefix FROM Company WHERE Employees_Prefix IS NOT NULL AND LTRIM(RTRIM(Employees_Prefix)) <> ''
+                        ELSE
+                            SELECT NULL";
+
+                    var prefix = await db.ExecuteScalarAsync<string>(checkSql);
+                    if (!string.IsNullOrWhiteSpace(prefix))
+                    {
+                        return prefix.Trim().TrimEnd('-');
+                    }
+
+                    // Fallback: check existing employee pattern if prefix not explicitly set in Company
+                    string fallbackSql = @"
+                        SELECT TOP 1 SUBSTRING(empid, 1, CHARINDEX('-', empid) - 1)
+                        FROM Employees
+                        WHERE empid LIKE '%-%' AND CHARINDEX('-', empid) > 1";
+                    var detected = await db.ExecuteScalarAsync<string>(fallbackSql);
+                    if (!string.IsNullOrWhiteSpace(detected))
+                    {
+                        return detected.Trim().TrimEnd('-');
+                    }
+
+                    return "EMP";
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting employee prefix from Company table");
+                return "EMP";
+            }
+        }
+
+        public async Task<string> GetNextEmpIDAsync(string deptId)
+        {
+            try
+            {
+                string prefix = await GetEmployeePrefixAsync();
+                using (IDbConnection db = new SqlConnection(_connectionString))
+                {
+                    string pattern = $"{prefix}-%";
+                    string sql = @"
+                        SELECT MAX(CAST(SUBSTRING(empid, CHARINDEX('-', empid) + 1, 10) AS INT)) 
+                        FROM Employees 
+                        WHERE empid LIKE @Pattern 
+                          AND ISNUMERIC(SUBSTRING(empid, CHARINDEX('-', empid) + 1, 10)) = 1";
+
+                    var maxId = await db.ExecuteScalarAsync<int?>(sql, new { Pattern = pattern });
 
                     int nextNum = (maxId ?? 0) + 1;
-                    return $"EMR-{nextNum:D5}";
+                    return $"{prefix}-{nextNum:D5}";
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting next employee ID");
-                return "EMR-00001";
+                return "EMP-00001";
             }
         }
 

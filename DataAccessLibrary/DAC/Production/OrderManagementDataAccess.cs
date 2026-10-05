@@ -711,7 +711,11 @@ namespace DataAccessLibrary.DAC.Production
                     ISNULL(p.Description, 'Manufacturing Process') AS ProcessName,
                     ISNULL(vid.IssQty, 0) AS IssQty,
                     ISNULL(rcv.TotalRcvd, ISNULL(vid.RcvdQty, 0)) AS RcvdQty,
-                    vid.ReturnDT
+                    vid.ReturnDT,
+                    vi.MakerSignedCopyPath,
+                    vi.MakerSignedCopyFileName,
+                    vi.MakerSignedCopyUploadedAt,
+                    vi.MakerSignedCopyUploadedBy
                 FROM VendIssdDetail vid
                 INNER JOIN VendIssued vi ON vid.RefID = vi.EntryID
                 LEFT JOIN (
@@ -970,6 +974,78 @@ namespace DataAccessLibrary.DAC.Production
             sb.Append(" ORDER BY soa.EntryID DESC");
 
             return (await db.QueryAsync<ItemStockAdjustmentDto>(sb.ToString(), p)).ToList();
+        }
+
+        public async Task<bool> SaveMasterPoSignedCopyAsync(string masterPoNo, int entryId, string filePath, string fileName, string userName)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+
+            string sql;
+            var p = new DynamicParameters();
+            p.Add("@FilePath", filePath);
+            p.Add("@FileName", fileName);
+            p.Add("@UploadedAt", DateTime.Now);
+            p.Add("@UploadedBy", userName);
+
+            if (!string.IsNullOrWhiteSpace(masterPoNo))
+            {
+                sql = @"
+                    UPDATE VendIssued 
+                    SET MakerSignedCopyPath = @FilePath,
+                        MakerSignedCopyFileName = @FileName,
+                        MakerSignedCopyUploadedAt = @UploadedAt,
+                        MakerSignedCopyUploadedBy = @UploadedBy
+                    WHERE MasterPONo = @MasterPONo";
+                p.Add("@MasterPONo", masterPoNo.Trim());
+            }
+            else
+            {
+                sql = @"
+                    UPDATE VendIssued 
+                    SET MakerSignedCopyPath = @FilePath,
+                        MakerSignedCopyFileName = @FileName,
+                        MakerSignedCopyUploadedAt = @UploadedAt,
+                        MakerSignedCopyUploadedBy = @UploadedBy
+                    WHERE EntryID = @EntryID";
+                p.Add("@EntryID", entryId);
+            }
+
+            var rowsAffected = await db.ExecuteAsync(sql, p);
+            return rowsAffected > 0;
+        }
+
+        public async Task<bool> DeleteMasterPoSignedCopyAsync(string masterPoNo, int entryId)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+
+            string sql;
+            var p = new DynamicParameters();
+
+            if (!string.IsNullOrWhiteSpace(masterPoNo))
+            {
+                sql = @"
+                    UPDATE VendIssued 
+                    SET MakerSignedCopyPath = NULL,
+                        MakerSignedCopyFileName = NULL,
+                        MakerSignedCopyUploadedAt = NULL,
+                        MakerSignedCopyUploadedBy = NULL
+                    WHERE MasterPONo = @MasterPONo";
+                p.Add("@MasterPONo", masterPoNo.Trim());
+            }
+            else
+            {
+                sql = @"
+                    UPDATE VendIssued 
+                    SET MakerSignedCopyPath = NULL,
+                        MakerSignedCopyFileName = NULL,
+                        MakerSignedCopyUploadedAt = NULL,
+                        MakerSignedCopyUploadedBy = NULL
+                    WHERE EntryID = @EntryID";
+                p.Add("@EntryID", entryId);
+            }
+
+            var rowsAffected = await db.ExecuteAsync(sql, p);
+            return rowsAffected > 0;
         }
     }
 }

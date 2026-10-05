@@ -192,7 +192,8 @@
                                                     tabindex="0"
                                                     MouseButtonTrigger="MouseButtonTrigger.Right"
                                                     CssClass="@($"clickable-row key-{ledger.VchrNo} {(ledger.VchrNo == pVoucherNo ? "table-primary" : "")} {(isFirst ? "voucher-start" : "")}")"
-                                                    Id="@($"row-{ledger.VchrNo}")"        
+                                                    Id="@($"row-{ledger.VchrNo}")"
+                                                    @onmouseup="@(async (MouseEventArgs e) => await OnRowMouseUp(e, ledger.VchrNo))"
                                             >
                                                 <td class="text-center">@(isFirst ? ledger.VDate.ToString("dd-MMM-yyyy") : "")</td>
                                                 <td class="fw-bold text-nowrap">@(isFirst ? ledger.VchrNo : "")</td>
@@ -216,7 +217,8 @@
                                                     <ContextMenuTrigger MenuId="accountContextMenu"
                                                              Data="ledger"
                                                              MouseButtonTrigger="MouseButtonTrigger.Left">
-                                                        <button class="btn btn-sm text-secondary p-0" style="border:none; background:none;">
+                                                        <button class="btn btn-sm text-secondary p-0" style="border:none; background:none;"
+                                                                @onmouseup="@(async (MouseEventArgs e) => await OnRowMouseUp(e, ledger.VchrNo))">
                                                             <i class="fas fa-ellipsis-v"></i>
                                                         </button>
                                                     </ContextMenuTrigger>
@@ -246,6 +248,7 @@
 <!-- CONTEXT MENU -->
 <ContextMenu Id="accountContextMenu"
         UseDefaultEventHandlers="true"
+        OnAppearing="OnContextMenuAppearing"
              Template="Win11Style">
 
         <Item class="menu-item" OnClick="@RefreshLedger">
@@ -273,6 +276,18 @@
         <Item class="menu-item" OnClick="@(async e => await ShowPrintChequeModal(e))">
             <i class="fas fa-money-check fa-fw win11-icon text-success"></i> Print Cheque
         </Item>
+        @if (IsMakerBillVisible)
+        {
+            <Item class="menu-item" Visible="@IsMakerBillVisible" OnClick="@(async e => await PrintMakerBill(e))">
+                <i class="fas fa-file-invoice fa-fw win11-icon text-info"></i> Print Maker Bill
+            </Item>
+        }
+        @if (IsVendorBillVisible)
+        {
+            <Item class="menu-item" Visible="@IsVendorBillVisible" OnClick="@(async e => await PrintVendorBill(e))">
+                <i class="fas fa-file-invoice-dollar fa-fw win11-icon text-warning"></i> Print Vendor Bill
+            </Item>
+        }
 
 </ContextMenu>
 

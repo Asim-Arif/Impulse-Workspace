@@ -76,29 +76,63 @@ namespace DataAccessLibrary.DAC.Stock
 
             try
             {
-                // Generate next AccNo for the selected category
-                string maxAccSql = @"
-                    SELECT TOP 1 AccNo FROM Accounts 
-                    WHERE SubAccOf = @ParentAccNo 
-                    ORDER BY CAST(RIGHT(AccNo, LEN(AccNo) - CHARINDEX('-', AccNo, CHARINDEX('-', AccNo) + 1)) AS INT) DESC";
-                
-                string lastAccNo = await connection.ExecuteScalarAsync<string>(maxAccSql, new { ParentAccNo = model.ParentAccNo }, transaction);
-                
-                string newAccNo = string.Empty;
-                if (!string.IsNullOrEmpty(lastAccNo))
+                string accType = !string.IsNullOrEmpty(model.ParentAccNo) && model.ParentAccNo.Length >= 2 
+                    ? model.ParentAccNo.Substring(0, 2) 
+                    : "24";
+
+                // Generate next AccNo for the selected category using standard ERP logic
+                string newAccNo = await connection.ExecuteScalarAsync<string>(
+                    "SELECT dbo.GetNextAccno(@AccountName, @AccType, @ParentAccount, 0)",
+                    new {
+                        AccountName = model.VendorName ?? string.Empty,
+                        AccType = accType,
+                        ParentAccount = model.ParentAccNo
+                    },
+                    transaction);
+
+                // Robust fallback in case function returns null or empty
+                if (string.IsNullOrWhiteSpace(newAccNo))
                 {
-                    int lastDash = lastAccNo.LastIndexOf('-');
-                    if (lastDash >= 0 && int.TryParse(lastAccNo.Substring(lastDash + 1), out int sequence))
+                    string prefix = "00";
+                    if (!string.IsNullOrWhiteSpace(model.VendorName))
                     {
-                        newAccNo = $"{model.ParentAccNo}-{sequence + 1:D3}";
+                        char firstChar = char.ToUpperInvariant(model.VendorName.Trim()[0]);
+                        if (firstChar >= 'A' && firstChar <= 'Z')
+                        {
+                            prefix = (firstChar - 64).ToString("00");
+                        }
                     }
-                }
-                
-                if (string.IsNullOrEmpty(newAccNo))
-                {
-                    // Fallback if no accounts exist under this parent
-                    // Often starts with 001 or 1 depending on system, let's use 001
-                    newAccNo = $"{model.ParentAccNo}-001";
+
+                    // Query existing child account numbers under this parent safely without SQL casting
+                    var existingAccNos = (await connection.QueryAsync<string>(
+                        "SELECT AccNo FROM Accounts WHERE SubAccOf = @ParentAccNo",
+                        new { ParentAccNo = model.ParentAccNo },
+                        transaction)).ToList();
+
+                    int maxSeq = 0;
+                    foreach (var acc in existingAccNos)
+                    {
+                        if (string.IsNullOrEmpty(acc)) continue;
+                        int lastDash = acc.LastIndexOf('-');
+                        if (lastDash >= 0 && lastDash + 1 < acc.Length)
+                        {
+                            string suffix = acc.Substring(lastDash + 1);
+                            // Suffix format is {Prefix 2 digits}{Seq 3 digits} e.g. 03009
+                            if (suffix.Length == 5 && suffix.StartsWith(prefix))
+                            {
+                                if (int.TryParse(suffix.Substring(2), out int seq) && seq > maxSeq)
+                                {
+                                    maxSeq = seq;
+                                }
+                            }
+                            else if (suffix.Length <= 3 && int.TryParse(suffix, out int simpleSeq) && simpleSeq > maxSeq)
+                            {
+                                maxSeq = simpleSeq;
+                            }
+                        }
+                    }
+
+                    newAccNo = $"{model.ParentAccNo}-{prefix}{maxSeq + 1:D3}";
                 }
 
                 model.AccNo = newAccNo;
@@ -109,13 +143,14 @@ namespace DataAccessLibrary.DAC.Stock
                 // 1. Insert into Accounts
                 string sqlAccount = @"
                     INSERT INTO Accounts (AccNo, AccTitle, SubAccOf, Type, openbal, opendate, Balance, Parent, Active, UserName, ComputerName)
-                    VALUES (@AccNo, @VendorName, @ParentAccNo, '0', @OpenBal, @OpenDate, @OpenBal, 0, @Active, 'Developer', 'Developer');
+                    VALUES (@AccNo, @VendorName, @ParentAccNo, @Type, @OpenBal, @OpenDate, @OpenBal, 0, @Active, 'Developer', 'Developer');
                 ";
                 
                 var accParams = new {
                     AccNo = model.AccNo,
                     VendorName = model.VendorName,
                     ParentAccNo = model.ParentAccNo,
+                    Type = accType,
                     OpenBal = actualOpenBal,
                     OpenDate = DateTime.Now.Date,
                     Active = model.Inactive ? 0 : 1

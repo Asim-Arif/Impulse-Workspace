@@ -15,5 +15,7 @@ namespace DataAccessLibrary.Interface.Production
         Task<List<ItemRunningLotDto>> GetItemRunningLotsAsync(string orderNo, string itemCode, string? compItemCode = null);
         Task<List<ItemStockAdjustmentDto>> GetItemStockAdjustmentsAsync(string orderNo, string itemCode, string? compItemCode = null);
         Task<List<ItemDispatchDetailDto>> GetItemDispatchDetailsAsync(string orderNo, string itemCode, string? compItemCode = null);
+        Task<bool> SaveMasterPoSignedCopyAsync(string masterPoNo, int entryId, string filePath, string fileName, string userName);
+        Task<bool> DeleteMasterPoSignedCopyAsync(string masterPoNo, int entryId);
     }
 }

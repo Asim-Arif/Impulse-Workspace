@@ -53,6 +53,43 @@ namespace Impulse.Pages.Setups.Users
         protected string OptionSearchFilter { get; set; } = string.Empty;
         protected bool IsLoadingOptions { get; set; } = false;
 
+        // Customers Access State
+        protected List<UserCustomerPermissionModel> AvailableCustomers { get; set; } = new();
+        protected string CustomerSearchFilter { get; set; } = string.Empty;
+        protected int TotalSelectedCustomersCount => AvailableCustomers.Count(c => c.IsAssigned);
+        protected IEnumerable<UserCustomerPermissionModel> FilteredCustomers
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(CustomerSearchFilter))
+                    return AvailableCustomers;
+
+                var term = CustomerSearchFilter.Trim();
+                return AvailableCustomers.Where(c =>
+                    (!string.IsNullOrEmpty(c.CustCode) && c.CustCode.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrEmpty(c.CustomerName) && c.CustomerName.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrEmpty(c.Country) && c.Country.Contains(term, StringComparison.OrdinalIgnoreCase)));
+            }
+        }
+
+        // Stores Access State
+        protected List<UserStorePermissionModel> AvailableStores { get; set; } = new();
+        protected string StoreSearchFilter { get; set; } = string.Empty;
+        protected int TotalSelectedStoresCount => AvailableStores.Count(s => s.IsAssigned);
+        protected IEnumerable<UserStorePermissionModel> FilteredStores
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(StoreSearchFilter))
+                    return AvailableStores;
+
+                var term = StoreSearchFilter.Trim();
+                return AvailableStores.Where(s =>
+                    (!string.IsNullOrEmpty(s.StoreName) && s.StoreName.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
+                    s.StoreId.ToString().Contains(term));
+            }
+        }
+
         private int _lastLoadedUserId = -1;
         private bool _wasOpen = false;
 
@@ -69,6 +106,7 @@ namespace Impulse.Pages.Setups.Users
 
                     await LoadEmployeesAsync();
                     await LoadPermissionsDataAsync();
+                    await LoadCustomersAndStoresAsync();
 
                     if (!string.IsNullOrEmpty(User.EmpID))
                     {
@@ -173,15 +211,26 @@ namespace Impulse.Pages.Setups.Users
             }
         }
 
+        protected bool IsOptionChecked(string optionId)
+            => PermissionService.IsOptionGranted(optionId, UserSelectedOptionIds);
+
         protected void ToggleOption(string optionId, bool isChecked)
         {
             if (isChecked)
             {
                 UserSelectedOptionIds.Add(optionId);
+                foreach (var alias in PermissionService.GetOptionAliases(optionId))
+                {
+                    UserSelectedOptionIds.Add(alias);
+                }
             }
             else
             {
                 UserSelectedOptionIds.Remove(optionId);
+                foreach (var alias in PermissionService.GetOptionAliases(optionId))
+                {
+                    UserSelectedOptionIds.Remove(alias);
+                }
             }
         }
 
@@ -190,6 +239,10 @@ namespace Impulse.Pages.Setups.Users
             foreach (var opt in FilteredModuleOptions)
             {
                 UserSelectedOptionIds.Add(opt.OptionID);
+                foreach (var alias in PermissionService.GetOptionAliases(opt.OptionID))
+                {
+                    UserSelectedOptionIds.Add(alias);
+                }
             }
         }
 
@@ -198,10 +251,14 @@ namespace Impulse.Pages.Setups.Users
             foreach (var opt in FilteredModuleOptions)
             {
                 UserSelectedOptionIds.Remove(opt.OptionID);
+                foreach (var alias in PermissionService.GetOptionAliases(opt.OptionID))
+                {
+                    UserSelectedOptionIds.Remove(alias);
+                }
             }
         }
 
-        protected int CurrentModuleSelectedCount => CurrentModuleOptions.Count(o => UserSelectedOptionIds.Contains(o.OptionID));
+        protected int CurrentModuleSelectedCount => CurrentModuleOptions.Count(o => IsOptionChecked(o.OptionID));
         protected int TotalSelectedOptionsCount => UserSelectedOptionIds.Count;
 
         private async Task LoadEmployeesAsync()
@@ -278,6 +335,8 @@ namespace Impulse.Pages.Setups.Users
                     {
                         User.UserID = newId;
                         await PermissionService.SaveAllUserMenuOptionsAsync(newId, UserSelectedOptionIds);
+                        await UserService.SaveUserCustomersAsync(newId, AvailableCustomers.Where(c => c.IsAssigned).Select(c => c.CustCode));
+                        await UserService.SaveUserStoresAsync(newId, AvailableStores.Where(s => s.IsAssigned).Select(s => s.StoreId));
 
                         NotificationService.Notify(new NotificationMessage
                         {
@@ -305,6 +364,8 @@ namespace Impulse.Pages.Setups.Users
                     if (success)
                     {
                         await PermissionService.SaveAllUserMenuOptionsAsync(User.UserID, UserSelectedOptionIds);
+                        await UserService.SaveUserCustomersAsync(User.UserID, AvailableCustomers.Where(c => c.IsAssigned).Select(c => c.CustCode));
+                        await UserService.SaveUserStoresAsync(User.UserID, AvailableStores.Where(s => s.IsAssigned).Select(s => s.StoreId));
 
                         NotificationService.Notify(new NotificationMessage
                         {
@@ -340,6 +401,31 @@ namespace Impulse.Pages.Setups.Users
             finally
             {
                 IsSaving = false;
+            }
+        }
+
+        private async Task LoadCustomersAndStoresAsync()
+        {
+            int targetUserId = (User != null && User.UserID > 0) ? User.UserID : 0;
+            AvailableCustomers = await UserService.GetCustomersWithUserAssignmentAsync(targetUserId);
+            AvailableStores = await UserService.GetStoresWithUserAssignmentAsync(targetUserId);
+        }
+
+        protected void SelectAllCustomers(bool select)
+        {
+            var targets = string.IsNullOrWhiteSpace(CustomerSearchFilter) ? AvailableCustomers : FilteredCustomers;
+            foreach (var c in targets)
+            {
+                c.IsAssigned = select;
+            }
+        }
+
+        protected void SelectAllStores(bool select)
+        {
+            var targets = string.IsNullOrWhiteSpace(StoreSearchFilter) ? AvailableStores : FilteredStores;
+            foreach (var s in targets)
+            {
+                s.IsAssigned = select;
             }
         }
 

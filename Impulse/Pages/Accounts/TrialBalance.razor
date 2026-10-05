@@ -1,4 +1,4 @@
-﻿@page "/accounts/trialbalance"
+@page "/accounts/trialbalance"
 @page "/accounts/trialbalance/{TrialType:int}"
 @attribute [Authorize]
 <PageTitle>Trial Balance</PageTitle>
@@ -136,22 +136,22 @@
                     </ContextMenuProvider>
                 </div>
                 <div class="d-flex justify-content-end gap-2 mt-3 border-top pt-3">
-                <button class="btn btn-outline-success btn-sm px-3 btn-min-width" @onclick="PrintTrialBalanceReport">
+                    <button class="btn btn-outline-success btn-sm px-3 btn-min-width" @onclick="PrintClosingBalance">
                         <i class="fas fa-print me-1"></i> Print with Closing Balance
                     </button>
 
-                <button class="btn btn-outline-success btn-sm px-3 btn-min-width" @onclick="PrintTrialBalanceReport">
+                    <button class="btn btn-outline-success btn-sm px-3 btn-min-width" @onclick="PrintOpeningBalance">
                         <i class="fas fa-print me-1"></i> Print with Op. Balance
                     </button>
 
-                <button class="btn btn-outline-success btn-sm px-3 btn-min-width" @onclick="PrintTrialBalanceReport">
+                    <button class="btn btn-outline-success btn-sm px-3 btn-min-width" @onclick="PrintTrialBalanceII">
                         <i class="fas fa-print me-1"></i> Print II
                     </button>
 
-                    <button class="btn btn-outline-success btn-sm px-3 btn-min-width" @onclick="PrintTrialBalanceReport">
-                            <i class="fas fa-print me-1"></i> Print
-                        </button>
-                    </div>
+                    <button class="btn btn-outline-success btn-sm px-3 btn-min-width" @onclick="PrintStandardTrialBalance">
+                        <i class="fas fa-print me-1"></i> Print
+                    </button>
+                </div>
             }
             else
             {

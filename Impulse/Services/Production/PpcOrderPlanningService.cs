@@ -52,6 +52,16 @@ namespace Impulse.Services.Production
             bool ok = await _dataAccess.SavePpcPlanAsync(request);
             if (!ok) return false;
 
+            // Complete pending PPC workflow task for this customer order
+            try
+            {
+                await _workflowTaskEngine.CompleteRoleTaskAsync("CustomerOrder", request.OrderNo, "PPC", request.PlannedBy ?? "PPC Planner");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error completing PPC task for Order #{OrderNo}", request.OrderNo);
+            }
+
             // Dispatch 3 streams of tasks and real-time notifications
             try
             {

@@ -2,6 +2,7 @@ using DataAccessLibrary.Models.ViewModels.Production;
 using Impulse.Services;
 using Impulse.Services.Production;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Forms;
 using Radzen;
 using System;
 using System.Collections.Generic;
@@ -34,6 +35,7 @@ namespace Impulse.Pages.Production.OrderManagement
         [Inject] private NavigationManager NavManager { get; set; } = default!;
         [Inject] private NotificationService NotificationService { get; set; } = default!;
         [Inject] private Impulse.Services.Setup.IUserPermissionService PermissionService { get; set; } = default!;
+        [Inject] private Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthStateProvider { get; set; } = default!;
 
         // Access Controls
         protected bool CanShowCustomerOrderNo => PermissionService.ShowCustomerOrderNo;
@@ -67,6 +69,20 @@ namespace Impulse.Pages.Production.OrderManagement
         protected bool IsLoadingDetails { get; set; } = false;
         protected int ActiveTab { get; set; } = 1; // 1 = POs, 2 = Running Lots, 3 = Dispatch Details
         protected bool ShowAllDetailsTogether { get; set; } = false;
+
+        // Master PO Maker Signed Copy Modal & Preview State
+        protected bool ShowAttachSignedCopyModal { get; set; } = false;
+        protected ItemPurchaseOrderDto? SelectedPoForAttachment { get; set; }
+        protected IBrowserFile? SelectedAttachmentFile { get; set; }
+        protected string? SelectedAttachmentFileName { get; set; }
+        protected long SelectedAttachmentFileSize { get; set; }
+        protected string? AttachmentErrorMessage { get; set; }
+        protected bool IsUploadingAttachment { get; set; } = false;
+        protected bool IsDeletingAttachment { get; set; } = false;
+
+        protected bool ShowPdfPreviewModal { get; set; } = false;
+        protected string? PreviewPdfUrl { get; set; }
+        protected string? PreviewPdfTitle { get; set; }
 
         protected override async Task OnInitializedAsync()
         {
@@ -349,5 +365,256 @@ namespace Impulse.Pages.Production.OrderManagement
                 });
             }
         }
+
+        protected async Task PrintPtcForLotAsync(string? lotNo)
+        {
+            if (string.IsNullOrWhiteSpace(lotNo) || lotNo == "0")
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Warning,
+                    Summary = "Invalid Lot",
+                    Detail = "Please select a valid Lot No to print PTC.",
+                    Duration = 3000
+                });
+                return;
+            }
+
+            try
+            {
+                await ReportNavigationService.PrintReportAsync(new ReportRequest
+                {
+                    ReportName = "PTCQel.rpt",
+                    Parameters = new Dictionary<string, object>
+                    {
+                        { "@LotNo", lotNo.Trim() }
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Print Error",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+            }
+        }
+
+        #region Master PO Maker Signed Copy Modal & Preview Methods
+
+        protected void OpenAttachSignedCopyModal(ItemPurchaseOrderDto po)
+        {
+            SelectedPoForAttachment = po;
+            SelectedAttachmentFile = null;
+            SelectedAttachmentFileName = null;
+            SelectedAttachmentFileSize = 0;
+            AttachmentErrorMessage = null;
+            ShowAttachSignedCopyModal = true;
+        }
+
+        protected void CloseAttachSignedCopyModal()
+        {
+            ShowAttachSignedCopyModal = false;
+            SelectedPoForAttachment = null;
+            SelectedAttachmentFile = null;
+            SelectedAttachmentFileName = null;
+            SelectedAttachmentFileSize = 0;
+            AttachmentErrorMessage = null;
+            IsUploadingAttachment = false;
+            IsDeletingAttachment = false;
+        }
+
+        protected void OnAttachmentFileSelected(Microsoft.AspNetCore.Components.Forms.InputFileChangeEventArgs e)
+        {
+            AttachmentErrorMessage = null;
+            var file = e.File;
+
+            if (file == null)
+            {
+                SelectedAttachmentFile = null;
+                SelectedAttachmentFileName = null;
+                SelectedAttachmentFileSize = 0;
+                return;
+            }
+
+            var extension = System.IO.Path.GetExtension(file.Name);
+            if (string.IsNullOrWhiteSpace(extension) || !extension.Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                AttachmentErrorMessage = "Only PDF (.pdf) files are allowed.";
+                SelectedAttachmentFile = null;
+                SelectedAttachmentFileName = null;
+                SelectedAttachmentFileSize = 0;
+                return;
+            }
+
+            const long maxFileSize = 15 * 1024 * 1024; // 15 MB
+            if (file.Size > maxFileSize)
+            {
+                AttachmentErrorMessage = "File size exceeds 15 MB limit.";
+                SelectedAttachmentFile = null;
+                SelectedAttachmentFileName = null;
+                SelectedAttachmentFileSize = 0;
+                return;
+            }
+
+            SelectedAttachmentFile = file;
+            SelectedAttachmentFileName = file.Name;
+            SelectedAttachmentFileSize = file.Size;
+        }
+
+        protected async Task SaveSignedCopyAttachmentAsync()
+        {
+            if (SelectedPoForAttachment == null) return;
+
+            if (SelectedAttachmentFile == null)
+            {
+                AttachmentErrorMessage = "Please choose a PDF file to attach.";
+                return;
+            }
+
+            IsUploadingAttachment = true;
+            AttachmentErrorMessage = null;
+
+            try
+            {
+                var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+                var userName = authState.User?.Identity?.Name ?? "User";
+
+                using var stream = SelectedAttachmentFile.OpenReadStream(15 * 1024 * 1024);
+                var (success, errorMessage, relativePath) = await OrderService.UploadMasterPoSignedCopyAsync(
+                    SelectedPoForAttachment.MasterPONo,
+                    SelectedPoForAttachment.EntryID,
+                    stream,
+                    SelectedAttachmentFile.Name,
+                    userName);
+
+                if (success && !string.IsNullOrWhiteSpace(relativePath))
+                {
+                    var now = DateTime.Now;
+                    var fileName = SelectedAttachmentFile.Name;
+
+                    // Update selected PO
+                    SelectedPoForAttachment.MakerSignedCopyPath = relativePath;
+                    SelectedPoForAttachment.MakerSignedCopyFileName = fileName;
+                    SelectedPoForAttachment.MakerSignedCopyUploadedAt = now;
+                    SelectedPoForAttachment.MakerSignedCopyUploadedBy = userName;
+
+                    // Synchronize all rows in ItemPOs sharing the same MasterPONo
+                    if (!string.IsNullOrWhiteSpace(SelectedPoForAttachment.MasterPONo))
+                    {
+                        foreach (var sibling in ItemPOs.Where(p => string.Equals(p.MasterPONo, SelectedPoForAttachment.MasterPONo, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            sibling.MakerSignedCopyPath = relativePath;
+                            sibling.MakerSignedCopyFileName = fileName;
+                            sibling.MakerSignedCopyUploadedAt = now;
+                            sibling.MakerSignedCopyUploadedBy = userName;
+                        }
+                    }
+
+                    NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Attachment Saved",
+                        Detail = "Master PO Maker Signed Scanned Copy uploaded and linked successfully.",
+                        Duration = 4000
+                    });
+
+                    CloseAttachSignedCopyModal();
+                }
+                else
+                {
+                    AttachmentErrorMessage = errorMessage ?? "Failed to upload attachment.";
+                }
+            }
+            catch (Exception ex)
+            {
+                AttachmentErrorMessage = $"Upload error: {ex.Message}";
+            }
+            finally
+            {
+                IsUploadingAttachment = false;
+            }
+        }
+
+        protected async Task DeleteSignedCopyAttachmentAsync()
+        {
+            if (SelectedPoForAttachment == null) return;
+
+            IsDeletingAttachment = true;
+            try
+            {
+                var success = await OrderService.DeleteMasterPoSignedCopyAsync(
+                    SelectedPoForAttachment.MasterPONo,
+                    SelectedPoForAttachment.EntryID,
+                    SelectedPoForAttachment.MakerSignedCopyPath);
+
+                if (success)
+                {
+                    var masterPo = SelectedPoForAttachment.MasterPONo;
+
+                    // Clear selected PO
+                    SelectedPoForAttachment.MakerSignedCopyPath = null;
+                    SelectedPoForAttachment.MakerSignedCopyFileName = null;
+                    SelectedPoForAttachment.MakerSignedCopyUploadedAt = null;
+                    SelectedPoForAttachment.MakerSignedCopyUploadedBy = null;
+
+                    // Synchronize all sibling rows
+                    if (!string.IsNullOrWhiteSpace(masterPo))
+                    {
+                        foreach (var sibling in ItemPOs.Where(p => string.Equals(p.MasterPONo, masterPo, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            sibling.MakerSignedCopyPath = null;
+                            sibling.MakerSignedCopyFileName = null;
+                            sibling.MakerSignedCopyUploadedAt = null;
+                            sibling.MakerSignedCopyUploadedBy = null;
+                        }
+                    }
+
+                    NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Attachment Removed",
+                        Detail = "Master PO Maker Signed Scanned Copy removed successfully.",
+                        Duration = 4000
+                    });
+
+                    CloseAttachSignedCopyModal();
+                }
+                else
+                {
+                    AttachmentErrorMessage = "Failed to remove attachment from database.";
+                }
+            }
+            catch (Exception ex)
+            {
+                AttachmentErrorMessage = $"Delete error: {ex.Message}";
+            }
+            finally
+            {
+                IsDeletingAttachment = false;
+            }
+        }
+
+        protected void OpenPdfPreview(ItemPurchaseOrderDto po)
+        {
+            if (string.IsNullOrWhiteSpace(po.MakerSignedCopyPath)) return;
+
+            PreviewPdfUrl = po.MakerSignedCopyPath;
+            var poLabel = !string.IsNullOrWhiteSpace(po.MasterPONo) ? $"Master PO: {po.MasterPONo}" : $"PO: {po.POReceiptID}";
+            PreviewPdfTitle = $"{poLabel} - Signed Scanned Copy ({po.VenderName})";
+            ShowPdfPreviewModal = true;
+        }
+
+        protected void ClosePdfPreview()
+        {
+            ShowPdfPreviewModal = false;
+            PreviewPdfUrl = null;
+            PreviewPdfTitle = null;
+        }
+
+        #endregion
     }
 }

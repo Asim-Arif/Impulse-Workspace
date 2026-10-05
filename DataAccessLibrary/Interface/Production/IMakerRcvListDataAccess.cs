@@ -15,6 +15,7 @@ namespace DataAccessLibrary.Interface.Production
         Task<List<LookupItemInt>> GetProcessesAsync();
         Task<bool> DeleteReceivingAsync(long vrdEntryId, string userName, string machineName);
         Task<bool> CloseLotAsync(string lotNo, string userName, string machineName);
+        Task<(bool Success, string Message)> MarkMoveToStoreAsync(long vrdEntryId, string userName, string machineName);
         Task<bool> UpdateManualPTCNoAsync(string lotNo, string manualPTCNo);
         Task<int> CheckIssuanceExistsAsync(long vrdEntryId);
         Task<bool> GetUserRightAsync(string rightName, string userName);

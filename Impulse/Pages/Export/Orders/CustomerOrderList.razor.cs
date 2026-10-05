@@ -33,6 +33,19 @@ namespace Impulse.Pages.Export.Orders
         public int ViewType { get; set; } = 0; // 0 = Show All, 1 = Non Parts & Stock, 2 = Parts & Stock Only
 
         [Parameter]
+        [SupplyParameterFromQuery(Name = "forProduction")]
+        public bool? ForProductionParam { get; set; }
+
+        [Parameter]
+        [SupplyParameterFromQuery(Name = "sample")]
+        public bool? SampleParam { get; set; }
+
+        protected bool IsProductionMode => 
+            ForProductionParam == true || NavigationManager.Uri.Contains("/production/", StringComparison.OrdinalIgnoreCase);
+
+        protected bool IsSampleMode => SampleParam == true;
+
+        [Parameter]
         [SupplyParameterFromQuery(Name = "orderNo")]
         public string? OrderNoParam { get; set; }
 
@@ -84,6 +97,10 @@ namespace Impulse.Pages.Export.Orders
         protected override async Task OnInitializedAsync()
         {
             await CheckDirectorRoleAsync();
+            if (IsSampleMode)
+            {
+                selectedOrderType = "Sample";
+            }
             await LoadLookups();
 
             if (!string.IsNullOrWhiteSpace(OrderNoParam))
@@ -98,6 +115,11 @@ namespace Impulse.Pages.Export.Orders
 
         protected override async Task OnParametersSetAsync()
         {
+            if (IsSampleMode && selectedOrderType != "Sample")
+            {
+                selectedOrderType = "Sample";
+            }
+
             if (!string.IsNullOrWhiteSpace(OrderNoParam) && searchText != OrderNoParam.Trim())
             {
                 searchText = OrderNoParam.Trim();
@@ -148,7 +170,20 @@ namespace Impulse.Pages.Export.Orders
                     CompanyName = c.DropDownValue_Description 
                 }).ToList();
 
-                customers = await CustomerOrderService.GetCustomersAsync();
+                var allCustomers = await CustomerOrderService.GetCustomersAsync();
+                if (ViewType == 1) // Non Parts & Stock
+                {
+                    customers = allCustomers.Where(c => !new[] { "Parts", "Stock" }.Contains(c.CustCode, StringComparer.OrdinalIgnoreCase)).ToList();
+                }
+                else if (ViewType == 2) // Parts & Stock Only
+                {
+                    customers = allCustomers.Where(c => new[] { "Parts", "Stock" }.Contains(c.CustCode, StringComparer.OrdinalIgnoreCase)).ToList();
+                }
+                else
+                {
+                    customers = allCustomers;
+                }
+
                 await LoadCountries();
             }
             catch (Exception ex)
@@ -510,9 +545,9 @@ namespace Impulse.Pages.Export.Orders
 
         private async Task AuthorizeOrder(CustomerOrderListItemModel order)
         {
-            if (order.Authorized)
+            if (order.AuthorizationStatus == "Authorized" && order.Authorized)
             {
-                NotificationServiceManager.ShowWarning("Already Authorized", $"Order {order.OrderNo} is already authorized.");
+                NotificationServiceManager.ShowWarning("Already Authorized", $"Order {order.OrderNo} is already fully authorized.");
                 return;
             }
 
@@ -528,7 +563,7 @@ namespace Impulse.Pages.Export.Orders
                 bool success = await WorkflowTaskEngine.AuthorizeCustomerOrderAsync(order.OrderNo, currentUserName);
                 if (success)
                 {
-                    NotificationServiceManager.ShowSuccess("Order Authorized", $"Customer Order {order.OrderNo} has been authorized successfully and workflow task generated for PPC.");
+                    NotificationServiceManager.ShowSuccess("Order Authorized", $"Customer Order {order.OrderNo} items authorized successfully and workflow task generated for PPC.");
                     await RefreshList();
                 }
                 else

@@ -52,7 +52,7 @@
             {
                 <div class="nav-sub-section">
                     <div class="nav-sub-links">
-                        <SecureNavLink class="nav-link" href="/setup" Module="Setup" Match="NavLinkMatch.All">
+                        <SecureNavLink class="nav-link" href="/setup" OptionId="SetupHub" Module="Setup" Match="NavLinkMatch.All">
                             <i class="fas fa-sliders-h me-2"></i> Setups Hub
                         </SecureNavLink>
                         <SecureNavLink class="nav-link" href="/setup/users" OptionId="SetupUsers" Module="Setup">
@@ -142,8 +142,14 @@
                         <SecureNavLink class="nav-link" href="/office/leads" OptionId="OfficeLeads" Module="IntraOffice">
                             <i class="fas fa-funnel-dollar me-2 text-success"></i> Leads & Pipeline
                         </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/office/customer-360" OptionId="OfficeLeads" Module="IntraOffice">
+                            <i class="fas fa-users me-2 text-primary"></i> Customer 360° Hub
+                        </SecureNavLink>
                         <SecureNavLink class="nav-link" href="/office/chat" OptionId="OfficeChat" Module="IntraOffice">
                             <i class="fas fa-comments me-2 text-info"></i> Group Discussions
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/office/channels" OptionId="OfficeChat" Module="IntraOffice">
+                            <i class="fas fa-hashtag me-2 text-info"></i> Team Channels
                         </SecureNavLink>
                         <SecureNavLink class="nav-link" href="/office/messages" OptionId="OfficeMessages" Module="IntraOffice">
                             <i class="fas fa-envelope me-2 text-warning"></i> Direct Messages
@@ -156,6 +162,9 @@
                         </SecureNavLink>
                         <SecureNavLink class="nav-link" href="/office/meetings" OptionId="OfficeMeetings" Module="IntraOffice">
                             <i class="fas fa-video me-2 text-danger"></i> Meetings & Rooms
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/office/minutes-approval" OptionId="OfficeMinutes" Module="IntraOffice">
+                            <i class="fas fa-file-circle-plus me-2 text-success"></i> New Minute Memo
                         </SecureNavLink>
                         <SecureNavLink class="nav-link" href="/office/minutes-list" OptionId="OfficeMinutes" Module="IntraOffice">
                             <i class="fas fa-file-signature me-2 text-warning"></i> Executive Minutes
@@ -232,7 +241,7 @@
                         <SecureNavLink class="nav-link" href="/company/currency-exchange-rates" OptionId="CmpExchangeRates" Module="Company">
                             <i class="fas fa-money-bill-wave me-2"></i> Exchange Rates
                         </SecureNavLink>
-                        <SecureNavLink class="nav-link" href="/company/customer-catalog" OptionId="CmpCustomerCatalog" Module="Company">
+                        <SecureNavLink class="nav-link" href="/company/customer-catalog" OptionId="CustomerCatalog" Module="Company">
                             <i class="fas fa-address-book me-2"></i> Customer Catalog
                         </SecureNavLink>
                     </div>
@@ -425,7 +434,7 @@
                         <SecureNavLink class="nav-link" href="/export/advance-payment-list" OptionId="ExpAdvancePayment" Module="Export">
                             <i class="fas fa-money-check-dollar me-2"></i> Advance Payment List
                         </SecureNavLink>
-                        <SecureNavLink class="nav-link" href="/export/order-item-list" OptionId="ExpOrderItemList" Module="Export">
+                        <SecureNavLink class="nav-link" href="/export/order-item-list" OptionId="OrderItemList" Module="Export">
                             <i class="fas fa-clipboard-list me-2"></i> Order Item List
                         </SecureNavLink>
                         <SecureNavLink class="nav-link" href="/export/orders/customer-item-balances" OptionId="ExpCustomerItemBalances" Module="Export">
@@ -440,10 +449,10 @@
                         <SecureNavLink class="nav-link" href="/export/proformas/proforma-list" OptionId="ExpProformaList" Module="Export">
                             <i class="fas fa-file-invoice me-2"></i> Proforma List
                         </SecureNavLink>
-                        <SecureNavLink class="nav-link" href="/export/invoices/custom" OptionId="ExpCustomInvoice" Module="Export">
+                        <SecureNavLink class="nav-link" href="/export/invoices/custom" OptionId="CustomInvoice" Module="Export">
                             <i class="fas fa-file-invoice-dollar me-2"></i> Custom Invoice List
                         </SecureNavLink>
-                        <SecureNavLink class="nav-link" href="/export/custominvoices/new-custominvoice" OptionId="ExpNewCustomInvoice" Module="Export">
+                        <SecureNavLink class="nav-link" href="/export/custominvoices/new-custominvoice" OptionId="NewCustomInvoice" Module="Export">
                             <i class="fas fa-file-invoice me-2"></i> New Custom Invoice
                         </SecureNavLink>
                         <SecureNavLink class="nav-link" href="/export/custom-payment-status" OptionId="ExpCustomPaymentStatus" Module="Export">
@@ -467,11 +476,14 @@
                         <SecureNavLink class="nav-link" href="/export/invoices/shipping-instructions" OptionId="ExpShippingInstructions" Module="Export">
                             <i class="fas fa-ship me-2"></i> Shipping Instructions
                         </SecureNavLink>
-                        <SecureNavLink class="nav-link" href="/export/invoices/print-valuation-form" OptionId="ExpValuationForm" Module="Export">
+                        <SecureNavLink class="nav-link" href="/export/invoices/print-valuation-form" OptionId="PrintValuationForm" Module="Export">
                             <i class="fas fa-file-invoice me-2"></i> Print Valuation Form
                         </SecureNavLink>
                         <SecureNavLink class="nav-link" href="/export/invoices/commercial-covering" OptionId="ExpCommercialCovering" Module="Export">
                             <i class="fas fa-file-alt me-2"></i> Commercial Covering Letter
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/export/statistics" OptionId="ExpStatistics" Module="Export">
+                            <i class="fas fa-chart-line me-2"></i> Export Statistics
                         </SecureNavLink>
                     </div>
                 </div>
@@ -518,7 +530,7 @@
                         <SecureNavLink class="nav-link" href="/payroll/employee-transfer" OptionId="PayEmpTransfer" Module="Payroll">
                             <i class="fas fa-exchange-alt me-2"></i> Employee Transfer
                         </SecureNavLink>
-                        <SecureNavLink class="nav-link" href="/payroll/manual-attendance" OptionId="PayAttendanceManual" Module="Payroll">
+                        <SecureNavLink class="nav-link" href="/payroll/manual-attendance" OptionId="PrlTakeAttendanceEx" Module="Payroll">
                             <i class="fas fa-clock me-2"></i> Manual Attendance
                         </SecureNavLink>
                         <SecureNavLink class="nav-link" href="/payroll/overtime-authorization" OptionId="PayOvertimeAuth" Module="Payroll">
@@ -572,13 +584,13 @@
                         <SecureNavLink class="nav-link" href="/payroll/gratuity-calculation?returnUrl=/payroll" OptionId="PayGratuity" Module="Payroll">
                             <i class="fas fa-gift me-2"></i> Gratuity Calculation
                         </SecureNavLink>
-                        <SecureNavLink class="nav-link" href="/payroll/absent-sheet?returnUrl=/payroll" OptionId="PayAbsentSheet" Module="Payroll">
+                        <SecureNavLink class="nav-link" href="/payroll/absent-sheet?returnUrl=/payroll" OptionId="PrlAbsentSheet" Module="Payroll">
                             <i class="fas fa-user-slash me-2"></i> Absent Sheet
                         </SecureNavLink>
-                        <SecureNavLink class="nav-link" href="/payroll/social-security?returnUrl=/payroll" OptionId="PaySocialSecurity" Module="Payroll">
+                        <SecureNavLink class="nav-link" href="/payroll/social-security?returnUrl=/payroll" OptionId="PrlSocialSecurity" Module="Payroll">
                             <i class="fas fa-shield-alt me-2"></i> Social Security
                         </SecureNavLink>
-                        <SecureNavLink class="nav-link" href="/payroll/eobi?returnUrl=/payroll" OptionId="PayEOBI" Module="Payroll">
+                        <SecureNavLink class="nav-link" href="/payroll/eobi?returnUrl=/payroll" OptionId="PrlEOBI" Module="Payroll">
                             <i class="fas fa-building-user me-2"></i> EOBI Sheet
                         </SecureNavLink>
                         <SecureNavLink class="nav-link" href="/payroll/designations?returnUrl=/payroll" OptionId="PayDesignation" Module="Payroll">
@@ -587,7 +599,7 @@
                         <SecureNavLink class="nav-link" href="/payroll/settings?returnUrl=/payroll" OptionId="PaySettings" Module="Payroll">
                             <i class="fas fa-sliders-h me-2"></i> Payroll Settings
                         </SecureNavLink>
-                        <SecureNavLink class="nav-link" href="/payroll/policies?returnUrl=/payroll" OptionId="PayPolicies" Module="Payroll">
+                        <SecureNavLink class="nav-link" href="/payroll/policies?returnUrl=/payroll" OptionId="PrlPayrollPolicies" Module="Payroll">
                             <i class="fas fa-file-contract me-2"></i> Payroll Policies
                         </SecureNavLink>
                         <SecureNavLink class="nav-link" href="/payroll/holidays?returnUrl=/payroll" OptionId="PayHolidays" Module="Payroll">
@@ -629,7 +641,7 @@
                         <SecureNavLink class="nav-link" href="/stock" Module="Stock">
                             <i class="fas fa-gauge me-2"></i> Stock Dashboard
                         </SecureNavLink>
-                        <SecureNavLink class="nav-link" href="/stock/rmgroups" OptionId="StkRMGroups" Module="Stock">
+                        <SecureNavLink class="nav-link" href="/stock/rmgroups" OptionId="StkMaterialGroup" Module="Stock">
                             <i class="fas fa-layer-group me-2"></i> Raw Material Groups
                         </SecureNavLink>
                         <SecureNavLink class="nav-link" href="/newrm" OptionId="StkNewRM" Module="Stock">
@@ -683,6 +695,9 @@
                         <SecureNavLink class="nav-link" href="/stock/finish-stock-issuance" OptionId="StkFinishIssuance" Module="Stock">
                             <i class="fas fa-boxes-stacked me-2"></i> Finish Stock Issuance
                         </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/stock/stock-order-adjustment?returnUrl=/stock" OptionId="StkFinishIssuance" Module="Stock">
+                            <i class="fas fa-boxes-packing me-2"></i> Stock Order Adjustment (PPC)
+                        </SecureNavLink>
                         <SecureNavLink class="nav-link" href="/stock/finish-stock-receiving" OptionId="StkFinishReceiving" Module="Stock">
                             <i class="fas fa-boxes-packing me-2"></i> Finish Stock Receiving
                         </SecureNavLink>
@@ -695,10 +710,10 @@
                         <SecureNavLink class="nav-link" href="/stock/finish-stock-movement" OptionId="StkFinishMovement" Module="Stock">
                             <i class="fas fa-right-left me-2"></i> Finish Stock Movement
                         </SecureNavLink>
-                        <SecureNavLink class="nav-link" href="/stock/vendor-billing-list" OptionId="StkVendorBillingList" Module="Stock">
+                        <SecureNavLink class="nav-link" href="/stock/vendor-billing-list" OptionId="StkVenderBillingList" Module="Stock">
                             <i class="fas fa-file-invoice-dollar me-2"></i> Vendor Billing List
                         </SecureNavLink>
-                        <SecureNavLink class="nav-link" href="/stock/vendor-billing" OptionId="StkVendorBilling" Module="Stock">
+                        <SecureNavLink class="nav-link" href="/stock/vendor-billing" OptionId="StkVenderBilling" Module="Stock">
                             <i class="fas fa-file-invoice me-2"></i> Vendor Billing
                         </SecureNavLink>
                         <SecureNavLink class="nav-link" href="/stock/change-batch-no" OptionId="StkChangeBatchNo" Module="Stock">
@@ -740,25 +755,28 @@
                         <SecureNavLink class="nav-link" href="/production" Module="Production">
                             <i class="fas fa-gauge me-2"></i> Production Dashboard
                         </SecureNavLink>
-                        <SecureNavLink class="nav-link" href="/production/order-management" Module="Production">
+                        <SecureNavLink class="nav-link" href="/production/customer-order-list" OptionId="PrdCustOrderList" Module="Production">
+                            <i class="fas fa-clipboard-list me-2 text-primary"></i> Customer Orders
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/production/order-management" OptionId="PrdOrderManagement" Module="Production">
                             <i class="fas fa-stream me-2 text-warning"></i> Order Management
                         </SecureNavLink>
-                        <SecureNavLink class="nav-link" href="/production/order-lots-tracking" Module="Production">
+                        <SecureNavLink class="nav-link" href="/production/order-lots-tracking" OptionId="PrdOrderLotsTracking" Module="Production">
                             <i class="fas fa-boxes-stacked me-2 text-success"></i> Order Lots & Hub Tracking
                         </SecureNavLink>
-                        <SecureNavLink class="nav-link" href="/production/employee-performance" Module="Production">
+                        <SecureNavLink class="nav-link" href="/production/employee-performance" OptionId="PrdEmployeePerformance" Module="Production">
                             <i class="fas fa-user-check me-2 text-info"></i> Worker Performance & Capacity
                         </SecureNavLink>
-                        <SecureNavLink class="nav-link" href="/production/order-planning" Module="Production">
+                        <SecureNavLink class="nav-link" href="/production/order-planning" OptionId="PrdOrderPlanning" Module="Production">
                             <i class="fas fa-clipboard-check me-2 text-info"></i> PPC Order Planning
                         </SecureNavLink>
-                        <SecureNavLink class="nav-link" href="/production/maker-orders" Module="Production">
+                        <SecureNavLink class="nav-link" href="/production/maker-orders" OptionId="PrdMakerOrders" Module="Production">
                             <i class="fas fa-cart-arrow-down me-2 text-primary"></i> Maker POs (From PPC)
                         </SecureNavLink>
                         <SecureNavLink class="nav-link" href="/production/new-maker" OptionId="PrdNewMaker" Module="Production">
                             <i class="fas fa-person-digging me-2"></i> New Maker
                         </SecureNavLink>
-                        <SecureNavLink class="nav-link" href="/production/maker-list" OptionId="PrdMakerList" Module="Production">
+                        <SecureNavLink class="nav-link" href="/production/maker-list" OptionId="AccMakerList" Module="Production">
                             <i class="fas fa-users-gear me-2"></i> Maker List
                         </SecureNavLink>
                         <SecureNavLink class="nav-link" href="/production/maker-item-assignment" OptionId="PrdMakerItemAssign" Module="Production">
@@ -773,7 +791,7 @@
                         <SecureNavLink class="nav-link" href="/production/maker-issuance-from-sf" OptionId="PrdMakerIssuanceSF" Module="Production">
                             <i class="fas fa-boxes-packing me-2"></i> Maker Issuance from SF
                         </SecureNavLink>
-                        <SecureNavLink class="nav-link" href="/production/receive-against-po" OptionId="PrdReceivePO" Module="Production">
+                        <SecureNavLink class="nav-link" href="/production/receive-against-po" OptionId="PrdReceivingAgainstPO" Module="Production">
                             <i class="fas fa-truck-ramp-box me-2"></i> Receive against PO
                         </SecureNavLink>
                         <SecureNavLink class="nav-link" href="/production/receive-lot" OptionId="PrdReceiveLot" Module="Production">

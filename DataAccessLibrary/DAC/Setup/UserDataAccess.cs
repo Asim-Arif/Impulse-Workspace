@@ -53,6 +53,7 @@ namespace DataAccessLibrary.DAC.Setup
                         COALESCE(u.SamplingMainLink, 0) AS SamplingMainLink,
                         COALESCE(u.HelpMainLink, 0) AS HelpMainLink,
                         COALESCE(u.IntraOfficeMainLink, 0) AS IntraOfficeMainLink,
+                        COALESCE(u.SetupMainLink, 0) AS SetupMainLink,
                         COALESCE(u.OpenCommandCenter, 0) AS OpenCommandCenter,
                         COALESCE(u.RestrictedItemProfile, 0) AS RestrictedItemProfile,
                         COALESCE(u.GeneralInfoItemProfile, 0) AS GeneralInfoItemProfile,
@@ -148,6 +149,7 @@ namespace DataAccessLibrary.DAC.Setup
                         COALESCE(u.SamplingMainLink, 0) AS SamplingMainLink,
                         COALESCE(u.HelpMainLink, 0) AS HelpMainLink,
                         COALESCE(u.IntraOfficeMainLink, 0) AS IntraOfficeMainLink,
+                        COALESCE(u.SetupMainLink, 0) AS SetupMainLink,
                         COALESCE(u.OpenCommandCenter, 0) AS OpenCommandCenter,
                         COALESCE(u.RestrictedItemProfile, 0) AS RestrictedItemProfile,
                         COALESCE(u.GeneralInfoItemProfile, 0) AS GeneralInfoItemProfile,
@@ -231,14 +233,14 @@ namespace DataAccessLibrary.DAC.Setup
                     INSERT INTO Users (
                         UserName, Password, FullUserName, EmpID, InActive,
                         UserManagement, ChangePassword,
-                        CompanyMainLink, FinancialMainLink, PayrollMainLink, ExportMainLink, StockMainLink, ProductionMainLink, DashBoardMainLink, QMSMainLink, FixedAssetsMainLink, SamplingMainLink, HelpMainLink, IntraOfficeMainLink, OpenCommandCenter,
+                        CompanyMainLink, FinancialMainLink, PayrollMainLink, ExportMainLink, StockMainLink, ProductionMainLink, DashBoardMainLink, QMSMainLink, FixedAssetsMainLink, SamplingMainLink, HelpMainLink, IntraOfficeMainLink, SetupMainLink, OpenCommandCenter,
                         RestrictedItemProfile, GeneralInfoItemProfile, ProcessesItemProfile, WeightItemProfile, PriceItemProfile, ReferencesItemProfile, PictureItemProfile, RMItemProfile, ShipInfoItemProfile, RestrictCompanyCatalogEditing,
                         AuthorizeVouchers, AuthorizeIssuance, PostMakerBill, ChangeRateonIssuance, ChangeRateMakerAssign, MakerBill_EditRate, HideRateMakerAssign, AddEditCustomerComplaint, EditFollowUp, CloseCAPA,
                         BackupData, RestoreData, HicoVisible, AddProdPlan, ShowTips, Show_Customer_Order_No
                     ) VALUES (
                         @UserName, @Password, @FullUserName, @EmpID, @InActive,
                         @UserManagement, @ChangePassword,
-                        @CompanyMainLink, @FinancialMainLink, @PayrollMainLink, @ExportMainLink, @StockMainLink, @ProductionMainLink, @DashBoardMainLink, @QMSMainLink, @FixedAssetsMainLink, @SamplingMainLink, @HelpMainLink, @IntraOfficeMainLink, @OpenCommandCenter,
+                        @CompanyMainLink, @FinancialMainLink, @PayrollMainLink, @ExportMainLink, @StockMainLink, @ProductionMainLink, @DashBoardMainLink, @QMSMainLink, @FixedAssetsMainLink, @SamplingMainLink, @HelpMainLink, @IntraOfficeMainLink, @SetupMainLink, @OpenCommandCenter,
                         @RestrictedItemProfile, @GeneralInfoItemProfile, @ProcessesItemProfile, @WeightItemProfile, @PriceItemProfile, @ReferencesItemProfile, @PictureItemProfile, @RMItemProfile, @ShipInfoItemProfile, @RestrictCompanyCatalogEditing,
                         @AuthorizeVouchers, @AuthorizeIssuance, @PostMakerBill, @ChangeRateonIssuance, @ChangeRateMakerAssign, @MakerBill_EditRate, @HideRateMakerAssign, @AddEditCustomerComplaint, @EditFollowUp, @CloseCAPA,
                         @BackupData, @RestoreData, @HicoVisible, @AddProdPlan, @ShowTips, @Show_Customer_Order_No
@@ -279,6 +281,7 @@ namespace DataAccessLibrary.DAC.Setup
                         SamplingMainLink = @SamplingMainLink,
                         HelpMainLink = @HelpMainLink,
                         IntraOfficeMainLink = @IntraOfficeMainLink,
+                        SetupMainLink = @SetupMainLink,
                         OpenCommandCenter = @OpenCommandCenter,
                         RestrictedItemProfile = @RestrictedItemProfile,
                         GeneralInfoItemProfile = @GeneralInfoItemProfile,
@@ -421,6 +424,22 @@ namespace DataAccessLibrary.DAC.Setup
                         FROM Users_User_Roles
                         WHERE UserID = @SourceUserId;";
                     await db.ExecuteAsync(copyRolesSql, new { SourceUserId = fromUserId, TargetUserId = newId });
+
+                    const string copyCustomersSql = @"
+                        DELETE FROM Users_Customers WHERE UserID = @TargetUserId;
+                        INSERT INTO Users_Customers (UserID, CustCode)
+                        SELECT @TargetUserId, CustCode
+                        FROM Users_Customers
+                        WHERE UserID = @SourceUserId;";
+                    await db.ExecuteAsync(copyCustomersSql, new { SourceUserId = fromUserId, TargetUserId = newId });
+
+                    const string copyStoresSql = @"
+                        DELETE FROM Users_Stores WHERE UserID = @TargetUserId;
+                        INSERT INTO Users_Stores (UserID, Store_RefID)
+                        SELECT @TargetUserId, Store_RefID
+                        FROM Users_Stores
+                        WHERE UserID = @SourceUserId;";
+                    await db.ExecuteAsync(copyStoresSql, new { SourceUserId = fromUserId, TargetUserId = newId });
                 }
 
                 if (newId > 0 && (!string.IsNullOrWhiteSpace(password) || !string.IsNullOrWhiteSpace(fullUserName)))
@@ -450,6 +469,135 @@ namespace DataAccessLibrary.DAC.Setup
             {
                 _logger.LogError(ex, "Error copying user ID {FromID} to {NewUserName}", fromUserId, newUserName);
                 throw;
+            }
+        }
+
+        public async Task<List<UserCustomerPermissionModel>> GetCustomersWithUserAssignmentAsync(int userId)
+        {
+            try
+            {
+                using var db = CreateConnection();
+                const string sql = @"
+                    SELECT 
+                        fc.CustCode, 
+                        ISNULL(fc.Name, '') AS CustomerName, 
+                        ISNULL(fc.Country, '') AS Country,
+                        CASE WHEN uc.CustCode IS NOT NULL THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END AS IsAssigned
+                    FROM ForeignCustomers fc
+                    LEFT JOIN Users_Customers uc ON fc.CustCode = uc.CustCode AND uc.UserID = @UserId
+                    ORDER BY fc.CustCode ASC";
+
+                var list = await db.QueryAsync<UserCustomerPermissionModel>(sql, new { UserId = userId });
+                return list.ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching customers with assignments for User ID {UserId}", userId);
+                return new List<UserCustomerPermissionModel>();
+            }
+        }
+
+        public async Task<List<UserStorePermissionModel>> GetStoresWithUserAssignmentAsync(int userId)
+        {
+            try
+            {
+                using var db = CreateConnection();
+                const string sql = @"
+                    SELECT 
+                        s.EntryID AS StoreId, 
+                        ISNULL(s.StoreName, '') AS StoreName,
+                        CASE WHEN us.Store_RefID IS NOT NULL THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END AS IsAssigned
+                    FROM Stores s
+                    LEFT JOIN Users_Stores us ON s.EntryID = us.Store_RefID AND us.UserID = @UserId
+                    ORDER BY s.StoreName ASC";
+
+                var list = await db.QueryAsync<UserStorePermissionModel>(sql, new { UserId = userId });
+                return list.ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching stores with assignments for User ID {UserId}", userId);
+                return new List<UserStorePermissionModel>();
+            }
+        }
+
+        public async Task<bool> SaveUserCustomersAsync(int userId, IEnumerable<string> custCodes)
+        {
+            try
+            {
+                using var db = CreateConnection();
+                if (db.State != ConnectionState.Open) db.Open();
+                using var tran = db.BeginTransaction();
+                try
+                {
+                    await db.ExecuteAsync("DELETE FROM Users_Customers WHERE UserID = @UserId", new { UserId = userId }, tran);
+
+                    if (custCodes != null)
+                    {
+                        var items = custCodes
+                            .Where(c => !string.IsNullOrWhiteSpace(c))
+                            .Select(c => new { UserID = userId, CustCode = c })
+                            .ToList();
+
+                        if (items.Any())
+                        {
+                            await db.ExecuteAsync("INSERT INTO Users_Customers (UserID, CustCode) VALUES (@UserID, @CustCode)", items, tran);
+                        }
+                    }
+
+                    tran.Commit();
+                    return true;
+                }
+                catch
+                {
+                    tran.Rollback();
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error saving customer assignments for User ID {UserId}", userId);
+                return false;
+            }
+        }
+
+        public async Task<bool> SaveUserStoresAsync(int userId, IEnumerable<int> storeIds)
+        {
+            try
+            {
+                using var db = CreateConnection();
+                if (db.State != ConnectionState.Open) db.Open();
+                using var tran = db.BeginTransaction();
+                try
+                {
+                    await db.ExecuteAsync("DELETE FROM Users_Stores WHERE UserID = @UserId", new { UserId = userId }, tran);
+
+                    if (storeIds != null)
+                    {
+                        var items = storeIds
+                            .Where(id => id > 0)
+                            .Select(id => new { UserID = userId, Store_RefID = id })
+                            .ToList();
+
+                        if (items.Any())
+                        {
+                            await db.ExecuteAsync("INSERT INTO Users_Stores (UserID, Store_RefID) VALUES (@UserID, @Store_RefID)", items, tran);
+                        }
+                    }
+
+                    tran.Commit();
+                    return true;
+                }
+                catch
+                {
+                    tran.Rollback();
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error saving store assignments for User ID {UserId}", userId);
+                return false;
             }
         }
     }

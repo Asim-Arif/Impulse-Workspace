@@ -7,6 +7,9 @@ namespace Impulse.Constants
         public const string BOD_Meetings_Participants = "BOD_Meetings_Participants.rpt";
         public const string EditedVouchers = "EditedVouchers.rpt";
         public const string TrialBalance = "TrialBalance.rpt";
+        public const string TrialBalance_II = "TrialBalance_II.rpt";
+        public const string TrialBalance_Opening = "TrialBalance_Opening.rpt";
+        public const string TrialBalance_Closing = "TrialBalance_Closing.rpt";
         public const string CashnBankStatus = "CashnBankStatus.rpt";
         public const string ChequeReceivingList = "ChequeReceivingList.rpt";
         public const string ImportantTasksList = "ImportantTasksList.rpt";

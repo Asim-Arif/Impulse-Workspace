@@ -13,8 +13,10 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string CustomerName { get; set; } = string.Empty;
         public string Country { get; set; } = string.Empty;
         public int TotalItems { get; set; }
+        public int PlannedItems { get; set; }
         public int TotalOrderQty { get; set; }
         public bool IsPlanned { get; set; }
+        public bool IsPartiallyPlanned => PlannedItems > 0 && PlannedItems < TotalItems;
         public string? PlannedBy { get; set; }
         public DateTime? PlannedAt { get; set; }
     }
@@ -30,6 +32,9 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string Currency { get; set; } = string.Empty;
         public bool Authorized { get; set; }
         public bool IsPlanned { get; set; }
+        public bool IsPartiallyPlanned => Items.Any(i => i.IsPlanned) && Items.Any(i => !i.IsPlanned && i.Authorized);
+        public bool HasUnplannedItems => Items.Any(i => !i.IsPlanned && i.Authorized);
+        public int PlannedItemsCount => Items.Count(i => i.IsPlanned);
         public string? PlannedBy { get; set; }
         public DateTime? PlannedAt { get; set; }
         public string? Notes { get; set; }
@@ -42,6 +47,9 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string CompItemID { get; set; } = string.Empty;
         public string ItemName { get; set; } = string.Empty;
         public int OrderQty { get; set; }
+        public bool Authorized { get; set; } = true;
+        public int AuthorizedQty { get; set; }
+        public bool IsPlanned { get; set; }
         public int AvailableInHandStock { get; set; }
 
         // 1. Stock Allocation

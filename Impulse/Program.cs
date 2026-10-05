@@ -563,10 +563,10 @@ app.MapBlazorHub();
 app.MapHub<Impulse.Hubs.ChatHub>("/chathub");
 app.MapFallbackToPage("/_Host");
 
-// Ensure IntraOffice upload directories exist
+// Ensure upload directories exist
 var env = app.Services.GetRequiredService<IWebHostEnvironment>();
 var webRoot = env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-foreach (var sub in new[] { "tasks", "announcements", "chat", "meetings", "leads", "minutes" })
+foreach (var sub in new[] { "tasks", "announcements", "chat", "meetings", "leads", "minutes", "maker_po_signed" })
 {
     var dir = Path.Combine(webRoot, "uploads", sub);
     if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);

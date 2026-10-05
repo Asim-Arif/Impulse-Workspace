@@ -3,7 +3,6 @@
 @attribute [Authorize]
 
 @using Impulse.Services.Setup
-@inject IUserPermissionService PermissionService
 
 <PageTitle>Setup &amp; System Administration - Impulse ERP</PageTitle>
 
@@ -152,18 +151,36 @@
                                     </div>
                                 }
 
-                                <a href="/intraoffice/health" class="list-group-item list-group-item-action border rounded-3 p-3 d-flex align-items-center justify-content-between transition-hover">
-                                    <div class="d-flex align-items-center gap-3">
-                                        <div class="p-2 bg-light rounded-circle text-success">
-                                            <i class="fas fa-heartbeat fa-fw"></i>
+                                @if (PermissionService.HasOptionAccess("IntraOfficeHealth"))
+                                {
+                                    <a href="/intraoffice/health" class="list-group-item list-group-item-action border rounded-3 p-3 d-flex align-items-center justify-content-between transition-hover">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="p-2 bg-light rounded-circle text-success">
+                                                <i class="fas fa-heartbeat fa-fw"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-dark">System Health &amp; Diagnostics</div>
+                                                <small class="text-secondary">Real-time database connectivity, SignalR circuit monitor &amp; latency</small>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <div class="fw-bold text-dark">System Health &amp; Diagnostics</div>
-                                            <small class="text-secondary">Real-time database connectivity, SignalR circuit monitor &amp; latency</small>
+                                        <i class="fas fa-chevron-right text-muted"></i>
+                                    </a>
+                                }
+                                else
+                                {
+                                    <div class="list-group-item border rounded-3 p-3 d-flex align-items-center justify-content-between" style="opacity: 0.45; cursor: not-allowed; background: #f8f9fa;">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="p-2 bg-light rounded-circle text-muted">
+                                                <i class="fas fa-heartbeat fa-fw"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-muted">System Health &amp; Diagnostics</div>
+                                                <small class="text-muted">Real-time database connectivity, SignalR circuit monitor &amp; latency</small>
+                                            </div>
                                         </div>
+                                        <i class="fas fa-lock text-muted"></i>
                                     </div>
-                                    <i class="fas fa-chevron-right text-muted"></i>
-                                </a>
+                                }
                             </div>
                         </div>
                     </div>
@@ -180,18 +197,98 @@
                         </div>
                         <div class="card-body p-3">
                             <div class="list-group list-group-flush gap-2">
-                                <a href="/intraoffice" class="list-group-item list-group-item-action border rounded-3 p-3 d-flex align-items-center justify-content-between transition-hover">
-                                    <div class="d-flex align-items-center gap-3">
-                                        <div class="p-2 bg-light rounded-circle text-info">
-                                            <i class="fas fa-comments fa-fw"></i>
+                                @if (PermissionService.HasModuleAccess("IntraOffice"))
+                                {
+                                    <a href="/intraoffice" class="list-group-item list-group-item-action border rounded-3 p-3 d-flex align-items-center justify-content-between transition-hover">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="p-2 bg-light rounded-circle text-info">
+                                                <i class="fas fa-comments fa-fw"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-dark">IntraOffice Collaboration Suite</div>
+                                                <small class="text-secondary">Direct chats, executive minutes, task kanban &amp; announcement boards</small>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <div class="fw-bold text-dark">IntraOffice Collaboration Suite</div>
-                                            <small class="text-secondary">Direct chats, executive minutes, task kanban &amp; announcement boards</small>
+                                        <i class="fas fa-chevron-right text-muted"></i>
+                                    </a>
+                                }
+                                else
+                                {
+                                    <div class="list-group-item border rounded-3 p-3 d-flex align-items-center justify-content-between" style="opacity: 0.45; cursor: not-allowed; background: #f8f9fa;">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="p-2 bg-light rounded-circle text-muted">
+                                                <i class="fas fa-comments fa-fw"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-muted">IntraOffice Collaboration Suite</div>
+                                                <small class="text-muted">Direct chats, executive minutes, task kanban &amp; announcement boards</small>
+                                            </div>
                                         </div>
+                                        <i class="fas fa-lock text-muted"></i>
                                     </div>
-                                    <i class="fas fa-chevron-right text-muted"></i>
-                                </a>
+                                }
+
+                                @if (PermissionService.HasOptionAccess("OfficeMinuteTypes"))
+                                {
+                                    <a href="/office/admin/minute-types" class="list-group-item list-group-item-action border rounded-3 p-3 d-flex align-items-center justify-content-between transition-hover">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="p-2 bg-light rounded-circle text-secondary">
+                                                <i class="fas fa-tags fa-fw"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-dark">Minute Types Definition</div>
+                                                <small class="text-secondary">Configure executive minute classifications, urgency levels &amp; workflows</small>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-chevron-right text-muted"></i>
+                                    </a>
+                                }
+                                else
+                                {
+                                    <div class="list-group-item border rounded-3 p-3 d-flex align-items-center justify-content-between" style="opacity: 0.45; cursor: not-allowed; background: #f8f9fa;">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="p-2 bg-light rounded-circle text-muted">
+                                                <i class="fas fa-tags fa-fw"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-muted">Minute Types Definition</div>
+                                                <small class="text-muted">Configure executive minute classifications, urgency levels &amp; workflows</small>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-lock text-muted"></i>
+                                    </div>
+                                }
+
+                                @if (PermissionService.HasOptionAccess("OfficeEmailSettings"))
+                                {
+                                    <a href="/office/admin/email-settings" class="list-group-item list-group-item-action border rounded-3 p-3 d-flex align-items-center justify-content-between transition-hover">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="p-2 bg-light rounded-circle text-warning">
+                                                <i class="fas fa-envelope-cog fa-fw"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-dark">Email &amp; SMTP Settings</div>
+                                                <small class="text-secondary">SMTP server host, ports, TLS credentials &amp; automated notification queues</small>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-chevron-right text-muted"></i>
+                                    </a>
+                                }
+                                else
+                                {
+                                    <div class="list-group-item border rounded-3 p-3 d-flex align-items-center justify-content-between" style="opacity: 0.45; cursor: not-allowed; background: #f8f9fa;">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="p-2 bg-light rounded-circle text-muted">
+                                                <i class="fas fa-envelope-cog fa-fw"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-muted">Email &amp; SMTP Settings</div>
+                                                <small class="text-muted">SMTP server host, ports, TLS credentials &amp; automated notification queues</small>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-lock text-muted"></i>
+                                    </div>
+                                }
 
                             </div>
                         </div>

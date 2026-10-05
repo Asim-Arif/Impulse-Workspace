@@ -79,6 +79,15 @@ namespace Impulse.Pages.Payroll
                 Employee.Active = true;
                 Employee.ExemptSettings = false;
                 Employee.TempEmp = false;
+
+                try
+                {
+                    Employee.EmpID = await EmployeeService.GetNextEmpIDAsync(Employee.DeptID ?? "");
+                }
+                catch
+                {
+                    // Fallback to be generated when department is selected
+                }
             }
         }
 
@@ -86,7 +95,7 @@ namespace Impulse.Pages.Payroll
         {
             try
             {
-                Departments = await DepartmentService.GetDepartmentsListAsync(true);
+                Departments = await DepartmentService.GetDepartmentsListAsync(!string.IsNullOrEmpty(EmployeeId));
                 Designations = new List<string> { "Manager", "Supervisor", "Staff", "Worker" };
                 Processes = await EmployeeService.GetProcessesAsync();
                 Groups = await EmployeeService.GetGroupsAsync();
@@ -135,11 +144,11 @@ namespace Impulse.Pages.Payroll
 
         private async Task HandleDepartmentChanged(string deptId)
         {
-            if (!string.IsNullOrEmpty(deptId) && string.IsNullOrEmpty(Employee.EmpID))
+            if (string.IsNullOrEmpty(Employee.EmpID))
             {
                 try
                 {
-                    var newEmpId = await EmployeeService.GetNextEmpIDAsync(deptId);
+                    var newEmpId = await EmployeeService.GetNextEmpIDAsync(deptId ?? "");
                     await InvokeAsync(() =>
                     {
                         Employee.EmpID = newEmpId;

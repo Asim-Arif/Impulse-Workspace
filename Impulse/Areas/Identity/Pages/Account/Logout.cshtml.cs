@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc;
@@ -17,17 +17,20 @@ public class LogoutModel : PageModel
         _signInManager = signInManager;
         _logger = logger;
     }
-    public async Task OnGetAsync(string returnUrl = null)
+    public async Task<IActionResult> OnGetAsync(string? returnUrl = null)
     {
-        returnUrl ??= Url.Content("~/"); 
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        ReturnUrl = returnUrl;
+        _logger.LogInformation("User signed out.");
+        if (!string.IsNullOrEmpty(returnUrl))
+        {
+            return LocalRedirect(returnUrl);
+        }
+        return Page();
     }
-    public async Task<IActionResult> OnPostAsync()
+    public async Task<IActionResult> OnPostAsync(string? returnUrl = null)
     {
-        
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        _logger.LogInformation("User logged out.");
+        _logger.LogInformation("User signed out.");
         return RedirectToPage("Login");
     }
 }

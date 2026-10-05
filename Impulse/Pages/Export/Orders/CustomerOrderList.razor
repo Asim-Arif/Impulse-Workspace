@@ -1,23 +1,35 @@
 @page "/export/customer-order-list"
 @page "/export/orders/customer-order-list"
+@page "/production/customer-order-list"
+@page "/production/customer-orders"
 @attribute [Authorize]
 @using DataAccessLibrary.Models.ViewModels.Export
 @using Impulse.Services
 @using Blazored.Typeahead
 @using BlazorContextMenu
 
-<PageTitle>Customer Order List</PageTitle>
+<PageTitle>@(IsProductionMode ? "Production Customer Order List" : "Customer Order List")</PageTitle>
 
 <div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
     <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
         <div class="card-body pt-3">
 
             <!-- Title -->
-            <div class="d-flex align-items-end pb-2 mb-3 border-bottom">
-                <h5 class="mb-0 fw-bold text-dark-emphasis">
-                    <i class="fas fa-list-alt text-primary me-2"></i>
-                    Order List
-                </h5>
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas @(IsProductionMode ? "fa-industry text-success" : "fa-list-alt text-primary") me-2"></i>
+                        @(IsProductionMode ? "Customer Orders (Production)" : "Order List")
+                    </h5>
+                    @if (IsProductionMode)
+                    {
+                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style="font-size: 0.75rem;">Production View</span>
+                    }
+                    @if (IsSampleMode)
+                    {
+                        <span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-1" style="font-size: 0.75rem;">Sample Orders</span>
+                    }
+                </div>
             </div>
 
             <!-- "?"? Filter Toolbar Row 1 "?"? -->
@@ -81,7 +93,7 @@
                 <!-- Order Type -->
                 <div class="col-md-2">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Order Type</label>
-                    <select class="form-select form-select-sm" value="@selectedOrderType" @onchange="OnOrderTypeChanged">
+                    <select class="form-select form-select-sm" value="@selectedOrderType" @onchange="OnOrderTypeChanged" disabled="@IsSampleMode">
                         <option value="<All Types>">&lt;All Types&gt;</option>
                         <option value="Stock Order">Stock Order</option>
                         <option value="Sample Order">Sample Order</option>
@@ -194,8 +206,11 @@
                                             <th>Int. Ref #</th>
                                             <th class="text-center">Order DT</th>
                                             <th class="text-center">Delivery DT</th>
-                                            <th class="text-end">Order Amt</th>
-                                            <th class="text-end">Bal. Amt</th>
+                                            @if (!IsProductionMode)
+                                            {
+                                                <th class="text-end">Order Amt</th>
+                                                <th class="text-end">Bal. Amt</th>
+                                            }
                                             <th class="text-center">Status</th>
                                             <th class="text-end">Weight</th>
                                             <th class="text-center">Qty</th>
@@ -209,7 +224,7 @@
                                         @if (!allOrders.Any())
                                         {
                                             <tr>
-                                                <td colspan="19" class="text-center text-muted py-4">No customer orders found matching these filters.</td>
+                                                <td colspan="@(IsProductionMode ? 17 : 19)" class="text-center text-muted py-4">No customer orders found matching these filters.</td>
                                             </tr>
                                         }
                                         else
@@ -230,15 +245,21 @@
                                                     <td>@order.Country</td>
                                                     <td class="fw-semibold">@order.OrderNo</td>
                                                     <td class="text-center">
-                                                        @if (order.Authorized)
+                                                        @if (order.AuthorizationStatus == "Authorized")
                                                         {
                                                             <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" title="Authorized by @order.AuthorizedBy on @(order.AuthorizedDT?.ToString("dd-MMM-yyyy HH:mm"))">
                                                                 <i class="fas fa-check-circle me-1"></i>Auth
                                                             </span>
                                                         }
+                                                        else if (order.AuthorizationStatus == "Partially Authorized")
+                                                        {
+                                                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning px-2 py-1" title="@order.TotalPendingArticles article(s) pending authorization">
+                                                                <i class="fas fa-exclamation-circle me-1"></i>Partial (@order.TotalAuthorizedArticles/@order.TotalArticles)
+                                                            </span>
+                                                        }
                                                         else
                                                         {
-                                                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1" title="Pending Director Authorization">
+                                                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1" title="Pending Director Authorization">
                                                                 <i class="fas fa-clock me-1"></i>Pending
                                                             </span>
                                                         }
@@ -247,8 +268,11 @@
                                                     <td>@order.InternalRefNo</td>
                                                     <td class="text-center">@order.DT.ToString("dd-MMM-yyyy")</td>
                                                     <td class="text-center">@order.DeliveryDT.ToString("dd-MMM-yyyy")</td>
-                                                    <td class="text-end fw-semibold text-primary">@order.Curr @order.OrderAmt.ToString("N2")</td>
-                                                    <td class="text-end text-danger">@order.Curr @((order.OrderAmt - (order.TotalShippedAmt ?? 0)).ToString("N2"))</td>
+                                                    @if (!IsProductionMode)
+                                                    {
+                                                        <td class="text-end fw-semibold text-primary">@order.Curr @order.OrderAmt.ToString("N2")</td>
+                                                        <td class="text-end text-danger">@order.Curr @((order.OrderAmt - (order.TotalShippedAmt ?? 0)).ToString("N2"))</td>
+                                                    }
                                                     <td class="text-center">
                                                         <span class="badge @(order.OrderStatus == "Shipped" ? "bg-success" : (order.OrderStatus == "Cancelled" ? "bg-danger" : (order.OrderStatus == "Hold" ? "bg-warning text-dark" : "bg-info")))">
                                                             @order.OrderStatus
@@ -270,13 +294,16 @@
                             </div>
                         </div>
 
-                        <!-- Grand Total Footer Banner -->
-                        <div class="row align-items-center mt-3 p-3 bg-light rounded-3 border g-2">
-                            <div class="col-md-6 d-flex align-items-center">
-                                <span class="fw-bold text-dark-emphasis"><i class="fas fa-file-invoice-dollar text-secondary me-2"></i> Total Active Orders Amount (PKR equivalent):</span>
-                                <span class="badge bg-primary text-white ms-2 px-3 py-2 rounded-pill fs-6">Rs. @totalAmtPKR.ToString("N2")</span>
+                        @if (!IsProductionMode)
+                        {
+                            <!-- Grand Total Footer Banner -->
+                            <div class="row align-items-center mt-3 p-3 bg-light rounded-3 border g-2">
+                                <div class="col-md-6 d-flex align-items-center">
+                                    <span class="fw-bold text-dark-emphasis"><i class="fas fa-file-invoice-dollar text-secondary me-2"></i> Total Active Orders Amount (PKR equivalent):</span>
+                                    <span class="badge bg-primary text-white ms-2 px-3 py-2 rounded-pill fs-6">Rs. @totalAmtPKR.ToString("N2")</span>
+                                </div>
                             </div>
-                        </div>
+                        }
                     }
                 </div>
             </div>
@@ -339,47 +366,52 @@
     @if (context.Data is CustomerOrderListItemModel order)
     {
         <div class="win11-section-header">Order No: @order.OrderNo</div>
-        <Item class="win11-menu-item" OnClick="@(() => EditOrder(order.OrderNo))">
-            <i class="fas fa-edit fa-fw win11-icon text-primary"></i> Edit Order
-        </Item>
-        <Item class="win11-menu-item" OnClick="@(() => CopyOrder(order.OrderNo))">
-            <i class="fas fa-copy fa-fw win11-icon text-secondary"></i> Copy Order
-        </Item>
-        <Item class="win11-menu-item" OnClick="@(() => DeleteOrder(order.OrderNo))">
-            <i class="fas fa-trash-alt fa-fw win11-icon text-danger"></i> Delete Order
-        </Item>
+        @if (!IsProductionMode)
+        {
+            <Item class="win11-menu-item" OnClick="@(() => EditOrder(order.OrderNo))">
+                <i class="fas fa-edit fa-fw win11-icon text-primary"></i> Edit Order
+            </Item>
+            <Item class="win11-menu-item" OnClick="@(() => CopyOrder(order.OrderNo))">
+                <i class="fas fa-copy fa-fw win11-icon text-secondary"></i> Copy Order
+            </Item>
+            <Item class="win11-menu-item" OnClick="@(() => DeleteOrder(order.OrderNo))">
+                <i class="fas fa-trash-alt fa-fw win11-icon text-danger"></i> Delete Order
+            </Item>
 
-        <div class="win11-divider"></div>
-        <div class="win11-section-header">Status Management</div>
-        @if (!order.Authorized && isDirector)
-        {
-            <Item class="win11-menu-item" OnClick="@(() => AuthorizeOrder(order))">
-                <i class="fas fa-stamp fa-fw win11-icon text-success"></i> Authorize Order
-            </Item>
-        }
-        @if (order.Authorized)
-        {
-            <div class="px-3 py-1 text-muted" style="font-size: 0.75rem;">
-                <i class="fas fa-shield-alt text-success me-1"></i>Authorized by @order.AuthorizedBy
-            </div>
-        }
-        @if (order.Cancelled == 0)
-        {
-            <Item class="win11-menu-item" OnClick="@(() => CancelOrder(order))">
-                <i class="fas fa-ban fa-fw win11-icon text-danger"></i> Cancel Order
-            </Item>
-            <Item class="win11-menu-item" OnClick="@(() => HoldOrder(order))">
-                <i class="fas fa-pause fa-fw win11-icon text-warning"></i> Hold Order
-            </Item>
-            <Item class="win11-menu-item" OnClick="@(() => MarkAsShipped(order))">
-                <i class="fas fa-check-double fa-fw win11-icon text-success"></i> Mark As Shipped
-            </Item>
-        }
-        else
-        {
-            <Item class="win11-menu-item" OnClick="@(() => UnCancelUnHoldOrder(order.OrderNo))">
-                <i class="fas fa-undo fa-fw win11-icon text-success"></i> Restore Order (Un-Cancel/Un-Hold)
-            </Item>
+            <div class="win11-divider"></div>
+            <div class="win11-section-header">Status Management</div>
+            @if (order.AuthorizationStatus != "Authorized" && isDirector)
+            {
+                <Item class="win11-menu-item" OnClick="@(() => AuthorizeOrder(order))">
+                    <i class="fas fa-stamp fa-fw win11-icon text-success"></i> @(order.AuthorizationStatus == "Partially Authorized" ? "Authorize Pending Items" : "Authorize Order")
+                </Item>
+            }
+            @if (order.AuthorizationStatus == "Authorized")
+            {
+                <div class="px-3 py-1 text-muted" style="font-size: 0.75rem;">
+                    <i class="fas fa-shield-alt text-success me-1"></i>Authorized by @order.AuthorizedBy
+                </div>
+            }
+            @if (order.Cancelled == 0)
+            {
+                <Item class="win11-menu-item" OnClick="@(() => CancelOrder(order))">
+                    <i class="fas fa-ban fa-fw win11-icon text-danger"></i> Cancel Order
+                </Item>
+                <Item class="win11-menu-item" OnClick="@(() => HoldOrder(order))">
+                    <i class="fas fa-pause fa-fw win11-icon text-warning"></i> Hold Order
+                </Item>
+                <Item class="win11-menu-item" OnClick="@(() => MarkAsShipped(order))">
+                    <i class="fas fa-check-double fa-fw win11-icon text-success"></i> Mark As Shipped
+                </Item>
+            }
+            else
+            {
+                <Item class="win11-menu-item" OnClick="@(() => UnCancelUnHoldOrder(order.OrderNo))">
+                    <i class="fas fa-undo fa-fw win11-icon text-success"></i> Restore Order (Un-Cancel/Un-Hold)
+                </Item>
+            }
+
+            <div class="win11-divider"></div>
         }
 
         <div class="win11-divider"></div>

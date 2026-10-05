@@ -25,7 +25,7 @@ namespace Impulse.Pages.Stock
                 if (_selectedVendor != value)
                 {
                     _selectedVendor = value;
-                    _ = OnVendorSelected();
+                    _ = InvokeAsync(OnVendorSelected);
                 }
             }
         }
@@ -46,7 +46,14 @@ namespace Impulse.Pages.Stock
 
         protected override async Task OnInitializedAsync()
         {
-            Vendors = await VendorRMAssignmentService.GetVendorsAsync();
+            try
+            {
+                Vendors = await VendorRMAssignmentService.GetVendorsAsync();
+            }
+            catch (Exception ex)
+            {
+                NotificationService.ShowError("Error loading vendors", ex.Message);
+            }
         }
 
         private async Task<IEnumerable<NewVendorViewModel>> SearchVendors(string searchText)
@@ -66,17 +73,27 @@ namespace Impulse.Pages.Stock
 
             if (SelectedVendor != null)
             {
-                isLoading = true;
-                StateHasChanged();
-                await LoadVendorData();
-                isLoading = false;
-                StateHasChanged();
+                try
+                {
+                    isLoading = true;
+                    await InvokeAsync(StateHasChanged);
+                    await LoadVendorData();
+                }
+                catch (Exception ex)
+                {
+                    NotificationService.ShowError("Error loading vendor data", ex.Message);
+                }
+                finally
+                {
+                    isLoading = false;
+                    await InvokeAsync(StateHasChanged);
+                }
             }
             else
             {
                 AssignedRMs.Clear();
                 UnassignedRMs.Clear();
-                StateHasChanged();
+                await InvokeAsync(StateHasChanged);
             }
         }
 
@@ -182,9 +199,16 @@ namespace Impulse.Pages.Stock
         {
             if (e.Data is VendorRMAssignmentModel item)
             {
-                currentHistoryItem = item;
-                historyItems = await VendorRMAssignmentService.GetHistoryAsync(item.EntryID);
-                showHistoryModal = true;
+                try
+                {
+                    currentHistoryItem = item;
+                    historyItems = await VendorRMAssignmentService.GetHistoryAsync(item.EntryID);
+                    showHistoryModal = true;
+                }
+                catch (Exception ex)
+                {
+                    NotificationService.ShowError("Error loading history", ex.Message);
+                }
             }
         }
 

@@ -497,6 +497,7 @@
                         <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
                             <thead class="table-light text-secondary sticky-top" style="font-size: 0.75rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
                                 <tr>
+                                    <th class="text-center" style="width: 40px;">#</th>
                                     <th style="min-width: 140px;">@(CanShowCustomerOrderNo ? "Sales Order / Ref / Cust" : "Internal Ref / Cust")</th>
                                     <th style="min-width: 280px;">Product / Batch</th>
                                     <th class="text-center" style="width: 80px;">Ordered Qty</th>
@@ -508,10 +509,13 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach (var item in OrderItems)
+                                @for (int i = 0; i < OrderItems.Count; i++)
                                 {
+                                    var item = OrderItems[i];
+                                    int serialNo = i + 1;
                                     bool isItemSelected = SelectedItem?.ID == item.ID;
                                     <tr class="table-selectable-row @(isItemSelected ? "table-row-active" : "")" @onclick="() => SelectItemAsync(item)">
+                                        <td class="text-center text-muted fw-bold small">@serialNo</td>
                                         <td>
                                             <div class="fw-bold text-dark d-flex align-items-center flex-wrap gap-1">
                                                 @if (CanShowCustomerOrderNo)
@@ -536,13 +540,13 @@
                                         <td>
                                             <div class="fw-semibold text-dark" style="font-size: 0.88rem; line-height: 1.35; white-space: normal;" title="@item.ItemName">@item.ItemName</div>
                                             <div class="d-flex align-items-center flex-wrap gap-1 mt-1">
-                                                @if (!string.IsNullOrWhiteSpace(item.CompItemCode))
+                                                @if (CanShowCustomerOrderNo && !string.IsNullOrWhiteSpace(item.CompItemCode))
                                                 {
                                                     <span class="badge bg-primary-subtle text-primary border font-monospace" style="font-size: 0.70rem; padding: 2px 5px;" title="Company Item Code (Items.ItemID)">
                                                         <i class="fas fa-tag me-1"></i>Comp: @item.CompItemCode
                                                     </span>
                                                 }
-                                                @if (!string.IsNullOrWhiteSpace(item.ItemCode) && !item.ItemCode.Equals(item.CompItemCode, StringComparison.OrdinalIgnoreCase))
+                                                @if (!string.IsNullOrWhiteSpace(item.ItemCode) && (!CanShowCustomerOrderNo || !item.ItemCode.Equals(item.CompItemCode, StringComparison.OrdinalIgnoreCase)))
                                                 {
                                                     <span class="badge bg-light text-secondary border font-monospace" style="font-size: 0.70rem; padding: 2px 5px;" title="Customer Item Code (FCustomerCatalog.ItemID)">
                                                         Cust: @item.ItemCode
@@ -670,9 +674,9 @@
                     </button>
                     <span class="text-muted small">
                         Product: <strong class="text-dark">@SelectedItem.ItemCode</strong>
-                        @if (!string.IsNullOrEmpty(SelectedItem.CompItemCode) && !SelectedItem.CompItemCode.Equals(SelectedItem.ItemCode, StringComparison.OrdinalIgnoreCase))
+                        @if (CanShowCustomerOrderNo && !string.IsNullOrEmpty(SelectedItem.CompItemCode) && !SelectedItem.CompItemCode.Equals(SelectedItem.ItemCode, StringComparison.OrdinalIgnoreCase))
                         {
-                            <span class="badge bg-light text-secondary border font-monospace ms-1">@SelectedItem.CompItemCode</span>
+                            <span class="badge bg-light text-secondary border font-monospace ms-1" title="Company Item Code">@SelectedItem.CompItemCode</span>
                         }
                         (@SelectedItem.ItemName)
                     </span>
@@ -717,6 +721,7 @@
                                             <th style="min-width: 150px;">PO Progress</th>
                                             <th>Return Target</th>
                                             <th class="text-center">Status</th>
+                                            <th class="text-center" style="min-width: 130px;">Signed Copy</th>
                                             <th class="text-center" style="width: 80px;">Action</th>
                                         </tr>
                                     </thead>
@@ -752,6 +757,36 @@
                                                     <span class="pill-badge @(po.StatusText == "Fulfilled" ? "pill-completed" : po.StatusText == "Partial" ? "pill-inprogress" : "pill-muted")">
                                                         @po.StatusText
                                                     </span>
+                                                </td>
+                                                <td class="text-center">
+                                                    @if (po.HasSignedCopy)
+                                                    {
+                                                        <div class="d-inline-flex align-items-center gap-1">
+                                                            <button class="btn btn-outline-success btn-sm px-2 py-0 d-inline-flex align-items-center gap-1 shadow-sm"
+                                                                    style="font-size: 0.72rem; border-radius: 5px; height: 26px; font-weight: 600;"
+                                                                    title="View Signed Scanned Copy (Uploaded: @(po.MakerSignedCopyUploadedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-") by @(po.MakerSignedCopyUploadedBy ?? "-"))"
+                                                                    @onclick="() => OpenPdfPreview(po)">
+                                                                <i class="fas fa-file-pdf text-danger"></i>
+                                                                <span>Signed</span>
+                                                            </button>
+                                                            <button class="btn btn-outline-secondary btn-sm px-1 py-0 d-inline-flex align-items-center justify-content-center"
+                                                                    style="font-size: 0.68rem; border-radius: 5px; height: 26px; width: 24px;"
+                                                                    title="Manage / Replace / Delete Signed Copy"
+                                                                    @onclick="() => OpenAttachSignedCopyModal(po)">
+                                                                <i class="fas fa-cog"></i>
+                                                            </button>
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <button class="btn btn-outline-secondary btn-sm px-2 py-0 d-inline-flex align-items-center gap-1"
+                                                                style="font-size: 0.72rem; border-radius: 5px; height: 26px; border-style: dashed; background: #fafafa;"
+                                                                title="Attach Master PO Maker Signed Scanned Copy"
+                                                                @onclick="() => OpenAttachSignedCopyModal(po)">
+                                                            <i class="fas fa-paperclip text-muted"></i>
+                                                            <span>Attach Signed</span>
+                                                        </button>
+                                                    }
                                                 </td>
                                                 <td class="text-center">
                                                     <button class="btn btn-outline-primary btn-sm px-2 py-0 d-inline-flex align-items-center gap-1"
@@ -799,6 +834,7 @@
                                             <th style="min-width: 150px;">Process Completion</th>
                                             <th>Last Activity</th>
                                             <th class="text-center">Type</th>
+                                            <th class="text-center" style="width: 80px;">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -838,6 +874,18 @@
                                                     else
                                                     {
                                                         <span class="badge bg-light text-secondary border">Standard</span>
+                                                    }
+                                                </td>
+                                                <td class="text-center">
+                                                    @if (!string.IsNullOrWhiteSpace(lot.LotNo) && lot.LotNo != "0")
+                                                    {
+                                                        <button class="btn btn-outline-primary btn-sm px-2 py-0 d-inline-flex align-items-center gap-1"
+                                                                style="font-size: 0.72rem; border-radius: 5px; height: 26px;"
+                                                                title="Print PTC Card"
+                                                                @onclick="() => PrintPtcForLotAsync(lot.LotNo)">
+                                                            <i class="fas fa-print"></i>
+                                                            <span>PTC</span>
+                                                        </button>
                                                     }
                                                 </td>
                                             </tr>
@@ -889,9 +937,18 @@
                                                 <td>
                                                     @if (!string.IsNullOrEmpty(s.LotNo))
                                                     {
-                                                        <span class="badge px-2 py-1 font-monospace" style="background-color: #2196F3; color: #ffffff; font-weight: 700; border-radius: 4px;">
-                                                            @s.LotNo
-                                                        </span>
+                                                        <div class="d-flex align-items-center gap-1">
+                                                            <span class="badge px-2 py-1 font-monospace" style="background-color: #2196F3; color: #ffffff; font-weight: 700; border-radius: 4px;">
+                                                                @s.LotNo
+                                                            </span>
+                                                            <button class="btn btn-outline-primary btn-sm p-0 px-1 d-inline-flex align-items-center gap-1"
+                                                                    style="font-size: 0.68rem; height: 22px; border-radius: 4px;"
+                                                                    title="Print PTC Card"
+                                                                    @onclick="() => PrintPtcForLotAsync(s.LotNo)">
+                                                                <i class="fas fa-print" style="font-size: 0.65rem;"></i>
+                                                                <span>PTC</span>
+                                                            </button>
+                                                        </div>
                                                     }
                                                     else
                                                     {
@@ -1035,4 +1092,200 @@
         </div>
     }
 
+    <!-- ===================================================================== -->
+    <!-- MODAL 1: Attach Master PO Maker Signed Scanned Copy                   -->
+    <!-- ===================================================================== -->
+    @if (ShowAttachSignedCopyModal && SelectedPoForAttachment != null)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 1060;">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; overflow: hidden;">
+                    <!-- Modal Header -->
+                    <div class="modal-header bg-light py-2 px-3 border-bottom d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="rounded-circle bg-primary bg-opacity-10 text-primary p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                <i class="fas fa-file-signature"></i>
+                            </div>
+                            <div>
+                                <h6 class="modal-title fw-bold text-dark mb-0" style="font-size: 0.95rem;">Attach Master PO Maker Signed Scanned Copy</h6>
+                                <div class="text-muted" style="font-size: 0.72rem;">Upload, review, or replace the physical maker-signed purchase order scan</div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close" aria-label="Close" @onclick="CloseAttachSignedCopyModal"></button>
+                    </div>
+
+                    <!-- Modal Body -->
+                    <div class="modal-body p-3">
+                        <!-- PO Context Banner -->
+                        <div class="p-2 mb-3 rounded border bg-light d-flex flex-wrap align-items-center justify-content-between gap-2" style="font-size: 0.8rem;">
+                            <div>
+                                <span class="text-muted">Master PO #:</span>
+                                <strong class="text-primary ms-1 font-monospace">@(!string.IsNullOrEmpty(SelectedPoForAttachment.MasterPONo) ? SelectedPoForAttachment.MasterPONo : SelectedPoForAttachment.POReceiptID)</strong>
+                            </div>
+                            <div>
+                                <span class="text-muted">Maker / Supplier:</span>
+                                <strong class="text-dark ms-1">@SelectedPoForAttachment.VenderName</strong>
+                            </div>
+                            <div>
+                                <span class="text-muted">Process:</span>
+                                <span class="badge bg-white text-dark border ms-1">@SelectedPoForAttachment.ProcessName</span>
+                            </div>
+                            <div>
+                                <span class="text-muted">Issued Qty:</span>
+                                <strong class="text-dark ms-1">@SelectedPoForAttachment.IssQty.ToString("N0") Pcs</strong>
+                            </div>
+                        </div>
+
+                        <!-- Current Attached File (If Any) -->
+                        @if (SelectedPoForAttachment.HasSignedCopy)
+                        {
+                            <div class="card border border-success border-opacity-25 bg-success bg-opacity-10 mb-3 p-3" style="border-radius: 8px;">
+                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <i class="fas fa-file-pdf text-danger fa-2x"></i>
+                                        <div>
+                                            <div class="fw-bold text-dark" style="font-size: 0.85rem;">@SelectedPoForAttachment.MakerSignedCopyFileName</div>
+                                            <div class="text-muted small" style="font-size: 0.72rem;">
+                                                Uploaded: <strong>@(SelectedPoForAttachment.MakerSignedCopyUploadedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</strong>
+                                                by <span class="badge bg-secondary">@(SelectedPoForAttachment.MakerSignedCopyUploadedBy ?? "User")</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <button class="btn btn-sm btn-success px-2 py-1 d-inline-flex align-items-center gap-1"
+                                                style="font-size: 0.75rem;"
+                                                @onclick="() => OpenPdfPreview(SelectedPoForAttachment)">
+                                            <i class="fas fa-eye"></i>
+                                            <span>View Scanned Copy</span>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger px-2 py-1 d-inline-flex align-items-center gap-1"
+                                                style="font-size: 0.75rem;"
+                                                disabled="@IsDeletingAttachment"
+                                                @onclick="DeleteSignedCopyAttachmentAsync">
+                                            @if (IsDeletingAttachment)
+                                            {
+                                                <i class="fas fa-spinner fa-spin"></i>
+                                                <span>Removing...</span>
+                                            }
+                                            else
+                                            {
+                                                <i class="fas fa-trash-alt"></i>
+                                                <span>Remove</span>
+                                            }
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        <!-- Upload Control -->
+                        <div class="border rounded p-3 bg-white">
+                            <label class="form-label fw-bold text-dark mb-1" style="font-size: 0.82rem;">
+                                <i class="fas fa-cloud-upload-alt text-primary me-1"></i>
+                                @(SelectedPoForAttachment.HasSignedCopy ? "Upload Replacement Scanned Copy (.pdf):" : "Select Signed Scanned PDF Copy:")
+                            </label>
+                            
+                            <Microsoft.AspNetCore.Components.Forms.InputFile OnChange="OnAttachmentFileSelected" accept=".pdf" class="form-control form-control-sm" />
+
+                            @if (SelectedAttachmentFile != null)
+                            {
+                                <div class="mt-2 p-2 bg-light rounded border d-flex align-items-center justify-content-between text-success small" style="font-size: 0.78rem;">
+                                    <div>
+                                        <i class="fas fa-check-circle me-1"></i>
+                                        <strong>Ready to upload:</strong> @SelectedAttachmentFileName
+                                    </div>
+                                    <span class="badge bg-secondary font-monospace">@((SelectedAttachmentFileSize / 1024.0).ToString("N0")) KB</span>
+                                </div>
+                            }
+
+                            @if (!string.IsNullOrEmpty(AttachmentErrorMessage))
+                            {
+                                <div class="alert alert-danger py-2 px-3 small mt-2 mb-0" style="font-size: 0.78rem;">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>@AttachmentErrorMessage
+                                </div>
+                            }
+
+                            <div class="text-muted small mt-2" style="font-size: 0.72rem; line-height: 1.3;">
+                                <i class="fas fa-info-circle text-info me-1"></i>
+                                Accepts <strong>PDF (.pdf)</strong> files up to 15MB. All line items sharing Master PO <strong>@(!string.IsNullOrEmpty(SelectedPoForAttachment.MasterPONo) ? SelectedPoForAttachment.MasterPONo : SelectedPoForAttachment.POReceiptID)</strong> will automatically link to this document.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal Footer -->
+                    <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">
+                        <button type="button" class="btn btn-secondary btn-sm" @onclick="CloseAttachSignedCopyModal">
+                            <i class="fas fa-times me-1"></i>Cancel
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm px-3"
+                                disabled="@(SelectedAttachmentFile == null || IsUploadingAttachment)"
+                                @onclick="SaveSignedCopyAttachmentAsync">
+                            @if (IsUploadingAttachment)
+                            {
+                                <i class="fas fa-spinner fa-spin me-1"></i>
+                                <span>Uploading...</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-save me-1"></i>
+                                <span>Upload & Save Attachment</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 2: PDF Document Viewer / Preview                                -->
+    <!-- ===================================================================== -->
+    @if (ShowPdfPreviewModal && !string.IsNullOrEmpty(PreviewPdfUrl))
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 1070;" @onclick="ClosePdfPreview">
+            <div class="modal-dialog modal-dialog-centered modal-xl" style="max-width: 92vw;" @onclick:stopPropagation="true">
+                <div class="modal-content border-0 shadow-lg" style="height: 90vh; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column;">
+                    <!-- Modal Header -->
+                    <div class="modal-header bg-dark text-white py-2 px-3 d-flex align-items-center justify-content-between flex-shrink-0" style="border-bottom: 1px solid rgba(255,255,255,0.15);">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fas fa-file-pdf text-danger fa-lg"></i>
+                            <div>
+                                <h6 class="modal-title fw-bold text-white mb-0" style="font-size: 0.92rem;">@PreviewPdfTitle</h6>
+                                <div class="text-white-50" style="font-size: 0.7rem;">Master PO Maker Signed Scanned Document</div>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <a href="@PreviewPdfUrl" target="_blank" class="btn btn-outline-light btn-sm px-2 py-1 d-inline-flex align-items-center gap-1" style="font-size: 0.78rem;" title="Open in new browser tab / window">
+                                <i class="fas fa-external-link-alt"></i>
+                                <span>Open in Tab</span>
+                            </a>
+                            <button type="button" class="btn btn-danger btn-sm px-3 py-1 d-inline-flex align-items-center gap-1 fw-bold" style="font-size: 0.78rem; border-radius: 6px;" @onclick="ClosePdfPreview">
+                                <i class="fas fa-times"></i>
+                                <span>Close Preview</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Modal Body / PDF Frame -->
+                    <div class="modal-body p-0 bg-secondary flex-grow-1" style="overflow: hidden;">
+                        <iframe src="@PreviewPdfUrl" style="width: 100%; height: 100%; border: none;"></iframe>
+                    </div>
+
+                    <!-- Modal Footer -->
+                    <div class="modal-footer bg-dark text-white py-2 px-3 d-flex align-items-center justify-content-between flex-shrink-0" style="border-top: 1px solid rgba(255,255,255,0.15);">
+                        <div class="text-white-50 small" style="font-size: 0.75rem;">
+                            <i class="fas fa-info-circle me-1"></i>You can also click outside this modal to close it.
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-secondary btn-sm px-3" @onclick="ClosePdfPreview">
+                                <i class="fas fa-times me-1"></i>Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
 </div>
+

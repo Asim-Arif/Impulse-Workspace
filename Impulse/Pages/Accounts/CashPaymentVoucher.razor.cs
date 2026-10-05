@@ -33,6 +33,7 @@ namespace Impulse.Pages.Accounts
 
         private VoucherLineItemViewModel newVoucherLine = new VoucherLineItemViewModel();
         private string validationMessage = string.Empty;
+        private bool IsPrintWhenSaved = true;
 
         private Timer _timer; // Declare the Timer object
         // Implement IDisposable to ensure the timer is cleaned up
@@ -276,7 +277,10 @@ namespace Impulse.Pages.Accounts
                 //successMessage = "Data Saved Successfully!";
                 NotificationServiceManager.ShowSuccess("Saved", "Transaction saved successfully.");
                 
-                ReportNavigationService.PrintVoucher(strReturnVchrNo);
+                if (IsPrintWhenSaved)
+                {
+                    ReportNavigationService.PrintVoucher(strReturnVchrNo);
+                }
                 //StateHasChanged();
                 // Auto-hide the message after 10 seconds
                 //await Task.Delay(3000);

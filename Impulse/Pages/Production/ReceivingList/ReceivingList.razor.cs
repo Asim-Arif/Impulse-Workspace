@@ -1345,8 +1345,49 @@ namespace Impulse.Pages.Production.ReceivingList
         public async Task PrintProcessInspectionReport(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            if (SelectedItem == null) return;
+            if (SelectedItem == null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Selection Required",
+                    Detail = "Please select a receiving record first.",
+                    Duration = 4000
+                });
+                return;
+            }
 
+            await ReportNavigationService.PrintReportAsync(new ReportRequest
+            {
+                ReportName = "Customer_Item_Process_Inspection_Report.rpt",
+                SelectionFormula = $"{{VRD_PIP_Details.VRD_RefID}} = {SelectedItem.VRD_EntryID}"
+            });
+        }
+
+        public async Task PrintAnalysisCertificate(ItemClickEventArgs args)
+        {
+            ResolveRowItem(args);
+            if (SelectedItem == null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Selection Required",
+                    Detail = "Please select a receiving record first.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            await ReportNavigationService.PrintReportAsync(new ReportRequest
+            {
+                ReportName = "Customer_Item_Process_Inspection_Report_AC.rpt",
+                SelectionFormula = $"{{VRD_PIP_Details.VRD_RefID}} = {SelectedItem.VRD_EntryID}"
+            });
+        }
+
+        public async Task PrintReworkRejectionReport(ItemClickEventArgs args)
+        {
             string filtersStr = BuildFiltersString();
             string dateRangeStr = $"{Filter.DtFrom:dd-MMM-yyyy} to {Filter.DtTo:dd-MMM-yyyy}";
 
@@ -1357,6 +1398,33 @@ namespace Impulse.Pages.Production.ReceivingList
                 FormulaValues = new Dictionary<string, object>
                 {
                     { "Filters", $"'{filtersStr}'" },
+                    { "DateRange", $"'{dateRangeStr}'" }
+                }
+            });
+        }
+
+        public async Task PrintRejectionReportDetailChargeTo(ItemClickEventArgs args)
+        {
+            ResolveRowItem(args);
+            string dateRangeStr = $"{Filter.DtFrom:dd-MMM-yyyy} to {Filter.DtTo:dd-MMM-yyyy}";
+
+            var conditions = new List<string>
+            {
+                $"{{VMakerRepair.DT}} in Date({Filter.DtFrom.Year}, {Filter.DtFrom.Month}, {Filter.DtFrom.Day}) to Date({Filter.DtTo.Year}, {Filter.DtTo.Month}, {Filter.DtTo.Day})"
+            };
+
+            int vendId = SelectedItem?.VendID ?? (Filter.MakerIds?.FirstOrDefault() ?? 0);
+            if (vendId > 0)
+            {
+                conditions.Add($"{{VMakerRepair.VendID}} = {vendId}");
+            }
+
+            await ReportNavigationService.PrintReportAsync(new ReportRequest
+            {
+                ReportName = "Rejection_ChargedTo_Lotwise.rpt",
+                SelectionFormula = string.Join(" and ", conditions),
+                FormulaValues = new Dictionary<string, object>
+                {
                     { "DateRange", $"'{dateRangeStr}'" }
                 }
             });
@@ -1576,5 +1644,153 @@ namespace Impulse.Pages.Production.ReceivingList
                 SelectionFormula = string.Empty
             });
         }
+
+        public async Task PrintListSelection(ItemClickEventArgs args)
+        {
+            ResolveRowItem(args);
+            if (SelectedItem == null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Selection Required",
+                    Detail = "Please select a receiving record to print.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            string filtersStr = BuildFiltersString();
+            string dateRangeStr = $"{Filter.DtFrom:dd-MMM-yyyy} to {Filter.DtTo:dd-MMM-yyyy}";
+
+            await ReportNavigationService.PrintReportAsync(new ReportRequest
+            {
+                ReportName = "ReceivingList_Selection.rpt",
+                SelectionFormula = $"{{VVendReceivingList.VRD_EntryID}} = {SelectedItem.VRD_EntryID}",
+                FormulaValues = new Dictionary<string, object>
+                {
+                    { "Filters", $"'{filtersStr}'" },
+                    { "DateRange", $"'{dateRangeStr}'" }
+                }
+            });
+        }
+
+        public async Task PrintProcesswiseIssueReceive(ItemClickEventArgs args)
+        {
+            ResolveRowItem(args);
+            int processId = SelectedItem != null && SelectedItem.ProcessID > 0
+                ? SelectedItem.ProcessID
+                : (Filter.ProcessIds?.FirstOrDefault() ?? 0);
+
+            await ReportNavigationService.PrintReportAsync(new ReportRequest
+            {
+                ReportName = "Processwise_Issue_Receive_Summary.rpt",
+                Parameters = new Dictionary<string, object>
+                {
+                    { "@DTFrom", Filter.DtFrom },
+                    { "@DTTo", Filter.DtTo },
+                    { "@ProcessID", processId.ToString() }
+                }
+            });
+        }
+
+        public async Task PrintBillingPlan(ItemClickEventArgs args)
+        {
+            string filtersStr = BuildFiltersString();
+            string selectionFormula = BuildSelectionFormula(out string dateRangeStr);
+
+            await ReportNavigationService.PrintReportAsync(new ReportRequest
+            {
+                ReportName = "ReceivingList_Days.rpt",
+                SelectionFormula = selectionFormula,
+                FormulaValues = new Dictionary<string, object>
+                {
+                    { "Filters", $"'{filtersStr}'" },
+                    { "DateRange", $"'{dateRangeStr}'" }
+                }
+            });
+        }
+
+        public async Task PrintDelayedLots(ItemClickEventArgs args)
+        {
+            string dateRangeStr = $"{Filter.DtFrom:dd-MMM-yyyy} to {Filter.DtTo:dd-MMM-yyyy}";
+
+            var conditions = new List<string>
+            {
+                "{@Days_To_Process} > {VVendRcvdDetail.No_Of_Days}",
+                $"{{VVendRcvdDetail.DT}} in Date({Filter.DtFrom.Year}, {Filter.DtFrom.Month}, {Filter.DtFrom.Day}) to Date({Filter.DtTo.Year}, {Filter.DtTo.Month}, {Filter.DtTo.Day})"
+            };
+
+            if (Filter.MakerIds != null && Filter.MakerIds.Any())
+            {
+                conditions.Add($"{{VVendRcvdDetail.VendID}} in [{string.Join(",", Filter.MakerIds)}]");
+            }
+            else if (SelectedItem?.VendID > 0)
+            {
+                conditions.Add($"{{VVendRcvdDetail.VendID}} = {SelectedItem.VendID}");
+            }
+
+            if (Filter.ProcessIds != null && Filter.ProcessIds.Any())
+            {
+                conditions.Add($"{{VVendRcvdDetail.ProcessID}} in [{string.Join(",", Filter.ProcessIds)}]");
+            }
+            else if (SelectedItem?.ProcessID > 0)
+            {
+                conditions.Add($"{{VVendRcvdDetail.ProcessID}} = {SelectedItem.ProcessID}");
+            }
+
+            await ReportNavigationService.PrintReportAsync(new ReportRequest
+            {
+                ReportName = "Lots_Delayed.rpt",
+                SelectionFormula = string.Join(" and ", conditions),
+                FormulaValues = new Dictionary<string, object>
+                {
+                    { "DateRange", $"'{dateRangeStr}'" }
+                }
+            });
+        }
+
+        public async Task MarkMoveToStore(ItemClickEventArgs args)
+        {
+            ResolveRowItem(args);
+            if (SelectedItem == null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Selection Required",
+                    Detail = "Please select a receiving record first.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            string userName = await GetCurrentUserName();
+            string machineName = Environment.MachineName;
+
+            var result = await RcvListService.MarkMoveToStoreAsync(SelectedItem.VRD_EntryID, userName, machineName);
+            if (result.Success)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Success,
+                    Summary = "Move to Store",
+                    Detail = result.Message,
+                    Duration = 4000
+                });
+                await LoadDataAsync();
+            }
+            else
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Move to Store",
+                    Detail = result.Message,
+                    Duration = 5000
+                });
+            }
+        }
     }
 }
+

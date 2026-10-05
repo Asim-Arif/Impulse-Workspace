@@ -302,7 +302,39 @@ namespace Impulse.Services.WorkflowTasks
                 db.Open();
                 using var trans = db.BeginTransaction();
 
-                // 1. Authorize Customer Order
+                // 1. Check pending items / deltas before updating
+                var pendingItemsSql = @"
+                    SELECT oi.ID, oi.CompItemCode, oi.ItemCode, oi.Qty, ISNULL(oi.AuthorizedQty, 0) AS AuthorizedQty,
+                           ISNULL(v.ItemName, oi.CompItemCode) AS ItemName,
+                           (oi.Qty - ISNULL(oi.AuthorizedQty, 0)) AS DeltaQty
+                    FROM FOrderItems oi
+                    LEFT JOIN VItems v ON oi.CompItemCode = v.ItemID
+                    WHERE oi.OrderNo = @OrderNo AND (ISNULL(oi.Authorized, 0) = 0 OR oi.Qty <> ISNULL(oi.AuthorizedQty, 0))";
+
+                var pendingItems = (await db.QueryAsync<dynamic>(pendingItemsSql, new { OrderNo = orderNo }, trans)).ToList();
+
+                var previouslyAuthCountSql = @"
+                    SELECT COUNT(*) FROM FOrderItems 
+                    WHERE OrderNo = @OrderNo AND ISNULL(Authorized, 0) = 1 AND ISNULL(AuthorizedQty, 0) > 0";
+                int previouslyAuthCount = await db.QueryFirstOrDefaultAsync<int>(previouslyAuthCountSql, new { OrderNo = orderNo }, trans);
+                bool isReauthorization = previouslyAuthCount > 0 && pendingItems.Any();
+
+                // 2. Authorize pending item lines in FOrderItems
+                var updateItemsSql = @"
+                    UPDATE FOrderItems 
+                    SET Authorized = 1,
+                        AuthorizedQty = Qty,
+                        AuthorizedBy = @AuthorizedBy,
+                        AuthorizedDT = GETDATE()
+                    WHERE OrderNo = @OrderNo AND (ISNULL(Authorized, 0) = 0 OR Qty <> ISNULL(AuthorizedQty, 0))";
+
+                await db.ExecuteAsync(updateItemsSql, new
+                {
+                    OrderNo = orderNo,
+                    AuthorizedBy = authorizedByUserName
+                }, trans);
+
+                // 3. Authorize Customer Order Header
                 var updateOrderSql = @"
                     UPDATE FCustomerOrders 
                     SET Authorized = 1, 
@@ -322,7 +354,7 @@ namespace Impulse.Services.WorkflowTasks
                     return false;
                 }
 
-                // 2. Mark Director task completed
+                // 4. Mark Director tasks completed
                 var completeTaskSql = @"
                     UPDATE TaskItems 
                     SET Status = 2, 
@@ -339,35 +371,57 @@ namespace Impulse.Services.WorkflowTasks
                     AuthorizedBy = authorizedByUserName
                 }, trans);
 
-                // 3. Log comment
+                // 5. Log comment
+                var commentText = isReauthorization
+                    ? $"Order Re-Authorized by Director ({authorizedByUserName}). {pendingItems.Count} new/modified item(s) approved and handed over to PPC."
+                    : $"Order Authorized by Director ({authorizedByUserName}). Automatic handover to PPC initiated.";
+
                 var commentSql = @"
                     INSERT INTO TaskComments (TaskId, UserId, Content, CreatedAt)
-                    SELECT Id, @AuthorizedBy, 'Order Authorized by Director. Automatic handover to PPC initiated.', GETUTCDATE()
+                    SELECT Id, @AuthorizedBy, @CommentText, GETUTCDATE()
                     FROM TaskItems
                     WHERE SourceEntityType = 'CustomerOrder' AND SourceEntityRefId = @OrderNo";
 
                 await db.ExecuteAsync(commentSql, new
                 {
                     OrderNo = orderNo,
-                    AuthorizedBy = authorizedByUserName
+                    AuthorizedBy = authorizedByUserName,
+                    CommentText = commentText
                 }, trans);
 
                 trans.Commit();
 
                 _logger.LogInformation("Customer Order #{OrderNo} successfully authorized by {User}. Triggering PPC workflow task.", orderNo, authorizedByUserName);
 
-                // 4. Automatically generate handover task for PPC role
+                // 6. Automatically generate handover task for PPC role
+                var itemSummaryList = pendingItems.Select(p => 
+                    (int)p.AuthorizedQty > 0 
+                        ? $"{p.ItemName} (Qty: {p.Qty}, Delta: +{p.DeltaQty})" 
+                        : $"{p.ItemName} (Qty: {p.Qty})").ToList();
+
+                string itemsDetails = itemSummaryList.Any() 
+                    ? string.Join(", ", itemSummaryList.Take(5)) + (itemSummaryList.Count > 5 ? $" (+{itemSummaryList.Count - 5} more)" : "")
+                    : "all items";
+
                 _ = Task.Run(async () =>
                 {
                     try
                     {
+                        string taskTitle = isReauthorization
+                            ? $"[Update] New Items Authorized for Order #{orderNo}"
+                            : $"PPC Planning for Authorized Order #{orderNo}";
+
+                        string taskDesc = isReauthorization
+                            ? $"Director ({authorizedByUserName}) authorized new/modified items for Order #{orderNo}: {itemsDetails}. Please complete material planning, store issuance, and production orders for these items."
+                            : $"Customer Order #{orderNo} has been authorized by Director ({authorizedByUserName}). Ready for material planning, store issuance, and production orders.";
+
                         await CreateRoleTaskAsync(new WorkflowTaskCreateRequest
                         {
                             SourceEntityType = "CustomerOrder",
                             SourceEntityRefId = orderNo,
                             TargetRole = "PPC",
-                            Title = $"PPC Planning for Authorized Order #{orderNo}",
-                            Description = $"Customer Order #{orderNo} has been authorized by Director ({authorizedByUserName}). Ready for material planning, store issuance, and production orders.",
+                            Title = taskTitle,
+                            Description = taskDesc,
                             ActionUrl = $"/production/order-planning?orderNo={orderNo}",
                             Priority = 1,
                             DueDate = DateTime.Today.AddDays(2),

@@ -35,6 +35,7 @@ namespace DataAccessLibrary.Models.Setup
         public bool SamplingMainLink { get; set; }
         public bool HelpMainLink { get; set; }
         public bool IntraOfficeMainLink { get; set; }
+        public bool SetupMainLink { get; set; }
         public bool OpenCommandCenter { get; set; }
 
         // Item Profile Access Controls

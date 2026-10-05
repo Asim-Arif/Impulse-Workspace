@@ -279,7 +279,7 @@
 
                             <div class="col-sm-12">
                                 <label class="form-label fw-semibold">Account Title</label>
-                                    <input @bind="CurrentAccount.AccTitle" class="form-control" @bind:event="oninput" @onchange="OnChangedAccTitle" />
+                                    <input @bind="CurrentAccount.AccTitle" @bind:event="oninput" @bind:after="OnChangedAccTitle" class="form-control" />
                             </div>
                             
                             @if (IsEdit == false){
@@ -300,11 +300,11 @@
                                                 MaximumSuggestions="1000">
 
                                                 <SelectedTemplate Context="selectedhead_sub">
-                                                    @selectedhead_sub?.SubAccTitle
+                                                    @if (!string.IsNullOrEmpty(selectedhead_sub?.SubAccOf)) { <text>[@selectedhead_sub.SubAccOf] </text> }@selectedhead_sub?.SubAccTitle
                                                 </SelectedTemplate>
 
                                                 <ResultTemplate Context="result">
-                                                    @result.SubAccTitle
+                                                    @if (!string.IsNullOrEmpty(result.SubAccOf)) { <text>[@result.SubAccOf] </text> }@result.SubAccTitle
                                                 </ResultTemplate>
 
                                     </BlazoredTypeahead>
@@ -355,7 +355,7 @@
                             {
                                 <div class="col-md-6">
                                     <label class="form-label fw-semibold" for="opt2">Master Account</label>
-                                    <input @bind="CurrentAccount.AccType" type="checkbox" id="master" name="checkbox" value="checkbox" @bind:event="oninput" @onchange="OnChangedMasterType" />
+                                    <input @bind="CurrentAccount.AccType" @bind:after="OnChangedMasterType" type="checkbox" id="master" name="checkbox" value="checkbox" />
                                 </div>
                             }
                     </div>

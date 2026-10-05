@@ -34,11 +34,12 @@ namespace DataAccessLibrary.DAC.Payroll
                         SELECT deptid, Name, Description, Active, Color, Dept_ID, TempDept, 
                                SalaryAccNo, AccruedAccNo, AccruedFoodAccNo, AccruedUnionAccNo, 
                                SchAccNo, AccruedEOBIAccNo, TaxAccNo, OnePercentAccNo 
-                        FROM Departments";
+                        FROM Departments
+                        WHERE LTRIM(RTRIM(ISNULL(deptid, ''))) <> '' AND ISNULL(TempDept, 0) = 0";
 
                     if (!showInactive)
                     {
-                        sql += " WHERE Active = 1";
+                        sql += " AND Active = 1";
                     }
 
                     sql += " ORDER BY deptid";

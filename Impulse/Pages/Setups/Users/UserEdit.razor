@@ -115,6 +115,24 @@
                         }
                     </button>
                 </li>
+                <li class="nav-item">
+                    <button class="nav-link text-nowrap py-2 px-3 @(ActiveTab == 5 ? "active fw-bold shadow-sm" : "text-secondary")" @onclick="() => ActiveTab = 5">
+                        <i class="fas fa-building-user me-1"></i> Customers
+                        @if (TotalSelectedCustomersCount > 0)
+                        {
+                            <span class="badge @(ActiveTab == 5 ? "bg-white text-primary" : "bg-primary-subtle text-primary") ms-1">@TotalSelectedCustomersCount</span>
+                        }
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link text-nowrap py-2 px-3 @(ActiveTab == 6 ? "active fw-bold shadow-sm" : "text-secondary")" @onclick="() => ActiveTab = 6">
+                        <i class="fas fa-warehouse me-1"></i> Stores
+                        @if (TotalSelectedStoresCount > 0)
+                        {
+                            <span class="badge @(ActiveTab == 6 ? "bg-white text-primary" : "bg-primary-subtle text-primary") ms-1">@TotalSelectedStoresCount</span>
+                        }
+                    </button>
+                </li>
             </ul>
 
             <!-- Tab Contents -->
@@ -439,6 +457,18 @@
                                 </div>
                             </div>
                         </div>
+
+                        <div class="col-xl-3 col-lg-4 col-md-6 col-12">
+                            <div class="p-3 border rounded-3 bg-light h-100 transition-all">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="chkSetup" @bind="User.SetupMainLink" />
+                                    <label class="form-check-label small fw-semibold text-dark" for="chkSetup">
+                                        <i class="fas fa-sliders-h text-primary me-2"></i>System Setups
+                                    </label>
+                                    <div class="text-muted small mt-1" style="font-size: 0.75rem;">Setups hub, user security, diagnostics &amp; system parameters</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 }
                 else if (ActiveTab == 2)
@@ -757,7 +787,7 @@
                             <div class="row g-3">
                                 @foreach (var opt in FilteredModuleOptions)
                                 {
-                                    var isChecked = UserSelectedOptionIds.Contains(opt.OptionID);
+                                    var isChecked = IsOptionChecked(opt.OptionID);
                                     <div class="col-xxl-3 col-lg-4 col-md-6 col-12">
                                         <div class="p-3 border rounded-3 @(isChecked ? "bg-primary-subtle border-primary-subtle shadow-sm" : "bg-white") transition-all"
                                              style="cursor: pointer; transition: all 0.15s ease-in-out;"
@@ -781,6 +811,171 @@
                                 }
                             </div>
                         }
+                    </div>
+                }
+                else if (ActiveTab == 5)
+                {
+                    <!-- Tab 5: Customers Access -->
+                    <div class="card border border-light-subtle shadow-none bg-light-subtle p-3 rounded-3">
+                        <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                            <div>
+                                <h6 class="fw-bold text-primary mb-1">
+                                    <i class="fas fa-building-user me-1"></i> Customer Order &amp; Document Access
+                                </h6>
+                                <div class="text-secondary small">
+                                    Select the foreign customers this user is authorized to view and process. If no customer is restricted, access rules apply according to operational roles.
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-primary px-3 py-2" style="font-size: 0.8rem;">
+                                    <i class="fas fa-check-double me-1"></i> @TotalSelectedCustomersCount of @AvailableCustomers.Count Selected
+                                </span>
+                                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => SelectAllCustomers(true)">
+                                    Select All
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => SelectAllCustomers(false)">
+                                    Deselect All
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-5">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                                    <input type="text" class="form-control" placeholder="Search by customer code, name, or country..." @bind="CustomerSearchFilter" @bind:event="oninput" />
+                                    @if (!string.IsNullOrWhiteSpace(CustomerSearchFilter))
+                                    {
+                                        <button class="btn btn-outline-secondary" type="button" @onclick="() => CustomerSearchFilter = string.Empty">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive border rounded-3 bg-white" style="max-height: 520px; overflow-y: auto;">
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                    <tr>
+                                        <th style="width: 50px;" class="text-center">#</th>
+                                        <th style="width: 60px;" class="text-center">Allow</th>
+                                        <th style="width: 180px;">Customer Code</th>
+                                        <th>Customer Name</th>
+                                        <th style="width: 180px;">Country</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @{ int custIdx = 1; }
+                                    @foreach (var cust in FilteredCustomers)
+                                    {
+                                        var rowIdx = custIdx++;
+                                        <tr style="cursor: pointer;" @onclick="() => cust.IsAssigned = !cust.IsAssigned">
+                                            <td class="text-center text-muted small">@rowIdx</td>
+                                            <td class="text-center" @onclick:stopPropagation="true">
+                                                <input class="form-check-input" type="checkbox" @bind="cust.IsAssigned" />
+                                            </td>
+                                            <td class="fw-bold text-primary font-monospace">@cust.CustCode</td>
+                                            <td>@(string.IsNullOrWhiteSpace(cust.CustomerName) ? "—" : cust.CustomerName)</td>
+                                            <td>
+                                                @if (!string.IsNullOrWhiteSpace(cust.Country))
+                                                {
+                                                    <span class="badge bg-light text-dark border">@cust.Country</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                    @if (!FilteredCustomers.Any())
+                                    {
+                                        <tr>
+                                            <td colspan="5" class="text-center text-muted py-4">
+                                                <i class="fas fa-search me-1"></i> No customers found matching search criteria.
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+                else if (ActiveTab == 6)
+                {
+                    <!-- Tab 6: Stores Access -->
+                    <div class="card border border-light-subtle shadow-none bg-light-subtle p-3 rounded-3">
+                        <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                            <div>
+                                <h6 class="fw-bold text-primary mb-1">
+                                    <i class="fas fa-warehouse me-1"></i> Inventory &amp; Warehouse Store Access
+                                </h6>
+                                <div class="text-secondary small">
+                                    Specify the warehouses and inventory stock locations this user is permitted to issue, receive, or view.
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-primary px-3 py-2" style="font-size: 0.8rem;">
+                                    <i class="fas fa-check-double me-1"></i> @TotalSelectedStoresCount of @AvailableStores.Count Selected
+                                </span>
+                                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => SelectAllStores(true)">
+                                    Select All
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => SelectAllStores(false)">
+                                    Deselect All
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-5">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                                    <input type="text" class="form-control" placeholder="Search by store ID or store name..." @bind="StoreSearchFilter" @bind:event="oninput" />
+                                    @if (!string.IsNullOrWhiteSpace(StoreSearchFilter))
+                                    {
+                                        <button class="btn btn-outline-secondary" type="button" @onclick="() => StoreSearchFilter = string.Empty">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive border rounded-3 bg-white" style="max-height: 520px; overflow-y: auto;">
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                    <tr>
+                                        <th style="width: 50px;" class="text-center">#</th>
+                                        <th style="width: 60px;" class="text-center">Allow</th>
+                                        <th style="width: 120px;" class="text-center">Store ID</th>
+                                        <th>Store / Warehouse Name</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @{ int storeIdx = 1; }
+                                    @foreach (var store in FilteredStores)
+                                    {
+                                        var rowIdx = storeIdx++;
+                                        <tr style="cursor: pointer;" @onclick="() => store.IsAssigned = !store.IsAssigned">
+                                            <td class="text-center text-muted small">@rowIdx</td>
+                                            <td class="text-center" @onclick:stopPropagation="true">
+                                                <input class="form-check-input" type="checkbox" @bind="store.IsAssigned" />
+                                            </td>
+                                            <td class="text-center font-monospace text-secondary">#@store.StoreId</td>
+                                            <td class="fw-semibold text-dark">
+                                                <i class="fas fa-box text-secondary me-2"></i>@store.StoreName
+                                            </td>
+                                        </tr>
+                                    }
+                                    @if (!FilteredStores.Any())
+                                    {
+                                        <tr>
+                                            <td colspan="4" class="text-center text-muted py-4">
+                                                <i class="fas fa-search me-1"></i> No stores found matching search criteria.
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 }
             }

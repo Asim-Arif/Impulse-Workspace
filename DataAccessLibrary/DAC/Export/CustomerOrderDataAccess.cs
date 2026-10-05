@@ -150,12 +150,14 @@ namespace DataAccessLibrary.DAC.Export
             if (order == null) return null;
 
             const string itemsSql = @"
-                SELECT ID, OrderNo, ItemCode, CompItemCode, Price, Qty, InvQty, CustomPrice, SortNo, DeliveryDT, 
-                       StampsItem AS Stamps, Quality, DeliveryStatus, Remarks, Weight, Item_Finishing_Type, IW_OrderNo, IW_BatchNo, 
-                       ItemName, Description, Unit, Item_Finishing_Type_Text
-                FROM VrptOrders 
-                WHERE OrderNo = @OrderNo 
-                ORDER BY SortNo";
+                SELECT oi.ID, oi.OrderNo, oi.ItemCode, oi.CompItemCode, oi.Price, oi.Qty, oi.InvQty, oi.CustomPrice, oi.SortNo, oi.DeliveryDT, 
+                       oi.Stamps, oi.Quality, oi.DeliveryStatus, oi.Remarks, oi.Weight, oi.Item_Finishing_Type, oi.IW_OrderNo, oi.IW_BatchNo, 
+                       ISNULL(oi.Authorized, 0) AS Authorized, ISNULL(oi.AuthorizedQty, 0) AS AuthorizedQty, oi.AuthorizedBy, oi.AuthorizedDT,
+                       v.ItemName, v.Description, v.Unit, v.Item_Finishing_Type_Text
+                FROM FOrderItems oi
+                LEFT JOIN VrptOrders v ON oi.ID = v.ID
+                WHERE oi.OrderNo = @OrderNo 
+                ORDER BY oi.SortNo, oi.ID";
             order.OrderItems = (await db.QueryAsync<CustomerOrderItemViewModel>(itemsSql, new { OrderNo = orderNo })).ToList();
 
             return order;
@@ -214,27 +216,28 @@ namespace DataAccessLibrary.DAC.Export
                     item.OrderNo = order.OrderNo;
                     if (item.ID == 0)
                     {
-                        // Insert
+                        // Insert new item line
                         const string insertItemSql = @"
                             INSERT INTO FOrderItems (OrderNo, ItemCode, CompItemCode, Price, Qty, InvQty, 
                                                      CustomPrice, SortNo, DeliveryDT, Quality, Stamps, 
                                                      DeliveryStatus, Remarks, Weight, Item_Finishing_Type, 
-                                                     IW_OrderNo, IW_BatchNo) 
+                                                     IW_OrderNo, IW_BatchNo, Authorized, AuthorizedQty) 
                             VALUES (@OrderNo, @ItemCode, @CompItemCode, @Price, @Qty, @Qty, 
                                     @CustomPrice, @SortNo, @DeliveryDT, @Quality, @Stamps, 
                                     @DeliveryStatus, @Remarks, @Weight, @Item_Finishing_Type, 
-                                    @IW_OrderNo, @IW_BatchNo)";
+                                    @IW_OrderNo, @IW_BatchNo, 0, 0)";
                         await db.ExecuteAsync(insertItemSql, item, trans);
                     }
                     else
                     {
-                        // Update
+                        // Update existing item line - if Qty changes, reset Authorized = 0
                         const string updateItemSql = @"
                             UPDATE FOrderItems 
                             SET Price = @Price, Qty = @Qty, SortNo = @SortNo, DeliveryDT = @DeliveryDT, 
                                 Quality = @Quality, Stamps = @Stamps, DeliveryStatus = @DeliveryStatus, 
                                 Remarks = @Remarks, Weight = @Weight, Item_Finishing_Type = @Item_Finishing_Type, 
-                                IW_OrderNo = @IW_OrderNo, IW_BatchNo = @IW_BatchNo 
+                                IW_OrderNo = @IW_OrderNo, IW_BatchNo = @IW_BatchNo,
+                                Authorized = CASE WHEN @Qty = ISNULL(AuthorizedQty, 0) THEN Authorized ELSE 0 END
                             WHERE ID = @ID";
                         await db.ExecuteAsync(updateItemSql, item, trans);
                     }
@@ -257,6 +260,16 @@ namespace DataAccessLibrary.DAC.Export
                         }
                     }
                 }
+
+                // Synchronize FCustomerOrders.Authorized header state
+                const string syncHeaderAuthSql = @"
+                    UPDATE FCustomerOrders
+                    SET Authorized = CASE 
+                        WHEN EXISTS (SELECT 1 FROM FOrderItems WHERE OrderNo = @OrderNo)
+                         AND NOT EXISTS (SELECT 1 FROM FOrderItems WHERE OrderNo = @OrderNo AND (ISNULL(Authorized, 0) = 0 OR Qty > ISNULL(AuthorizedQty, 0)))
+                        THEN 1 ELSE 0 END
+                    WHERE OrderNo = @OrderNo";
+                await db.ExecuteAsync(syncHeaderAuthSql, new { OrderNo = order.OrderNo }, trans);
 
                 trans.Commit();
                 return true;
@@ -534,6 +547,19 @@ namespace DataAccessLibrary.DAC.Export
                 else
                 {
                     item.PurchasePlanStatus = "-";
+                }
+
+                if (item.TotalPendingArticles == 0 && item.TotalAuthorizedArticles > 0 && item.Authorized)
+                {
+                    item.AuthorizationStatus = "Authorized";
+                }
+                else if (item.TotalAuthorizedArticles > 0 && item.TotalPendingArticles > 0)
+                {
+                    item.AuthorizationStatus = "Partially Authorized";
+                }
+                else
+                {
+                    item.AuthorizationStatus = "Pending Authorization";
                 }
             }
 

@@ -297,6 +297,10 @@ namespace Impulse.Pages.Company
                 }
             }
 
+            Item.ForgingWeight ??= 0;
+            Item.FinishedWeight ??= 0;
+            Item.WasteVisible ??= 0;
+
             IsSaving = true;
             try
             {

@@ -203,12 +203,6 @@ namespace Impulse.Pages.Stock.RMIssuance
                 NotificationService.ShowWarning("Insufficient Stock", $"Cannot issue {QtyToIssue}. Only {SelectedLocation.ShelfQty} available in this location.");
                 return;
             }
-            
-            if (QtyToIssue > TotalQtyInStock)
-            {
-                NotificationService.ShowWarning("Insufficient Stock", $"Cannot issue {QtyToIssue}. Only {TotalQtyInStock} available across all stores.");
-                return;
-            }
 
             var newRow = new RMIssuanceDetailRow
             {
@@ -225,7 +219,7 @@ namespace Impulse.Pages.Stock.RMIssuance
                 Rate = CurrentPrice,
                 BatchNo = SelectedLocation.BatchNo,
                 LotNo = SelectedLocation.LotNo,
-                TotalQtyInStock = TotalQtyInStock
+                TotalQtyInStock = SelectedLocation.ShelfQty
             };
 
             Request.Rows.Add(newRow);

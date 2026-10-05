@@ -6,7 +6,7 @@
 
 <div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
     <!-- Page Header & Action Bar -->
-    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px; position: relative !important; z-index: 1050 !important;">
         <div class="card-body py-2 px-3">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom pb-2 mb-2">
                 <div class="d-flex align-items-center gap-2">
@@ -61,6 +61,8 @@
                         <i class="fas fa-search me-1"></i>Select Customer Order
                     </label>
                     <BlazoredTypeahead SearchMethod="SearchOrdersAsync"
+                                       EnableDropDown="true"
+                                       Data="ActiveOrdersWithStock"
                                        TValue="PpcStockAdjustmentOrderHeaderModel"
                                        TItem="PpcStockAdjustmentOrderHeaderModel"
                                        Value="SelectedOrderLookup"
@@ -96,7 +98,7 @@
                     <label class="form-label small fw-semibold text-secondary mb-1">
                         <i class="fas fa-calendar-day me-1"></i>Adjustment Date
                     </label>
-                    <input type="date" class="form-control form-control-sm" @bind="AdjustmentDate" style="height: 35px;" />
+                    <input type="date" class="form-control form-control-sm" @bind="AdjustmentDate" style="height: 31px;" />
                 </div>
 
                 @if (OrderHeader != null)
@@ -105,7 +107,7 @@
                         <label class="form-label small fw-semibold text-secondary mb-1">
                             <i class="fas fa-id-card me-1"></i>Order &amp; Customer Details
                         </label>
-                        <div class="px-3 border rounded bg-light d-flex align-items-center justify-content-between flex-wrap gap-2" style="height: 35px; box-sizing: border-box;">
+                        <div class="px-3 border rounded bg-light d-flex align-items-center justify-content-between flex-wrap gap-2" style="height: 31px; box-sizing: border-box;">
                             <div class="text-truncate">
                                 <span class="text-secondary small me-1">Customer:</span>
                                 <strong>@OrderHeader.CustomerName</strong>
@@ -477,18 +479,37 @@
 
 <style>
     .blazored-typeahead {
-        height: 35px !important;
-        min-height: 35px !important;
+        height: 31px !important;
+        font-size: 0.85rem !important;
         padding: 0 !important;
         box-sizing: border-box !important;
     }
-    .blazored-typeahead__controls {
-        height: 35px !important;
-        min-height: 35px !important;
+    .blazored-typeahead:focus-within {
+        position: relative;
+        z-index: 10001 !important;
     }
-    .blazored-typeahead__input-mask,
+    .blazored-typeahead__input-wrap {
+        height: 100% !important;
+    }
     .blazored-typeahead__input {
-        height: 35px !important;
-        font-size: 0.88rem !important;
+        height: 29px !important;
+        padding: 2px 8px !important;
+        font-size: 0.85rem !important;
+    }
+    .blazored-typeahead__controls {
+        height: 100% !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.4rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    .blazored-typeahead__results {
+        max-height: 280px !important;
+        overflow-y: auto !important;
+        z-index: 99999 !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
+        border: 1px solid #dee2e6 !important;
+        border-radius: 6px !important;
     }
 </style>

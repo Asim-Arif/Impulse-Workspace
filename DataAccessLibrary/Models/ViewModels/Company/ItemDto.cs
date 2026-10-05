@@ -180,9 +180,9 @@ namespace DataAccessLibrary.Models.ViewModels.Company
         /// <summary>Maps to Items.UnitWeight (varchar 50) — stored as text in DB.</summary>
         public string? UnitWeight { get; set; }
 
-        public double? ForgingWeight { get; set; }
-        public double? FinishedWeight { get; set; }
-        public double? WasteVisible { get; set; }
+        public double? ForgingWeight { get; set; } = 0;
+        public double? FinishedWeight { get; set; } = 0;
+        public double? WasteVisible { get; set; } = 0;
 
         // ── Pricing tab ──────────────────────────────────────────────────────
         [StringLength(50)]
@@ -190,7 +190,7 @@ namespace DataAccessLibrary.Models.ViewModels.Company
         public decimal? EuroRate { get; set; }
 
         // Regular Pricing
-        public decimal FOB { get; set; }
+        public decimal FOB { get; set; } = 0m;
         public decimal? ExWorks { get; set; }
         public decimal? CnISea { get; set; }
         public decimal? CnIAir { get; set; }

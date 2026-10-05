@@ -21,5 +21,7 @@ namespace Impulse.Services.Setup
         Task<bool> SaveAllUserMenuOptionsAsync(int userId, IEnumerable<string> allOptionIds);
         Task<bool> SyncMenuOptionsAsync(IEnumerable<MenuOptionModel> options);
         Task<bool> ResetAllOptionsAsync();
+        IEnumerable<string> GetOptionAliases(string optionId);
+        bool IsOptionGranted(string optionId, ISet<string> userOptionIds);
     }
 }

@@ -17,5 +17,9 @@ namespace DataAccessLibrary.Interface.Setup
         Task<int> CopyUserAsync(int fromUserId, string newUserName, string? password = null, string? fullUserName = null);
         Task<int> GetTotalUsersCountAsync();
         Task<int> GetActiveUsersCountAsync();
+        Task<List<UserCustomerPermissionModel>> GetCustomersWithUserAssignmentAsync(int userId);
+        Task<List<UserStorePermissionModel>> GetStoresWithUserAssignmentAsync(int userId);
+        Task<bool> SaveUserCustomersAsync(int userId, IEnumerable<string> custCodes);
+        Task<bool> SaveUserStoresAsync(int userId, IEnumerable<int> storeIds);
     }
 }

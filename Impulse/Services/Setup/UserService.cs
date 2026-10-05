@@ -159,5 +159,47 @@ namespace Impulse.Services.Setup
                 return (false, $"Failed to copy user: {ex.Message}", 0);
             }
         }
+
+        public async Task<List<UserCustomerPermissionModel>> GetCustomersWithUserAssignmentAsync(int userId)
+        {
+            return await _userDataAccess.GetCustomersWithUserAssignmentAsync(userId);
+        }
+
+        public async Task<List<UserStorePermissionModel>> GetStoresWithUserAssignmentAsync(int userId)
+        {
+            return await _userDataAccess.GetStoresWithUserAssignmentAsync(userId);
+        }
+
+        public async Task<(bool Success, string Message)> SaveUserCustomersAsync(int userId, IEnumerable<string> custCodes)
+        {
+            try
+            {
+                var success = await _userDataAccess.SaveUserCustomersAsync(userId, custCodes);
+                return success
+                    ? (true, "Customer access permissions saved successfully.")
+                    : (false, "Failed to save customer access permissions.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in SaveUserCustomersAsync for User ID {UserId}", userId);
+                return (false, $"Error saving customer permissions: {ex.Message}");
+            }
+        }
+
+        public async Task<(bool Success, string Message)> SaveUserStoresAsync(int userId, IEnumerable<int> storeIds)
+        {
+            try
+            {
+                var success = await _userDataAccess.SaveUserStoresAsync(userId, storeIds);
+                return success
+                    ? (true, "Store access permissions saved successfully.")
+                    : (false, "Failed to save store access permissions.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in SaveUserStoresAsync for User ID {UserId}", userId);
+                return (false, $"Error saving store permissions: {ex.Message}");
+            }
+        }
     }
 }

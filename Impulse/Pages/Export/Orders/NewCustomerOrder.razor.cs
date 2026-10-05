@@ -704,13 +704,26 @@ namespace Impulse.Pages.Export.Orders
                 var userName = auth.User.Identity?.Name ?? "User";
                 var totalQty = Order.OrderItems.Sum(i => i.Qty);
 
+                var pendingItems = Order.OrderItems.Where(i => !i.Authorized || i.Qty != i.AuthorizedQty).ToList();
+                if (!pendingItems.Any()) return; // All items already authorized
+
+                bool isPartialUpdate = Order.OrderItems.Any(i => i.Authorized && i.Qty == i.AuthorizedQty);
+
+                string title = isPartialUpdate
+                    ? $"Authorize New / Modified Articles for Order #{orderNo}"
+                    : $"Authorize Customer Order #{orderNo}";
+
+                string desc = isPartialUpdate
+                    ? $"Order #{orderNo} edited. {pendingItems.Count} article(s) require Director authorization (Total Order Qty: {totalQty:N0})."
+                    : $"New Customer Order #{orderNo} for {Order.CustCode} ({Order.OrderItems.Count} articles, Total Qty: {totalQty:N0}). Authorization required before production processing.";
+
                 await WorkflowTaskEngine.CreateRoleTaskAsync(new Impulse.Services.WorkflowTasks.WorkflowTaskCreateRequest
                 {
                     SourceEntityType = "CustomerOrder",
                     SourceEntityRefId = orderNo,
                     TargetRole = "Director",
-                    Title = $"Authorize Customer Order #{orderNo}",
-                    Description = $"New Customer Order #{orderNo} for {Order.CustCode} ({Order.OrderItems.Count} articles, Total Qty: {totalQty:N0}). Authorization required before production processing.",
+                    Title = title,
+                    Description = desc,
                     ActionUrl = $"/export/customer-order-list?orderNo={Uri.EscapeDataString(orderNo)}",
                     Priority = 2,
                     DueDate = DateTime.Today.AddDays(1),

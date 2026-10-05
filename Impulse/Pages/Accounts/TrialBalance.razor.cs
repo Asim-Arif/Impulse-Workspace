@@ -184,13 +184,20 @@ namespace Impulse.Pages.Accounts
         private void GoToVoucherTransaction() 
         {
         }
-        private void PrintTrialBalanceReport() 
+
+        private void PrintStandardTrialBalance() => PrintTrialBalanceReport(ReportNames.TrialBalance);
+        private void PrintTrialBalanceII() => PrintTrialBalanceReport(ReportNames.TrialBalance_II);
+        private void PrintOpeningBalance() => PrintTrialBalanceReport(ReportNames.TrialBalance_Opening);
+        private void PrintClosingBalance() => PrintTrialBalanceReport(ReportNames.TrialBalance_Closing);
+        private void PrintTrialBalanceReport() => PrintTrialBalanceReport(ReportNames.TrialBalance);
+
+        private void PrintTrialBalanceReport(string reportName) 
         {
             string strFromTo = DTFrom.ToString("dd-MMM-yyyy") + " to " + DTTo.ToString("dd-MMM-yyyy");            
             
             var reportRequest = new ReportRequest
             {
-                ReportName = ReportNames.TrialBalance,
+                ReportName = reportName,
                 SelectionFormula = $"1=1",
                 FormulaValues = new Dictionary<string, object>
                 {
@@ -200,7 +207,7 @@ namespace Impulse.Pages.Accounts
                 {
                     { "@DTFrom", DTFrom },
                     { "@DTTo", DTTo },
-                    { "@Code", SelectedAccount.DropDownValue_ID  },
+                    { "@Code", SelectedAccount?.DropDownValue_ID ?? "0" },
                 }
             };
 

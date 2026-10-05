@@ -4479,3 +4479,397 @@ BEGIN
     PRINT 'Added column Show_Customer_Order_No to Users';
 END
 GO
+
+-- ====================================================================================================
+-- SCRIPT: FOrderItems - Authorized, AuthorizedQty, AuthorizedBy, AuthorizedDT
+-- ====================================================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('FOrderItems') AND name = 'Authorized')
+BEGIN
+    ALTER TABLE [dbo].[FOrderItems] ADD [Authorized] BIT NOT NULL CONSTRAINT [DF_FOrderItems_Authorized] DEFAULT (0);
+    PRINT 'Added column Authorized to FOrderItems';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('FOrderItems') AND name = 'AuthorizedQty')
+BEGIN
+    ALTER TABLE [dbo].[FOrderItems] ADD [AuthorizedQty] INT NOT NULL CONSTRAINT [DF_FOrderItems_AuthorizedQty] DEFAULT (0);
+    PRINT 'Added column AuthorizedQty to FOrderItems';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('FOrderItems') AND name = 'AuthorizedBy')
+BEGIN
+    ALTER TABLE [dbo].[FOrderItems] ADD [AuthorizedBy] VARCHAR(50) NULL;
+    PRINT 'Added column AuthorizedBy to FOrderItems';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('FOrderItems') AND name = 'AuthorizedDT')
+BEGIN
+    ALTER TABLE [dbo].[FOrderItems] ADD [AuthorizedDT] DATETIME NULL;
+    PRINT 'Added column AuthorizedDT to FOrderItems';
+END
+GO
+
+-- Backfill existing authorized orders so their items match current authorization
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('FOrderItems') AND name = 'Authorized')
+BEGIN
+    UPDATE oi
+    SET oi.Authorized = 1,
+        oi.AuthorizedQty = ISNULL(oi.Qty, 0),
+        oi.AuthorizedBy = ISNULL(co.AuthorizedBy, 'System'),
+        oi.AuthorizedDT = ISNULL(co.AuthorizedDT, co.DT)
+    FROM [dbo].[FOrderItems] oi
+    INNER JOIN [dbo].[FCustomerOrders] co ON oi.OrderNo = co.OrderNo
+    WHERE ISNULL(co.Authorized, 0) = 1 AND ISNULL(oi.Authorized, 0) = 0 AND ISNULL(oi.AuthorizedQty, 0) = 0;
+    PRINT 'Backfilled FOrderItems authorization for existing authorized orders';
+END
+GO
+
+-- -------------------------------------------------------------
+-- Update VFOrderList to include TotalAuthorizedArticles & TotalPendingArticles
+-- -------------------------------------------------------------
+CREATE OR ALTER VIEW [dbo].[VFOrderList]
+AS
+SELECT     dbo.FCustomerOrders.OrderNo, dbo.FCustomerOrders.DT, dbo.FCustomerOrders.CustCode, dbo.FCustomerOrders.Country, dbo.F_OrderAmt(dbo.FCustomerOrders.OrderNo, 0) AS OrderAmt, 
+                      dbo.ForeignCustomers.Curr, dbo.VFOrderTotalQty.TotalInvQty, dbo.VFOrderTotalQty.TotalOrderQty, dbo.FCustomerOrders.DeliveryDT, dbo.FCustomerOrders.CompanyRefID, 
+                      dbo.Companies.CompanyName, dbo.VUnshippedOrderList.OrderNo AS UnshippedOrderNo, TotalShipped.TotalShippedQty, dbo.VCurrencyExchangeRates.ExchRate, 
+                      dbo.FCustomerOrders.InternalRefNo, ROUND(dbo.VFOrderTotalQty.TotalWeight, 2) AS TotalWeight, TotalShipped.TotalShippedAmt, ISNULL(dbo.FCustomerFinalOrders.Cancelled, 0) AS Cancelled, 
+                      TotalQuantities.TotalArticles, dbo.FCustomerFinalOrders.Remarks, TotalShipped.ShippedItemCount, TotalShipped.ShippedItemQty, TotalShipped.PartiallyShippedItemCount, 
+                      TotalShipped.PartiallyShippedItemQty, TotalShipped.TotalBalanceQty, dbo.FCustomerOrders.OrderType, T1.TotalPlannedQty, dbo.FCustomerOrders.OrderPlanApproved
+                      ,dbo.ForeignCustomers.LateOrderAlerts
+                      ,ISNULL(dbo.FCustomerOrders.Authorized, 0) AS Authorized
+                      ,dbo.FCustomerOrders.AuthorizedBy
+                      ,dbo.FCustomerOrders.AuthorizedDT
+                      ,ISNULL(TotalQuantities.TotalAuthorizedArticles, 0) AS TotalAuthorizedArticles
+                      ,ISNULL(TotalQuantities.TotalPendingArticles, 0) AS TotalPendingArticles
+FROM         dbo.FCustomerOrders INNER JOIN
+                      dbo.ForeignCustomers ON dbo.FCustomerOrders.CustCode = dbo.ForeignCustomers.CustCode AND dbo.FCustomerOrders.Country = dbo.ForeignCustomers.Country INNER JOIN
+                      dbo.VFOrderTotalQty ON dbo.FCustomerOrders.OrderNo = dbo.VFOrderTotalQty.OrderNo INNER JOIN
+                      dbo.Companies ON dbo.FCustomerOrders.CompanyRefID = dbo.Companies.EntryID LEFT OUTER JOIN
+                      dbo.VUnshippedOrderList ON dbo.FCustomerOrders.OrderNo = dbo.VUnshippedOrderList.OrderNo INNER JOIN
+                          (SELECT     OrderNo, 
+                                      SUM(Qty) AS TotalOrderQty, 
+                                      COUNT(*) AS TotalArticles,
+                                      SUM(CASE WHEN ISNULL(Authorized, 0) = 1 AND ISNULL(AuthorizedQty, 0) >= ISNULL(Qty, 0) THEN 1 ELSE 0 END) AS TotalAuthorizedArticles,
+                                      SUM(CASE WHEN ISNULL(Authorized, 0) = 0 OR ISNULL(AuthorizedQty, 0) < ISNULL(Qty, 0) THEN 1 ELSE 0 END) AS TotalPendingArticles
+                            FROM          dbo.FOrderItems
+                            GROUP BY OrderNo) AS TotalQuantities ON dbo.FCustomerOrders.OrderNo = TotalQuantities.OrderNo LEFT OUTER JOIN
+                      dbo.FCustomerFinalOrders ON dbo.FCustomerOrders.OrderNo = dbo.FCustomerFinalOrders.OrderNo LEFT OUTER JOIN
+                          (SELECT     OrderNo, SUM(ShippedQty) AS TotalShippedQty, SUM(ShippedQty * Price) AS TotalShippedAmt, SUM(CASE WHEN ShippedQty >= Qty THEN 1 ELSE 0 END) AS ShippedItemCount, 
+                                                   SUM(CASE WHEN ShippedQty >= Qty THEN ShippedQty ELSE 0 END) AS ShippedItemQty, SUM(CASE WHEN ShippedQty > 0 AND ShippedQty < Qty THEN 1 ELSE 0 END) 
+                                                   AS PartiallyShippedItemCount, SUM(CASE WHEN ShippedQty > 0 AND ShippedQty < Qty THEN ShippedQty ELSE 0 END) AS PartiallyShippedItemQty, 
+                                                   SUM(CASE WHEN ShippedQty >= Qty THEN 0 ELSE Qty - ShippedQty END) AS TotalBalanceQty
+                            FROM          dbo.VFOrderItemswithShippedQty
+                            WHERE      (CompItemCode IN
+                                                       (SELECT     ItemID
+                                                         FROM          dbo.Items))
+                            GROUP BY OrderNo) AS TotalShipped ON dbo.FCustomerOrders.OrderNo = TotalShipped.OrderNo LEFT OUTER JOIN
+                      dbo.VCurrencyExchangeRates ON dbo.ForeignCustomers.Curr = dbo.VCurrencyExchangeRates.Currency LEFT OUTER JOIN
+                          (SELECT     OrderNo, SUM(Qty) AS TotalPlannedQty
+                            FROM          dbo.OrderPlanningDetails
+                            GROUP BY OrderNo) AS T1 ON dbo.FCustomerOrders.OrderNo = T1.OrderNo
+GO
+
+-- ============================================================================
+-- Maker Purchase Orders: Attach Master PO Maker Signed Scanned Copy
+-- ============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('VendIssued') AND name = 'MakerSignedCopyPath')
+BEGIN
+    ALTER TABLE VendIssued ADD MakerSignedCopyPath NVARCHAR(500) NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('VendIssued') AND name = 'MakerSignedCopyFileName')
+BEGIN
+    ALTER TABLE VendIssued ADD MakerSignedCopyFileName NVARCHAR(255) NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('VendIssued') AND name = 'MakerSignedCopyUploadedAt')
+BEGIN
+    ALTER TABLE VendIssued ADD MakerSignedCopyUploadedAt DATETIME NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('VendIssued') AND name = 'MakerSignedCopyUploadedBy')
+BEGIN
+    ALTER TABLE VendIssued ADD MakerSignedCopyUploadedBy NVARCHAR(100) NULL;
+END
+GO
+
+-- ============================================================================
+-- Setup Module Security & Screen Rights: SetupMainLink and Setup MenuOptions
+-- ============================================================================
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Users' AND COLUMN_NAME='SetupMainLink')
+BEGIN
+    ALTER TABLE dbo.Users ADD SetupMainLink BIT NOT NULL CONSTRAINT DF_Users_SetupMainLink DEFAULT (0);
+    PRINT 'Added SetupMainLink to Users table';
+END
+GO
+
+IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Users' AND COLUMN_NAME='SetupMainLink')
+BEGIN
+    EXEC sp_executesql N'UPDATE dbo.Users SET SetupMainLink = 1 WHERE UserManagement = 1;';
+    PRINT 'Updated SetupMainLink = 1 for users with UserManagement = 1';
+END
+GO
+
+-- Ensure Setup Menu Options exist in MenuOptions table
+IF NOT EXISTS (SELECT 1 FROM MenuOptions WHERE OptionID = 'SetupHub')
+BEGIN
+    INSERT INTO MenuOptions (OptionID, OptionName, ModuleName, FormName)
+    VALUES ('SetupHub', 'Setups Hub', 'Setup', 'SetupDashboard');
+END
+ELSE
+BEGIN
+    UPDATE MenuOptions SET ModuleName = 'Setup', OptionName = 'Setups Hub', FormName = 'SetupDashboard' WHERE OptionID = 'SetupHub';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM MenuOptions WHERE OptionID = 'SetupUsers')
+BEGIN
+    INSERT INTO MenuOptions (OptionID, OptionName, ModuleName, FormName)
+    VALUES ('SetupUsers', 'User Management', 'Setup', 'UsersList');
+END
+ELSE
+BEGIN
+    UPDATE MenuOptions SET ModuleName = 'Setup', OptionName = 'User Management', FormName = 'UsersList' WHERE OptionID = 'SetupUsers';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM MenuOptions WHERE OptionID = 'OfficeMinuteTypes')
+BEGIN
+    INSERT INTO MenuOptions (OptionID, OptionName, ModuleName, FormName)
+    VALUES ('OfficeMinuteTypes', 'Minute Types', 'Setup', 'MinuteTypesAdmin');
+END
+ELSE
+BEGIN
+    UPDATE MenuOptions SET ModuleName = 'Setup', OptionName = 'Minute Types', FormName = 'MinuteTypesAdmin' WHERE OptionID = 'OfficeMinuteTypes';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM MenuOptions WHERE OptionID = 'OfficeEmailSettings')
+BEGIN
+    INSERT INTO MenuOptions (OptionID, OptionName, ModuleName, FormName)
+    VALUES ('OfficeEmailSettings', 'Email & SMTP Settings', 'Setup', 'EmailSettingsAdmin');
+END
+ELSE
+BEGIN
+    UPDATE MenuOptions SET ModuleName = 'Setup', OptionName = 'Email & SMTP Settings', FormName = 'EmailSettingsAdmin' WHERE OptionID = 'OfficeEmailSettings';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM MenuOptions WHERE OptionID = 'IntraOfficeHealth')
+BEGIN
+    INSERT INTO MenuOptions (OptionID, OptionName, ModuleName, FormName)
+    VALUES ('IntraOfficeHealth', 'System Diagnostics', 'Setup', 'SystemHealth');
+END
+ELSE
+BEGIN
+    UPDATE MenuOptions SET ModuleName = 'Setup', OptionName = 'System Diagnostics', FormName = 'SystemHealth' WHERE OptionID = 'IntraOfficeHealth';
+END
+GO
+
+-- Backfill UserMenuOptions for users who already have legacy 'UserManagement' right
+IF EXISTS (SELECT 1 FROM UserMenuOptions WHERE OptionID = 'UserManagement')
+BEGIN
+    INSERT INTO UserMenuOptions (UserID, OptionID)
+    SELECT DISTINCT umo.UserID, 'SetupUsers'
+    FROM UserMenuOptions umo
+    WHERE umo.OptionID = 'UserManagement'
+      AND NOT EXISTS (SELECT 1 FROM UserMenuOptions existing WHERE existing.UserID = umo.UserID AND existing.OptionID = 'SetupUsers');
+    PRINT 'Backfilled SetupUsers permission for users having legacy UserManagement';
+END
+GO
+
+-- ==============================================================================
+-- Deduplicate and Harmonize MenuOptions with UserMenuOptions
+-- Realigns Blazor OptionIDs with canonical legacy OptionIDs where user rights reside
+-- ==============================================================================
+
+-- 1. Ensure any permissions granted under duplicate OptionIDs are preserved in canonical OptionIDs
+INSERT INTO UserMenuOptions (UserID, OptionID)
+SELECT umo.UserID, 'CompanyCatalog'
+FROM UserMenuOptions umo
+WHERE umo.OptionID = 'CmpCompanyCatalog'
+  AND NOT EXISTS (SELECT 1 FROM UserMenuOptions e WHERE e.UserID = umo.UserID AND e.OptionID = 'CompanyCatalog');
+
+INSERT INTO UserMenuOptions (UserID, OptionID)
+SELECT umo.UserID, 'CustomerCatalog'
+FROM UserMenuOptions umo
+WHERE umo.OptionID = 'CmpCustomerCatalog'
+  AND NOT EXISTS (SELECT 1 FROM UserMenuOptions e WHERE e.UserID = umo.UserID AND e.OptionID = 'CustomerCatalog');
+
+INSERT INTO UserMenuOptions (UserID, OptionID)
+SELECT umo.UserID, 'OrderItemList'
+FROM UserMenuOptions umo
+WHERE umo.OptionID = 'ExpOrderItemList'
+  AND NOT EXISTS (SELECT 1 FROM UserMenuOptions e WHERE e.UserID = umo.UserID AND e.OptionID = 'OrderItemList');
+
+INSERT INTO UserMenuOptions (UserID, OptionID)
+SELECT umo.UserID, 'CustomInvoice'
+FROM UserMenuOptions umo
+WHERE umo.OptionID = 'ExpCustomInvoice'
+  AND NOT EXISTS (SELECT 1 FROM UserMenuOptions e WHERE e.UserID = umo.UserID AND e.OptionID = 'CustomInvoice');
+
+INSERT INTO UserMenuOptions (UserID, OptionID)
+SELECT umo.UserID, 'NewCustomInvoice'
+FROM UserMenuOptions umo
+WHERE umo.OptionID = 'ExpNewCustomInvoice'
+  AND NOT EXISTS (SELECT 1 FROM UserMenuOptions e WHERE e.UserID = umo.UserID AND e.OptionID = 'NewCustomInvoice');
+
+INSERT INTO UserMenuOptions (UserID, OptionID)
+SELECT umo.UserID, 'PrintValuationForm'
+FROM UserMenuOptions umo
+WHERE umo.OptionID = 'ExpValuationForm'
+  AND NOT EXISTS (SELECT 1 FROM UserMenuOptions e WHERE e.UserID = umo.UserID AND e.OptionID = 'PrintValuationForm');
+
+INSERT INTO UserMenuOptions (UserID, OptionID)
+SELECT umo.UserID, 'StkMaterialGroup'
+FROM UserMenuOptions umo
+WHERE umo.OptionID = 'StkRMGroups'
+  AND NOT EXISTS (SELECT 1 FROM UserMenuOptions e WHERE e.UserID = umo.UserID AND e.OptionID = 'StkMaterialGroup');
+
+INSERT INTO UserMenuOptions (UserID, OptionID)
+SELECT umo.UserID, 'StkVenderBilling'
+FROM UserMenuOptions umo
+WHERE umo.OptionID = 'StkVendorBilling'
+  AND NOT EXISTS (SELECT 1 FROM UserMenuOptions e WHERE e.UserID = umo.UserID AND e.OptionID = 'StkVenderBilling');
+
+INSERT INTO UserMenuOptions (UserID, OptionID)
+SELECT umo.UserID, 'StkVenderBillingList'
+FROM UserMenuOptions umo
+WHERE umo.OptionID = 'StkVendorBillingList'
+  AND NOT EXISTS (SELECT 1 FROM UserMenuOptions e WHERE e.UserID = umo.UserID AND e.OptionID = 'StkVenderBillingList');
+
+INSERT INTO UserMenuOptions (UserID, OptionID)
+SELECT umo.UserID, 'PrlTakeAttendanceEx'
+FROM UserMenuOptions umo
+WHERE umo.OptionID = 'PayAttendanceManual'
+  AND NOT EXISTS (SELECT 1 FROM UserMenuOptions e WHERE e.UserID = umo.UserID AND e.OptionID = 'PrlTakeAttendanceEx');
+
+INSERT INTO UserMenuOptions (UserID, OptionID)
+SELECT umo.UserID, 'PrlAbsentSheet'
+FROM UserMenuOptions umo
+WHERE umo.OptionID = 'PayAbsentSheet'
+  AND NOT EXISTS (SELECT 1 FROM UserMenuOptions e WHERE e.UserID = umo.UserID AND e.OptionID = 'PrlAbsentSheet');
+
+INSERT INTO UserMenuOptions (UserID, OptionID)
+SELECT umo.UserID, 'PrlSocialSecurity'
+FROM UserMenuOptions umo
+WHERE umo.OptionID = 'PaySocialSecurity'
+  AND NOT EXISTS (SELECT 1 FROM UserMenuOptions e WHERE e.UserID = umo.UserID AND e.OptionID = 'PrlSocialSecurity');
+
+INSERT INTO UserMenuOptions (UserID, OptionID)
+SELECT umo.UserID, 'PrlEOBI'
+FROM UserMenuOptions umo
+WHERE umo.OptionID = 'PayEOBI'
+  AND NOT EXISTS (SELECT 1 FROM UserMenuOptions e WHERE e.UserID = umo.UserID AND e.OptionID = 'PrlEOBI');
+
+INSERT INTO UserMenuOptions (UserID, OptionID)
+SELECT umo.UserID, 'PrlPayrollPolicies'
+FROM UserMenuOptions umo
+WHERE umo.OptionID = 'PayPolicies'
+  AND NOT EXISTS (SELECT 1 FROM UserMenuOptions e WHERE e.UserID = umo.UserID AND e.OptionID = 'PrlPayrollPolicies');
+
+INSERT INTO UserMenuOptions (UserID, OptionID)
+SELECT umo.UserID, 'PrdReceivingAgainstPO'
+FROM UserMenuOptions umo
+WHERE umo.OptionID = 'PrdReceivePO'
+  AND NOT EXISTS (SELECT 1 FROM UserMenuOptions e WHERE e.UserID = umo.UserID AND e.OptionID = 'PrdReceivingAgainstPO');
+
+INSERT INTO UserMenuOptions (UserID, OptionID)
+SELECT umo.UserID, 'AccMakerList'
+FROM UserMenuOptions umo
+WHERE umo.OptionID = 'PrdMakerList'
+  AND NOT EXISTS (SELECT 1 FROM UserMenuOptions e WHERE e.UserID = umo.UserID AND e.OptionID = 'AccMakerList');
+GO
+
+-- 2. Remove orphaned duplicate assignments from UserMenuOptions
+DELETE FROM UserMenuOptions 
+WHERE OptionID IN (
+    'CmpCompanyCatalog', 'CmpCustomerCatalog', 'ExpOrderItemList', 'ExpCustomInvoice',
+    'ExpNewCustomInvoice', 'ExpValuationForm', 'StkRMGroups', 'StkVendorBilling',
+    'StkVendorBillingList', 'PayAttendanceManual', 'PayAbsentSheet', 'PaySocialSecurity',
+    'PayEOBI', 'PayPolicies', 'PrdReceivePO', 'PrdMakerList'
+);
+GO
+
+-- 3. Remove orphaned duplicate rows from MenuOptions
+DELETE FROM MenuOptions 
+WHERE OptionID IN (
+    'CmpCompanyCatalog', 'CmpCustomerCatalog', 'ExpOrderItemList', 'ExpCustomInvoice',
+    'ExpNewCustomInvoice', 'ExpValuationForm', 'StkRMGroups', 'StkVendorBilling',
+    'StkVendorBillingList', 'PayAttendanceManual', 'PayAbsentSheet', 'PaySocialSecurity',
+    'PayEOBI', 'PayPolicies', 'PrdReceivePO', 'PrdMakerList'
+);
+GO
+
+-- 4. Disambiguate identical display names that represent different screens
+UPDATE MenuOptions SET OptionName = 'Commercial Packing List' WHERE OptionID = 'ComPackingList' AND OptionName = 'Packing List';
+UPDATE MenuOptions SET OptionName = 'Custom Packing List' WHERE OptionID = 'CustomPackingList' AND OptionName = 'Packing List';
+UPDATE MenuOptions SET OptionName = 'Change Locations (Raw Material)' WHERE OptionID = 'StkChangeLocations' AND OptionName = 'Change Locations';
+UPDATE MenuOptions SET OptionName = 'Change Locations (Semi-Finished)' WHERE OptionID = 'StkChangeLocationsSF' AND OptionName = 'Change Locations';
+GO
+
+-- 5. Add Employees_Prefix to Company table if not exists
+IF NOT EXISTS (
+    SELECT 1 FROM sys.columns 
+    WHERE object_id = OBJECT_ID('dbo.Company') 
+      AND name = 'Employees_Prefix'
+)
+BEGIN
+    ALTER TABLE [dbo].[Company] ADD [Employees_Prefix] VARCHAR(10) NULL;
+    PRINT 'Added Employees_Prefix column to Company table.';
+END
+GO
+
+-- 6. Clean up invalid/empty department records
+DELETE FROM Departments WHERE LTRIM(RTRIM(ISNULL(deptid, ''))) = '';
+GO
+
+-- 7. Ensure GetNextAccno function handles alphabetical and numeric account prefixes safely
+CREATE OR ALTER FUNCTION [dbo].[GetNextAccno](@AccountName AS VARCHAR(255),@AccType AS VARCHAR(50),@ParentAccount As Varchar(255)=NULL,@IsParent As BIT=0)
+RETURNS VARCHAR(255) AS  
+BEGIN
+DECLARE @AccNo AS VARCHAR(255)
+DECLARE @NewVal AS VARCHAR(255), @Prefix As VARCHAR(50)
+
+IF @IsParent=1
+	BEGIN
+		SET @NewVal=(SELECT MAX(CAST(RIGHT(AccNo,3) AS INT)) from Accounts WHERE SubAccOf=@ParentAccount)
+		SET @NewVal=CAST(ISNULL(@NewVal,'') AS INT)+1
+		SET @AccNo=@ParentAccount + '-' + REPLICATE('0',3-LEN(@NewVal)) + @NewVal
+	END
+ELSE
+	BEGIN
+		SET @Prefix=ASCII(UPPER(LEFT(LTRIM(RTRIM(ISNULL(@AccountName,''))),1)))
+		IF @Prefix>=65 AND @Prefix<=90
+			SET @Prefix=REPLICATE('0',2-LEN(@Prefix-64)) + CAST(@Prefix-64 AS VARCHAR)
+		ELSE 
+			SET @Prefix='00'
+		
+		SET @NewVal=(SELECT MAX(CAST(RIGHT(AccNo,3) AS INT)) FROM Accounts WHERE SubAccOf=@ParentAccount AND SUBSTRING(AccNo,LEN(Accno)-4,2)=@Prefix)
+		SET @NewVal=CAST(ISNULL(@NewVal,'') AS INT)+1
+		SET @AccNo=@ParentAccount + '-' + @Prefix + REPLICATE('0',3-LEN(@NewVal)) + @NewVal
+	END
+RETURN @AccNo
+END
+GO
+
+-- ============================================================================
+-- Maker Receiving List: VRD_Mark_Move_To_Store Table
+-- Tracks receiving records marked for transfer / move to store
+-- ============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'VRD_Mark_Move_To_Store')
+BEGIN
+    CREATE TABLE dbo.VRD_Mark_Move_To_Store (
+        VRD_EntryID INT NOT NULL PRIMARY KEY,
+        UserName VARCHAR(50) NULL,
+        MachineName VARCHAR(50) NULL,
+        DTEntry DATETIME NULL DEFAULT (GETDATE())
+    );
+END
+GO
+

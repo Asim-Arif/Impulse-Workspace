@@ -30,7 +30,8 @@ namespace Impulse.Pages.Stock.RMMovement
                     _selectedMaterial = value;
                     SelectedLocation = null;
                     QtyToMove = 0;
-                    _ = LoadLocationsAsync();
+                    Locations.Clear();
+                    _ = InvokeAsync(LoadLocationsAsync);
                 }
             }
         }
@@ -48,7 +49,9 @@ namespace Impulse.Pages.Stock.RMMovement
                     _selectedStore = value;
                     SelectedRack = null;
                     SelectedShelf = null;
-                    _ = LoadRacksAsync();
+                    Racks.Clear();
+                    Shelves.Clear();
+                    _ = InvokeAsync(LoadRacksAsync);
                 }
             }
         }
@@ -63,7 +66,8 @@ namespace Impulse.Pages.Stock.RMMovement
                 {
                     _selectedRack = value;
                     SelectedShelf = null;
-                    _ = LoadShelvesAsync();
+                    Shelves.Clear();
+                    _ = InvokeAsync(LoadShelvesAsync);
                 }
             }
         }
@@ -77,7 +81,7 @@ namespace Impulse.Pages.Stock.RMMovement
                 if (_selectedShelf != value)
                 {
                     _selectedShelf = value;
-                    _ = LoadTargetShelfQtyAsync();
+                    _ = InvokeAsync(LoadTargetShelfQtyAsync);
                 }
             }
         }
@@ -93,17 +97,18 @@ namespace Impulse.Pages.Stock.RMMovement
             try
             {
                 var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-                _userName = authState.User.Identity.Name;
-                _machineName = "WebClient"; // Can be enhanced to get actual client IP/Name if needed
+                _userName = authState.User.Identity?.Name ?? "System";
+                _machineName = Environment.MachineName;
 
                 // Load Initial Data
                 Materials = await RMDataAccess.GetMaterialsAsync();
                 
-                // Load Stores for user
-                // Assuming we have a claim or we just use 0 for admin for now
-                // Wait, UserID is required for GetStoresForUserAsync. We can just load all stores or parse the userId.
-                // For this migration, we'll assume a dummy user id or fetch properly.
-                int userId = 1; // You'd parse this from authState claims in a real scenario
+                int userId = 1;
+                var idClaim = authState.User.FindFirst("UserId");
+                if (idClaim != null && int.TryParse(idClaim.Value, out int uid))
+                {
+                    userId = uid;
+                }
                 Stores = await PlacementService.GetStoresForUserAsync(userId);
             }
             catch (Exception ex)
@@ -118,54 +123,94 @@ namespace Impulse.Pages.Stock.RMMovement
 
         private async Task LoadLocationsAsync()
         {
-            if (SelectedMaterial != null)
+            try
             {
-                Locations = await MovementService.GetLocationsForMaterialAsync(SelectedMaterial.RMID1);
+                if (SelectedMaterial != null)
+                {
+                    Locations = await MovementService.GetLocationsForMaterialAsync(SelectedMaterial.RMID1);
+                }
+                else
+                {
+                    Locations.Clear();
+                }
             }
-            else
+            catch (Exception ex)
             {
-                Locations.Clear();
+                NotificationService.ShowError("Error loading locations", ex.Message);
             }
-            StateHasChanged();
+            finally
+            {
+                await InvokeAsync(StateHasChanged);
+            }
         }
 
         private async Task LoadRacksAsync()
         {
-            if (SelectedStore != null)
+            try
             {
-                Racks = await PlacementService.GetRacksAsync(SelectedStore.EntryID);
+                if (SelectedStore != null)
+                {
+                    Racks = await PlacementService.GetRacksAsync(SelectedStore.EntryID);
+                }
+                else
+                {
+                    Racks.Clear();
+                }
             }
-            else
+            catch (Exception ex)
             {
-                Racks.Clear();
+                NotificationService.ShowError("Error loading racks", ex.Message);
             }
-            StateHasChanged();
+            finally
+            {
+                await InvokeAsync(StateHasChanged);
+            }
         }
 
         private async Task LoadShelvesAsync()
         {
-            if (SelectedRack != null)
+            try
             {
-                Shelves = await PlacementService.GetShelvesAsync(SelectedRack.EntryID);
+                if (SelectedRack != null)
+                {
+                    Shelves = await PlacementService.GetShelvesAsync(SelectedRack.EntryID);
+                }
+                else
+                {
+                    Shelves.Clear();
+                }
             }
-            else
+            catch (Exception ex)
             {
-                Shelves.Clear();
+                NotificationService.ShowError("Error loading shelves", ex.Message);
             }
-            StateHasChanged();
+            finally
+            {
+                await InvokeAsync(StateHasChanged);
+            }
         }
 
         private async Task LoadTargetShelfQtyAsync()
         {
-            if (SelectedShelf != null && SelectedMaterial != null)
+            try
             {
-                TargetShelfQty = await MovementService.GetShelfQuantityAsync(SelectedShelf.EntryID, SelectedMaterial.RMID1);
+                if (SelectedShelf != null && SelectedMaterial != null)
+                {
+                    TargetShelfQty = await MovementService.GetShelfQuantityAsync(SelectedShelf.EntryID, SelectedMaterial.RMID1);
+                }
+                else
+                {
+                    TargetShelfQty = 0;
+                }
             }
-            else
+            catch (Exception ex)
             {
-                TargetShelfQty = 0;
+                NotificationService.ShowError("Error loading shelf quantity", ex.Message);
             }
-            StateHasChanged();
+            finally
+            {
+                await InvokeAsync(StateHasChanged);
+            }
         }
 
         // Typeahead Search Methods

@@ -129,6 +129,13 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public DateTime? ReturnDT { get; set; }
         public bool IsDelayed => ReturnDT.HasValue && ReturnDT.Value.Date < DateTime.Today && Balance > 0;
         public string StatusText => Balance == 0 && IssQty > 0 ? "Fulfilled" : RcvdQty > 0 ? "Partial" : "Issued";
+
+        // Maker Signed Scanned Copy Attachment
+        public string? MakerSignedCopyPath { get; set; }
+        public string? MakerSignedCopyFileName { get; set; }
+        public DateTime? MakerSignedCopyUploadedAt { get; set; }
+        public string? MakerSignedCopyUploadedBy { get; set; }
+        public bool HasSignedCopy => !string.IsNullOrWhiteSpace(MakerSignedCopyPath);
     }
 
     public class ItemRunningLotDto

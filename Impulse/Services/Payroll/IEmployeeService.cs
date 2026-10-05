@@ -14,6 +14,7 @@ namespace Impulse.Services.Payroll
         Task<string> GetCompanyNameAsync();
         Task SaveEmployeeAsync(EmployeeDto employee, bool isAdd);
         Task<string> GetNextEmpIDAsync(string deptId);
+        Task<string> GetEmployeePrefixAsync();
         Task<List<ProcessLookupModel>> GetProcessesAsync();
         Task<EmployeeDto?> GetEmployeeByIdAsync(string empId);
         Task<List<GroupLookupModel>> GetGroupsAsync();

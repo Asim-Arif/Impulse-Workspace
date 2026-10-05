@@ -36,9 +36,16 @@
                         }
                         else if (OrderHeader.IsPlanned)
                         {
-                            <button type="button" class="btn btn-sm btn-outline-success fw-bold px-4" disabled style="cursor: not-allowed; opacity: 0.9;">
-                                <i class="fas fa-check-circle me-1"></i>
-                                <span>Plan Saved &amp; Dispatched</span>
+                            <button type="button" class="btn btn-sm btn-success fw-bold px-4" @onclick="SavePlanAsync" disabled="@(!CanSavePlan)">
+                                <i class="fas fa-save me-1"></i>
+                                <span>Update Plan &amp; Dispatch</span>
+                            </button>
+                        }
+                        else if (OrderHeader.IsPartiallyPlanned)
+                        {
+                            <button type="button" class="btn btn-sm btn-success fw-bold px-4" @onclick="SavePlanAsync" disabled="@(!CanSavePlan)">
+                                <i class="fas fa-paper-plane me-1"></i>
+                                <span>Save Delta Plan &amp; Dispatch</span>
                             </button>
                         }
                         else
@@ -65,7 +72,7 @@
                                 @foreach (var o in AuthorizedOrders)
                                 {
                                     <option value="@o.OrderNo">
-                                        @o.OrderNo - @o.CustomerName (@o.TotalOrderQty.ToString("N0") pcs) @(o.IsPlanned ? "✓ Planned" : "• Pending")
+                                        @o.OrderNo - @o.CustomerName (@o.TotalOrderQty.ToString("N0") pcs) @(o.IsPlanned ? "✓ Planned" : (o.IsPartiallyPlanned ? $"• Partial ({o.PlannedItems}/{o.TotalItems})" : "• Pending"))
                                     </option>
                                 }
                             </select>
@@ -87,7 +94,13 @@
                             @if (OrderHeader.IsPlanned)
                             {
                                 <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
-                                    <i class="fas fa-check-circle me-1"></i> Planned by @OrderHeader.PlannedBy
+                                    <i class="fas fa-check-circle me-1"></i> Fully Planned @(string.IsNullOrEmpty(OrderHeader.PlannedBy) ? "" : $"by {OrderHeader.PlannedBy}")
+                                </span>
+                            }
+                            else if (OrderHeader.IsPartiallyPlanned)
+                            {
+                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning px-2 py-1">
+                                    <i class="fas fa-adjust me-1"></i> Partially Planned (@OrderHeader.PlannedItemsCount/@OrderHeader.Items.Count)
                                 </span>
                             }
                             else
@@ -129,7 +142,16 @@
                     <div class="alert alert-success d-flex align-items-center justify-content-between py-2 px-3 mb-3 border-success-subtle shadow-sm" style="font-size: 0.88rem; border-radius: 8px;">
                         <div>
                             <i class="fas fa-check-circle text-success me-2"></i>
-                            <strong>Plan Saved &amp; Dispatched:</strong> This PPC plan was created by <strong>@OrderHeader.PlannedBy</strong>@(OrderHeader.PlannedAt.HasValue ? $" on {OrderHeader.PlannedAt.Value:dd-MMM-yyyy hh:mm tt}" : ""). Tasks have been dispatched to Stock, Purchasing, and Hub Supervisors.
+                            <strong>All Articles Planned:</strong> This PPC plan was created by <strong>@OrderHeader.PlannedBy</strong>@(OrderHeader.PlannedAt.HasValue ? $" on {OrderHeader.PlannedAt.Value:dd-MMM-yyyy hh:mm tt}" : ""). You can make adjustments and re-dispatch if needed.
+                        </div>
+                    </div>
+                }
+                else if (OrderHeader.IsPartiallyPlanned)
+                {
+                    <div class="alert alert-warning d-flex align-items-center justify-content-between py-2 px-3 mb-3 border-warning shadow-sm" style="font-size: 0.88rem; border-radius: 8px;">
+                        <div>
+                            <i class="fas fa-exclamation-triangle text-warning-emphasis me-2"></i>
+                            <strong>Partially Planned Order:</strong> @OrderHeader.PlannedItemsCount of @OrderHeader.Items.Count items have been planned. Complete planning for newly added/authorized items below and click <strong>Save Delta Plan &amp; Dispatch</strong>.
                         </div>
                     </div>
                 }
@@ -159,6 +181,38 @@
                                 </div>
 
                                 <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    @if (item.Authorized && item.AuthorizedQty >= item.OrderQty)
+                                    {
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" title="Authorized: @item.AuthorizedQty pcs">
+                                            <i class="fas fa-check-circle me-1"></i> Authorized
+                                        </span>
+                                    }
+                                    else if (item.AuthorizedQty > 0 && item.OrderQty > item.AuthorizedQty)
+                                    {
+                                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning px-2 py-1" title="Authorized: @item.AuthorizedQty pcs, Current: @item.OrderQty pcs">
+                                            <i class="fas fa-exclamation-triangle me-1"></i> Auth Delta (@item.AuthorizedQty / @item.OrderQty)
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1" title="Awaiting Director Authorization">
+                                            <i class="fas fa-clock me-1"></i> Awaiting Director Auth
+                                        </span>
+                                    }
+
+                                    @if (item.IsPlanned)
+                                    {
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" title="PPC Planning Saved">
+                                            <i class="fas fa-clipboard-check me-1"></i> Planned
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning px-2 py-1" title="Needs PPC Planning">
+                                            <i class="fas fa-pencil-ruler me-1"></i> Needs Planning
+                                        </span>
+                                    }
+
                                     <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle px-2 py-1">
                                         <strong>Order Qty:</strong> @item.OrderQty.ToString("N0") pcs
                                     </span>
@@ -198,7 +252,7 @@
                                                        max="@item.AvailableInHandStock"
                                                        @bind="item.StockQty"
                                                        @bind:event="oninput"
-                                                       disabled="@OrderHeader.IsPlanned" />
+                                                       disabled="@IsSaving" />
                                                 <span class="input-group-text bg-white text-muted">pcs</span>
                                             </div>
                                             @if (item.StockQty > item.AvailableInHandStock)
@@ -233,12 +287,9 @@
                                                 <i class="fas fa-shopping-cart me-1 text-success"></i> Maker Purchase Allocations
                                                 <span class="badge bg-secondary rounded-pill ms-1">@item.Purchases.Count</span>
                                             </div>
-                                            @if (!OrderHeader.IsPlanned)
-                                            {
-                                                <button type="button" class="btn btn-sm btn-outline-success fw-bold py-0 px-2" style="font-size: 0.8rem;" @onclick="async () => await AddPurchaseSplit(item)">
-                                                    <i class="fas fa-plus me-1"></i> Add Purchase Split
-                                                </button>
-                                            }
+                                            <button type="button" class="btn btn-sm btn-outline-success fw-bold py-0 px-2" style="font-size: 0.8rem;" @onclick="async () => await AddPurchaseSplit(item)" disabled="@IsSaving">
+                                                <i class="fas fa-plus me-1"></i> Add Purchase Split
+                                            </button>
                                         </div>
 
                                         @if (!item.Purchases.Any())
@@ -267,7 +318,7 @@
                                                                     <select class="form-select form-select-sm"
                                                                             value="@split.ProcessID"
                                                                             @onchange="@(e => OnPurchaseProcessChanged(item, split, e))"
-                                                                            disabled="@OrderHeader.IsPlanned">
+                                                                            disabled="@IsSaving">
                                                                         <option value="0">-- Select Process --</option>
                                                                         @foreach (var proc in item.AvailablePurchaseProcesses)
                                                                         {
@@ -279,7 +330,7 @@
                                                                     <select class="form-select form-select-sm"
                                                                             value="@(split.VendID ?? 0)"
                                                                             @onchange="@(e => OnMakerChanged(split, e))"
-                                                                            disabled="@OrderHeader.IsPlanned">
+                                                                            disabled="@IsSaving">
                                                                         <option value="0">-- Leave for Purchaser --</option>
                                                                         @foreach (var mkr in split.AvailableMakers)
                                                                         {
@@ -293,15 +344,12 @@
                                                                            min="1"
                                                                            @bind="split.PurchaseQty"
                                                                            @bind:event="oninput"
-                                                                           disabled="@OrderHeader.IsPlanned" />
+                                                                           disabled="@IsSaving" />
                                                                 </td>
                                                                 <td class="text-center">
-                                                                    @if (!OrderHeader.IsPlanned)
-                                                                    {
-                                                                        <button type="button" class="btn btn-link btn-sm text-danger p-0" title="Remove Split" @onclick="() => RemovePurchaseSplit(item, split)">
-                                                                            <i class="fas fa-trash-alt"></i>
-                                                                        </button>
-                                                                    }
+                                                                    <button type="button" class="btn btn-link btn-sm text-danger p-0" title="Remove Split" @onclick="() => RemovePurchaseSplit(item, split)" disabled="@IsSaving">
+                                                                        <i class="fas fa-trash-alt"></i>
+                                                                    </button>
                                                                 </td>
                                                             </tr>
                                                         }
@@ -367,13 +415,13 @@
                                                                         }
                                                                     </td>
                                                                     <td>
-                                                                        <input type="date" class="form-control form-control-sm" @bind="hub.StartDate" disabled="@OrderHeader.IsPlanned" />
+                                                                        <input type="date" class="form-control form-control-sm" @bind="hub.StartDate" disabled="@IsSaving" />
                                                                     </td>
                                                                     <td>
-                                                                        <input type="date" class="form-control form-control-sm @(hub.StartDate > hub.EndDate ? "is-invalid" : "")" @bind="hub.EndDate" disabled="@OrderHeader.IsPlanned" />
+                                                                        <input type="date" class="form-control form-control-sm @(hub.StartDate > hub.EndDate ? "is-invalid" : "")" @bind="hub.EndDate" disabled="@IsSaving" />
                                                                     </td>
                                                                     <td>
-                                                                        <input type="number" class="form-control form-control-sm text-center fw-bold" @bind="hub.PlannedQty" disabled="@OrderHeader.IsPlanned" />
+                                                                        <input type="number" class="form-control form-control-sm text-center fw-bold" @bind="hub.PlannedQty" disabled="@IsSaving" />
                                                                     </td>
                                                                 </tr>
                                                             }
@@ -403,7 +451,7 @@
                                    class="form-control form-control-sm"
                                    placeholder="Add any specific notes for store, purchasers, or hub supervisors..."
                                    @bind="PlanningNotes"
-                                   disabled="@OrderHeader.IsPlanned" />
+                                   disabled="@IsSaving" />
                         </div>
                         <div class="col-md-4 text-end">
                             @if (IsSaving)
@@ -415,9 +463,16 @@
                             }
                             else if (OrderHeader.IsPlanned)
                             {
-                                <button type="button" class="btn btn-outline-success fw-bold px-4 shadow-sm" disabled style="cursor: not-allowed; opacity: 0.9;">
-                                    <i class="fas fa-check-circle me-1"></i>
-                                    <span>Plan Saved &amp; Dispatched</span>
+                                <button type="button" class="btn btn-success fw-bold px-4 shadow-sm" @onclick="SavePlanAsync" disabled="@(!CanSavePlan)">
+                                    <i class="fas fa-save me-1"></i>
+                                    <span>Update Plan &amp; Dispatch</span>
+                                </button>
+                            }
+                            else if (OrderHeader.IsPartiallyPlanned)
+                            {
+                                <button type="button" class="btn btn-success fw-bold px-4 shadow-sm" @onclick="SavePlanAsync" disabled="@(!CanSavePlan)">
+                                    <i class="fas fa-paper-plane me-1"></i>
+                                    <span>Save Delta Plan &amp; Dispatch</span>
                                 </button>
                             }
                             else

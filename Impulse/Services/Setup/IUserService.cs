@@ -16,5 +16,9 @@ namespace Impulse.Services.Setup
         Task<bool> DeleteUserAsync(int userId);
         Task<(bool Success, string Message, int NewUserId)> CopyUserAsync(int fromUserId, string newUserName, string? password = null, string? fullUserName = null);
         Task<(int TotalUsers, int ActiveUsers, int InactiveUsers)> GetUserStatisticsAsync();
+        Task<List<UserCustomerPermissionModel>> GetCustomersWithUserAssignmentAsync(int userId);
+        Task<List<UserStorePermissionModel>> GetStoresWithUserAssignmentAsync(int userId);
+        Task<(bool Success, string Message)> SaveUserCustomersAsync(int userId, IEnumerable<string> custCodes);
+        Task<(bool Success, string Message)> SaveUserStoresAsync(int userId, IEnumerable<int> storeIds);
     }
 }

@@ -180,7 +180,7 @@ namespace Impulse.Pages.Accounts
             }
             else
             {
-                strcond = "{VTempAccounts.Active} = 1";
+                strcond = "{VTempAccounts.Active} = True";
             }
 
             // Since it's Payable/Receivable, also restrict by SubAccOf in formula

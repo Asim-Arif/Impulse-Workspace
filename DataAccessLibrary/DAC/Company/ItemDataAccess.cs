@@ -505,6 +505,10 @@ namespace DataAccessLibrary.DAC.Company
 
         private async Task SaveBaseItemAsync(IDbConnection db, IDbTransaction tx, ItemDto item, bool isAdd)
         {
+            item.ForgingWeight ??= 0;
+            item.FinishedWeight ??= 0;
+            item.WasteVisible ??= 0;
+
             if (isAdd)
             {
                 const string sql = @"
@@ -544,8 +548,8 @@ namespace DataAccessLibrary.DAC.Company
                         @Fig_No, @Scale, @HRC_From, @HRC_To,
                         @MinLevel, @MaxLevel, @ReOrderLevel, @ReorderPoint,
                         @ItemMaxLotSize, @ItemLotSizeBuffer, @FixedPackingUnit,
-                        @UnitWeight, @ForgingWeight, @FinishedWeight, @WasteVisible,
-                        @ItemCurr, @FOB, @ExWorks, @CnISea, @CnIAir, @CIFSea, @CIFAir, @CnFSea, @CnFAir,
+                        @UnitWeight, ISNULL(@ForgingWeight, 0), ISNULL(@FinishedWeight, 0), ISNULL(@WasteVisible, 0),
+                        @ItemCurr, ISNULL(@FOB, 0), @ExWorks, @CnISea, @CnIAir, @CIFSea, @CIFAir, @CnFSea, @CnFAir,
                         @FOBTop, @ExWorksTop, @CnISeaTop, @CnIAirTop, @CIFSeaTop, @CIFAirTop, @CnFSeaTop, @CnFAirTop,
                         @PlantRate, @SnaffRate, @StampRate,
                         @ReadyFinishPrice, @FillingPrice, @PriceForCost,
@@ -555,7 +559,7 @@ namespace DataAccessLibrary.DAC.Company
                         @SmallBoxPcs, @MasterCartonSmallBoxes,
                         @FinishDescription1, @FinishDescription2,
                         @MakerDescription1, @MakerDescription2,
-                        @InActive, @Sample, @AvailableForECommerce,
+                        ISNULL(@InActive, 0), @Sample, @AvailableForECommerce,
                         @ItemPic, @TechnicalDrawing,
                         GETDATE()
                     )";
@@ -607,11 +611,11 @@ namespace DataAccessLibrary.DAC.Company
                         ItemLotSizeBuffer   = @ItemLotSizeBuffer,
                         FixedPackingUnit    = @FixedPackingUnit,
                         UnitWeight          = @UnitWeight,
-                        ForgingWeight       = @ForgingWeight,
-                        FinishedWeight      = @FinishedWeight,
-                        WasteVisible        = @WasteVisible,
+                        ForgingWeight       = ISNULL(@ForgingWeight, 0),
+                        FinishedWeight      = ISNULL(@FinishedWeight, 0),
+                        WasteVisible        = ISNULL(@WasteVisible, 0),
                         ItemCurr            = @ItemCurr,
-                        FOB                 = @FOB,
+                        FOB                 = ISNULL(@FOB, 0),
                         ExWorks             = @ExWorks,
                         CnISea              = @CnISea,
                         CnIAir              = @CnIAir,
@@ -648,7 +652,7 @@ namespace DataAccessLibrary.DAC.Company
                         FinishDescription2  = @FinishDescription2,
                         MakerDescription1   = @MakerDescription1,
                         MakerDescription2   = @MakerDescription2,
-                        InActive            = @InActive,
+                        InActive            = ISNULL(@InActive, 0),
                         Sample              = @Sample,
                         AvailableForECommerce = @AvailableForECommerce,
                         ItemPic             = @ItemPic,

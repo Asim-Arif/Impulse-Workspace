@@ -40,15 +40,20 @@ namespace DataAccessLibrary.DAC.Production
                         ISNULL(fc.Name, '') AS CustomerName,
                         ISNULL(o.Country, '') AS Country,
                         COUNT(DISTINCT oi.CompItemCode) AS TotalItems,
+                        COUNT(DISTINCT pip.ItemID) AS PlannedItems,
                         ISNULL(SUM(oi.Qty), 0) AS TotalOrderQty,
-                        CASE WHEN pm.OrderNo IS NOT NULL THEN 1 ELSE 0 END AS IsPlanned,
+                        CASE 
+                            WHEN COUNT(DISTINCT oi.CompItemCode) > 0 AND COUNT(DISTINCT pip.ItemID) >= COUNT(DISTINCT oi.CompItemCode) THEN 1 
+                            ELSE 0 
+                        END AS IsPlanned,
                         pm.PlannedBy,
                         pm.PlannedAt
                     FROM FCustomerOrders o
                     LEFT JOIN ForeignCustomers fc ON o.CustCode = fc.CustCode AND o.Country = fc.Country
-                    LEFT JOIN FOrderItems oi ON o.OrderNo = oi.OrderNo
+                    LEFT JOIN FOrderItems oi ON o.OrderNo = oi.OrderNo AND ISNULL(oi.Authorized, 0) = 1
                     LEFT JOIN PPC_Order_Planning_Master pm ON o.OrderNo = pm.OrderNo
-                    WHERE o.Authorized = 1
+                    LEFT JOIN PPC_Order_Item_Planning pip ON o.OrderNo = pip.OrderNo AND oi.CompItemCode = pip.ItemID
+                    WHERE o.Authorized = 1 OR EXISTS (SELECT 1 FROM FOrderItems foi WHERE foi.OrderNo = o.OrderNo AND ISNULL(foi.Authorized, 0) = 1)
                     GROUP BY o.OrderNo, o.DT, o.DeliveryDT, o.CustCode, fc.Name, o.Country, pm.OrderNo, pm.PlannedBy, pm.PlannedAt
                     ORDER BY o.DT DESC, o.OrderNo DESC";
 
@@ -98,10 +103,19 @@ namespace DataAccessLibrary.DAC.Production
                         v.CompItemID,
                         ISNULL(v.ItemName, v.Description) AS ItemName,
                         v.Qty AS OrderQty,
+                        ISNULL(foi.Authorized, 0) AS Authorized,
+                        ISNULL(foi.AuthorizedQty, 0) AS AuthorizedQty,
                         ISNULL(v.InHand, 0) AS AvailableInHandStock,
                         COALESCE(ipg.PG_RefID, i.GroupID, 0) AS GroupID,
                         ISNULL(pg.GroupName, '') AS GroupName
                     FROM VrptOrders_ForProduction v
+                    LEFT JOIN (
+                        SELECT OrderNo, CompItemCode, 
+                               MIN(CAST(ISNULL(Authorized, 0) AS INT)) AS Authorized, 
+                               SUM(ISNULL(AuthorizedQty, 0)) AS AuthorizedQty
+                        FROM FOrderItems
+                        GROUP BY OrderNo, CompItemCode
+                    ) foi ON v.OrderNo = foi.OrderNo AND v.CompItemID = foi.CompItemCode
                     LEFT JOIN Items i ON v.CompItemID = i.ItemID
                     LEFT JOIN ItemProcessGroups ipg ON v.CompItemID = ipg.ItemID
                     LEFT JOIN ProcessGroups pg ON COALESCE(ipg.PG_RefID, i.GroupID) = pg.EntryID
@@ -201,6 +215,11 @@ namespace DataAccessLibrary.DAC.Production
                     if (savedPlanMap.TryGetValue(item.CompItemID, out var plan))
                     {
                         item.StockQty = (int)plan.StockQty;
+                        item.IsPlanned = true;
+                    }
+                    else
+                    {
+                        item.IsPlanned = false;
                     }
 
                     // Restore saved purchases
@@ -256,10 +275,14 @@ namespace DataAccessLibrary.DAC.Production
                                 .Where(s => s.GroupID == item.GroupID && s.Hub_Name == hubName)
                                 .ToList();
 
-                            item.HubSchedules.Add(sched);
+                    item.HubSchedules.Add(sched);
                         }
                     }
                 }
+
+                // Header is fully planned only if all authorized items have saved planning
+                var authItems = items.Where(i => i.Authorized).ToList();
+                header.IsPlanned = authItems.Any() && authItems.All(i => i.IsPlanned);
 
                 return header;
             }

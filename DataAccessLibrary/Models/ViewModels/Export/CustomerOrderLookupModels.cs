@@ -46,9 +46,12 @@ namespace DataAccessLibrary.Models.ViewModels.Export
         public bool Authorized { get; set; }
         public string? AuthorizedBy { get; set; }
         public DateTime? AuthorizedDT { get; set; }
+        public int TotalAuthorizedArticles { get; set; }
+        public int TotalPendingArticles { get; set; }
 
         // Helper derived fields for UI display
         public string OrderStatus { get; set; } = string.Empty;
         public string PurchasePlanStatus { get; set; } = string.Empty;
+        public string AuthorizationStatus { get; set; } = "Pending Authorization";
     }
 }

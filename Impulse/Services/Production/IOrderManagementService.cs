@@ -15,5 +15,7 @@ namespace Impulse.Services.Production
         Task<List<ItemRunningLotDto>> GetItemRunningLotsAsync(string orderNo, string itemCode, string? compItemCode = null);
         Task<List<ItemStockAdjustmentDto>> GetItemStockAdjustmentsAsync(string orderNo, string itemCode, string? compItemCode = null);
         Task<List<ItemDispatchDetailDto>> GetItemDispatchDetailsAsync(string orderNo, string itemCode, string? compItemCode = null);
+        Task<(bool Success, string? ErrorMessage, string? RelativePath)> UploadMasterPoSignedCopyAsync(string masterPoNo, int entryId, System.IO.Stream fileStream, string originalFileName, string userName);
+        Task<bool> DeleteMasterPoSignedCopyAsync(string masterPoNo, int entryId, string? existingFilePath);
     }
 }

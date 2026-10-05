@@ -190,16 +190,17 @@ namespace Impulse.Pages.Payroll.BiometricLedger
                 await BiometricLedgerService.ExecutePrintDailyAbsentLeaveDetailAsync(SelectedDate);
 
                 string selFormula = "{Employees.Active}=True AND {VMainDepartments.TempDept}=False";
-                if (SelectedDepartment != null)
+                if (SelectedDepartment != null && !string.IsNullOrEmpty(SelectedDepartment.DeptID) && SelectedDepartment.DeptID != "0")
                     selFormula += $" AND {{VMainDepartments.DeptID}}='{SelectedDepartment.DeptID}'";
 
                 await ReportNavigationService.PrintReportAsync(new ReportRequest
                 {
                     ReportName = ReportNames.Payroll.DailyAttendance,
                     SelectionFormula = selFormula,
-                    Parameters = new Dictionary<string, object>
+                    FormulaValues = new Dictionary<string, object>
                     {
-                        { "@ForDate", SelectedDate.ToString("dd-MMM-yyyy") }
+                        { "DT", $"#{SelectedDate:dd-MMM-yyyy}#" },
+                        { "{@DT}", $"#{SelectedDate:dd-MMM-yyyy}#" }
                     }
                 });
             }
@@ -209,66 +210,7 @@ namespace Impulse.Pages.Payroll.BiometricLedger
             }
         }
 
-        private async Task PrintAbsentLeaveSummary(ItemClickEventArgs e)
-        {
-            try
-            {
-                await BiometricLedgerService.ExecutePrintDailyAbsentLeaveSummaryAsync(SelectedDate);
-                await ReportNavigationService.PrintReportAsync(new ReportRequest
-                {
-                    ReportName = ReportNames.Payroll.AbsentLeaveSummary,
-                    Parameters = new Dictionary<string, object>
-                    {
-                        { "@ForDate", SelectedDate.ToString("dd-MMM-yyyy") }
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                NotificationService.ShowError("Report Error", ex.Message);
-            }
-        }
 
-        private async Task PrintLateComers(ItemClickEventArgs e)
-        {
-            try
-            {
-                await BiometricLedgerService.ExecutePrintDailyAbsentLeaveDetailAsync(SelectedDate);
-                await ReportNavigationService.PrintReportAsync(new ReportRequest
-                {
-                    ReportName = ReportNames.Payroll.LateComers,
-                    SelectionFormula = "{PrintDailyAbsentLeaveDetail.LateComing}=TRUE",
-                    Parameters = new Dictionary<string, object>
-                    {
-                        { "@ForDate", SelectedDate.ToString("dd-MMM-yyyy") }
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                NotificationService.ShowError("Report Error", ex.Message);
-            }
-        }
-
-        private async Task PrintPresentEmployees(ItemClickEventArgs e)
-        {
-            try
-            {
-                await ReportNavigationService.PrintReportAsync(new ReportRequest
-                {
-                    ReportName = ReportNames.Payroll.PresentEmpList,
-                    SelectionFormula = $"{{AttendanceSheet.DT}}=Date({SelectedDate.Year}, {SelectedDate.Month}, {SelectedDate.Day}) AND {{AttendanceSheet.Attendance}}=1",
-                    Parameters = new Dictionary<string, object>
-                    {
-                        { "@ForDate", SelectedDate.ToString("dd-MMM-yyyy") }
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                NotificationService.ShowError("Report Error", ex.Message);
-            }
-        }
 
         // ── Navigation ────────────────────────────────────────────────────
         private void NavigateBack()

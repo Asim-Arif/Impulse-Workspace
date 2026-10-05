@@ -10,6 +10,12 @@ namespace Impulse.Pages.Setups
         [Inject]
         protected IUserService UserService { get; set; } = default!;
 
+        [Inject]
+        protected IUserPermissionService PermissionService { get; set; } = default!;
+
+        [Inject]
+        protected NavigationManager NavigationManager { get; set; } = default!;
+
         protected int TotalUsers { get; set; } = 0;
         protected int ActiveUsers { get; set; } = 0;
         protected int InactiveUsers { get; set; } = 0;
@@ -17,6 +23,12 @@ namespace Impulse.Pages.Setups
 
         protected override async Task OnInitializedAsync()
         {
+            if (!PermissionService.HasModuleAccess("Setup"))
+            {
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+
             try
             {
                 IsLoading = true;

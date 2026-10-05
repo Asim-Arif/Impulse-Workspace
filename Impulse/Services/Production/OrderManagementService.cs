@@ -6,17 +6,25 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
+using Microsoft.AspNetCore.Hosting;
+using System.IO;
+
 namespace Impulse.Services.Production
 {
     public class OrderManagementService : IOrderManagementService
     {
         private readonly IOrderManagementDataAccess _dataAccess;
         private readonly ILogger<OrderManagementService> _logger;
+        private readonly IWebHostEnvironment _environment;
 
-        public OrderManagementService(IOrderManagementDataAccess dataAccess, ILogger<OrderManagementService> logger)
+        public OrderManagementService(
+            IOrderManagementDataAccess dataAccess, 
+            ILogger<OrderManagementService> logger,
+            IWebHostEnvironment environment)
         {
             _dataAccess = dataAccess;
             _logger = logger;
+            _environment = environment;
         }
 
         public async Task<List<LookupItemString>> GetCustomersAsync()
@@ -133,6 +141,86 @@ namespace Impulse.Services.Production
             {
                 _logger.LogError(ex, "Error fetching dispatch details for Order {OrderNo}, Item {ItemCode}", orderNo, itemCode);
                 return new List<ItemDispatchDetailDto>();
+            }
+        }
+
+        public async Task<(bool Success, string? ErrorMessage, string? RelativePath)> UploadMasterPoSignedCopyAsync(
+            string masterPoNo, int entryId, Stream fileStream, string originalFileName, string userName)
+        {
+            try
+            {
+                if (fileStream == null)
+                    return (false, "File stream is empty.", null);
+
+                var ext = Path.GetExtension(originalFileName);
+                if (string.IsNullOrWhiteSpace(ext) || !ext.Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+                    return (false, "Only PDF (.pdf) files are allowed for Maker Signed Copy.", null);
+
+                var webRoot = _environment.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+                var folderPath = Path.Combine(webRoot, "uploads", "maker_po_signed");
+                if (!Directory.Exists(folderPath))
+                {
+                    Directory.CreateDirectory(folderPath);
+                }
+
+                // Sanitize Master PO number for safe filename
+                var cleanMasterPo = !string.IsNullOrWhiteSpace(masterPoNo) 
+                    ? string.Concat(masterPoNo.Split(Path.GetInvalidFileNameChars())) 
+                    : $"Entry_{entryId}";
+
+                var uniqueFileName = $"Signed_MasterPO_{cleanMasterPo}_{DateTime.Now:yyyyMMddHHmmss}_{Guid.NewGuid().ToString().Substring(0, 8)}.pdf";
+                var physicalFilePath = Path.Combine(folderPath, uniqueFileName);
+
+                using (var destStream = new FileStream(physicalFilePath, FileMode.Create))
+                {
+                    await fileStream.CopyToAsync(destStream);
+                }
+
+                var relativePath = $"/uploads/maker_po_signed/{uniqueFileName}";
+
+                var dbSuccess = await _dataAccess.SaveMasterPoSignedCopyAsync(
+                    masterPoNo, entryId, relativePath, originalFileName, userName);
+
+                if (!dbSuccess)
+                {
+                    // Rollback physical file if DB fails
+                    if (File.Exists(physicalFilePath))
+                    {
+                        try { File.Delete(physicalFilePath); } catch { }
+                    }
+                    return (false, "Failed to update database record with signed copy path.", null);
+                }
+
+                return (true, null, relativePath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error uploading signed copy for Master PO {MasterPONo} / EntryID {EntryID}", masterPoNo, entryId);
+                return (false, $"Upload failed: {ex.Message}", null);
+            }
+        }
+
+        public async Task<bool> DeleteMasterPoSignedCopyAsync(string masterPoNo, int entryId, string? existingFilePath)
+        {
+            try
+            {
+                var dbSuccess = await _dataAccess.DeleteMasterPoSignedCopyAsync(masterPoNo, entryId);
+                if (dbSuccess && !string.IsNullOrWhiteSpace(existingFilePath))
+                {
+                    var webRoot = _environment.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+                    var cleanPath = existingFilePath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+                    var physicalPath = Path.Combine(webRoot, cleanPath);
+                    if (File.Exists(physicalPath))
+                    {
+                        try { File.Delete(physicalPath); } catch { }
+                    }
+                }
+                return dbSuccess;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting signed copy for Master PO {MasterPONo} / EntryID {EntryID}", masterPoNo, entryId);
+                return false;
             }
         }
     }

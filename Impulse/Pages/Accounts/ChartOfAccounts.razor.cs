@@ -150,12 +150,11 @@ namespace Impulse.Pages.Accounts
         }
         private async Task ShowAddModal()
         {
-            CurrentAccount = new ChartOfAccountsModel { };
+            ResetForm();
             IsAdding = true;
+            IsEdit = false;
             ShowModal = true;
             accheadsforlist = await iChartOfAccountsDataAccess.GetAccountsHeads();
-            CurrentAccount.OpenDate= DateTime.Today;
-            CurrentAccount.BalType = 1;
         }
 
         //private ConfirmDialog msgdialog = null!;
@@ -236,56 +235,98 @@ namespace Impulse.Pages.Accounts
 
         private async Task SaveAccount()
         {
-            if (IsAdding)
+            try
             {
-                if (string.IsNullOrWhiteSpace(CurrentAccount.AccTitle))
+                if (IsAdding)
                 {
-                    await JS.InvokeVoidAsync("alert", "Cannot Proceed Without Account Title.");
-                    return;
-                }
-                if (CurrentAccount.BalType == 2)
-                {
-                    CurrentAccount.Balance = -CurrentAccount.Balance;
-                }
-                else
-                {
-                    CurrentAccount.Balance = Math.Abs(CurrentAccount.Balance);
-                }
+                    if (string.IsNullOrWhiteSpace(CurrentAccount.AccTitle))
+                    {
+                        NotificationServiceManager.ShowWarning("Validation", "Cannot Proceed Without Account Title.");
+                        return;
+                    }
+                    if (Selectedhead == null || string.IsNullOrWhiteSpace(CurrentAccount.HeadTypeNo))
+                    {
+                        NotificationServiceManager.ShowWarning("Validation", "Please select an Account Head.");
+                        return;
+                    }
+                    if (Selectedhead_sub == null || string.IsNullOrWhiteSpace(CurrentAccount.SubAccOf))
+                    {
+                        NotificationServiceManager.ShowWarning("Validation", "Please select Sub Acc Of.");
+                        return;
+                    }
 
-                await GetNextAccountNo(CurrentAccount.HeadTypeNo, CurrentAccount.AccTitle, CurrentAccount.AccType, CurrentAccount.SubAccOf);
-                await iChartOfAccountsDataAccess.SaveNewAccount(CurrentAccount);
+                    if (string.IsNullOrWhiteSpace(CurrentAccount.AccNo))
+                    {
+                        await TryGenerateAccountNo();
+                    }
+
+                    if (string.IsNullOrWhiteSpace(CurrentAccount.AccNo))
+                    {
+                        NotificationServiceManager.ShowError("Error", "Account number could not be generated. Please verify Account Head and Sub Acc Of.");
+                        return;
+                    }
+
+                    if (CurrentAccount.BalType == 2)
+                    {
+                        CurrentAccount.Balance = -Math.Abs(CurrentAccount.Balance);
+                    }
+                    else
+                    {
+                        CurrentAccount.Balance = Math.Abs(CurrentAccount.Balance);
+                    }
+
+                    await iChartOfAccountsDataAccess.SaveNewAccount(CurrentAccount);
+                    NotificationServiceManager.ShowSuccess("Success", "Account created successfully.");
+                    await Refreshlist(bshowinactive);
+                }
+                else if (IsEdit)
+                {
+                    if (string.IsNullOrWhiteSpace(CurrentAccount.AccTitle))
+                    {
+                        NotificationServiceManager.ShowWarning("Validation", "Cannot Proceed Without Account Title.");
+                        return;
+                    }
+                    if (CurrentAccount.BalType == 2)
+                    {
+                        CurrentAccount.Balance = -Math.Abs(CurrentAccount.Balance);
+                    }
+                    else 
+                    {
+                        CurrentAccount.Balance = Math.Abs(CurrentAccount.Balance);
+                    }
+                    await iChartOfAccountsDataAccess.EditAccount(CurrentAccount, CurrentAccount.AccNo);
+                    NotificationServiceManager.ShowSuccess("Success", "Account updated successfully.");
+                    await Refreshlist(bshowinactive);
+                }
+                HideModal();
+                ResetForm();
             }
-            else if (IsEdit)
+            catch (Exception ex)
             {
-                if (string.IsNullOrWhiteSpace(CurrentAccount.AccTitle))
-                {
-                    await JS.InvokeVoidAsync("alert", "Cannot Proceed Without Account Title.");
-                    return;
-                }
-                if (CurrentAccount.BalType == 2)
-                {
-                    CurrentAccount.Balance = -CurrentAccount.Balance;
-                }
-                else {
-                    CurrentAccount.Balance = Math.Abs(CurrentAccount.Balance);
-                }
-                await iChartOfAccountsDataAccess.EditAccount(CurrentAccount, CurrentAccount.AccNo);
-                await Refreshlist(bshowinactive);
+                NotificationServiceManager.ShowError("Error Occurred", $"Failed to save account: {ex.Message}");
             }
-            HideModal();
-            ResetForm();
         }
 
         private void ResetForm()
         {
-            CurrentAccount.AccTitle= "";
-            CurrentAccount.AccNo = "";
-            CurrentAccount.OpeningBalance = 0;
+            CurrentAccount = new ChartOfAccountsModel 
+            { 
+                OpenDate = DateTime.Today,
+                BalType = 1,
+                AccTitle = "",
+                AccNo = "",
+                SubAccOf = "",
+                SubAccTitle = "",
+                HeadType = "",
+                HeadTypeNo = ""
+            };
             Selectedhead = null;
             Selectedhead_sub = null;
+            accheadsforlist_sub = new List<ChartOfAccountsModel>();
 
             StateHasChanged();
         }
+
         private void HideModal()
         {
             ShowModal = false;
@@ -297,64 +338,123 @@ namespace Impulse.Pages.Accounts
         private ChartOfAccountsModel? Selectedhead = null;
         private async Task<IEnumerable<ChartOfAccountsModel>> GetHeads(string searchText)
         {
-            return await Task.FromResult(accheadsforlist.Where(x => x.HeadType.ToLower().Contains(searchText.ToLower())).ToList());
+            if (string.IsNullOrWhiteSpace(searchText))
+            {
+                return await Task.FromResult(accheadsforlist);
+            }
+            return await Task.FromResult(accheadsforlist.Where(x => 
+                !string.IsNullOrEmpty(x.HeadType) && x.HeadType.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            ).ToList());
         }
+
         private async Task SelectedResultChanged(ChartOfAccountsModel? selectedhead)
         {
             Selectedhead = selectedhead;
-            CurrentAccount.HeadType= selectedhead.HeadType;
-            CurrentAccount.HeadTypeNo = selectedhead.HeadTypeNo;
-            if (CurrentAccount.HeadTypeNo != null)
+            if (selectedhead != null)
             {
+                CurrentAccount.HeadType = selectedhead.HeadType;
+                CurrentAccount.HeadTypeNo = selectedhead.HeadTypeNo;
                 accheadsforlist_sub = await iChartOfAccountsDataAccess.GetSubAccOfAccounts(CurrentAccount.HeadTypeNo);
             }
             else
             {
-                CurrentAccount.SubAccOf = "";
+                CurrentAccount.HeadType = "";
+                CurrentAccount.HeadTypeNo = "";
+                accheadsforlist_sub = new List<ChartOfAccountsModel>();
             }
-            if (CurrentAccount.AccTitle != null && CurrentAccount.HeadTypeNo != null)
-            {
-                await GetNextAccountNo(CurrentAccount.HeadTypeNo, CurrentAccount.AccTitle, false, CurrentAccount.SubAccOf);
-            }
+
+            Selectedhead_sub = null;
+            CurrentAccount.SubAccOf = "";
+            CurrentAccount.SubAccTitle = "";
+            CurrentAccount.AccNo = "";
+
+            await TryGenerateAccountNo();
         }
+
         //////////////////// NOW GET SUB ACCOUNT HEADS DATA 
         private List<ChartOfAccountsModel> accheadsforlist_sub = new List<ChartOfAccountsModel>();
         private ChartOfAccountsModel? Selectedhead_sub = null;
         private async Task<IEnumerable<ChartOfAccountsModel>> GetHeads_sub(string searchText)
         {
-           return await Task.FromResult(accheadsforlist_sub.Where(x => x.SubAccOf.ToLower().Contains(searchText.ToLower())).ToList());
+            if (string.IsNullOrWhiteSpace(searchText))
+            {
+                return await Task.FromResult(accheadsforlist_sub);
+            }
+
+            return await Task.FromResult(accheadsforlist_sub.Where(x => 
+                (!string.IsNullOrEmpty(x.SubAccTitle) && x.SubAccTitle.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrEmpty(x.SubAccOf) && x.SubAccOf.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+            ).ToList());
         }
+
         private async Task SelectedResultChanged_sub(ChartOfAccountsModel? selectedhead_sub)
         {
             Selectedhead_sub = selectedhead_sub;
-            CurrentAccount.SubAccOf = selectedhead_sub.SubAccOf;
-            CurrentAccount.SubAccTitle = selectedhead_sub.SubAccTitle;
-            //accheadsforlist_sub = await iChartOfAccountsDataAccess.GetSubAccOfAccounts(CurrentAccount.HeadTypeNo);
-            if (CurrentAccount.AccTitle != null && CurrentAccount.HeadTypeNo != null && CurrentAccount.SubAccOf != null)
-            { 
-                await GetNextAccountNo(CurrentAccount.HeadTypeNo,CurrentAccount.AccTitle, CurrentAccount.AccType, CurrentAccount.SubAccOf);
+            if (selectedhead_sub != null)
+            {
+                CurrentAccount.SubAccOf = selectedhead_sub.SubAccOf ?? "";
+                CurrentAccount.SubAccTitle = selectedhead_sub.SubAccTitle ?? "";
+            }
+            else
+            {
+                CurrentAccount.SubAccOf = "";
+                CurrentAccount.SubAccTitle = "";
+            }
+
+            await TryGenerateAccountNo();
+        }
+
+        private async Task TryGenerateAccountNo()
+        {
+            if (IsEdit == false)
+            {
+                if (!string.IsNullOrWhiteSpace(CurrentAccount.HeadTypeNo) && 
+                    !string.IsNullOrWhiteSpace(CurrentAccount.SubAccOf) && 
+                    !string.IsNullOrWhiteSpace(CurrentAccount.AccTitle))
+                {
+                    await GetNextAccountNo(CurrentAccount.HeadTypeNo, CurrentAccount.AccTitle, CurrentAccount.AccType, CurrentAccount.SubAccOf);
+                }
+                else
+                {
+                    CurrentAccount.AccNo = "";
+                }
+                StateHasChanged();
             }
         }
+
         private async Task GetNextAccountNo(string acctype, string accountname, Boolean isparent, string subaccof)
         {
-            string NextAccountNo = await iChartOfAccountsDataAccess.GetNextAccountNumberAsync(acctype, accountname, isparent, subaccof);
-            CurrentAccount.AccNo = NextAccountNo;
-        }
-        private async Task OnChangedAccTitle(ChangeEventArgs e)
-        {
-            if(IsEdit == false)
-            { 
-                await GetNextAccountNo(CurrentAccount.HeadTypeNo, CurrentAccount.AccTitle, CurrentAccount.AccType, CurrentAccount.SubAccOf);
+            try
+            {
+                string nextAccountNo = await iChartOfAccountsDataAccess.GetNextAccountNumberAsync(acctype, accountname, isparent, subaccof);
+                CurrentAccount.AccNo = nextAccountNo ?? "";
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error generating account number: {ex.Message}");
             }
         }
-        private async Task OnChangedMasterType(ChangeEventArgs e)
+
+        private async Task OnChangedAccTitle()
         {
-            await GetNextAccountNo(CurrentAccount.HeadTypeNo, CurrentAccount.AccTitle, CurrentAccount.AccType, CurrentAccount.SubAccOf);
+            if (IsEdit == false)
+            {
+                await TryGenerateAccountNo();
+            }
+        }
+
+        private async Task OnChangedMasterType()
+        {
             if (CurrentAccount.AccType == true)
             {
                 CurrentAccount.Balance = 0;
             }
+            if (IsEdit == false)
+            {
+                await TryGenerateAccountNo();
+            }
         }
+
         private void OnChangedBalanceType(int value)
         {
             CurrentAccount.BalType = value;
@@ -495,7 +595,7 @@ namespace Impulse.Pages.Accounts
             }
             else
             {
-                strcond = "{VTempAccounts.Active} = 1";
+                strcond = "{VTempAccounts.Active} = True";
             }
 
             string strreportname = "";

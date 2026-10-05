@@ -29,7 +29,7 @@ namespace DataAccessLibrary.DAC.Stock
             string sql = @"
                 SELECT RMID, RMName + ' {' + RMID1 + '}' AS RMName 
                 FROM RM 
-                WHERE RMID NOT IN (SELECT RMID FROM VenderAssItems WHERE VendID=@VendID)  
+                WHERE RMID NOT IN (SELECT ISNULL(TRY_CAST(RMID AS int), 0) FROM VenderAssItems WHERE VendID=@VendID)  
                 ORDER BY RMName";
             var result = await _dbHelper.getListasync<UnassignedRMLookupModel>(sql, new { VendID = vendId });
             return result.ToList();
@@ -38,7 +38,13 @@ namespace DataAccessLibrary.DAC.Stock
         public async Task<List<VendorRMAssignmentModel>> GetAssignedRMsAsync(string vendId)
         {
             string sql = @"
-                SELECT EntryID, RMID, RMID1, RMName, GroupName, Rate, Remarks 
+                SELECT EntryID, 
+                       ISNULL(TRY_CAST(RMID AS int), 0) AS RMID, 
+                       RMID1, 
+                       RMName, 
+                       GroupName, 
+                       CAST(ISNULL(Rate, 0) AS decimal(18,2)) AS Rate, 
+                       ISNULL(Remarks, '') AS Remarks 
                 FROM VVenderAssItems 
                 WHERE VendID=@VendID
                 ORDER BY EntryID";
@@ -49,7 +55,7 @@ namespace DataAccessLibrary.DAC.Stock
         public async Task AssignRMAsync(string vendId, int rmId)
         {
             string sql = "INSERT INTO VenderAssItems(VendID, RMID) VALUES(@VendID, @RMID)";
-            await _dbHelper.ExecuteAsync(sql, new { VendID = vendId, RMID = rmId });
+            await _dbHelper.ExecuteAsync(sql, new { VendID = vendId, RMID = rmId.ToString() });
         }
 
         public async Task<bool> HasPendingReceivablesAsync(int entryId)
@@ -73,7 +79,7 @@ namespace DataAccessLibrary.DAC.Stock
         public async Task UpdateRMAssignmentAsync(int entryId, decimal rate, string remarks, string userName)
         {
             string sql = "UPDATE VenderAssItems SET Rate=@Rate, Remarks=@Remarks WHERE EntryID=@EntryID";
-            await _dbHelper.ExecuteAsync(sql, new { EntryID = entryId, Rate = rate, Remarks = remarks ?? string.Empty });
+            await _dbHelper.ExecuteAsync(sql, new { EntryID = entryId, Rate = (double)rate, Remarks = remarks ?? string.Empty });
 
             string historySql = @"
                 INSERT INTO VenderAssItems_Revisions(VAI_RefID, Rate, UserName, MachineName, Remarks) 
@@ -81,7 +87,7 @@ namespace DataAccessLibrary.DAC.Stock
             
             await _dbHelper.ExecuteAsync(historySql, new { 
                 EntryID = entryId, 
-                Rate = rate, 
+                Rate = (double)rate, 
                 UserName = userName, 
                 MachineName = Environment.MachineName, 
                 Remarks = remarks ?? string.Empty 
@@ -91,7 +97,11 @@ namespace DataAccessLibrary.DAC.Stock
         public async Task<List<VendorRMAssignmentHistoryModel>> GetHistoryAsync(int entryId)
         {
             string sql = @"
-                SELECT EntryID, DTEntry, UserName, Rate, Remarks 
+                SELECT EntryID, 
+                       DTEntry, 
+                       UserName, 
+                       CAST(ISNULL(Rate, 0) AS decimal(18,2)) AS Rate, 
+                       ISNULL(Remarks, '') AS Remarks 
                 FROM VenderAssItems_Revisions 
                 WHERE VAI_RefID=@EntryID 
                 ORDER BY EntryID";

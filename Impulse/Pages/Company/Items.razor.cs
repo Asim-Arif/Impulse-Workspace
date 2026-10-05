@@ -587,23 +587,6 @@ namespace Impulse.Pages.Company
             }
         }
 
-        private async Task PrintECommerceStock(ItemClickEventArgs? e = null)
-        {
-            try
-            {
-                var request = new ReportRequest
-                {
-                    ReportName = "ECommerceStockReport.rpt",
-                    SelectionFormula = "{VItemWithStocks.AvailableForECommerce}=TRUE"
-                };
-                await ReportNavigation.PrintReportAsync(request);
-            }
-            catch (Exception ex)
-            {
-                NotificationService.ShowError("Print Error", ex.Message);
-            }
-        }
-
         private async Task PrintSFStock(ItemClickEventArgs? e = null)
         {
             try

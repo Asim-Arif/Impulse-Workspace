@@ -13,6 +13,7 @@ namespace DataAccessLibrary.Interface.Payroll
         Task SetEmployeeActiveStateAsync(string empId, bool active, DateTime? date = null, string? remarks = null, string? userName = null, string? machineName = null);
         Task SaveEmployeeAsync(EmployeeDto employee, bool isAdd, string userName, string machineName);
         Task<string> GetNextEmpIDAsync(string deptId);
+        Task<string> GetEmployeePrefixAsync();
         Task<List<ProcessLookupModel>> GetProcessesAsync();
         Task<EmployeeDto?> GetEmployeeByIdAsync(string empId);
         Task<List<GroupLookupModel>> GetGroupsAsync();

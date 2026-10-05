@@ -2,22 +2,22 @@
 @model LogoutModel
 
 @{
-    ViewData["Title"] = "Log Out";
+    ViewData["Title"] = "Signed Out";
 }
 
-<h1>@ViewData["Title"]</h1>
-@* <form method="post"> <button type="submit" class="btn btn-primary">Log out</button> </form> *@
-<div class="row">
-    <div class="col-md-4">
-        <section>
-            <form id="account" method="post">
-                <h2>Use Impulse account to log out.</h2>
-                <hr />                
-                <div>
-                    <button id="logout-submit" type="submit" class="w-100 btn btn-lg btn-primary">Log Out</button>
-                </div>                
-            </form>
-        </section>
+<div class="d-flex justify-content-center align-items-center" style="min-height: 60vh;">
+    <div class="card border-0 shadow-sm p-4 text-center" style="max-width: 440px; width: 100%; border-radius: 12px; background: rgba(255,255,255,0.95);">
+        <div class="mb-3">
+            <div class="rounded-circle bg-primary bg-opacity-10 text-primary mx-auto d-flex align-items-center justify-content-center" style="width: 64px; height: 64px; font-size: 1.75rem;">
+                <i class="fas fa-sign-out-alt"></i>
+            </div>
+        </div>
+        <h4 class="fw-bold text-dark mb-1">Signed Out</h4>
+        <p class="text-secondary small mb-4">You have successfully signed out of Impulse ERP.</p>
+
+        <a href="~/Identity/Account/Login" class="btn btn-primary w-100 py-2 fw-semibold" style="border-radius: 8px;">
+            <i class="fas fa-sign-in-alt me-1"></i> Log In Again
+        </a>
     </div>
 </div>
 

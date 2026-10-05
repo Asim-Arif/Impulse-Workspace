@@ -152,7 +152,7 @@ namespace DataAccessLibrary.Models.ViewModels.Payroll
                 yield return new ValidationResult("Employee's age must be at least 18 years.", new[] { nameof(DOB) });
             }
 
-            var currentSalary = Salary ?? StartingSalary ?? 0;
+            var currentSalary = StartingSalary ?? 0;
             if (TaxPayee && currentSalary <= 0)
             {
                 yield return new ValidationResult("Tax Amount Can't Be Zero. A valid salary amount must be provided when taxable.", new[] { nameof(TaxPayee) });
@@ -160,7 +160,7 @@ namespace DataAccessLibrary.Models.ViewModels.Payroll
 
             if (currentSalary <= 0)
             {
-                yield return new ValidationResult("Must Enter Salary Amount.", new[] { nameof(Salary), nameof(StartingSalary) });
+                yield return new ValidationResult("Must Enter Salary Amount.", new[] { nameof(StartingSalary) });
             }
         }
 

@@ -114,6 +114,7 @@ namespace Impulse.Services.Setup
                 "sampling" => _currentUserModel.SamplingMainLink,
                 "help" => _currentUserModel.HelpMainLink,
                 "office" or "intraoffice" => _currentUserModel.IntraOfficeMainLink,
+                "setup" or "setups" => _currentUserModel.SetupMainLink,
                 _ => true
             };
         }
@@ -177,8 +178,9 @@ namespace Impulse.Services.Setup
             ["StkRMList"] = new[] { "RMList", "RawMaterialsList" },
             ["RMList"] = new[] { "StkRMList" },
 
-            ["StkRMGroups"] = new[] { "RMGroups" },
-            ["RMGroups"] = new[] { "StkRMGroups" },
+            ["StkRMGroups"] = new[] { "StkMaterialGroup", "RMGroups" },
+            ["StkMaterialGroup"] = new[] { "StkRMGroups", "RMGroups" },
+            ["RMGroups"] = new[] { "StkMaterialGroup", "StkRMGroups" },
 
             ["StkNewRM"] = new[] { "NewRM" },
             ["NewRM"] = new[] { "StkNewRM" },
@@ -198,11 +200,13 @@ namespace Impulse.Services.Setup
             ["StkMaterialPlacementList"] = new[] { "MaterialPlacementList" },
             ["MaterialPlacementList"] = new[] { "StkMaterialPlacementList" },
 
-            ["StkVendorBilling"] = new[] { "VendorBilling" },
-            ["VendorBilling"] = new[] { "StkVendorBilling" },
+            ["StkVendorBilling"] = new[] { "StkVenderBilling", "VendorBilling" },
+            ["StkVenderBilling"] = new[] { "StkVendorBilling", "VendorBilling" },
+            ["VendorBilling"] = new[] { "StkVenderBilling", "StkVendorBilling" },
 
-            ["StkVendorBillingList"] = new[] { "VendorBillingList" },
-            ["VendorBillingList"] = new[] { "StkVendorBillingList" },
+            ["StkVendorBillingList"] = new[] { "StkVenderBillingList", "VendorBillingList" },
+            ["StkVenderBillingList"] = new[] { "StkVendorBillingList", "VendorBillingList" },
+            ["VendorBillingList"] = new[] { "StkVenderBillingList", "StkVendorBillingList" },
 
             ["StkChangeBatchLot"] = new[] { "ChangeBatchLot" },
             ["ChangeBatchLot"] = new[] { "StkChangeBatchLot" },
@@ -247,8 +251,9 @@ namespace Impulse.Services.Setup
             ["PrdNewMaker"] = new[] { "NewMaker" },
             ["NewMaker"] = new[] { "PrdNewMaker" },
 
-            ["PrdMakerList"] = new[] { "MakerList" },
-            ["MakerList"] = new[] { "PrdMakerList" },
+            ["PrdMakerList"] = new[] { "MakerList", "AccMakerList" },
+            ["AccMakerList"] = new[] { "PrdMakerList", "MakerList" },
+            ["MakerList"] = new[] { "PrdMakerList", "AccMakerList" },
 
             ["PrdTransferReadyFinish"] = new[] { "PrdTransferToReadyFinishStock", "TransferToReadyFinishStock" },
             ["PrdTransferToReadyFinishStock"] = new[] { "PrdTransferReadyFinish", "TransferToReadyFinishStock" },
@@ -258,9 +263,10 @@ namespace Impulse.Services.Setup
             ["PrdProductionItemList"] = new[] { "PrdItemList", "ProductionItemList" },
             ["ProductionItemList"] = new[] { "PrdItemList", "PrdProductionItemList" },
 
-            ["PrdReceivePO"] = new[] { "ReceivePO", "ReceiveAgainstPO" },
-            ["ReceivePO"] = new[] { "PrdReceivePO" },
-            ["ReceiveAgainstPO"] = new[] { "PrdReceivePO" },
+            ["PrdReceivePO"] = new[] { "ReceivePO", "ReceiveAgainstPO", "PrdReceivingAgainstPO" },
+            ["PrdReceivingAgainstPO"] = new[] { "PrdReceivePO", "ReceivePO", "ReceiveAgainstPO" },
+            ["ReceivePO"] = new[] { "PrdReceivePO", "PrdReceivingAgainstPO" },
+            ["ReceiveAgainstPO"] = new[] { "PrdReceivePO", "PrdReceivingAgainstPO" },
 
             ["PrdCreateDispatchList"] = new[] { "CreateDispatchList" },
             ["CreateDispatchList"] = new[] { "PrdCreateDispatchList" },
@@ -587,6 +593,7 @@ namespace Impulse.Services.Setup
             // ==========================================
             // Dashboards, Setup & IntraOffice Aliases
             // ==========================================
+            ["SetupHub"] = new[] { "Setup", "Setups" },
             ["SetupUsers"] = new[] { "UserManagement", "PrlUserManager" },
             ["UserManagement"] = new[] { "SetupUsers" },
             ["PrlUserManager"] = new[] { "SetupUsers" },
@@ -604,7 +611,9 @@ namespace Impulse.Services.Setup
             ["OfficeMinuteTypes"] = new[] { "OfficeMinutes" },
             ["OfficeTemplates"] = new[] { "OfficeReports", "OfficeLeads" },
             ["OfficeEmailSettings"] = new[] { "OfficeReports", "OfficeMessages" },
-            ["IntraOfficeHealth"] = new[] { "Diagnostics", "Health" }
+            ["IntraOfficeHealth"] = new[] { "Diagnostics", "Health", "SystemHealth" },
+            ["ExpStatistics"] = new[] { "ExpOrderList", "ExpCustomer" },
+            ["StkStockOrderAdjustment"] = new[] { "StkFinishIssuance", "StkFinishStockIssuance" }
         };
 
         public bool HasOptionAccess(string optionId)
@@ -653,7 +662,7 @@ namespace Impulse.Services.Setup
             ["accounts/transactionregister"] = ("Accounts", "AccTransactionRegister"),
             ["accounts/trialbalance"] = ("Accounts", "AccTBSummary"),
             ["company/currency-exchange-rates"] = ("Company", "CmpExchangeRates"),
-            ["company/customer-catalog"] = ("Company", "CmpCustomerCatalog"),
+            ["company/customer-catalog"] = ("Company", "CustomerCatalog"),
             ["company/item-groups"] = ("Company", "CmpItemGroups"),
             ["company/items"] = ("Company", "CmpItems"),
             ["company/misc-setup/additionalgroups"] = ("Company", "CmpItemGroups"),
@@ -674,17 +683,17 @@ namespace Impulse.Services.Setup
             ["export/customer-order-list"] = ("Export", "ExpOrderList"),
             ["export/customer-quotation-list"] = ("Export", "ExpQuotationList"),
             ["export/customers"] = ("Export", "ExpCustomer"),
-            ["export/custominvoices/new-custominvoice"] = ("Export", "ExpNewCustomInvoice"),
+            ["export/custominvoices/new-custominvoice"] = ("Export", "NewCustomInvoice"),
             ["export/invoices/bank"] = ("Export", "ExpBankInvoice"),
             ["export/invoices/commercial"] = ("Export", "ExpCommercialInvoice"),
             ["export/invoices/commercial-covering"] = ("Export", "ExpCommercialCovering"),
-            ["export/invoices/custom"] = ("Export", "ExpCustomInvoice"),
+            ["export/invoices/custom"] = ("Export", "CustomInvoice"),
             ["export/invoices/packing-labels"] = ("Export", "ExpPackingList"),
             ["export/invoices/print-inner-labels"] = ("Export", "ExpPackingList"),
-            ["export/invoices/print-valuation-form"] = ("Export", "ExpValuationForm"),
+            ["export/invoices/print-valuation-form"] = ("Export", "PrintValuationForm"),
             ["export/invoices/shipping-instructions"] = ("Export", "ExpShippingInstructions"),
             ["export/new-customer-order"] = ("Export", "ExpOrderEntry"),
-            ["export/order-item-list"] = ("Export", "ExpOrderItemList"),
+            ["export/order-item-list"] = ("Export", "OrderItemList"),
             ["export/orders/articlewise-shipped-status"] = ("Export", "ExpArticlewiseShipped"),
             ["export/orders/customer-item-balances"] = ("Export", "ExpCustomerItemBalances"),
             ["export/proformas/new-proforma"] = ("Export", "ExpProforma"),
@@ -706,12 +715,15 @@ namespace Impulse.Services.Setup
             ["office/admin/minute-types"] = ("IntraOffice", "OfficeMinuteTypes"),
             ["office/ai-assistant"] = ("IntraOffice", "OfficeAI"),
             ["office/announcements"] = ("IntraOffice", "OfficeAnnouncements"),
+            ["office/channels"] = ("IntraOffice", "OfficeChat"),
             ["office/chat"] = ("IntraOffice", "OfficeChat"),
+            ["office/customer-360"] = ("IntraOffice", "OfficeLeads"),
             ["office/directory"] = ("IntraOffice", "OfficeDirectory"),
             ["office/hub"] = ("IntraOffice", "OfficeHub"),
             ["office/leads"] = ("IntraOffice", "OfficeLeads"),
             ["office/meetings"] = ("IntraOffice", "OfficeMeetings"),
             ["office/messages"] = ("IntraOffice", "OfficeMessages"),
+            ["office/minutes-approval"] = ("IntraOffice", "OfficeMinutes"),
             ["office/minutes-list"] = ("IntraOffice", "OfficeMinutes"),
             ["office/reports"] = ("IntraOffice", "OfficeReports"),
             ["office/tasks"] = ("IntraOffice", "OfficeTasks"),
@@ -719,7 +731,7 @@ namespace Impulse.Services.Setup
             ["chat"] = ("IntraOffice", "OfficeChat"),
             ["messages"] = ("IntraOffice", "OfficeMessages"),
             ["tasks"] = ("IntraOffice", "OfficeTasks"),
-            ["payroll/absent-sheet"] = ("Payroll", "PayAbsentSheet"),
+            ["payroll/absent-sheet"] = ("Payroll", "PrlAbsentSheet"),
             ["payroll/adjust-deduction-amount"] = ("Payroll", "PayDeductionAdjust"),
             ["payroll/advance-ledger"] = ("Payroll", "PayAdvanceRegister"),
             ["payroll/advance-long"] = ("Payroll", "PayAdvances"),
@@ -735,24 +747,24 @@ namespace Impulse.Services.Setup
             ["payroll/emp-to-emp-transfer"] = ("Payroll", "PayEmpTransfer"),
             ["payroll/employee-transfer"] = ("Payroll", "PayEmpTransfer"),
             ["payroll/employeelist"] = ("Payroll", "PayEmpProfile"),
-            ["payroll/eobi"] = ("Payroll", "PayEOBI"),
+            ["payroll/eobi"] = ("Payroll", "PrlEOBI"),
             ["payroll/gate-pass"] = ("Payroll", "PayGatePass"),
             ["payroll/gratuity-calculation"] = ("Payroll", "PayGratuity"),
             ["payroll/hold-salary"] = ("Payroll", "PayHoldSalary"),
             ["payroll/holidays"] = ("Payroll", "PayHolidays"),
             ["payroll/leaves"] = ("Payroll", "PayLeaves"),
-            ["payroll/manual-attendance"] = ("Payroll", "PayAttendanceManual"),
+            ["payroll/manual-attendance"] = ("Payroll", "PrlTakeAttendanceEx"),
             ["payroll/monthly-attendance"] = ("Payroll", "PayAttendanceMonthly"),
             ["payroll/newemployee"] = ("Payroll", "PayNewEmp"),
             ["payroll/overtime-authorization"] = ("Payroll", "PayOvertimeAuth"),
-            ["payroll/policies"] = ("Payroll", "PayPolicies"),
+            ["payroll/policies"] = ("Payroll", "PrlPayrollPolicies"),
             ["payroll/post-fine"] = ("Payroll", "PayPostFine"),
             ["payroll/reports"] = ("Payroll", "PayReports"),
             ["payroll/salary-history"] = ("Payroll", "PaySalaryCalculation"),
             ["payroll/salary-sheet"] = ("Payroll", "PaySalarySheet"),
             ["payroll/settings"] = ("Payroll", "PaySettings"),
             ["payroll/short-term-sheet"] = ("Payroll", "PayAdvances"),
-            ["payroll/social-security"] = ("Payroll", "PaySocialSecurity"),
+            ["payroll/social-security"] = ("Payroll", "PrlSocialSecurity"),
             ["production/authorize-received"] = ("Production", "PrdAuthReceived"),
             ["production/create-dispatch-list"] = ("Production", "PrdCreateDispatchList"),
             ["production/dispatch-list"] = ("Production", "PrdDispatchList"),
@@ -762,13 +774,13 @@ namespace Impulse.Services.Setup
             ["production/maker-billing-list"] = ("Production", "PrdMakerBillingList"),
             ["production/maker-issuance-from-sf"] = ("Production", "PrdMakerIssuanceSF"),
             ["production/maker-item-assignment"] = ("Production", "PrdMakerItemAssign"),
-            ["production/maker-list"] = ("Production", "PrdMakerList"),
+            ["production/maker-list"] = ("Production", "AccMakerList"),
             ["production/maker-po"] = ("Production", "PrdMakerPO"),
             ["production/maker-po-list"] = ("Production", "PrdMakerPOList"),
             ["production/new-maker"] = ("Production", "PrdNewMaker"),
             ["production/process-groups"] = ("Production", "PrdProcessGroups"),
             ["production/processes"] = ("Production", "PrdProcesses"),
-            ["production/receive-against-po"] = ("Production", "PrdReceivePO"),
+            ["production/receive-against-po"] = ("Production", "PrdReceivingAgainstPO"),
             ["production/receive-lot"] = ("Production", "PrdReceiveLot"),
             ["production/receiving-list"] = ("Production", "PrdReceivingList"),
             ["production/repair-types"] = ("Production", "PrdRepairTypes"),
@@ -777,6 +789,8 @@ namespace Impulse.Services.Setup
             ["production/transfer-to-ready-finish-stock"] = ("Production", "PrdTransferReadyFinish"),
             ["production/wastage-types"] = ("Production", "PrdWastageTypes"),
             ["rmlist"] = ("Stock", "StkRMList"),
+            ["setup"] = ("Setup", "SetupHub"),
+            ["setups"] = ("Setup", "SetupHub"),
             ["setup/users"] = ("Setup", "SetupUsers"),
             ["stock/change-batch-lot"] = ("Stock", "StkChangeBatchLot"),
             ["stock/change-batch-no"] = ("Stock", "StkChangeBatchNo"),
@@ -791,16 +805,17 @@ namespace Impulse.Services.Setup
             ["stock/rm-issuance"] = ("Stock", "StkRMIssuance"),
             ["stock/rm-issuance-list"] = ("Stock", "StkRMIssuanceList"),
             ["stock/rm-movement"] = ("Stock", "StkMaterialMovement"),
-            ["stock/rmgroups"] = ("Stock", "StkRMGroups"),
+            ["stock/rmgroups"] = ("Stock", "StkMaterialGroup"),
             ["stock/rmpolist"] = ("Stock", "StkRMPOList"),
             ["stock/semi-finish-open-receiving"] = ("Stock", "StkSFOpenRcv"),
             ["stock/sf-movement"] = ("Stock", "StkSFMovement"),
             ["stock/sf-transactions"] = ("Stock", "StkSFTransactions"),
             ["stock/stock-ledger"] = ("Stock", "StkRMLedger"),
+            ["stock/stock-order-adjustment"] = ("Stock", "StkFinishIssuance"),
             ["stock/vend-gate-rcvd"] = ("Stock", "StkVendorGateRcv"),
             ["stock/vend-rcv-list"] = ("Stock", "StkVendorRcvList"),
-            ["stock/vendor-billing"] = ("Stock", "StkVendorBilling"),
-            ["stock/vendor-billing-list"] = ("Stock", "StkVendorBillingList"),
+            ["stock/vendor-billing"] = ("Stock", "StkVenderBilling"),
+            ["stock/vendor-billing-list"] = ("Stock", "StkVenderBillingList"),
             ["stock/vendor-rm-assignment"] = ("Stock", "StkVendorRMAssign"),
             ["vendorlist"] = ("Stock", "StkVendorList"),
         };
@@ -872,6 +887,26 @@ namespace Impulse.Services.Setup
         public Task<bool> SaveAllUserMenuOptionsAsync(int userId, IEnumerable<string> allOptionIds)
             => _permissionData.SaveAllUserMenuOptionsAsync(userId, allOptionIds);
 
+        public IEnumerable<string> GetOptionAliases(string optionId)
+        {
+            if (string.IsNullOrWhiteSpace(optionId)) return Enumerable.Empty<string>();
+            return OptionAliases.TryGetValue(optionId, out var aliases) ? aliases : Enumerable.Empty<string>();
+        }
+
+        public bool IsOptionGranted(string optionId, ISet<string> userOptionIds)
+        {
+            if (string.IsNullOrWhiteSpace(optionId) || userOptionIds == null) return false;
+            if (userOptionIds.Contains(optionId)) return true;
+            if (OptionAliases.TryGetValue(optionId, out var aliases))
+            {
+                foreach (var alias in aliases)
+                {
+                    if (userOptionIds.Contains(alias)) return true;
+                }
+            }
+            return false;
+        }
+
         public Task<bool> SyncMenuOptionsAsync(IEnumerable<MenuOptionModel> options)
             => _permissionData.SyncMenuOptionsAsync(options);
 
@@ -910,7 +945,13 @@ namespace Impulse.Services.Setup
                 new() { OptionID = "AccPV", OptionName = "Bank Payment Voucher", ModuleName = "Accounts" },
                 new() { OptionID = "AccJV", OptionName = "Journal Voucher", ModuleName = "Accounts" },
                 new() { OptionID = "AccEV", OptionName = "Cash Payment Voucher", ModuleName = "Accounts" },
+                new() { OptionID = "AccMakerLoan", OptionName = "Maker Loans (Short & Long Term)", ModuleName = "Accounts" },
+                new() { OptionID = "AccMakerLoanLedger", OptionName = "Maker Loan Ledgers", ModuleName = "Accounts" },
+                new() { OptionID = "AccMakerLoanClearance", OptionName = "Maker Loan Clearance", ModuleName = "Accounts" },
+                new() { OptionID = "AccMakerLoanTransfer", OptionName = "Maker Loan Transfer", ModuleName = "Accounts" },
+                new() { OptionID = "AccCustomInvoiceAuth", OptionName = "Custom Invoice Authorization", ModuleName = "Accounts" },
                 new() { OptionID = "AccLedger", OptionName = "Detailed Account Ledger", ModuleName = "Accounts" },
+                new() { OptionID = "AccTransactionRegister", OptionName = "Transaction Register", ModuleName = "Accounts" },
                 new() { OptionID = "AccCashBankStatus", OptionName = "Cash & Bank Status", ModuleName = "Accounts" },
                 new() { OptionID = "AccIncomeStatement", OptionName = "Income Statement", ModuleName = "Accounts" },
                 new() { OptionID = "AccBalanceSheet", OptionName = "Balance Sheet", ModuleName = "Accounts" },
@@ -918,7 +959,20 @@ namespace Impulse.Services.Setup
                 new() { OptionID = "AccTBDetail", OptionName = "Trial Balance (Detail)", ModuleName = "Accounts" },
                 new() { OptionID = "AccCashBook", OptionName = "Cash Book Report", ModuleName = "Accounts" },
 
+                // Dashboards & Intelligence
+                new() { OptionID = "DshExecutive", OptionName = "Executive Dashboards Suite", ModuleName = "DashBoard" },
+                new() { OptionID = "DshCommandCenter", OptionName = "Command Center (Visual)", ModuleName = "DashBoard" },
+                new() { OptionID = "DshCommandCenterGrid", OptionName = "Command Center (Grid)", ModuleName = "DashBoard" },
+                new() { OptionID = "DshProductionPlanning", OptionName = "Production Planning (Visual)", ModuleName = "DashBoard" },
+                new() { OptionID = "DshProductionPlanningGrid", OptionName = "Production Planning (Grid)", ModuleName = "DashBoard" },
+
                 // Production
+                new() { OptionID = "PrdOrderPlanning", OptionName = "PPC Order Planning", ModuleName = "Production" },
+                new() { OptionID = "PrdMakerOrders", OptionName = "Maker POs (From PPC)", ModuleName = "Production" },
+                new() { OptionID = "PrdOrderManagement", OptionName = "Order Management", ModuleName = "Production" },
+                new() { OptionID = "PrdOrderLotsTracking", OptionName = "Order Lots & Hub Tracking", ModuleName = "Production" },
+                new() { OptionID = "PrdEmployeePerformance", OptionName = "Worker Performance & Capacity", ModuleName = "Production" },
+                new() { OptionID = "PrdCustOrderList", OptionName = "Customer Orders (Production)", ModuleName = "Production" },
                 new() { OptionID = "PrdLotIssuance", OptionName = "Lot Issuance", ModuleName = "Production" },
                 new() { OptionID = "PrdReceiveLot", OptionName = "Receive Lot", ModuleName = "Production" },
                 new() { OptionID = "PrdReceivingList", OptionName = "Receiving List", ModuleName = "Production" },
@@ -929,49 +983,128 @@ namespace Impulse.Services.Setup
                 new() { OptionID = "PrdMakerIssuanceFromSF", OptionName = "Maker Issuance From SF", ModuleName = "Production" },
                 new() { OptionID = "PrdMakerItemAssignment", OptionName = "Maker Item Assignment", ModuleName = "Production" },
                 new() { OptionID = "PrdNewMaker", OptionName = "New Maker Setup", ModuleName = "Production" },
+                new() { OptionID = "AccMakerList", OptionName = "Maker List", ModuleName = "Production" },
+                new() { OptionID = "PrdReceivingAgainstPO", OptionName = "Receive against PO", ModuleName = "Production" },
                 new() { OptionID = "PrdTransferToReadyFinishStock", OptionName = "Transfer to Ready Finish Stock", ModuleName = "Production" },
+                new() { OptionID = "PrdCreateDispatchList", OptionName = "Create Dispatch List", ModuleName = "Production" },
+                new() { OptionID = "PrdDispatchList", OptionName = "Dispatch List", ModuleName = "Production" },
+                new() { OptionID = "PrdMakerBilling", OptionName = "Maker Billing", ModuleName = "Production" },
+                new() { OptionID = "PrdMakerBillingList", OptionName = "Maker Billing List", ModuleName = "Production" },
+                new() { OptionID = "PrdProcesses", OptionName = "Processes Setup", ModuleName = "Production" },
+                new() { OptionID = "PrdProcessGroups", OptionName = "Process Groups", ModuleName = "Production" },
+                new() { OptionID = "PrdRepairTypes", OptionName = "Repair Types", ModuleName = "Production" },
+                new() { OptionID = "PrdWastageTypes", OptionName = "Wastage Types", ModuleName = "Production" },
+                new() { OptionID = "PrdStatistics", OptionName = "Production Statistics", ModuleName = "Production" },
                 new() { OptionID = "PrdProductionItemList", OptionName = "Production Item List", ModuleName = "Production" },
 
+                // Export
+                new() { OptionID = "ExpCustomer", OptionName = "Foreign Customers", ModuleName = "Export" },
+                new() { OptionID = "ExpOrderEntry", OptionName = "New Customer Order", ModuleName = "Export" },
+                new() { OptionID = "ExpOrderList", OptionName = "Customer Order List", ModuleName = "Export" },
+                new() { OptionID = "ExpQuotationList", OptionName = "Customer Quotation List", ModuleName = "Export" },
+                new() { OptionID = "ExpAdvancePayment", OptionName = "Advance Payment List", ModuleName = "Export" },
+                new() { OptionID = "OrderItemList", OptionName = "Order Item List", ModuleName = "Export" },
+                new() { OptionID = "ExpCustomerItemBalances", OptionName = "Customer Item Balances", ModuleName = "Export" },
+                new() { OptionID = "ExpArticlewiseShipped", OptionName = "Articlewise Shipped Status", ModuleName = "Export" },
+                new() { OptionID = "ExpProforma", OptionName = "New Proforma Invoice", ModuleName = "Export" },
+                new() { OptionID = "ExpProformaList", OptionName = "Proforma List", ModuleName = "Export" },
+                new() { OptionID = "CustomInvoice", OptionName = "Custom Invoice List", ModuleName = "Export" },
+                new() { OptionID = "NewCustomInvoice", OptionName = "New Custom Invoice", ModuleName = "Export" },
+                new() { OptionID = "ExpCustomPaymentStatus", OptionName = "Custom Payment Status", ModuleName = "Export" },
+                new() { OptionID = "ExpReceiveCustomPayment", OptionName = "Receive Custom Payment", ModuleName = "Export" },
+                new() { OptionID = "ExpCommercialInvoice", OptionName = "Commercial Invoice List", ModuleName = "Export" },
+                new() { OptionID = "ExpBankInvoice", OptionName = "Bank Invoice List", ModuleName = "Export" },
+                new() { OptionID = "ExpPackingList", OptionName = "Packing Outer & Inner Labels", ModuleName = "Export" },
+                new() { OptionID = "ExpShippingInstructions", OptionName = "Shipping Instructions", ModuleName = "Export" },
+                new() { OptionID = "PrintValuationForm", OptionName = "Print Valuation Form", ModuleName = "Export" },
+                new() { OptionID = "ExpCommercialCovering", OptionName = "Commercial Covering Letter", ModuleName = "Export" },
+                new() { OptionID = "ExpStatistics", OptionName = "Export Statistics Hub", ModuleName = "Export" },
+
                 // Stock
-                new() { OptionID = "StkRMIssuance", OptionName = "RM Issuance", ModuleName = "Stock" },
-                new() { OptionID = "StkRMIssuanceList", OptionName = "RM Issuance List", ModuleName = "Stock" },
+                new() { OptionID = "StkMaterialGroup", OptionName = "Raw Material Groups", ModuleName = "Stock" },
+                new() { OptionID = "StkNewRM", OptionName = "New Raw Material", ModuleName = "Stock" },
+                new() { OptionID = "StkRMList", OptionName = "Raw Materials List", ModuleName = "Stock" },
                 new() { OptionID = "StkRMPOList", OptionName = "RM PO List", ModuleName = "Stock" },
+                new() { OptionID = "StkNewRMPO", OptionName = "New RM PO", ModuleName = "Stock" },
+                new() { OptionID = "StkNewVendor", OptionName = "New Vendor", ModuleName = "Stock" },
+                new() { OptionID = "StkVendorList", OptionName = "Vendor List", ModuleName = "Stock" },
+                new() { OptionID = "StkVendorRMAssign", OptionName = "Vendor RM Assignment", ModuleName = "Stock" },
                 new() { OptionID = "StkVendorGateRcvd", OptionName = "Vendor Gate Receiving", ModuleName = "Stock" },
                 new() { OptionID = "StkVendorReceivingList", OptionName = "Vendor Receiving List", ModuleName = "Stock" },
                 new() { OptionID = "StkMaterialPlacement", OptionName = "Material Placement", ModuleName = "Stock" },
                 new() { OptionID = "StkMaterialPlacementList", OptionName = "Material Placement List", ModuleName = "Stock" },
                 new() { OptionID = "StkRMMovement", OptionName = "Material Movement", ModuleName = "Stock" },
+                new() { OptionID = "StkChangeBatchLot", OptionName = "Change Batch / Lot", ModuleName = "Stock" },
+                new() { OptionID = "StkChangeBatchNo", OptionName = "Change Batch No", ModuleName = "Stock" },
                 new() { OptionID = "StkStockLedger", OptionName = "RM Stock Ledger", ModuleName = "Stock" },
+                new() { OptionID = "StkRMIssuance", OptionName = "RM Issuance", ModuleName = "Stock" },
+                new() { OptionID = "StkRMIssuanceList", OptionName = "RM Issuance List", ModuleName = "Stock" },
                 new() { OptionID = "StkSemiFinishOpenReceiving", OptionName = "Semi Finish Open Receiving", ModuleName = "Stock" },
                 new() { OptionID = "StkSFMovement", OptionName = "Semi Finish Material Movement", ModuleName = "Stock" },
                 new() { OptionID = "StkSFTransactions", OptionName = "Semi Finish Transactions", ModuleName = "Stock" },
                 new() { OptionID = "StkFinishStockIssuance", OptionName = "Finish Stock Issuance", ModuleName = "Stock" },
+                new() { OptionID = "StkStockOrderAdjustment", OptionName = "Stock Order Adjustment (PPC)", ModuleName = "Stock" },
                 new() { OptionID = "StkFinishStockReceiving", OptionName = "Finish Stock Receiving", ModuleName = "Stock" },
                 new() { OptionID = "StkFinishMovement", OptionName = "Finish Movement", ModuleName = "Stock" },
                 new() { OptionID = "StkFinishItemLedger", OptionName = "Finish Item Ledger", ModuleName = "Stock" },
                 new() { OptionID = "StkFinishTransactions", OptionName = "Finish Transactions", ModuleName = "Stock" },
+                new() { OptionID = "StkVenderBilling", OptionName = "Vendor Billing", ModuleName = "Stock" },
+                new() { OptionID = "StkVenderBillingList", OptionName = "Vendor Billing List", ModuleName = "Stock" },
 
                 // Payroll / HR
+                new() { OptionID = "PayNewEmp", OptionName = "New Employee Profile", ModuleName = "Payroll" },
                 new() { OptionID = "PrlEmployeeList", OptionName = "Employee Directory & Profiles", ModuleName = "Payroll" },
+                new() { OptionID = "PayDepartment", OptionName = "Departments List", ModuleName = "Payroll" },
                 new() { OptionID = "PrlAttendanceLedger", OptionName = "Attendance Ledger", ModuleName = "Payroll" },
+                new() { OptionID = "PrlTakeAttendanceEx", OptionName = "Manual Attendance", ModuleName = "Payroll" },
+                new() { OptionID = "PayOvertimeAuth", OptionName = "Overtime Authorization", ModuleName = "Payroll" },
+                new() { OptionID = "PayAttendanceAuto", OptionName = "Auto Attendance", ModuleName = "Payroll" },
+                new() { OptionID = "PayDailyActivity", OptionName = "Daily Activity", ModuleName = "Payroll" },
                 new() { OptionID = "PrlMonthlyAttendance", OptionName = "Monthly Attendance Processing", ModuleName = "Payroll" },
                 new() { OptionID = "PrlSalarySheet", OptionName = "Monthly Salary Sheet", ModuleName = "Payroll" },
                 new() { OptionID = "PrlSalaryHistory", OptionName = "Salary History Ledger", ModuleName = "Payroll" },
                 new() { OptionID = "PrlEmployeeLeave", OptionName = "Employee Leave Management", ModuleName = "Payroll" },
+                new() { OptionID = "PayGatePass", OptionName = "Gate Pass Entry", ModuleName = "Payroll" },
                 new() { OptionID = "PrlAdvanceShort", OptionName = "Short Term Salary Advance", ModuleName = "Payroll" },
+                new() { OptionID = "PayAdvances", OptionName = "Long Term Salary Advance", ModuleName = "Payroll" },
                 new() { OptionID = "PrlClearShortTermLoan", OptionName = "Clear Short Term Loans", ModuleName = "Payroll" },
+                new() { OptionID = "PayLoan", OptionName = "Clear Long Term Loans", ModuleName = "Payroll" },
                 new() { OptionID = "PrlPostFine", OptionName = "Employee Fines & Deductions", ModuleName = "Payroll" },
                 new() { OptionID = "PrlEmpFineLedger", OptionName = "Employee Fine Ledger", ModuleName = "Payroll" },
                 new() { OptionID = "PrlEmpToEmpTransfer", OptionName = "Employee Transfer", ModuleName = "Payroll" },
+                new() { OptionID = "PayDeductionAdjust", OptionName = "Adjust Deduction Amount", ModuleName = "Payroll" },
+                new() { OptionID = "PayAdvanceRegister", OptionName = "Loan & Advance Register", ModuleName = "Payroll" },
                 new() { OptionID = "PrlHoldSalary", OptionName = "Hold / Unhold Salary", ModuleName = "Payroll" },
+                new() { OptionID = "PayGratuity", OptionName = "Gratuity Calculation", ModuleName = "Payroll" },
+                new() { OptionID = "PrlAbsentSheet", OptionName = "Absent Sheet", ModuleName = "Payroll" },
+                new() { OptionID = "PrlSocialSecurity", OptionName = "Social Security Sheet", ModuleName = "Payroll" },
+                new() { OptionID = "PrlEOBI", OptionName = "EOBI Sheet", ModuleName = "Payroll" },
+                new() { OptionID = "PayDesignation", OptionName = "Designations Setup", ModuleName = "Payroll" },
+                new() { OptionID = "PaySettings", OptionName = "Payroll Settings", ModuleName = "Payroll" },
+                new() { OptionID = "PrlPayrollPolicies", OptionName = "Payroll Policies", ModuleName = "Payroll" },
+                new() { OptionID = "PayHolidays", OptionName = "Holidays Setup", ModuleName = "Payroll" },
+                new() { OptionID = "PayReports", OptionName = "Payroll Reports Hub", ModuleName = "Payroll" },
 
-                // Company Catalog
+                // Company
+                new() { OptionID = "CmpItems", OptionName = "Items List", ModuleName = "Company" },
+                new() { OptionID = "CmpNewItem", OptionName = "New Item Setup", ModuleName = "Company" },
                 new() { OptionID = "CmpCompanyDetail", OptionName = "Company Profile", ModuleName = "Company" },
-                new() { OptionID = "CmpCompanyCatalog", OptionName = "Company Catalog", ModuleName = "Company" },
-                new() { OptionID = "CmpItemGroups", OptionName = "Item Groups", ModuleName = "Company" },
+                new() { OptionID = "CompanyCatalog", OptionName = "Company Catalog", ModuleName = "Company" },
+                new() { OptionID = "CmpItemGroups", OptionName = "Item Groups & Classifications", ModuleName = "Company" },
+                new() { OptionID = "CmpPorts", OptionName = "Ports & Locations", ModuleName = "Company" },
+                new() { OptionID = "CmpStores", OptionName = "Stores, Racks & Bins", ModuleName = "Company" },
+                new() { OptionID = "CmpSteelList", OptionName = "Steel List", ModuleName = "Company" },
+                new() { OptionID = "CmpExchangeRates", OptionName = "Currency Exchange Rates", ModuleName = "Company" },
                 new() { OptionID = "CmpCustomerList", OptionName = "Customer List", ModuleName = "Company" },
                 new() { OptionID = "CmpNewCustomer", OptionName = "New Customer", ModuleName = "Company" },
-                new() { OptionID = "CmpCustomerCatalog", OptionName = "Customer Catalog", ModuleName = "Company" },
+                new() { OptionID = "CustomerCatalog", OptionName = "Customer Catalog", ModuleName = "Company" },
+
+                // Setups & System Administration
+                new() { OptionID = "SetupHub", OptionName = "Setups Hub", ModuleName = "Setup" },
+                new() { OptionID = "SetupUsers", OptionName = "User Management", ModuleName = "Setup" },
+                new() { OptionID = "OfficeMinuteTypes", OptionName = "Minute Types", ModuleName = "Setup" },
+                new() { OptionID = "OfficeEmailSettings", OptionName = "Email & SMTP Settings", ModuleName = "Setup" },
+                new() { OptionID = "IntraOfficeHealth", OptionName = "System Diagnostics", ModuleName = "Setup" },
 
                 // IntraOffice CRM
                 new() { OptionID = "OfficeHub", OptionName = "Collaboration Hub", ModuleName = "IntraOffice" },
@@ -985,9 +1118,7 @@ namespace Impulse.Services.Setup
                 new() { OptionID = "OfficeReports", OptionName = "CRM Reports", ModuleName = "IntraOffice" },
                 new() { OptionID = "OfficeAiAssistant", OptionName = "AI Assistant", ModuleName = "IntraOffice" },
                 new() { OptionID = "OfficeDirectory", OptionName = "Employee Directory", ModuleName = "IntraOffice" },
-                new() { OptionID = "OfficeTemplates", OptionName = "Email Templates", ModuleName = "IntraOffice" },
-                new() { OptionID = "OfficeMinuteTypes", OptionName = "Minute Types", ModuleName = "IntraOffice" },
-                new() { OptionID = "OfficeEmailSettings", OptionName = "Email & SMTP Settings", ModuleName = "IntraOffice" }
+                new() { OptionID = "OfficeTemplates", OptionName = "Email Templates", ModuleName = "IntraOffice" }
             };
         }
     }

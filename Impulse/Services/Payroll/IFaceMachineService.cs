@@ -11,19 +11,22 @@ namespace Impulse.Services.Payroll
     /// Communicates with ZKTeco IFace machines via COM interop (late-binding dynamic).
     /// Requires zkemkeeper.dll (or the ZKTeco SDK) to be registered on the server.
     /// 
-    /// Employee ID mapping: "EMR-" + enrollNumber.PadLeft(5,'0')  (same as legacy).
+    /// Employee ID mapping: dynamic Company prefix + "-" + enrollNumber.PadLeft(5,'0').
     /// Punch time rule: if time <= 05:00, subtract 1 day (night-shift rollover).
     /// </summary>
     public class IFaceMachineService : IIFaceMachineService
     {
         private readonly ITakeAttendanceDataAccess _takeAttendance;
+        private readonly IEmployeeDataAccess _employeeDataAccess;
         private readonly ILogger<IFaceMachineService> _logger;
 
         public IFaceMachineService(
             ITakeAttendanceDataAccess takeAttendance,
+            IEmployeeDataAccess employeeDataAccess,
             ILogger<IFaceMachineService> logger)
         {
             _takeAttendance = takeAttendance;
+            _employeeDataAccess = employeeDataAccess;
             _logger = logger;
         }
 
@@ -33,11 +36,21 @@ namespace Impulse.Services.Payroll
             int recordsRead = 0;
             int recordsProcessed = 0;
 
+            string prefix = "EMP";
+            try
+            {
+                prefix = await _employeeDataAccess.GetEmployeePrefixAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to resolve employee prefix from company; defaulting to EMP");
+            }
+
             // Collect punch records first (COM work must be synchronous)
             List<IFacePunchRecord> punches;
             try
             {
-                punches = ReadFromMachine(ipAddress, machineNo, portNo, out recordsRead);
+                punches = ReadFromMachine(ipAddress, machineNo, portNo, out recordsRead, prefix);
             }
             catch (Exception ex)
             {
@@ -68,7 +81,7 @@ namespace Impulse.Services.Payroll
         /// Synchronously connects to the ZKTeco IFace machine via COM (late-binding),
         /// reads all pending general log data, clears the log, disconnects, and returns punch records.
         /// </summary>
-        private List<IFacePunchRecord> ReadFromMachine(string ipAddress, int machineNo, int portNo, out int totalRead)
+        private List<IFacePunchRecord> ReadFromMachine(string ipAddress, int machineNo, int portNo, out int totalRead, string prefix = "EMP")
         {
             totalRead = 0;
             var records = new List<IFacePunchRecord>();
@@ -121,8 +134,8 @@ namespace Impulse.Services.Payroll
                     bool isNextDay = (hour < 5) || (hour == 5 && minute == 0);
                     if (isNextDay) attDate = attDate.AddDays(-1);
 
-                    // Legacy EmpID format: "EMR-00001"
-                    string empId = $"EMR-{enrollNumber:D5}";
+                    // Dynamic EmpID format: $"{prefix}-00001"
+                    string empId = $"{prefix}-{enrollNumber:D5}";
 
                     records.Add(new IFacePunchRecord
                     {

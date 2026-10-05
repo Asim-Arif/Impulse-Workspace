@@ -23,6 +23,7 @@ namespace Impulse.Services.Production
         public Task<List<LookupItemInt>> GetProcessesAsync() => _dataAccess.GetProcessesAsync();
         public Task<bool> DeleteReceivingAsync(long vrdEntryId, string userName, string machineName) => _dataAccess.DeleteReceivingAsync(vrdEntryId, userName, machineName);
         public Task<bool> CloseLotAsync(string lotNo, string userName, string machineName) => _dataAccess.CloseLotAsync(lotNo, userName, machineName);
+        public Task<(bool Success, string Message)> MarkMoveToStoreAsync(long vrdEntryId, string userName, string machineName) => _dataAccess.MarkMoveToStoreAsync(vrdEntryId, userName, machineName);
         public Task<bool> UpdateManualPTCNoAsync(string lotNo, string manualPTCNo) => _dataAccess.UpdateManualPTCNoAsync(lotNo, manualPTCNo);
         public Task<int> CheckIssuanceExistsAsync(long vrdEntryId) => _dataAccess.CheckIssuanceExistsAsync(vrdEntryId);
         public Task<bool> GetUserRightAsync(string rightName, string userName) => _dataAccess.GetUserRightAsync(rightName, userName);

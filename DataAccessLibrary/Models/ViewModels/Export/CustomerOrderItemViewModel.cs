@@ -23,6 +23,12 @@ namespace DataAccessLibrary.Models.ViewModels.Export
         public string IW_OrderNo { get; set; } = string.Empty;
         public string IW_BatchNo { get; set; } = string.Empty;
 
+        // Authorization fields
+        public bool Authorized { get; set; }
+        public decimal AuthorizedQty { get; set; }
+        public string? AuthorizedBy { get; set; }
+        public DateTime? AuthorizedDT { get; set; }
+
         // Joined view properties
         public string ItemName { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
