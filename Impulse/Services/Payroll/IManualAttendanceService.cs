@@ -14,5 +14,6 @@ namespace Impulse.Services.Payroll
         Task<bool> SaveManualAttendanceAsync(ManualAttendanceInputDto input);
         Task<bool> DeleteAttendanceAsync(string empId, System.DateTime date);
         Task<int> ReCalculateAttendanceAsync(System.DateTime dateFrom, System.DateTime dateTo, string deptId, string empId);
+        Task<bool> IsSalaryFinalizedAsync(int year, int month);
     }
 }

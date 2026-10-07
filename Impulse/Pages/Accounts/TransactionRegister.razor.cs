@@ -40,6 +40,8 @@ namespace Impulse.Pages.Accounts
         private Impulse.Services.INotificationService NotificationService { get; set; } = null!;
         [Inject]
         private SecurityService SecurityService { get; set; } = default!;
+        [Inject]
+        private Impulse.Services.WorkflowTasks.IWorkflowTaskEngine WorkflowTaskEngine { get; set; } = default!;
         private List<GenericDropDownModel> Accounts = new List<GenericDropDownModel>();
         private List<AccountsReportingModel> AccountsList = new List<AccountsReportingModel>();
         private AccountsReportingModel CurrentAccount = new AccountsReportingModel();
@@ -238,13 +240,13 @@ namespace Impulse.Pages.Accounts
 
         private async Task DeleteVoucher()
         {
-            if (IsEdit==false)
+            if (IsEdit == false || CurrentVoucher == null || SelectedVoucher == null)
                 return;
             try
             {
                 if (string.IsNullOrWhiteSpace(SelectedVoucher.DeleteReason))
                 {
-                    await JS.InvokeVoidAsync("alert", "Please Enter Reason of Deletion.");
+                    NotificationService.ShowWarning("Reason Required", "Please enter the reason for voucher deletion.");
                     return;
                 }
 
@@ -257,10 +259,16 @@ namespace Impulse.Pages.Accounts
                     return;
                 }
 
-                await AccountReportingAccess.DeleteVoucher(SelectedVoucher, CurrentVoucher.VchrNo,false);
+                // Create task for Director approval instead of deleting directly
+                await WorkflowTaskEngine.RequestVoucherDeletionAsync(
+                    CurrentVoucher.VchrNo, 
+                    userName, 
+                    SelectedVoucher.DeleteReason, 
+                    SelectedVoucher.MachineName);
+
+                NotificationService.ShowSuccess("Request Submitted", $"Deletion request for Voucher #{CurrentVoucher.VchrNo} has been submitted to the Directors for approval.");
 
                 ShowModal = false;
-                //SelectedVoucher = null;
                 CurrentVoucher = null;
                 HideModal();
                 RefreshLedger();
@@ -268,7 +276,8 @@ namespace Impulse.Pages.Accounts
             }
             catch (Exception ex)
             {
-                ShowModal =false;
+                NotificationService.ShowError("Error", $"Failed to submit deletion request: {ex.Message}");
+                ShowModal = false;
             }
         }
 

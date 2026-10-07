@@ -203,5 +203,10 @@ namespace Impulse.Services.Payroll
 
             return count;
         }
+
+        public async Task PopulatePrintSalaryTableAsync(int year, int month, bool isExternal, List<SalarySheetRowModel> rows)
+        {
+            await _dataAccess.PopulatePrintSalaryTableAsync(year, month, isExternal, rows);
+        }
     }
 }

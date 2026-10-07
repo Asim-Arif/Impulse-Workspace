@@ -2,11 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Dapper;
 using DataAccessLibrary.Interface.IntraOffice;
+using DataAccessLibrary.Interface.Payroll;
 using DataAccessLibrary.Interface.Setup;
 using DataAccessLibrary.Models.IntraOffice;
+using DataAccessLibrary.Models.ViewModels.Payroll;
 using Impulse.Services.IntraOffice;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
@@ -19,6 +22,9 @@ namespace Impulse.Services.WorkflowTasks
         private readonly IIntraOfficeDataAccess _intraData;
         private readonly IUserRoleDataAccess _userRoleData;
         private readonly IAppNotificationService _notificationService;
+        private readonly IAccountReportingAccess _accountReportingAccess;
+        private readonly IManualAttendanceDataAccess _manualAttendanceData;
+        private readonly IMonthlyAttendanceDataAccess _monthlyAttendanceData;
         private readonly string _connectionString;
         private readonly ILogger<WorkflowTaskEngine> _logger;
 
@@ -26,12 +32,18 @@ namespace Impulse.Services.WorkflowTasks
             IIntraOfficeDataAccess intraData,
             IUserRoleDataAccess userRoleData,
             IAppNotificationService notificationService,
+            IAccountReportingAccess accountReportingAccess,
+            IManualAttendanceDataAccess manualAttendanceData,
+            IMonthlyAttendanceDataAccess monthlyAttendanceData,
             IConfiguration configuration,
             ILogger<WorkflowTaskEngine> logger)
         {
             _intraData = intraData;
             _userRoleData = userRoleData;
             _notificationService = notificationService;
+            _accountReportingAccess = accountReportingAccess;
+            _manualAttendanceData = manualAttendanceData;
+            _monthlyAttendanceData = monthlyAttendanceData;
             _connectionString = configuration.GetConnectionString("DefaultConnection")
                 ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
             _logger = logger;
@@ -442,5 +454,560 @@ namespace Impulse.Services.WorkflowTasks
                 throw;
             }
         }
+
+        public async Task<bool> RejectRoleTaskAsync(string entityType, string entityRefId, string targetRole, string rejectedByUserName, string? rejectionReason = null)
+        {
+            try
+            {
+                using var db = CreateConnection();
+                var sql = @"
+                    UPDATE TaskItems 
+                    SET Status = 3, 
+                        CompletedBy = @RejectedBy, 
+                        UpdatedAt = GETUTCDATE()
+                    WHERE SourceEntityType = @EntityType 
+                      AND SourceEntityRefId = @EntityRefId 
+                      AND (TargetRole = @TargetRole OR AssignedTo = @TargetRole)
+                      AND Status IN (0, 1)";
+
+                var rows = await db.ExecuteAsync(sql, new
+                {
+                    EntityType = entityType,
+                    EntityRefId = entityRefId,
+                    TargetRole = targetRole,
+                    RejectedBy = rejectedByUserName
+                });
+
+                if (!string.IsNullOrWhiteSpace(rejectionReason) && rows > 0)
+                {
+                    var commentSql = @"
+                        INSERT INTO TaskComments (TaskId, UserId, Content, CreatedAt)
+                        SELECT Id, @RejectedBy, @Content, GETUTCDATE()
+                        FROM TaskItems
+                        WHERE SourceEntityType = @EntityType 
+                          AND SourceEntityRefId = @EntityRefId
+                          AND (TargetRole = @TargetRole OR AssignedTo = @TargetRole)";
+                    await db.ExecuteAsync(commentSql, new
+                    {
+                        EntityType = entityType,
+                        EntityRefId = entityRefId,
+                        TargetRole = targetRole,
+                        RejectedBy = rejectedByUserName,
+                        Content = rejectionReason
+                    });
+                }
+
+                if (rows > 0)
+                {
+                    var notifSql = @"
+                        UPDATE AppNotifications 
+                        SET IsRead = 1, ReadAt = GETUTCDATE()
+                        WHERE TaskId IN (
+                            SELECT Id FROM TaskItems 
+                            WHERE SourceEntityType = @EntityType 
+                              AND SourceEntityRefId = @EntityRefId
+                              AND (TargetRole = @TargetRole OR AssignedTo = @TargetRole)
+                        ) AND IsRead = 0";
+                    await db.ExecuteAsync(notifSql, new
+                    {
+                        EntityType = entityType,
+                        EntityRefId = entityRefId,
+                        TargetRole = targetRole
+                    });
+                }
+
+                return rows > 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error rejecting {Role} task for {EntityType} #{EntityRef}", targetRole, entityType, entityRefId);
+                return false;
+            }
+        }
+
+        public async Task<int> RequestVoucherDeletionAsync(string vchrNo, string originatorUserName, string deleteReason, string? machineName = null)
+        {
+            try
+            {
+                using var db = CreateConnection();
+                
+                // Idempotency check: prevent duplicate active deletion tasks for the same voucher
+                const string checkSql = @"
+                    SELECT TOP 1 Id FROM TaskItems 
+                    WHERE SourceEntityType = 'VoucherDeletion' 
+                      AND SourceEntityRefId = @VchrNo 
+                      AND Status IN (0, 1)";
+                var existingTaskId = await db.ExecuteScalarAsync<int?>(checkSql, new { VchrNo = vchrNo });
+                if (existingTaskId.HasValue && existingTaskId.Value > 0)
+                {
+                    _logger.LogInformation("Active deletion task #{TaskId} already exists for voucher #{VchrNo}", existingTaskId.Value, vchrNo);
+                    return existingTaskId.Value;
+                }
+
+                // Fetch voucher summary (Date & total amount)
+                const string voucherSummarySql = @"
+                    SELECT TOP 1 VDate, Description, 
+                           (SELECT ISNULL(SUM(Debit), 0) FROM Vouchers WHERE VchrNo = @VchrNo) AS TotalAmount
+                    FROM Vouchers 
+                    WHERE VchrNo = @VchrNo";
+                var voucherSummary = await db.QueryFirstOrDefaultAsync<dynamic>(voucherSummarySql, new { VchrNo = vchrNo });
+
+                DateTime vDate = voucherSummary != null ? Convert.ToDateTime(voucherSummary.VDate) : DateTime.Today;
+                decimal totalAmount = voucherSummary != null ? Convert.ToDecimal(voucherSummary.TotalAmount) : 0m;
+
+                string title = $"⚠️ Voucher Deletion Request: #{vchrNo}";
+                string desc = $"Requested by {originatorUserName} | Reason: {deleteReason} | Amount: PKR {totalAmount:N2} | Date: {vDate:yyyy-MM-dd}";
+
+                var taskId = await CreateRoleTaskAsync(new WorkflowTaskCreateRequest
+                {
+                    SourceEntityType = "VoucherDeletion",
+                    SourceEntityRefId = vchrNo,
+                    TargetRole = "Director",
+                    Title = title,
+                    Description = desc,
+                    ActionUrl = $"/accounts/voucher-approval?vchrNo={vchrNo}",
+                    Priority = 3, // Urgent
+                    DueDate = DateTime.Today.AddDays(1),
+                    CreatedBy = originatorUserName
+                });
+
+                if (taskId > 0 && !string.IsNullOrWhiteSpace(deleteReason))
+                {
+                    var commentSql = @"
+                        INSERT INTO TaskComments (TaskId, UserId, Content, CreatedAt)
+                        VALUES (@TaskId, @UserId, @Content, GETUTCDATE())";
+                    await db.ExecuteAsync(commentSql, new
+                    {
+                        TaskId = taskId,
+                        UserId = originatorUserName,
+                        Content = $"[Deletion Reason] {deleteReason}" + (!string.IsNullOrWhiteSpace(machineName) ? $" (Station: {machineName})" : "")
+                    });
+                }
+
+                return taskId;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error requesting voucher deletion task for Voucher #{VchrNo}", vchrNo);
+                throw;
+            }
+        }
+
+        public async Task<bool> ApproveVoucherDeletionAsync(string vchrNo, string approvedByDirectorUserName, string? directorRemarks = null)
+        {
+            try
+            {
+                using var db = CreateConnection();
+                // 1. Fetch active task for this voucher
+                const string taskSql = @"
+                    SELECT TOP 1 * FROM TaskItems 
+                    WHERE SourceEntityType = 'VoucherDeletion' 
+                      AND SourceEntityRefId = @VchrNo 
+                      AND Status IN (0, 1)
+                    ORDER BY Id DESC";
+                var task = await db.QueryFirstOrDefaultAsync<TaskItem>(taskSql, new { VchrNo = vchrNo });
+
+                string originator = task?.AssignedBy ?? "Unknown";
+
+                // Fetch originator deletion reason from comments
+                const string commentSql = @"
+                    SELECT TOP 1 Content FROM TaskComments 
+                    WHERE TaskId = @TaskId 
+                    ORDER BY Id ASC";
+                string? storedComment = task != null ? await db.ExecuteScalarAsync<string>(commentSql, new { TaskId = task.Id }) : null;
+                string reason = !string.IsNullOrWhiteSpace(storedComment) ? storedComment : task?.Description ?? "Deletion Approved by Director";
+
+                // 2. Call existing AccountReportingAccess.DeleteVoucher for 100% full business deletion
+                var model = new DataAccessLibrary.Models.ViewModels.Accounts.AccountsReportingModel
+                {
+                    VchrNo = vchrNo,
+                    DeleteReason = $"[Approved by Director {approvedByDirectorUserName}] {reason}" + (!string.IsNullOrWhiteSpace(directorRemarks) ? $" | Remarks: {directorRemarks}" : ""),
+                    UserName = originator,
+                    MachineName = Environment.MachineName
+                };
+
+                await _accountReportingAccess.DeleteVoucher(model, vchrNo, false);
+
+                // 3. Mark role task completed
+                if (task != null)
+                {
+                    await CompleteRoleTaskAsync("VoucherDeletion", vchrNo, "Director", approvedByDirectorUserName, 
+                        $"Voucher deletion approved and permanently removed by Director {approvedByDirectorUserName}." + 
+                        (!string.IsNullOrWhiteSpace(directorRemarks) ? $" Remarks: {directorRemarks}" : ""));
+                }
+
+                // 4. Send real-time notification + web push back to originator
+                if (!string.IsNullOrWhiteSpace(originator) && !string.Equals(originator, "System", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        await _notificationService.SendNotificationAsync(new AppNotification
+                        {
+                            Category = NotificationCategory.Task,
+                            Title = $"✅ Voucher #{vchrNo} Deletion Approved",
+                            Message = $"Your deletion request for Voucher #{vchrNo} was approved and deleted by Director {approvedByDirectorUserName}." + 
+                                      (!string.IsNullOrWhiteSpace(directorRemarks) ? $" Remarks: {directorRemarks}" : ""),
+                            SenderName = approvedByDirectorUserName,
+                            TargetUserId = originator,
+                            ActionUrl = "/accounts/transactionregister"
+                        });
+                    }
+                    catch (Exception notifEx)
+                    {
+                        _logger.LogError(notifEx, "Failed to send approval notification to originator '{Originator}' for Voucher #{VchrNo}", originator, vchrNo);
+                    }
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error approving voucher deletion for Voucher #{VchrNo}", vchrNo);
+                throw;
+            }
+        }
+
+        public async Task<bool> RejectVoucherDeletionAsync(string vchrNo, string rejectedByDirectorUserName, string rejectionReason)
+        {
+            try
+            {
+                using var db = CreateConnection();
+                // 1. Fetch active task
+                const string taskSql = @"
+                    SELECT TOP 1 * FROM TaskItems 
+                    WHERE SourceEntityType = 'VoucherDeletion' 
+                      AND SourceEntityRefId = @VchrNo 
+                      AND Status IN (0, 1)
+                    ORDER BY Id DESC";
+                var task = await db.QueryFirstOrDefaultAsync<TaskItem>(taskSql, new { VchrNo = vchrNo });
+
+                string originator = task?.AssignedBy ?? "Unknown";
+
+                // 2. Reject the role task
+                await RejectRoleTaskAsync("VoucherDeletion", vchrNo, "Director", rejectedByDirectorUserName, 
+                    $"Voucher deletion request rejected by Director {rejectedByDirectorUserName}. Reason: {rejectionReason}");
+
+                // 3. Send real-time notification + web push back to originator
+                if (!string.IsNullOrWhiteSpace(originator) && !string.Equals(originator, "System", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        await _notificationService.SendNotificationAsync(new AppNotification
+                        {
+                            Category = NotificationCategory.Task,
+                            Title = $"❌ Voucher #{vchrNo} Deletion Rejected",
+                            Message = $"Your deletion request for Voucher #{vchrNo} was rejected by Director {rejectedByDirectorUserName}. Remarks: {rejectionReason}",
+                            SenderName = rejectedByDirectorUserName,
+                            TargetUserId = originator,
+                            ActionUrl = $"/accounts/transactionregister?p_VchrNo={vchrNo}"
+                        });
+                    }
+                    catch (Exception notifEx)
+                    {
+                        _logger.LogError(notifEx, "Failed to send rejection notification to originator '{Originator}' for Voucher #{VchrNo}", originator, vchrNo);
+                    }
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error rejecting voucher deletion for Voucher #{VchrNo}", vchrNo);
+                throw;
+            }
+        }
+
+        public async Task<List<TaskItem>> GetPendingVoucherDeletionTasksAsync()
+        {
+            try
+            {
+                using var db = CreateConnection();
+                const string sql = @"
+                    SELECT t.*, 
+                           c.Content AS Description
+                    FROM TaskItems t
+                    OUTER APPLY (
+                        SELECT TOP 1 Content 
+                        FROM TaskComments 
+                        WHERE TaskId = t.Id 
+                        ORDER BY Id ASC
+                    ) c
+                    WHERE t.SourceEntityType = 'VoucherDeletion' 
+                      AND t.Status IN (0, 1)
+                    ORDER BY t.CreatedAt DESC";
+                var items = await db.QueryAsync<TaskItem>(sql);
+                return items.ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching pending voucher deletion tasks");
+                return new List<TaskItem>();
+            }
+        }
+
+        #region Attendance Workflow Methods
+
+        public async Task<int> RequestAttendanceActionAsync(AttendanceWorkflowRequestDto request)
+        {
+            try
+            {
+                // Month-wide salary finalization safeguard check
+                if (await _monthlyAttendanceData.IsSalaryFinalizedAsync(request.Year, request.Month))
+                {
+                    throw new InvalidOperationException($"Salary for {request.Year}-{request.Month:D2} has already been finalized. Attendance modification request cannot be created.");
+                }
+
+                string entityRefId = $"{request.ActionType}_{request.EmpID}_{request.Year:D4}{request.Month:D2}" +
+                                     (request.AttendanceDate.HasValue ? $"_{request.AttendanceDate.Value:dd}" : "");
+
+                using var db = CreateConnection();
+
+                // Check for existing active request
+                const string checkSql = @"
+                    SELECT TOP 1 Id FROM TaskItems 
+                    WHERE SourceEntityType = 'AttendanceWorkflow' 
+                      AND SourceEntityRefId = @RefId 
+                      AND Status IN (0, 1)";
+                var existingTaskId = await db.ExecuteScalarAsync<int?>(checkSql, new { RefId = entityRefId });
+                if (existingTaskId.HasValue && existingTaskId.Value > 0)
+                {
+                    _logger.LogInformation("Active attendance workflow task #{TaskId} already exists for ref {RefId}", existingTaskId.Value, entityRefId);
+                    return existingTaskId.Value;
+                }
+
+                string actionLabel = request.ActionType switch
+                {
+                    AttendanceWorkflowActionType.ManualSave => "Manual Attendance Edit",
+                    AttendanceWorkflowActionType.ManualDelete => "Manual Attendance Deletion",
+                    AttendanceWorkflowActionType.MonthlySave => "Monthly Attendance Batch Edit",
+                    AttendanceWorkflowActionType.MonthlyClearDate => "Clear Date Attendance",
+                    _ => "Attendance Modification"
+                };
+
+                string dateLabel = request.AttendanceDate.HasValue
+                    ? request.AttendanceDate.Value.ToString("dd-MMM-yyyy")
+                    : $"{request.Year}-{request.Month:D2}";
+
+                string title = $"🕒 Attendance Approval: [{request.EmpID}] {request.EmployeeName} - {actionLabel}";
+                string desc = $"Employee: [{request.EmpID}] {request.EmployeeName} | Period: {dateLabel} | Reason: {request.Reason} | Requested by: {request.OriginatorUserName}";
+
+                var taskId = await CreateRoleTaskAsync(new WorkflowTaskCreateRequest
+                {
+                    SourceEntityType = "AttendanceWorkflow",
+                    SourceEntityRefId = entityRefId,
+                    TargetRole = "Director",
+                    Title = title,
+                    Description = desc,
+                    ActionUrl = "/payroll/attendance-approval",
+                    Priority = 2,
+                    DueDate = DateTime.Today.AddDays(2),
+                    CreatedBy = request.OriginatorUserName
+                });
+
+                request.TaskId = taskId;
+                string payloadJson = JsonSerializer.Serialize(request);
+
+                // Store serialized payload in TaskComments for lossless replay
+                const string commentSql = @"
+                    INSERT INTO TaskComments (TaskId, UserId, Content, CreatedAt)
+                    VALUES (@TaskId, @UserId, @Content, GETUTCDATE())";
+                await db.ExecuteAsync(commentSql, new
+                {
+                    TaskId = taskId,
+                    UserId = request.OriginatorUserName,
+                    Content = payloadJson
+                });
+
+                return taskId;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error requesting attendance workflow task for EmpID {EmpID}", request.EmpID);
+                throw;
+            }
+        }
+
+        public async Task<bool> ApproveAttendanceActionAsync(int taskId, string approvedByDirectorUserName, string? directorRemarks = null)
+        {
+            try
+            {
+                var request = await GetAttendanceTaskDetailsAsync(taskId);
+                if (request == null)
+                {
+                    throw new InvalidOperationException($"Attendance task #{taskId} details could not be found.");
+                }
+
+                // Month-wide salary finalization safeguard check
+                if (await _monthlyAttendanceData.IsSalaryFinalizedAsync(request.Year, request.Month))
+                {
+                    throw new InvalidOperationException($"Approval Blocked: Salary for {request.Year}-{request.Month:D2} has already been finalized in MonthlySalaries. Attendance changes cannot be applied.");
+                }
+
+                // Execute the requested business operation
+                switch (request.ActionType)
+                {
+                    case AttendanceWorkflowActionType.ManualSave:
+                        if (request.ManualInput != null)
+                        {
+                            await _manualAttendanceData.SaveManualAttendanceAsync(request.ManualInput);
+                        }
+                        break;
+
+                    case AttendanceWorkflowActionType.ManualDelete:
+                        if (request.AttendanceDate.HasValue)
+                        {
+                            await _manualAttendanceData.DeleteAttendanceAsync(request.EmpID, request.AttendanceDate.Value);
+                        }
+                        break;
+
+                    case AttendanceWorkflowActionType.MonthlySave:
+                        if (request.MonthlyInput != null)
+                        {
+                            await _monthlyAttendanceData.SaveMonthlyAttendanceAsync(request.MonthlyInput);
+                        }
+                        break;
+
+                    case AttendanceWorkflowActionType.MonthlyClearDate:
+                        if (request.AttendanceDate.HasValue)
+                        {
+                            await _monthlyAttendanceData.ClearDateAttendanceAsync(request.EmpID, request.AttendanceDate.Value);
+                        }
+                        break;
+                }
+
+                string entityRefId = $"{request.ActionType}_{request.EmpID}_{request.Year:D4}{request.Month:D2}" +
+                                     (request.AttendanceDate.HasValue ? $"_{request.AttendanceDate.Value:dd}" : "");
+
+                // Mark task complete
+                await CompleteRoleTaskAsync("AttendanceWorkflow", entityRefId, "Director", approvedByDirectorUserName,
+                    $"Attendance change approved and applied by Director {approvedByDirectorUserName}." +
+                    (!string.IsNullOrWhiteSpace(directorRemarks) ? $" Remarks: {directorRemarks}" : ""));
+
+                // Notify originator
+                if (!string.IsNullOrWhiteSpace(request.OriginatorUserName) && !string.Equals(request.OriginatorUserName, "System", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        await _notificationService.SendNotificationAsync(new AppNotification
+                        {
+                            Category = NotificationCategory.Task,
+                            Title = $"✅ Attendance Approved: [{request.EmpID}] {request.EmployeeName}",
+                            Message = $"Your attendance change request for [{request.EmpID}] {request.EmployeeName} was approved by Director {approvedByDirectorUserName}." +
+                                      (!string.IsNullOrWhiteSpace(directorRemarks) ? $" Remarks: {directorRemarks}" : ""),
+                            SenderName = approvedByDirectorUserName,
+                            TargetUserId = request.OriginatorUserName,
+                            ActionUrl = "/payroll/manual-attendance"
+                        });
+                    }
+                    catch (Exception notifEx)
+                    {
+                        _logger.LogError(notifEx, "Failed to send approval notification to originator '{Originator}' for task #{TaskId}", request.OriginatorUserName, taskId);
+                    }
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error approving attendance task #{TaskId}", taskId);
+                throw;
+            }
+        }
+
+        public async Task<bool> RejectAttendanceActionAsync(int taskId, string rejectedByDirectorUserName, string rejectionReason)
+        {
+            try
+            {
+                var request = await GetAttendanceTaskDetailsAsync(taskId);
+                if (request == null)
+                {
+                    throw new InvalidOperationException($"Attendance task #{taskId} details could not be found.");
+                }
+
+                string entityRefId = $"{request.ActionType}_{request.EmpID}_{request.Year:D4}{request.Month:D2}" +
+                                     (request.AttendanceDate.HasValue ? $"_{request.AttendanceDate.Value:dd}" : "");
+
+                await RejectRoleTaskAsync("AttendanceWorkflow", entityRefId, "Director", rejectedByDirectorUserName,
+                    $"Attendance change request rejected by Director {rejectedByDirectorUserName}. Reason: {rejectionReason}");
+
+                // Notify originator
+                if (!string.IsNullOrWhiteSpace(request.OriginatorUserName) && !string.Equals(request.OriginatorUserName, "System", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        await _notificationService.SendNotificationAsync(new AppNotification
+                        {
+                            Category = NotificationCategory.Task,
+                            Title = $"❌ Attendance Rejected: [{request.EmpID}] {request.EmployeeName}",
+                            Message = $"Your attendance change request for [{request.EmpID}] {request.EmployeeName} was rejected by Director {rejectedByDirectorUserName}. Remarks: {rejectionReason}",
+                            SenderName = rejectedByDirectorUserName,
+                            TargetUserId = request.OriginatorUserName,
+                            ActionUrl = "/payroll/manual-attendance"
+                        });
+                    }
+                    catch (Exception notifEx)
+                    {
+                        _logger.LogError(notifEx, "Failed to send rejection notification to originator '{Originator}' for task #{TaskId}", request.OriginatorUserName, taskId);
+                    }
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error rejecting attendance task #{TaskId}", taskId);
+                throw;
+            }
+        }
+
+        public async Task<List<TaskItem>> GetPendingAttendanceTasksAsync()
+        {
+            try
+            {
+                using var db = CreateConnection();
+                const string sql = @"
+                    SELECT t.*, 
+                           t.Description
+                    FROM TaskItems t
+                    WHERE t.SourceEntityType = 'AttendanceWorkflow' 
+                      AND t.Status IN (0, 1)
+                    ORDER BY t.CreatedAt DESC";
+                var items = await db.QueryAsync<TaskItem>(sql);
+                return items.ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching pending attendance tasks");
+                return new List<TaskItem>();
+            }
+        }
+
+        public async Task<AttendanceWorkflowRequestDto?> GetAttendanceTaskDetailsAsync(int taskId)
+        {
+            try
+            {
+                using var db = CreateConnection();
+                const string sql = @"
+                    SELECT TOP 1 Content FROM TaskComments 
+                    WHERE TaskId = @TaskId 
+                    ORDER BY Id ASC";
+                string? json = await db.ExecuteScalarAsync<string>(sql, new { TaskId = taskId });
+                if (string.IsNullOrWhiteSpace(json)) return null;
+
+                var dto = JsonSerializer.Deserialize<AttendanceWorkflowRequestDto>(json);
+                if (dto != null)
+                {
+                    dto.TaskId = taskId;
+                }
+                return dto;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error parsing attendance task details for task #{TaskId}", taskId);
+                return null;
+            }
+        }
+
+        #endregion
     }
 }

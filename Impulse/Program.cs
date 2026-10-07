@@ -75,6 +75,9 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.LoginPath = $"{prefix}/Identity/Account/Login";
     options.LogoutPath = $"{prefix}/Identity/Account/Logout";
     options.AccessDeniedPath = $"{prefix}/Identity/Account/AccessDenied";
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.Path = "/";
 });
 
 builder.Services.AddAuthorization();
@@ -470,11 +473,13 @@ builder.Services.AddHttpClient("MyApiClient", client =>
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
-
         options.Cookie.Name = "auth_token";
-        options.LoginPath = "/login";
+        options.LoginPath = "/Identity/Account/Login";
         options.Cookie.MaxAge = TimeSpan.FromMinutes(30);
-        options.AccessDeniedPath = "/login";
+        options.AccessDeniedPath = "/Identity/Account/AccessDenied";
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.Path = "/";
     });
 
 /*builder.Services.AddControllers()
@@ -516,20 +521,23 @@ builder.Services.AddScoped<Impulse.Services.Setup.IUserPermissionService, Impuls
 builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IFavouriteDataAccess, DataAccessLibrary.DAC.Setup.FavouriteDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Setup.IFavouriteService, Impulse.Services.Setup.FavouriteService>();
 
+// Web Push Notification Registrations
+builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IPushNotificationDataAccess, DataAccessLibrary.DAC.Setup.PushNotificationDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Notifications.IWebPushNotificationService, Impulse.Services.Notifications.WebPushNotificationService>();
+
 // Workflow & Task Management Engine
 builder.Services.AddScoped<Impulse.Services.WorkflowTasks.IWorkflowTaskEngine, Impulse.Services.WorkflowTasks.WorkflowTaskEngine>();
 
+// WhatsApp Gateway Microservice Process Supervisor
+builder.Services.AddHostedService<Impulse.Services.IntraOffice.WhatsAppGatewayHostService>();
+
 var app = builder.Build();
 
-// Enable PathBase for IIS sub-application hosting (ensures Identity Login redirects stay under /impulse)
+// Enable PathBase only if explicitly configured in appsettings (e.g. for IIS sub-application hosting)
 var configuredPathBase = builder.Configuration.GetValue<string>("AppSettings:PathBase");
 if (!string.IsNullOrEmpty(configuredPathBase))
 {
     app.UsePathBase(configuredPathBase);
-}
-else
-{
-    app.UsePathBase("/impulse");
 }
 
 // Configure the HTTP request pipeline.
@@ -544,11 +552,11 @@ else
     app.UseHsts();
 }
 
-// In production without SSL certificate on IP binding, do not force HTTPS redirection
-if (app.Environment.IsDevelopment())
-{
-    app.UseHttpsRedirection();
-}
+// In production or local IP testing without SSL certificate, do not force HTTPS redirection
+// if (app.Environment.IsDevelopment())
+// {
+//     app.UseHttpsRedirection();
+// }
 
 app.UseStaticFiles();
 

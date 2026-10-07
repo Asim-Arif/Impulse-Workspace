@@ -41,14 +41,25 @@ namespace Impulse.Areas.Identity.Pages.Account
         private readonly SignInManager<IdentityUser> _signInManager;
         private readonly ILogger<LoginModel> _logger;
         public readonly UserSessionService _usersession;
+        private readonly DataAccessLibrary.Interface.Setup.IUserRoleDataAccess _userRoleData;
+        private readonly DataAccessLibrary.Interface.Setup.IUserDataAccess _userData;
 
-        public LoginModel(CustomUserStore userStore, SignInManager<IdentityUser> signInManager, ILogger<LoginModel> logger, IDBHelper idbhelper, UserSessionService userSession) 
+        public LoginModel(
+            CustomUserStore userStore, 
+            SignInManager<IdentityUser> signInManager, 
+            ILogger<LoginModel> logger, 
+            IDBHelper idbhelper, 
+            UserSessionService userSession,
+            DataAccessLibrary.Interface.Setup.IUserRoleDataAccess userRoleData,
+            DataAccessLibrary.Interface.Setup.IUserDataAccess userData) 
         { 
             _userStore = userStore; 
             _signInManager = signInManager; 
             _logger = logger;
             _idbhelper = idbhelper;
             _usersession = userSession;
+            _userRoleData = userRoleData;
+            _userData = userData;
         }
 
         [BindProperty]
@@ -94,46 +105,84 @@ namespace Impulse.Areas.Identity.Pages.Account
                 {
                     currentusername = Input.UserName;
                 }*/
-                string currentusername = Input.UserName;
+                string currentusername = Input.UserName?.Trim();
+
+                var dbUser = await _userStore.GetUserByUsernameAsync(currentusername);
+                if (dbUser != null && dbUser.InActive == true)
+                {
+                    ModelState.AddModelError(string.Empty, "This user account is inactive. Please contact the administrator.");
+                    return Page();
+                }
+
                 if (await _userStore.ValidateCredentialsAsync(currentusername, Input.Password))
-                //if (await _userStore.ValidateCredentialsAsync(Input.EmpID, Input.Password))
-                    {
-                    
+                {
+                    currentusername = dbUser?.UserName ?? currentusername;
                     _usersession.UserName = currentusername;
 
-                    _logger.LogInformation("User logged in.");
-                    // Add your logic to sign in the user and set the authentication cookie
-
-                    // Fetch the UserName according to EmpID
-                    //string currentusername = await _idbHelperService.getSingleStringValue("UserName", "Users", $"WHERE EmpID = '{Input.EmpID}'");
+                    _logger.LogInformation("User {UserName} logged in.", currentusername);
 
                     var claims = new List<Claim>
                     {
-                        //new Claim(ClaimTypes.Name, Input.UserName),
-                        //new Claim(ClaimTypes.Name, Input.EmpID),
-                        new Claim(ClaimTypes.Name, currentusername ?? Input.UserName),
+                        new Claim(ClaimTypes.Name, currentusername),
+                        new Claim(ClaimTypes.NameIdentifier, dbUser != null ? dbUser.UserID.ToString() : currentusername),
                         new Claim(ClaimTypes.Role, "User")
-
                     };
+
+                    // Load user roles from database
+                    if (dbUser != null)
+                    {
+                        try
+                        {
+                            var userRoles = await _userRoleData.GetRolesByUserIdAsync(dbUser.UserID);
+                            foreach (var role in userRoles.Where(r => !string.IsNullOrWhiteSpace(r)))
+                            {
+                                if (!claims.Any(c => c.Type == ClaimTypes.Role && c.Value.Equals(role, StringComparison.OrdinalIgnoreCase)))
+                                {
+                                    claims.Add(new Claim(ClaimTypes.Role, role));
+                                }
+                            }
+
+                            var fullUser = await _userData.GetUserByUserNameAsync(currentusername);
+                            if (fullUser?.UserManagement == true)
+                            {
+                                if (!claims.Any(c => c.Type == ClaimTypes.Role && c.Value.Equals("Administrator", StringComparison.OrdinalIgnoreCase)))
+                                    claims.Add(new Claim(ClaimTypes.Role, "Administrator"));
+                                if (!claims.Any(c => c.Type == ClaimTypes.Role && c.Value.Equals("Admin", StringComparison.OrdinalIgnoreCase)))
+                                    claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+                                if (!claims.Any(c => c.Type == ClaimTypes.Role && c.Value.Equals("Director", StringComparison.OrdinalIgnoreCase)))
+                                    claims.Add(new Claim(ClaimTypes.Role, "Director"));
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Could not load database roles for user {UserName}", currentusername);
+                        }
+                    }
+
+                    if (string.Equals(currentusername, "admin", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(currentusername, "administrator", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!claims.Any(c => c.Type == ClaimTypes.Role && c.Value.Equals("Administrator", StringComparison.OrdinalIgnoreCase)))
+                            claims.Add(new Claim(ClaimTypes.Role, "Administrator"));
+                        if (!claims.Any(c => c.Type == ClaimTypes.Role && c.Value.Equals("Admin", StringComparison.OrdinalIgnoreCase)))
+                            claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+                        if (!claims.Any(c => c.Type == ClaimTypes.Role && c.Value.Equals("Director", StringComparison.OrdinalIgnoreCase)))
+                            claims.Add(new Claim(ClaimTypes.Role, "Director"));
+                    }
 
                     var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
                     var principal = new ClaimsPrincipal(claimsIdentity);
 
                     var authProperties = new AuthenticationProperties 
                     {
-                        IsPersistent = Input.RememberMe
+                        IsPersistent = Input.RememberMe,
+                        ExpiresUtc = DateTimeOffset.UtcNow.AddDays(30)
                     };
 
                     await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
                     
-                    //await HttpContext.SignInAsync(principal);
-                    
-                    // Log claims for debugging
                     _logger.LogInformation("User authenticated with claims: {Claims}", string.Join(", ", claims.Select(c => c.Type + ": " + c.Value)));
                     return LocalRedirect(returnUrl);
-                    //return RedirectToPage("Login");
-
-                    //_NavigationManager.NavigateTo("/");
                 }
                 else
                 {

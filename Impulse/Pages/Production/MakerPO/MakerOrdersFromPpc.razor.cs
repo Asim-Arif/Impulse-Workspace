@@ -92,17 +92,6 @@ namespace Impulse.Pages.Production.MakerPO
                 Employees = await MakerPOService.GetEmployeesAsync();
                 SteelTypes = await MakerPOService.GetSteelTypesAsync();
                 ActiveOrdersWithPurchases = await PpcMakerOrderService.GetActiveOrdersWithPendingPurchasesAsync();
-
-                if (Employees.Any())
-                {
-                    SelectedIssEmp = Employees.FirstOrDefault();
-                    SelectedCountedBy = Employees.FirstOrDefault();
-                }
-
-                if (SteelTypes.Any())
-                {
-                    SelectedSteelTypeId = SteelTypes.FirstOrDefault()?.SteelID;
-                }
             }
             catch (Exception ex)
             {
@@ -233,7 +222,50 @@ namespace Impulse.Pages.Production.MakerPO
 
         private async Task GeneratePosInternalAsync(List<PpcMakerPoItemRowDto> linesToGenerate)
         {
-            // Validate that all lines have a maker assigned
+            // 1. Validate Required Selections: Issued By, Checked / Counted By, Default Steel Type
+            if (SelectedIssEmp == null || string.IsNullOrWhiteSpace(SelectedIssEmp.EmpID))
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Warning,
+                    Summary = "Issued By Required",
+                    Detail = "Please select an Issued By employee before generating PO(s).",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            if (SelectedCountedBy == null || string.IsNullOrWhiteSpace(SelectedCountedBy.EmpID))
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Warning,
+                    Summary = "Checked / Counted By Required",
+                    Detail = "Please select a Checked / Counted By employee before generating PO(s).",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            if (!SelectedSteelTypeId.HasValue || SelectedSteelTypeId.Value <= 0)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Warning,
+                    Summary = "Default Steel Type Required",
+                    Detail = "Please select a Default Steel Type before generating PO(s).",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            // Ensure selected lines inherit default steel type if not set individually
+            foreach (var line in linesToGenerate.Where(l => !l.SteelType_RefID.HasValue || l.SteelType_RefID.Value <= 0))
+            {
+                line.SteelType_RefID = SelectedSteelTypeId.Value;
+            }
+
+            // 3. Validate that all lines have a maker assigned
             var unassigned = linesToGenerate.FirstOrDefault(l => l.VendID <= 0);
             if (unassigned != null)
             {

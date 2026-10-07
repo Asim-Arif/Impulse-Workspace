@@ -145,6 +145,7 @@
                         <i class="fas fa-cubes me-1"></i>Default Steel Type
                     </label>
                     <select class="form-select form-select-sm" @bind="SelectedSteelTypeId">
+                        <option value="">-- Select Steel Type --</option>
                         @foreach (var st in SteelTypes)
                         {
                             <option value="@st.SteelID">@st.SteelType</option>
@@ -292,23 +293,23 @@
                         </div>
 
                         <!-- Table of Items under this Maker -->
-                        <div class="table-responsive" style="position: relative !important; z-index: 1 !important;">
-                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                        <div class="table-responsive-visible" style="position: relative !important; z-index: 1 !important; overflow: visible !important;">
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem; overflow: visible !important;">
                                 <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
                                     <tr>
                                         <th style="width: 40px;" class="text-center">
                                             <input type="checkbox" class="form-check-input"
                                                    checked="@(groupLines.All(l => l.IsSelected))"
                                                    @onchange="@((ChangeEventArgs e) => {
-                                                       bool isChecked = (bool)(e.Value ?? false);
-                                                       foreach (var l in groupLines.Where(x => !x.IsPosted)) l.IsSelected = isChecked;
+                                                        bool isChecked = (bool)(e.Value ?? false);
+                                                        foreach (var l in groupLines.Where(x => !x.IsPosted)) l.IsSelected = isChecked;
                                                    })" />
                                         </th>
                                         <th>Item Code / Description</th>
                                         <th>Process</th>
                                         @if (isUnassigned)
                                         {
-                                            <th style="width: 240px;">Assign Maker</th>
+                                            <th style="width: 260px;">Assign Maker</th>
                                         }
                                         <th class="text-center" style="width: 100px;">PO Qty</th>
                                         <th style="width: 120px;">Rate (PKR)</th>
@@ -320,7 +321,7 @@
                                 <tbody>
                                     @foreach (var line in groupLines)
                                     {
-                                        <tr class="@(line.IsPosted ? "table-light text-muted" : "")">
+                                        <tr class="@(line.IsPosted ? "table-light text-muted" : "")" style="position: relative;">
                                             <td class="text-center">
                                                 @if (!line.IsPosted)
                                                 {
@@ -341,25 +342,27 @@
 
                                             @if (isUnassigned)
                                             {
-                                                <td>
-                                                    <BlazoredTypeahead SearchMethod="SearchMakersAsync"
-                                                                       EnableDropDown="true"
-                                                                       Data="AllMakers"
-                                                                       TValue="MakerPOLookupModel"
-                                                                       TItem="MakerPOLookupModel"
-                                                                       Value="line.SelectedMaker"
-                                                                       ValueChanged="@((MakerPOLookupModel m) => OnMakerSelectedForLine(line, m))"
-                                                                       ValueExpression="@(() => line.SelectedMaker)"
-                                                                       Placeholder="Choose Maker..."
-                                                                       MaximumSuggestions="1000"
-                                                                       MinimumLength="0">
-                                                        <SelectedTemplate Context="m">
-                                                            @m.VenderName
-                                                        </SelectedTemplate>
-                                                        <ResultTemplate Context="m">
-                                                            <div>@m.DisplayText</div>
-                                                        </ResultTemplate>
-                                                    </BlazoredTypeahead>
+                                                <td style="position: relative; overflow: visible;">
+                                                    <div style="position: relative; z-index: 50;">
+                                                        <BlazoredTypeahead SearchMethod="SearchMakersAsync"
+                                                                           EnableDropDown="true"
+                                                                           Data="AllMakers"
+                                                                           TValue="MakerPOLookupModel"
+                                                                           TItem="MakerPOLookupModel"
+                                                                           Value="line.SelectedMaker"
+                                                                           ValueChanged="@((MakerPOLookupModel m) => OnMakerSelectedForLine(line, m))"
+                                                                           ValueExpression="@(() => line.SelectedMaker)"
+                                                                           Placeholder="Choose Maker..."
+                                                                           MaximumSuggestions="1000"
+                                                                           MinimumLength="0">
+                                                            <SelectedTemplate Context="m">
+                                                                @m.VenderName
+                                                            </SelectedTemplate>
+                                                            <ResultTemplate Context="m">
+                                                                <div>@m.DisplayText</div>
+                                                            </ResultTemplate>
+                                                        </BlazoredTypeahead>
+                                                    </div>
                                                 </td>
                                             }
 
@@ -438,7 +441,21 @@
 </div>
 
 <style>
-    /* Prevent BlazoredTypeahead disabled and layout overflow clipping */
+    /* Prevent BlazoredTypeahead layout overflow clipping and elevate z-index */
+    .table-responsive-visible {
+        overflow: visible !important;
+    }
+    .table td {
+        overflow: visible !important;
+    }
+    .table tr:focus-within {
+        position: relative;
+        z-index: 1050 !important;
+    }
+    .table td:focus-within {
+        position: relative;
+        z-index: 1050 !important;
+    }
     .blazored-typeahead {
         height: 31px !important;
         font-size: 0.85rem !important;
@@ -466,11 +483,14 @@
         align-items: center !important;
     }
     .blazored-typeahead__results {
+        position: absolute !important;
+        min-width: 280px !important;
         max-height: 280px !important;
         overflow-y: auto !important;
         z-index: 99999 !important;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25) !important;
         border: 1px solid #dee2e6 !important;
         border-radius: 6px !important;
+        background-color: #ffffff !important;
     }
 </style>

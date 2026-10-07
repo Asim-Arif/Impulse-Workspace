@@ -1,0 +1,340 @@
+@page "/payroll/attendance-approval"
+@page "/payroll/attendance-approval/{pTaskId:int}"
+@using DataAccessLibrary.Models.ViewModels.Payroll
+@using DataAccessLibrary.Models.IntraOffice
+@using Impulse.Services.WorkflowTasks
+@using Impulse.Services
+@attribute [Authorize]
+
+<PageTitle>Impulse - Attendance Modification Approvals</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <!-- Main Glassmorphism Card -->
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-4">
+            
+            <!-- Page Header -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary" style="width: 44px; height: 44px;">
+                        <i class="fas fa-calendar-check fs-4"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-0 fw-bold text-dark">Attendance Modification Approvals</h4>
+                        <div class="text-muted small">Director Review &amp; Payroll Governance Queue</div>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    @if (SelectedRequest != null || SelectedTaskId > 0)
+                    {
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="ClearSelection">
+                            <i class="fas fa-arrow-left me-1"></i> Back to Queue
+                        </button>
+                    }
+                    <a href="/payroll/manual-attendance" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-user-clock me-1"></i> Manual Attendance
+                    </a>
+                    <a href="/payroll/monthly-attendance" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-calendar-alt me-1"></i> Monthly Editor
+                    </a>
+                    <button class="btn btn-primary btn-sm" @onclick="LoadPendingRequestsAsync">
+                        <i class="fas fa-sync-alt me-1 @(IsLoading ? "fa-spin" : "")"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Error / Warning Alerts -->
+            @if (!string.IsNullOrEmpty(ErrorMessage))
+            {
+                <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center mb-3 py-2 px-3 small rounded-3" role="alert">
+                    <i class="fas fa-exclamation-circle me-2 fs-5"></i>
+                    <div>@ErrorMessage</div>
+                    <button type="button" class="btn-close ms-auto" @onclick="() => ErrorMessage = null"></button>
+                </div>
+            }
+
+            @if (IsSalaryFinalizedForSelected)
+            {
+                <div class="alert alert-warning d-flex align-items-center mb-3 py-2 px-3 small rounded-3" role="alert">
+                    <i class="fas fa-lock me-2 fs-5 text-danger"></i>
+                    <div>
+                        <strong>Salary Finalized:</strong> The salary for this month is already finalized in <code>MonthlySalaries</code>. This request cannot be approved and must be closed/rejected.
+                    </div>
+                </div>
+            }
+
+            @if (IsLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <div class="text-muted mt-2 small">Loading pending attendance requests...</div>
+                </div>
+            }
+            else if (SelectedRequest != null)
+            {
+                <!-- ================= ATTENDANCE DETAIL REVIEW VIEW ================= -->
+                
+                <!-- Status & Info Hero Banner -->
+                <div class="p-3 mb-3 rounded-3 border" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-md-3">
+                            <span class="text-muted small d-block">Employee</span>
+                            <span class="fw-bold fs-6 text-primary">[@SelectedRequest.EmpID] @SelectedRequest.EmployeeName</span>
+                            @if (!string.IsNullOrWhiteSpace(SelectedRequest.DepartmentName))
+                            {
+                                <span class="badge bg-secondary ms-1">@SelectedRequest.DepartmentName</span>
+                            }
+                        </div>
+                        <div class="col-md-3">
+                            <span class="text-muted small d-block">Modification Period / Date</span>
+                            <span class="fw-semibold">
+                                @(SelectedRequest.AttendanceDate.HasValue ? SelectedRequest.AttendanceDate.Value.ToString("dd-MMM-yyyy") : $"{SelectedRequest.Year}-{SelectedRequest.Month:D2}")
+                            </span>
+                            <span class="badge bg-info text-dark ms-1">@SelectedRequest.ActionType</span>
+                        </div>
+                        <div class="col-md-3">
+                            <span class="text-muted small d-block">Requested By (Originator)</span>
+                            <span class="fw-semibold text-dark">
+                                <i class="fas fa-user-circle text-secondary me-1"></i>@SelectedRequest.OriginatorUserName
+                            </span>
+                            <div class="text-muted" style="font-size: 0.75rem;">@SelectedRequest.CreatedAt.ToLocalTime().ToString("dd-MMM-yyyy hh:mm tt")</div>
+                        </div>
+                        <div class="col-md-3 text-md-end">
+                            <span class="text-muted small d-block">Status</span>
+                            @if (ActiveTask == null || ActiveTask.Status == TaskItemStatus.Pending || ActiveTask.Status == TaskItemStatus.InProgress)
+                            {
+                                <span class="badge bg-warning text-dark px-3 py-2 rounded-pill">
+                                    <i class="fas fa-clock me-1"></i> Pending Director Review
+                                </span>
+                            }
+                            else if (ActiveTask.Status == TaskItemStatus.Completed)
+                            {
+                                <span class="badge bg-success px-3 py-2 rounded-pill">
+                                    <i class="fas fa-check-circle me-1"></i> Approved &amp; Applied
+                                </span>
+                            }
+                            else if (ActiveTask.Status == TaskItemStatus.Cancelled)
+                            {
+                                <span class="badge bg-danger px-3 py-2 rounded-pill">
+                                    <i class="fas fa-times-circle me-1"></i> Rejected / Cancelled
+                                </span>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Operator Reason Box -->
+                <div class="card border mb-3 shadow-none bg-light">
+                    <div class="card-body p-3">
+                        <div class="fw-bold text-secondary small mb-1">
+                            <i class="fas fa-comment-alt me-1"></i> Reason for Change / Deletion:
+                        </div>
+                        <div class="text-dark bg-white p-2 rounded border" style="font-size: 0.95rem;">
+                            @SelectedRequest.Reason
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Comparison Diff Table -->
+                <div class="card border mb-4 shadow-none">
+                    <div class="card-header bg-white py-2 px-3 fw-bold text-dark border-bottom d-flex align-items-center justify-content-between">
+                        <div>
+                            <i class="fas fa-exchange-alt text-primary me-2"></i>
+                            Attendance Changes (Before vs. Proposed)
+                        </div>
+                        <span class="badge bg-light text-dark border">@SelectedRequest.DiffRows.Count Record(s)</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                    <tr>
+                                        <th style="width: 130px;">Date</th>
+                                        <th style="width: 100px;">Day</th>
+                                        <th class="table-danger text-danger text-center" style="width: 120px;">Current In</th>
+                                        <th class="table-danger text-danger text-center" style="width: 120px;">Current Out</th>
+                                        <th class="table-danger text-danger text-center" style="width: 100px;">Current Status</th>
+                                        <th class="table-success text-success text-center" style="width: 120px;">Proposed In</th>
+                                        <th class="table-success text-success text-center" style="width: 120px;">Proposed Out</th>
+                                        <th class="table-success text-success text-center" style="width: 100px;">Proposed Status</th>
+                                        <th class="text-center" style="width: 80px;">OT (Hrs)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var row in SelectedRequest.DiffRows)
+                                    {
+                                        <tr>
+                                            <td class="fw-semibold">@row.Date.ToString("dd-MMM-yyyy")</td>
+                                            <td class="text-muted">@row.DayName</td>
+                                            
+                                            <!-- Current DB state -->
+                                            <td class="text-center text-danger bg-danger bg-opacity-10">
+                                                @(string.IsNullOrWhiteSpace(row.PrevInTime) ? "-" : row.PrevInTime)
+                                            </td>
+                                            <td class="text-center text-danger bg-danger bg-opacity-10">
+                                                @(string.IsNullOrWhiteSpace(row.PrevOutTime) ? "-" : row.PrevOutTime)
+                                            </td>
+                                            <td class="text-center bg-danger bg-opacity-10">
+                                                <span class="badge @(row.PrevStatus == "Present" ? "bg-success" : (row.PrevStatus == "Leave" ? "bg-warning text-dark" : "bg-danger"))">
+                                                    @row.PrevStatus
+                                                </span>
+                                            </td>
+
+                                            <!-- Proposed New state -->
+                                            <td class="text-center text-success bg-success bg-opacity-10 fw-bold">
+                                                @(string.IsNullOrWhiteSpace(row.NewInTime) ? "-" : row.NewInTime)
+                                            </td>
+                                            <td class="text-center text-success bg-success bg-opacity-10 fw-bold">
+                                                @(string.IsNullOrWhiteSpace(row.NewOutTime) ? "-" : row.NewOutTime)
+                                            </td>
+                                            <td class="text-center bg-success bg-opacity-10">
+                                                <span class="badge @(row.NewStatus == "Present" ? "bg-success" : (row.NewStatus == "Leave" ? "bg-warning text-dark" : "bg-danger"))">
+                                                    @row.NewStatus
+                                                </span>
+                                            </td>
+
+                                            <td class="text-center fw-bold">
+                                                @if (row.NewOtHours > 0)
+                                                {
+                                                    <span class="text-primary">+@row.NewOtHours.ToString("0.#")</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">0</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Decision Action Bar -->
+                <div class="card border-0 shadow-sm p-3 bg-white rounded-3">
+                    <div class="row align-items-center g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-secondary mb-1">Director Remarks / Instructions (Optional):</label>
+                            <input type="text" class="form-control form-control-sm" placeholder="Add any specific approval or rejection notes..." @bind="DirectorRemarks" />
+                        </div>
+                        <div class="col-md-6 text-md-end d-flex justify-content-md-end gap-2 align-items-end">
+                            <button class="btn btn-outline-secondary btn-sm" @onclick="ClearSelection">
+                                <i class="fas fa-times me-1"></i> Close
+                            </button>
+                            
+                            @if (ActiveTask == null || ActiveTask.Status == TaskItemStatus.Pending || ActiveTask.Status == TaskItemStatus.InProgress)
+                            {
+                                <button class="btn btn-outline-danger btn-sm" @onclick="OpenRejectModal" disabled="@IsProcessing">
+                                    <i class="fas fa-ban me-1"></i> Reject Request
+                                </button>
+                                
+                                <button class="btn btn-success btn-sm px-4 fw-bold" @onclick="ApproveRequestAsync" disabled="@(IsProcessing || IsSalaryFinalizedForSelected)">
+                                    <i class="fas fa-check-circle me-1 @(IsProcessing ? "fa-spin" : "")"></i>
+                                    @(IsSalaryFinalizedForSelected ? "Locked (Salary Finalized)" : "Approve & Apply Changes")
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <!-- ================= PENDING REQUESTS QUEUE TABLE ================= -->
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="text-secondary small fw-bold">
+                        Pending Approvals: <span class="badge bg-primary rounded-pill">@PendingTasks.Count</span>
+                    </div>
+                </div>
+
+                @if (PendingTasks.Count == 0)
+                {
+                    <div class="text-center py-5 border rounded-3 bg-light">
+                        <i class="fas fa-check-double text-success fs-1 mb-2"></i>
+                        <h5 class="fw-bold text-dark">No Pending Attendance Requests</h5>
+                        <p class="text-muted small mb-0">All attendance modifications and deletion requests have been reviewed.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                <tr>
+                                    <th style="width: 80px;">Task #</th>
+                                    <th>Title &amp; Employee</th>
+                                    <th style="width: 140px;">Requested By</th>
+                                    <th style="width: 140px;">Created Date</th>
+                                    <th style="width: 110px;" class="text-center">Priority</th>
+                                    <th style="width: 110px;" class="text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var task in PendingTasks)
+                                {
+                                    <tr style="cursor: pointer;" @onclick="() => SelectTaskAsync(task.Id)">
+                                        <td class="fw-bold text-primary">#@task.Id</td>
+                                        <td>
+                                            <div class="fw-semibold text-dark">@task.Title</div>
+                                            <div class="text-muted small text-truncate" style="max-width: 500px;">@task.Description</div>
+                                        </td>
+                                        <td>
+                                            <i class="fas fa-user text-secondary me-1"></i>@task.AssignedBy
+                                        </td>
+                                        <td>@task.CreatedAt.ToLocalTime().ToString("dd-MMM-yyyy hh:mm tt")</td>
+                                        <td class="text-center">
+                                            @if (task.Priority == TaskPriority.Urgent)
+                                            {
+                                                <span class="badge bg-danger">Urgent</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">Normal</span>
+                                            }
+                                        </td>
+                                        <td class="text-center">
+                                            <button class="btn btn-outline-primary btn-sm py-0 px-2" @onclick="() => SelectTaskAsync(task.Id)" @onclick:stopPropagation="true">
+                                                <i class="fas fa-eye me-1"></i> Review
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            }
+
+        </div>
+    </div>
+</div>
+
+<!-- Reject Reason Modal -->
+@if (ShowRejectModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 1055;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-danger text-white py-2">
+                    <h6 class="modal-title fw-bold">
+                        <i class="fas fa-ban me-1"></i> Reject Attendance Request
+                    </h6>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => ShowRejectModal = false"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <p class="small text-muted mb-2">Please state the reason for rejecting this attendance modification request. This will be recorded and notified to the originator.</p>
+                    <textarea class="form-control form-control-sm" rows="3" placeholder="Enter rejection remarks..." @bind="RejectReasonText"></textarea>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => ShowRejectModal = false">Cancel</button>
+                    <button type="button" class="btn btn-danger btn-sm px-3 fw-bold" @onclick="ConfirmRejectAsync" disabled="@(string.IsNullOrWhiteSpace(RejectReasonText) || IsProcessing)">
+                        <i class="fas fa-ban me-1"></i> Confirm Rejection
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

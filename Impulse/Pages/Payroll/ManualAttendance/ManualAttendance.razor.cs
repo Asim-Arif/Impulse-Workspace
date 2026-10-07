@@ -2,6 +2,7 @@ using DataAccessLibrary.Models.ViewModels.Payroll;
 using Impulse.Components.Payroll;
 using Impulse.Services;
 using Impulse.Services.Payroll;
+using Impulse.Services.WorkflowTasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using System;
@@ -17,9 +18,15 @@ namespace Impulse.Pages.Payroll.ManualAttendance
         [SupplyParameterFromQuery(Name = "returnUrl")]
         public string? ReturnUrl { get; set; }
 
+        [Inject] private IWorkflowTaskEngine WorkflowTaskEngine { get; set; } = default!;
+        [Inject] private DataAccessLibrary.Interface.Setup.IUserDataAccess UserDataAccess { get; set; } = default!;
+        [Inject] private DataAccessLibrary.Interface.Setup.IUserRoleDataAccess UserRoleDataAccess { get; set; } = default!;
+
         private bool IsSaving = false;
         private bool IsLoadingDetails = false;
         private string CurrentUserName = "System";
+        private bool IsDirectorOrAdmin = false;
+        private bool IsSalaryFinalized = false;
 
         private DateTime AttendanceDate { get; set; } = DateTime.Today;
         private bool UseServerTime { get; set; } = false;
@@ -40,6 +47,13 @@ namespace Impulse.Pages.Payroll.ManualAttendance
         private List<EmpTimeDetailRow> AttendanceDetails = new();
         private string ValidationWarning { get; set; } = string.Empty;
 
+        // Reason Modal State for Workflow
+        private bool ShowReasonModal = false;
+        private string ReasonModalTitle = "Attendance Modification Request";
+        private string ReasonText = string.Empty;
+        private bool IsSubmittingRequest = false;
+        private AttendanceWorkflowActionType PendingActionType;
+
         protected override async Task OnInitializedAsync()
         {
             try
@@ -48,14 +62,48 @@ namespace Impulse.Pages.Payroll.ManualAttendance
                 if (authState?.User?.Identity?.IsAuthenticated == true)
                 {
                     CurrentUserName = authState.User.Identity.Name ?? "System";
+                    var user = authState.User;
+                    
+                    bool isRoleMatch = user.IsInRole("Director") || user.IsInRole("Admin") || user.IsInRole("Administrator") || user.IsInRole("SuperAdmin");
+                    bool isNameMatch = string.Equals(CurrentUserName, "admin", StringComparison.OrdinalIgnoreCase) || string.Equals(CurrentUserName, "administrator", StringComparison.OrdinalIgnoreCase);
+
+                    if (isRoleMatch || isNameMatch)
+                    {
+                        IsDirectorOrAdmin = true;
+                    }
+                    else
+                    {
+                        var dbUser = await UserDataAccess.GetUserByUserNameAsync(CurrentUserName);
+                        if (dbUser != null)
+                        {
+                            if (dbUser.UserManagement == true)
+                            {
+                                IsDirectorOrAdmin = true;
+                            }
+                            else
+                            {
+                                var userRoles = await UserRoleDataAccess.GetRolesByUserIdAsync(dbUser.UserID);
+                                if (userRoles != null && userRoles.Any(r => r.Equals("Director", StringComparison.OrdinalIgnoreCase) || r.Equals("Admin", StringComparison.OrdinalIgnoreCase) || r.Equals("Administrator", StringComparison.OrdinalIgnoreCase)))
+                                {
+                                    IsDirectorOrAdmin = true;
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Employees = await AttendanceService.GetActiveEmployeesAsync();
+                await CheckSalaryLockAsync();
             }
             catch (Exception ex)
             {
                 NotificationService.ShowError("Initialization Error", ex.Message);
             }
+        }
+
+        private async Task CheckSalaryLockAsync()
+        {
+            IsSalaryFinalized = await AttendanceService.IsSalaryFinalizedAsync(AttendanceDate.Year, AttendanceDate.Month);
         }
 
         private async Task<IEnumerable<EmployeeListItemModel>> SearchEmployees(string searchText)
@@ -82,6 +130,7 @@ namespace Impulse.Pages.Payroll.ManualAttendance
             if (DateTime.TryParse(e?.Value?.ToString(), out DateTime parsed))
             {
                 AttendanceDate = parsed.Date;
+                await CheckSalaryLockAsync();
                 await LoadAttendanceForEmployeeAsync();
             }
         }
@@ -174,6 +223,29 @@ namespace Impulse.Pages.Payroll.ManualAttendance
                 return;
             }
 
+            if (IsSalaryFinalized)
+            {
+                NotificationService.ShowError("Locked", $"Salary for {AttendanceDate:MMMM yyyy} has already been finalized in MonthlySalaries. Attendance cannot be modified.");
+                return;
+            }
+
+            // If user is Director/Admin -> Direct Bypass
+            if (IsDirectorOrAdmin)
+            {
+                await ExecuteDirectSaveAsync();
+                return;
+            }
+
+            // Regular operator -> Request Approval
+            PendingActionType = AttendanceWorkflowActionType.ManualSave;
+            ReasonModalTitle = $"Request Attendance Save - [{SelectedEmployee.EmpID}] {SelectedEmployee.Name}";
+            ReasonText = string.Empty;
+            ShowReasonModal = true;
+        }
+
+        private async Task ExecuteDirectSaveAsync()
+        {
+            if (SelectedEmployee == null) return;
             IsSaving = true;
             await InvokeAsync(StateHasChanged);
 
@@ -223,6 +295,29 @@ namespace Impulse.Pages.Payroll.ManualAttendance
         {
             if (SelectedEmployee == null || !AttendanceDetails.Any()) return;
 
+            if (IsSalaryFinalized)
+            {
+                NotificationService.ShowError("Locked", $"Salary for {AttendanceDate:MMMM yyyy} has already been finalized in MonthlySalaries. Attendance cannot be deleted.");
+                return;
+            }
+
+            // If user is Director/Admin -> Direct Bypass
+            if (IsDirectorOrAdmin)
+            {
+                await ExecuteDirectDeleteAsync();
+                return;
+            }
+
+            // Regular operator -> Request Approval
+            PendingActionType = AttendanceWorkflowActionType.ManualDelete;
+            ReasonModalTitle = $"Request Attendance Deletion - [{SelectedEmployee.EmpID}] {SelectedEmployee.Name}";
+            ReasonText = string.Empty;
+            ShowReasonModal = true;
+        }
+
+        private async Task ExecuteDirectDeleteAsync()
+        {
+            if (SelectedEmployee == null) return;
             IsSaving = true;
             await InvokeAsync(StateHasChanged);
 
@@ -246,6 +341,90 @@ namespace Impulse.Pages.Payroll.ManualAttendance
             finally
             {
                 IsSaving = false;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+
+        private async Task SubmitWorkflowRequestAsync()
+        {
+            if (SelectedEmployee == null) return;
+            if (string.IsNullOrWhiteSpace(ReasonText))
+            {
+                NotificationService.ShowWarning("Reason Required", "Please enter a reason for this attendance modification request.");
+                return;
+            }
+
+            IsSubmittingRequest = true;
+            await InvokeAsync(StateHasChanged);
+
+            try
+            {
+                string clientIp = AuditService.GetClientIpAddress();
+
+                var manualInput = new ManualAttendanceInputDto
+                {
+                    EmpID = SelectedEmployee.EmpID,
+                    DT = AttendanceDate,
+                    UseServerTime = UseServerTime,
+                    InTime = FormatTimeOnly(InTime),
+                    BrkOut = FormatTimeOnly(BrkOut),
+                    BrkIn = FormatTimeOnly(BrkIn),
+                    ChkOut = FormatTimeOnly(ChkOut),
+                    EnableOT = EnableOT,
+                    OTIn = FormatTimeOnly(OTIn),
+                    OTOut = FormatTimeOnly(OTOut),
+                    UserName = CurrentUserName,
+                    ComputerName = clientIp
+                };
+
+                var existingInTime = AttendanceDetails.FirstOrDefault(x => !x.OverTime)?.InTime ?? string.Empty;
+                var existingOutTime = AttendanceDetails.LastOrDefault(x => !x.OverTime)?.OutTime ?? string.Empty;
+                double existingOt = AttendanceDetails.Where(x => x.OverTime).Sum(x => x.PayableHrs);
+
+                var diffRow = new AttendanceDiffRow
+                {
+                    Date = AttendanceDate,
+                    DayName = AttendanceDate.DayOfWeek.ToString(),
+                    PrevInTime = existingInTime,
+                    PrevOutTime = existingOutTime,
+                    PrevStatus = AttendanceDetails.Any() ? "Present" : "Absent",
+                    PrevOtHours = existingOt,
+                    NewInTime = PendingActionType == AttendanceWorkflowActionType.ManualDelete ? string.Empty : FormatTimeOnly(InTime),
+                    NewOutTime = PendingActionType == AttendanceWorkflowActionType.ManualDelete ? string.Empty : FormatTimeOnly(ChkOut),
+                    NewStatus = PendingActionType == AttendanceWorkflowActionType.ManualDelete ? "Absent" : "Present",
+                    NewOtHours = PendingActionType == AttendanceWorkflowActionType.ManualDelete ? 0 : (EnableOT && OTIn.HasValue && OTOut.HasValue ? Math.Max(0, (OTOut.Value - OTIn.Value).TotalHours) : 0),
+                    IsDeleted = PendingActionType == AttendanceWorkflowActionType.ManualDelete
+                };
+
+                var request = new AttendanceWorkflowRequestDto
+                {
+                    ActionType = PendingActionType,
+                    EmpID = SelectedEmployee.EmpID,
+                    EmployeeName = SelectedEmployee.Name,
+                    DepartmentName = SelectedEmployee.Designation ?? string.Empty,
+                    Year = AttendanceDate.Year,
+                    Month = AttendanceDate.Month,
+                    AttendanceDate = AttendanceDate,
+                    Reason = ReasonText.Trim(),
+                    OriginatorUserName = CurrentUserName,
+                    MachineName = clientIp,
+                    ManualInput = manualInput,
+                    DiffRows = new List<AttendanceDiffRow> { diffRow }
+                };
+
+                int taskId = await WorkflowTaskEngine.RequestAttendanceActionAsync(request);
+
+                NotificationService.ShowSuccess("Request Submitted", $"Attendance change request has been submitted to the Director for approval (Task #{taskId}).");
+                ShowReasonModal = false;
+                ReasonText = string.Empty;
+            }
+            catch (Exception ex)
+            {
+                NotificationService.ShowError("Submission Failed", ex.Message);
+            }
+            finally
+            {
+                IsSubmittingRequest = false;
                 await InvokeAsync(StateHasChanged);
             }
         }

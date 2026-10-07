@@ -384,13 +384,17 @@
                     
                     <div class="modal-footer">
                         <div class="w-100 mb-2">
-                            <label class="fw-semibold text-secondary mb-1">Reason of Deletion :</label>
-                            <textarea class="form-control" rows="2" @bind="SelectedVoucher.DeleteReason" placeholder="Enter reason for deletion..."></textarea>
+                            <div class="alert alert-warning py-2 px-3 mb-2 small d-flex align-items-center">
+                                <i class="fas fa-info-circle me-2 fs-5 text-warning"></i>
+                                <span>Submitting this request will generate a task for the <strong>Director</strong> role. The voucher will only be deleted once approved by a Director.</span>
+                            </div>
+                            <label class="fw-semibold text-secondary mb-1">Reason for Deletion <span class="text-danger">*</span> :</label>
+                            <textarea class="form-control" rows="2" @bind="SelectedVoucher.DeleteReason" placeholder="Enter detailed reason for deletion for Director review..."></textarea>
                         </div>
                         <div class="d-flex justify-content-end w-100 gap-2">
                             <button class="btn btn-secondary px-4" @onclick="HideModal">Cancel</button>
                             <button class="btn btn-danger px-4 fw-bold" @onclick="DeleteVoucher">
-                                <i class="fas fa-trash-alt me-1"></i> Delete Voucher
+                                <i class="fas fa-paper-plane me-1"></i> Submit Deletion Request
                             </button>
                         </div>
                     </div>

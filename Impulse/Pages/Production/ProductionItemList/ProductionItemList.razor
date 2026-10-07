@@ -205,7 +205,6 @@
                                 <th class="text-end">Pack</th>
                                 <th>Order #</th>
                                 <th>Ship. Status</th>
-                                <th class="text-end">Price</th>
                                 <th>Hub</th>
                             </tr>
                         </thead>
@@ -213,7 +212,7 @@
                             @if (Items.Count == 0)
                             {
                                 <tr>
-                                    <td colspan="16" class="text-center py-5 text-muted">
+                                    <td colspan="15" class="text-center py-5 text-muted">
                                         <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
                                         No records found. Adjust filters and click Refresh.
                                     </td>
@@ -270,7 +269,6 @@
                                                 </div>
                                             }
                                         </td>
-                                        <td class="text-end">@(item.DisplayPrice?.ToString("N3") ?? "")</td>
                                         <td class="text-muted">@item.Hub_Name</td>
                                     </ContextMenuTrigger>
                                 </Virtualize>

@@ -32,7 +32,7 @@
     </div>
 
     <!-- Main Grid Table with 14 Specific Columns -->
-    <div class="table-responsive border rounded-3 mb-3" style="max-height: 48vh; overflow-y: auto;">
+    <div class="table-responsive border rounded-3 mb-3" style="max-height: 48vh; overflow: auto;">
         <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem; white-space: nowrap;">
             <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
                 <tr>
@@ -43,7 +43,7 @@
                     <th style="width: 95px;">Date</th>
                     <th style="width: 100px;">Order #</th>
                     <th style="width: 100px;">Item ID</th>
-                    <th style="min-width: 180px;">Description</th>
+                    <th style="width: 250px; min-width: 180px; max-width: 260px;">Description</th>
                     <th class="text-center" style="width: 85px;">Issd Qty</th>
                     <th class="text-end" style="width: 90px;">Price</th>
                     <th class="text-end" style="width: 100px;">Value</th>
@@ -51,7 +51,7 @@
                     <th class="text-end" style="width: 105px;">Rcvd. Value</th>
                     <th class="text-center" style="width: 85px;">Rcvd Qty</th>
                     <th class="text-center" style="width: 90px;">Lot #</th>
-                    <th>Process</th>
+                    <th style="width: 110px;">Process</th>
                     <th style="width: 90px;">Customer</th>
                 </tr>
             </thead>
@@ -85,8 +85,10 @@
                             <td>@lot.DT.ToString("dd-MMM-yy")</td>
                             <td class="fw-semibold">@lot.OrderNo</td>
                             <td><span class="badge bg-secondary">@lot.ItemCode</span></td>
-                            <td class="fw-semibold @(lot.Audited ? "text-primary" : "text-dark")" @onmouseenter="() => ShowImagePreview(lot.ItemCode)" title="@lot.ItemName">
-                                @lot.ItemName
+                            <td class="fw-semibold @(lot.Audited ? "text-primary" : "text-dark")" style="max-width: 260px;" @onmouseenter="() => ShowImagePreview(lot.ItemCode)" title="@lot.ItemName">
+                                <div class="text-truncate" style="max-width: 260px;" title="@lot.ItemName">
+                                    @lot.ItemName
+                                </div>
                             </td>
                             <td class="text-center fw-bold">@lot.IssQty.ToString("N0")</td>
                             <td class="text-end" @onclick:stopPropagation="true">

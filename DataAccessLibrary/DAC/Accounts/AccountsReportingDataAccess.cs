@@ -220,11 +220,10 @@ public class AccountsReportingDataAccess : IAccountReportingAccess
                     string Reason = selectedVoucher.DeleteReason;
                     string DT = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                     string sqlBackupInfo =
-                        @"INSERT INTO VouchersDeletedInfo 
-                      SELECT VchrNo, @Username, @MachineName, @DT, @Reason, UserName, MachineName,
-                             DT,BillDate, BillNo 
-                      FROM VoucherInfo 
-                      WHERE VchrNo = @VchrNo";
+                        @"INSERT INTO VouchersDeletedInfo (VchrNo, UserName, MachineName, DT, Reason, VchrUserName, VchrMachineName, VchrDT)
+                          SELECT VchrNo, @Username, @MachineName, @DT, @Reason, UserName, MachineName, DT 
+                          FROM VoucherInfo 
+                          WHERE VchrNo = @VchrNo";
                     
                     string sqlDeleteVoucher =
                         "DELETE FROM Vouchers WHERE VchrNo = @VchrNo";

@@ -1,0 +1,107 @@
+@page "/office/directory"
+@page "/directory"
+@attribute [Authorize]
+@using DataAccessLibrary.Models.IntraOffice
+@using Impulse.Services.IntraOffice
+@inject IIntraOfficeService IntraOfficeService
+@inject NavigationManager Navigation
+
+<div class="topbar">
+    <h1 class="topbar-title"><i class="bi bi-people-fill"></i> Employee Directory</h1>
+</div>
+
+<div class="content-area">
+    <div class="d-flex gap-16 mb-24">
+        <div class="search-bar" style="flex: 1; max-width: 400px;">
+            <i class="bi bi-search"></i>
+            <input type="text" placeholder="Search employees..." @bind="searchQuery" @bind:event="oninput" />
+        </div>
+        <select class="form-control" style="width: 200px;" @bind="filterDeptId" @bind:after="LoadUsers">
+            <option value="">All Departments</option>
+            @if (departments != null)
+            {
+                @foreach (var d in departments)
+                {
+                    <option value="@d.Id">@d.Name</option>
+                }
+            }
+        </select>
+    </div>
+
+    <div class="directory-grid">
+        @if (users != null)
+        {
+            @foreach (var user in FilteredUsers)
+            {
+                <div class="employee-card">
+                    <div class="avatar avatar-lg" style="margin: 0 auto 14px; overflow: hidden; padding: 0;">
+                        @if (!string.IsNullOrEmpty(user.Avatar))
+                        {
+                            <img src="@user.Avatar" alt="@user.FullName" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+                        }
+                        else
+                        {
+                            <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                                @(user.FullName.Length > 0 ? user.FullName[0].ToString().ToUpper() : "?")
+                            </div>
+                        }
+                    </div>
+                    <div class="employee-name">@user.FullName</div>
+                    <div class="employee-title">@(user.JobTitle ?? "Employee")</div>
+                    <div class="employee-dept"><i class="bi bi-building"></i> @(user.Department?.Name ?? "Unassigned")</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">
+                        <i class="bi bi-envelope"></i> @user.Email
+                    </div>
+                    <div class="employee-actions">
+                        <button class="btn btn-primary btn-sm" @onclick='() => Navigation.NavigateTo($"/office/messages/{user.Id}")'>
+                            <i class="bi bi-chat-dots"></i> Message
+                        </button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    @if (users != null && !FilteredUsers.Any())
+    {
+        <div class="empty-state">
+            <i class="bi bi-people"></i>
+            <h3>No employees found</h3>
+            <p>Try adjusting your search or filter</p>
+        </div>
+    }
+</div>
+
+@code {
+    private List<IntraUserProfile>? users;
+    private List<IntraDepartment>? departments;
+    private string searchQuery = "";
+    private string filterDeptId = "";
+
+    private IEnumerable<IntraUserProfile> FilteredUsers =>
+        users?.Where(u => string.IsNullOrEmpty(searchQuery) ||
+            u.FullName.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+            (u.Email?.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (u.JobTitle?.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ?? false))
+        ?? Enumerable.Empty<IntraUserProfile>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsers();
+        var depts = await IntraOfficeService.GetDepartmentsAsync();
+        departments = depts.Select(d => new IntraDepartment { Id = d.DeptId, Name = d.DeptName }).ToList();
+    }
+
+    private async Task LoadUsers()
+    {
+        var all = await IntraOfficeService.GetActiveUsersAsync();
+        if (!string.IsNullOrEmpty(filterDeptId))
+        {
+            users = all.Where(u => u.DepartmentId == filterDeptId).OrderBy(u => u.FullName).ToList();
+        }
+        else
+        {
+            users = all.OrderBy(u => u.FullName).ToList();
+        }
+    }
+}

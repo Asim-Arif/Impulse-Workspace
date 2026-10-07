@@ -4873,3 +4873,154 @@ BEGIN
 END
 GO
 
+-- ============================================================================
+-- Web Push Notifications: UserPushSubscriptions Table
+-- Stores browser and mobile push notification device subscriptions
+-- ============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'UserPushSubscriptions')
+BEGIN
+    CREATE TABLE dbo.UserPushSubscriptions (
+        Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        UserID INT NULL,
+        UserName VARCHAR(50) NOT NULL,
+        Endpoint VARCHAR(MAX) NOT NULL,
+        P256dh VARCHAR(255) NOT NULL,
+        Auth VARCHAR(255) NOT NULL,
+        DeviceName VARCHAR(100) NULL,
+        CreatedAt DATETIME NOT NULL DEFAULT (GETDATE()),
+        LastUsedAt DATETIME NULL
+    );
+    CREATE NONCLUSTERED INDEX IX_UserPushSubscriptions_UserName ON dbo.UserPushSubscriptions (UserName);
+END
+GO
+
+-- ============================================================================
+-- Workflow Tasks & Governance Engine Tables
+-- Used by: Voucher Deletion, Attendance Modifications/Approvals, Order Authorizations
+-- ============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'TaskItems')
+BEGIN
+    CREATE TABLE dbo.TaskItems (
+        Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        Title NVARCHAR(400) NOT NULL,
+        Description NVARCHAR(MAX) NULL,
+        AssignedTo NVARCHAR(100) NULL,
+        AssignedBy NVARCHAR(100) NOT NULL,
+        DepartmentId VARCHAR(50) NULL,
+        Priority INT NOT NULL DEFAULT (1),
+        Status INT NOT NULL DEFAULT (0),
+        DueDate DATETIME2(7) NULL,
+        WhatsAppMessageSent BIT NOT NULL DEFAULT (0),
+        CreatedAt DATETIME2(7) NOT NULL DEFAULT (GETUTCDATE()),
+        UpdatedAt DATETIME2(7) NULL,
+        CompletedAt DATETIME2(7) NULL,
+        AdditionalAssigneeIds NVARCHAR(MAX) NULL,
+        AssignedToNames NVARCHAR(MAX) NULL,
+        EmailMessageSent BIT NOT NULL DEFAULT (0),
+        IsRead BIT NOT NULL DEFAULT (0),
+        StartedAt DATETIME2(7) NULL,
+        SourceEntityType NVARCHAR(50) NULL,
+        SourceEntityRefId NVARCHAR(100) NULL,
+        TargetRole NVARCHAR(50) NULL,
+        CompletedBy NVARCHAR(100) NULL,
+        ActionUrl NVARCHAR(300) NULL,
+        DueWarningSent BIT NOT NULL DEFAULT (0),
+        OverdueWarningSent BIT NOT NULL DEFAULT (0)
+    );
+    CREATE NONCLUSTERED INDEX IX_TaskItems_AssignedTo ON dbo.TaskItems (AssignedTo ASC);
+    CREATE NONCLUSTERED INDEX IX_TaskItems_AssignedBy ON dbo.TaskItems (AssignedBy ASC);
+    CREATE NONCLUSTERED INDEX IX_TaskItems_Status ON dbo.TaskItems (Status ASC);
+    CREATE NONCLUSTERED INDEX IX_TaskItems_DepartmentId ON dbo.TaskItems (DepartmentId ASC);
+    CREATE NONCLUSTERED INDEX IX_TaskItems_SourceEntity ON dbo.TaskItems (SourceEntityType ASC, SourceEntityRefId ASC);
+    CREATE NONCLUSTERED INDEX IX_TaskItems_TargetRole_Status ON dbo.TaskItems (TargetRole ASC, Status ASC);
+END
+GO
+
+-- Ensure workflow governance columns exist if TaskItems was created earlier
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = 'TaskItems')
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TaskItems') AND name = 'SourceEntityType')
+        ALTER TABLE dbo.TaskItems ADD SourceEntityType NVARCHAR(50) NULL;
+
+    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TaskItems') AND name = 'SourceEntityRefId')
+        ALTER TABLE dbo.TaskItems ADD SourceEntityRefId NVARCHAR(100) NULL;
+
+    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TaskItems') AND name = 'TargetRole')
+        ALTER TABLE dbo.TaskItems ADD TargetRole NVARCHAR(50) NULL;
+
+    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TaskItems') AND name = 'ActionUrl')
+        ALTER TABLE dbo.TaskItems ADD ActionUrl NVARCHAR(300) NULL;
+
+    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TaskItems') AND name = 'CompletedBy')
+        ALTER TABLE dbo.TaskItems ADD CompletedBy NVARCHAR(100) NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'Task_Assignees')
+BEGIN
+    CREATE TABLE dbo.Task_Assignees (
+        TaskID INT NOT NULL,
+        UserID INT NOT NULL,
+        UserName NVARCHAR(100) NOT NULL,
+        AssignedAt DATETIME2(7) NOT NULL DEFAULT (GETDATE()),
+        CONSTRAINT PK_Task_Assignees PRIMARY KEY (TaskID ASC, UserID ASC),
+        CONSTRAINT FK_Task_Assignees_TaskItems FOREIGN KEY (TaskID) REFERENCES dbo.TaskItems (Id) ON DELETE CASCADE
+    );
+    CREATE NONCLUSTERED INDEX IX_Task_Assignees_User ON dbo.Task_Assignees (UserID ASC, UserName ASC);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'Task_Roles')
+BEGIN
+    CREATE TABLE dbo.Task_Roles (
+        TaskID INT NOT NULL,
+        RoleName NVARCHAR(50) NOT NULL,
+        AssignedAt DATETIME2(7) NOT NULL DEFAULT (GETDATE()),
+        CONSTRAINT PK_Task_Roles PRIMARY KEY (TaskID ASC, RoleName ASC),
+        CONSTRAINT FK_Task_Roles_TaskItems FOREIGN KEY (TaskID) REFERENCES dbo.TaskItems (Id) ON DELETE CASCADE
+    );
+    CREATE NONCLUSTERED INDEX IX_Task_Roles_Role ON dbo.Task_Roles (RoleName ASC);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'TaskComments')
+BEGIN
+    CREATE TABLE dbo.TaskComments (
+        Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        TaskId INT NOT NULL,
+        UserId NVARCHAR(100) NOT NULL,
+        Content NVARCHAR(MAX) NOT NULL,
+        CreatedAt DATETIME2(7) NOT NULL DEFAULT (GETUTCDATE()),
+        CONSTRAINT FK_TaskComments_TaskItems FOREIGN KEY (TaskId) REFERENCES dbo.TaskItems (Id) ON DELETE CASCADE
+    );
+    CREATE NONCLUSTERED INDEX IX_TaskComments_TaskId ON dbo.TaskComments (TaskId ASC);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'TaskAttachments')
+BEGIN
+    CREATE TABLE dbo.TaskAttachments (
+        Id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        TaskId INT NOT NULL,
+        FileName NVARCHAR(510) NOT NULL,
+        FilePath NVARCHAR(1000) NOT NULL,
+        FileSize BIGINT NOT NULL DEFAULT (0),
+        ContentType NVARCHAR(200) NULL,
+        UploadedAt DATETIME2(7) NOT NULL DEFAULT (GETUTCDATE()),
+        CONSTRAINT FK_TaskAttachments_TaskItems FOREIGN KEY (TaskId) REFERENCES dbo.TaskItems (Id) ON DELETE CASCADE
+    );
+    CREATE NONCLUSTERED INDEX IX_TaskAttachments_TaskId ON dbo.TaskAttachments (TaskId ASC);
+END
+GO
+
+-- ============================================================================
+-- MonthlySalaries: Index for ultra-fast finalized salary month-locking checks
+-- ============================================================================
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = 'MonthlySalaries')
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_MonthlySalaries_DT' AND object_id = OBJECT_ID('dbo.MonthlySalaries'))
+    BEGIN
+        CREATE NONCLUSTERED INDEX IX_MonthlySalaries_DT ON dbo.MonthlySalaries (DT);
+    END
+END
+GO

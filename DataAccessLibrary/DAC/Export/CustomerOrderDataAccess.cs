@@ -32,7 +32,7 @@ namespace DataAccessLibrary.DAC.Export
         public async Task<List<CustomerLookupModel>> GetCustomersAsync()
         {
             using IDbConnection db = new SqlConnection(_connectionString);
-            const string sql = "SELECT CustCode, Name FROM ForeignCustomers WHERE Active = 1 ORDER BY Name";
+            const string sql = "SELECT CustCode, Name FROM ForeignCustomers WHERE Active = 1 ORDER BY CustCode";
             return (await db.QueryAsync<CustomerLookupModel>(sql)).ToList();
         }
 

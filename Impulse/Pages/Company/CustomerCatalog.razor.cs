@@ -201,6 +201,11 @@ namespace Impulse.Pages.Company
             );
         }
 
+        private static string FormatPrice(double price)
+        {
+            return Math.Round(price, 4) == 0 ? "-" : price.ToString("N4");
+        }
+
         private async Task HighlightItem(CustomerCatalogItemViewModel item)
         {
             selectedCatalogItem = item;

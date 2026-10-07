@@ -1,0 +1,1304 @@
+@page "/office/tasks"
+@page "/tasks"
+@implements IDisposable
+@attribute [Authorize]
+@using DataAccessLibrary.Models.IntraOffice
+@using Impulse.Services.IntraOffice
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IIntraOfficeService IntraOfficeService
+@inject ITaskService TaskService
+@inject IWebHostEnvironment WebHostEnvironment
+@inject IJSRuntime JS
+@inject IFileService FileService
+@inject IAiService AiService
+@inject IAppNotificationService NotificationService
+@inject Impulse.Services.Setup.IUserPermissionService PermissionService
+
+<div class="topbar">
+    <div class="d-flex align-items-center gap-2">
+        <h1 class="topbar-title mb-0"><i class="bi bi-kanban-fill"></i> Task Board</h1>
+        @if (!isAdmin)
+        {
+            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-1" style="font-size: 0.72rem;">
+                <i class="bi bi-person-check me-1"></i>My Related Tasks
+            </span>
+        }
+        else
+        {
+            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-2 py-1" style="font-size: 0.72rem;">
+                <i class="bi bi-shield-check me-1"></i>All Tasks (Administrator View)
+            </span>
+        }
+    </div>
+    <div class="topbar-actions">
+        <button class="btn btn-primary btn-sm" @onclick="OpenCreateModal">
+            <i class="bi bi-plus-lg"></i> New Task
+        </button>
+    </div>
+</div>
+
+<div class="content-area">
+    <!-- FILTER & SEARCH PANEL -->
+    <div class="task-filter-panel mb-3 p-3 bg-white rounded-3 border shadow-sm">
+        <div class="row g-2 align-items-center">
+            <!-- Search Topic (Title) & Description -->
+            <div class="col-12 col-md-4">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" class="form-control border-start-0" placeholder="Search topic, description, assigned by, or assigned to..." 
+                           @bind="searchQuery" @bind:event="oninput" />
+                    @if (!string.IsNullOrEmpty(searchQuery))
+                    {
+                        <button class="btn btn-outline-secondary" type="button" @onclick="() => searchQuery = string.Empty" title="Clear search">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <!-- Initiated By / Assigned By Dropdown -->
+            <div class="col-6 col-md-3">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light"><i class="bi bi-person-up text-muted me-1"></i> By</span>
+                    <select class="form-select" @bind="filterInitiatedById">
+                        <option value="">All Initiators (Assigned By)</option>
+                        @if (allUsers != null)
+                        {
+                            @foreach (var u in allUsers)
+                            {
+                                <option value="@u.Id">@u.FullName</option>
+                            }
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <!-- Assigned To Dropdown -->
+            <div class="col-6 col-md-3">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light"><i class="bi bi-person-down text-muted me-1"></i> To</span>
+                    <select class="form-select" @bind="filterAssignedToId">
+                        <option value="">All Assignees (Assigned To)</option>
+                        @if (allUsers != null)
+                        {
+                            @foreach (var u in allUsers)
+                            {
+                                <option value="@u.Id">@u.FullName</option>
+                            }
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <!-- Reset & Counter -->
+            <div class="col-12 col-md-2 d-flex align-items-center justify-content-md-end justify-content-between gap-2">
+                @if (currentUser != null && allTasks != null && allTasks.Any(t => IsTaskAssignedToUser(t, currentUser.Id) && !t.IsRead && t.Status != TaskItemStatus.Completed && t.Status != TaskItemStatus.Cancelled))
+                {
+                    <button class="btn btn-outline-success btn-sm" @onclick="MarkAllTasksRead" title="Mark all your assigned tasks as read">
+                        <i class="bi bi-check2-all me-1"></i>Mark Read
+                    </button>
+                }
+                @if (HasActiveFilters)
+                {
+                    <button class="btn btn-outline-danger btn-sm" @onclick="ClearFilters" title="Reset all filters">
+                        <i class="bi bi-funnel-fill me-1"></i>Reset
+                    </button>
+                }
+                <span class="badge bg-light text-dark border px-2 py-1" style="font-size: 0.75rem;">
+                    @FilteredTasks.Count() of @(allTasks?.Count ?? 0) tasks
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="task-board">
+        @foreach (var status in new[] { TaskItemStatus.Pending, TaskItemStatus.InProgress, TaskItemStatus.Completed, TaskItemStatus.Cancelled })
+        {
+            var tasksInColumn = FilteredTasks.Where(t => t.Status == status).ToList();
+            <div class="task-column">
+                <div class="task-column-header">
+                    <div class="task-column-title">
+                        <i class="bi @GetStatusIcon(status)"></i>
+                        @GetStatusLabel(status)
+                    </div>
+                    <span class="task-column-count">@tasksInColumn.Count</span>
+                </div>
+                <div class="task-column-body">
+                    @foreach (var task in tasksInColumn)
+                    {
+                        <div class="task-card" @onclick="() => SelectTask(task)">
+                            <div class="d-flex align-center justify-content-between gap-8 mb-8">
+                                <span class="priority-badge @GetPriorityBadge(task.Priority)">@task.Priority</span>
+                                @if (!task.IsRead && IsTaskAssignedToUser(task, currentUser?.Id) && task.Status != TaskItemStatus.Completed && task.Status != TaskItemStatus.Cancelled)
+                                {
+                                    <span class="badge bg-danger text-white" style="font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 10px; letter-spacing: 0.5px;">
+                                        <i class="bi bi-bell-fill me-1"></i>NEW
+                                    </span>
+                                }
+                            </div>
+                            <div class="task-card-title">@task.Title</div>
+                            <div class="task-timing-badge @GetTimingBadgeClass(task.Status)">
+                                @if (task.Status == TaskItemStatus.Pending)
+                                {
+                                    <i class="bi bi-hourglass-split"></i>
+                                    <span>In Pending: @FormatDuration(DateTime.UtcNow - task.CreatedAt)</span>
+                                }
+                                else if (task.Status == TaskItemStatus.InProgress)
+                                {
+                                    var timeToStart = GetTimeToNextState(task, TaskItemStatus.Pending, TaskItemStatus.InProgress);
+                                    <i class="bi bi-stopwatch-fill"></i>
+                                    <span title="Time taken from Pending to In Progress">Moved to In Progress in <strong>@timeToStart</strong></span>
+                                }
+                                else if (task.Status == TaskItemStatus.Completed)
+                                {
+                                    var timeToComplete = GetTimeToComplete(task);
+                                    <i class="bi bi-check2-circle"></i>
+                                    <span title="Total time taken to complete">Completed in <strong>@timeToComplete</strong></span>
+                                }
+                                else if (task.Status == TaskItemStatus.Cancelled)
+                                {
+                                    var timeToCancel = GetTimeToNextState(task, TaskItemStatus.Pending, TaskItemStatus.Cancelled);
+                                    <i class="bi bi-x-circle"></i>
+                                    <span title="Time before cancellation">Cancelled after <strong>@timeToCancel</strong></span>
+                                }
+                            </div>
+                            <div class="task-card-meta">
+                                <div class="task-card-assignee">
+                                    <div class="avatar avatar-sm" style="width:22px;height:22px;font-size:0.6rem; padding: 0; overflow: hidden;">
+                                        @if (!string.IsNullOrEmpty(task.Assignee?.Avatar))
+                                        {
+                                            <img src="@task.Assignee.Avatar" alt="@task.Assignee.FullName" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+                                        }
+                                        else
+                                        {
+                                            <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                                                @(task.Assignee?.FullName?.Length > 0 ? task.Assignee.FullName[0].ToString().ToUpper() : "?")
+                                            </div>
+                                        }
+                                    </div>
+                                    <div>
+                                        <div style="line-height: 1.1; font-weight: 500;">@GetTaskAssigneesDisplay(task)</div>
+                                        @if (!string.IsNullOrEmpty(task.Assigner?.FullName))
+                                        {
+                                            <small class="text-muted" style="font-size: 0.68rem;">By: @task.Assigner.FullName</small>
+                                        }
+                                    </div>
+                                </div>
+                                @if (task.DueDate.HasValue)
+                                {
+                                    var cd = GetTaskCountdown(task);
+                                    <span class="badge @cd.BadgeClass d-inline-flex align-items-center gap-1 py-1 px-2" style="font-size: 0.72rem; letter-spacing: 0.2px;" title="Deadline: @task.DueDate.Value.ToString("MMM dd, yyyy HH:mm")">
+                                        <i class="@cd.IconClass"></i> @cd.Text
+                                    </span>
+                                }
+                                <div class="d-flex align-items-center gap-1 ms-auto">
+                                    @if (!string.IsNullOrEmpty(task.ActionUrl))
+                                    {
+                                        <a href="@task.ActionUrl" class="btn btn-outline-primary py-0 px-1 border-0" style="font-size: 0.82rem;" title="Open linked document/order" @onclick:stopPropagation="true">
+                                            <i class="bi bi-box-arrow-up-right"></i>
+                                        </a>
+                                    }
+                                    @if (task.WhatsAppMessageSent)
+                                    {
+                                        <span style="color: #25D366; font-size: 1.05rem;" title="WhatsApp Notification Sent">
+                                            <i class="bi bi-whatsapp"></i>
+                                        </span>
+                                    }
+                                    @if (task.EmailMessageSent)
+                                    {
+                                        <span style="color: #4f46e5; font-size: 1.05rem;" title="Email Notification Sent">
+                                            <i class="bi bi-envelope-check-fill"></i>
+                                        </span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    @if (!tasksInColumn.Any())
+                    {
+                        <div class="text-center text-muted" style="padding: 20px; font-size: 0.85rem;">
+                            No tasks
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@if (showCreateModal)
+{
+    <div class="modal-overlay" @onclick="() => showCreateModal = false">
+        <div class="modal-content" @onclick:stopPropagation>
+            <div class="modal-header">
+                <h3 class="modal-title">Create New Task</h3>
+                <button class="btn btn-ghost btn-icon" @onclick="() => showCreateModal = false"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Title</label>
+                <input type="text" class="form-control" @bind="newTitle" placeholder="Task title" />
+            </div>
+            <div class="form-group">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label class="form-label mb-0">Description</label>
+                    <button type="button" class="btn btn-ghost btn-sm" @onclick="GenerateAiDraft" disabled="@isAiLoading"><i class="bi bi-magic"></i> AI Draft</button>
+                </div>
+                <textarea class="form-control" @bind="newDesc" placeholder="Task description..." rows="3" disabled="@isAiLoading"></textarea>
+            </div>
+            <div class="form-group">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label class="form-label mb-0">Assign To (Multiple Users Supported)</label>
+                    @if (selectedAssigneeIds.Count > 1)
+                    {
+                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25" style="font-size: 0.72rem;">
+                            <i class="bi bi-check2-all me-1"></i>@selectedAssigneeIds.Count users assigned
+                        </span>
+                    }
+                </div>
+
+                <!-- Selected Users Chips -->
+                @if (selectedAssigneeIds.Any())
+                {
+                    <div class="d-flex flex-wrap gap-1 mb-2 p-2 bg-light rounded border">
+                        @foreach (var id in selectedAssigneeIds)
+                        {
+                            var u = allUsers?.FirstOrDefault(x => x.Id == id);
+                            if (u != null)
+                            {
+                                <span class="badge bg-primary d-inline-flex align-items-center gap-1 py-1 px-2" style="font-size: 0.82rem; font-weight: 500;">
+                                    <i class="bi bi-person-check-fill"></i>
+                                    <span>@u.UserName</span>
+                                    @if (!string.IsNullOrEmpty(u.FullUserName) && !string.Equals(u.FullUserName, u.UserName, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <span style="opacity: 0.85; font-size: 0.78rem;">(@u.FullUserName)</span>
+                                    }
+                                    <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.55rem;" @onclick="() => ToggleUserSelection(id)"></button>
+                                </span>
+                            }
+                        }
+                        @if (selectedAssigneeIds.Count > 1)
+                        {
+                            <button type="button" class="btn btn-link btn-sm text-danger text-decoration-none p-0 ms-auto" style="font-size: 0.75rem;" @onclick="ClearSelectedAssignees">
+                                Clear all
+                            </button>
+                        }
+                    </div>
+                }
+
+                <!-- User Dropdown Picker -->
+                <div class="dropdown position-relative">
+                    <button class="btn btn-outline-secondary w-100 text-start d-flex justify-content-between align-items-center bg-white" type="button" @onclick="() => showUserDropdown = !showUserDropdown" style="border-color: #cbd5e1; padding: 7px 12px; font-size: 0.9rem;">
+                        <span class="text-truncate">
+                            @if (!selectedAssigneeIds.Any())
+                            {
+                                <span class="text-muted">Select user(s)...</span>
+                            }
+                            else
+                            {
+                                <span>@(string.Join(", ", selectedAssigneeIds.Select(id => {
+                                    var u = allUsers?.FirstOrDefault(x => x.Id == id);
+                                    if (u == null) return null;
+                                    return !string.IsNullOrEmpty(u.FullUserName) && !string.Equals(u.FullUserName, u.UserName, StringComparison.OrdinalIgnoreCase) 
+                                        ? $"{u.UserName} ({u.FullUserName})" 
+                                        : u.UserName;
+                                }).Where(n => !string.IsNullOrEmpty(n))))</span>
+                            }
+                        </span>
+                        <i class="bi bi-chevron-down text-muted small"></i>
+                    </button>
+                    @if (showUserDropdown)
+                    {
+                        <div class="dropdown-menu show w-100 shadow-lg p-2" style="max-height: 230px; overflow-y: auto; z-index: 1050; border: 1px solid #cbd5e1; position: absolute; top: 100%; left: 0;">
+                            <div class="px-1 pb-2 border-bottom mb-2">
+                                <input type="text" class="form-control form-control-sm" placeholder="Search by username or name..." @bind="userSearchFilter" @bind:event="oninput" @onclick:stopPropagation />
+                            </div>
+                            @if (allUsers != null)
+                            {
+                                var filtered = string.IsNullOrWhiteSpace(userSearchFilter) 
+                                    ? allUsers 
+                                    : allUsers.Where(u => 
+                                        (u.UserName != null && u.UserName.Contains(userSearchFilter, StringComparison.OrdinalIgnoreCase)) ||
+                                        (!string.IsNullOrEmpty(u.FullUserName) && u.FullUserName.Contains(userSearchFilter, StringComparison.OrdinalIgnoreCase)) ||
+                                        (!string.IsNullOrEmpty(u.DepartmentName) && u.DepartmentName.Contains(userSearchFilter, StringComparison.OrdinalIgnoreCase))
+                                    ).ToList();
+
+                                @foreach (var u in filtered)
+                                {
+                                    var isSelected = selectedAssigneeIds.Contains(u.Id);
+                                    <div class="dropdown-item d-flex align-items-center gap-2 py-1 px-2 rounded @(isSelected ? "bg-primary bg-opacity-10 fw-semibold text-primary" : "")" 
+                                         style="cursor: pointer;"
+                                         @onclick="() => ToggleUserSelection(u.Id)" @onclick:stopPropagation>
+                                        <input type="checkbox" class="form-check-input mt-0" checked="@isSelected" @onclick:stopPropagation @onchange="() => ToggleUserSelection(u.Id)" style="cursor: pointer;" />
+                                        <div class="d-flex flex-column" style="line-height: 1.2;">
+                                            <div class="d-flex align-items-center gap-1">
+                                                <span class="fw-semibold text-dark">@u.UserName</span>
+                                                @if (!string.IsNullOrEmpty(u.FullUserName) && !string.Equals(u.FullUserName, u.UserName, StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    <span class="text-secondary small">(@u.FullUserName)</span>
+                                                }
+                                            </div>
+                                            @if (!string.IsNullOrEmpty(u.Designation))
+                                            {
+                                                <span class="text-muted" style="font-size: 0.72rem;">@u.Designation</span>
+                                            }
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(u.Department?.Name))
+                                        {
+                                            <span class="badge bg-light text-muted border ms-auto small" style="font-size: 0.7rem;">@u.Department.Name</span>
+                                        }
+                                    </div>
+                                }
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Priority</label>
+                <select class="form-control" @bind="newPriority">
+                    <option value="0">Low</option>
+                    <option value="1">Normal</option>
+                    <option value="2">High</option>
+                    <option value="3">Urgent</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Due Date</label>
+                <InputDate @bind-Value="newDueDate" class="form-control" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Attachments & Voice Notes</label>
+                <div class="d-flex gap-8 align-items-center mb-2">
+                    <label for="task-file-input" class="btn btn-outline-secondary btn-sm mb-0" style="cursor: pointer;">
+                        <i class="bi bi-paperclip"></i> Add Files
+                    </label>
+                    <button class="btn btn-sm @(isRecording ? "btn-danger recording-pulse" : "btn-outline-danger")" @onclick="ToggleRecording">
+                        <i class="bi bi-mic-fill"></i> @(isRecording ? "Recording..." : "Record Voice Note")
+                    </button>
+                    <InputFile id="task-file-input" @ref="fileInput" OnChange="HandleNewAttachments" multiple class="form-control" accept=".doc,.docx,.xls,.xlsx,.pdf,.jpg,.jpeg,.png" style="display: none;" />
+                </div>
+                
+                @if (pendingAttachments.Any())
+                {
+                    <div class="mt-2 d-flex flex-wrap gap-10">
+                        @foreach (var att in pendingAttachments)
+                        {
+                            <div class="pending-attachment-item" style="background: var(--surface-color); padding: 5px 10px; border-radius: 4px; font-size: 0.85rem; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 5px;">
+                                <i class="bi @(att.FileName.EndsWith(".webm") ? "bi-mic-fill text-danger" : "bi-file-earmark-text text-primary")"></i>
+                                <span style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@att.FileName</span>
+                                <button class="btn btn-sm text-danger" style="padding: 0; line-height: 1;" @onclick="() => pendingAttachments.Remove(att)" title="Remove">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+            <div class="d-flex flex-wrap align-items-center gap-4 mt-3 mb-4">
+                <div class="form-check d-flex align-items-center gap-2 mb-0">
+                    <input type="checkbox" class="form-check-input" id="sendWhatsapp" @bind="sendWhatsApp" style="width: 18px; height: 18px; cursor: pointer;" />
+                    <label class="form-check-label mb-0" for="sendWhatsapp" style="font-size: 0.95rem; cursor: pointer;">
+                        <i class="bi bi-whatsapp text-success me-1"></i> Send WhatsApp Notification
+                    </label>
+                </div>
+                <div class="form-check d-flex align-items-center gap-2 mb-0">
+                    <input type="checkbox" class="form-check-input" id="sendEmail" @bind="sendEmail" style="width: 18px; height: 18px; cursor: pointer;" />
+                    <label class="form-check-label mb-0" for="sendEmail" style="font-size: 0.95rem; cursor: pointer;">
+                        <i class="bi bi-envelope-fill text-primary me-1"></i> Send Task at Email
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="() => showCreateModal = false" disabled="@isSavingTask">Cancel</button>
+                <button class="btn btn-primary" @onclick="CreateTask" disabled="@isSavingTask">
+                    @if (isSavingTask)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        <span>Saving...</span>
+                    }
+                    else
+                    {
+                        <span>Create Task</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(toastMessage))
+{
+    <div class="toast-notification" style="position: fixed; bottom: 20px; right: 20px; background-color: #25D366; color: white; padding: 12px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 500; display: flex; align-items: center; gap: 8px;">
+        <i class="bi bi-check-circle-fill"></i> @toastMessage
+    </div>
+}
+
+@if (selectedTask != null)
+{
+    <div class="modal-overlay" @onclick="() => selectedTask = null">
+        <div class="modal-content" @onclick:stopPropagation style="max-width: 640px;">
+            <div class="modal-header">
+                <h3 class="modal-title">@selectedTask.Title</h3>
+                <div>
+                    @if (isAdmin)
+                    {
+                        <button class="btn btn-outline-danger btn-sm" @onclick="DeleteSelectedTask" style="margin-right: 8px;"><i class="bi bi-trash"></i> Delete</button>
+                    }
+                    <button class="btn btn-ghost btn-icon" @onclick="() => selectedTask = null"><i class="bi bi-x-lg"></i></button>
+                </div>
+            </div>
+
+            <div class="d-flex gap-12 mb-16">
+                <span class="priority-badge @GetPriorityBadge(selectedTask.Priority)">@selectedTask.Priority</span>
+                <span class="status-badge @GetStatusBadge(selectedTask.Status)">@selectedTask.Status</span>
+            </div>
+
+            @if (!string.IsNullOrEmpty(selectedTask.Description))
+            {
+                <p style="color: var(--text-secondary); margin-bottom: 16px;">@selectedTask.Description</p>
+            }
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; font-size: 0.88rem;">
+                <div><strong>Assigned To:</strong> @GetTaskAssigneesDisplay(selectedTask)</div>
+                <div><strong>Assigned By:</strong> @(selectedTask.Assigner?.FullName ?? "Unknown")</div>
+                <div><strong>Created:</strong> @selectedTask.CreatedAt.ToString("MMM dd, yyyy hh:mm tt")</div>
+                <div><strong>Due:</strong> @(selectedTask.DueDate?.ToString("MMM dd, yyyy") ?? "No due date")</div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(selectedTask.ActionUrl))
+            {
+                <div class="mb-3 p-2 rounded-3 bg-primary bg-opacity-10 border border-primary border-opacity-25 d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-2 text-primary" style="font-size: 0.85rem;">
+                        <i class="bi bi-link-45deg fs-5"></i>
+                        <span><strong>Linked Entity:</strong> @(selectedTask.SourceEntityType ?? "Record") @(selectedTask.SourceEntityRefId)</span>
+                    </div>
+                    <a href="@selectedTask.ActionUrl" class="btn btn-primary btn-sm px-3 shadow-sm">
+                        <i class="bi bi-box-arrow-up-right me-1"></i> Open Record
+                    </a>
+                </div>
+            }
+
+            <!-- State Transitions & Time Taken Section -->
+            <div class="card mb-3 border-0 bg-light rounded-3 p-3">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span style="font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #475569;">
+                        <i class="bi bi-stopwatch text-primary me-1"></i> State Transitions & Time Taken
+                    </span>
+                    @if (selectedTask.Status == TaskItemStatus.Completed)
+                    {
+                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style="font-size: 0.75rem;">
+                            <i class="bi bi-check2-circle me-1"></i>Total Turnaround: @GetTimeToComplete(selectedTask)
+                        </span>
+                    }
+                    else if (selectedTask.Status == TaskItemStatus.InProgress)
+                    {
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1" style="font-size: 0.75rem;">
+                            <i class="bi bi-arrow-repeat me-1"></i>Moved to In Progress in @GetTimeToNextState(selectedTask, TaskItemStatus.Pending, TaskItemStatus.InProgress)
+                        </span>
+                    }
+                </div>
+
+                @if (selectedTask.StatusHistories != null && selectedTask.StatusHistories.Any())
+                {
+                    <div class="transition-timeline">
+                        <div class="timeline-step">
+                            <div class="step-dot bg-secondary"></div>
+                            <div class="step-content">
+                                <div class="step-title"><strong>Task Created (Pending)</strong></div>
+                                <div class="step-time">@selectedTask.CreatedAt.ToString("MMM dd, yyyy hh:mm tt")</div>
+                            </div>
+                        </div>
+
+                        @foreach (var history in selectedTask.StatusHistories.OrderBy(h => h.ChangedAt))
+                        {
+                            <div class="timeline-transition-badge">
+                                <i class="bi bi-clock-history text-primary"></i>
+                                <span>Time taken to move to <strong>@history.ToStatus</strong>: <strong>@FormatDuration(TimeSpan.FromSeconds(history.DurationSeconds))</strong></span>
+                            </div>
+
+                            <div class="timeline-step">
+                                <div class="step-dot @GetStatusStepDotClass(history.ToStatus)"></div>
+                                <div class="step-content">
+                                    <div class="step-title">
+                                        Moved to <strong>@history.ToStatus</strong>
+                                        @if (history.ChangedBy != null)
+                                        {
+                                            <span class="text-muted" style="font-size: 0.78rem;">by @history.ChangedBy.FullName</span>
+                                        }
+                                    </div>
+                                    <div class="step-time">@history.ChangedAt.ToString("MMM dd, yyyy hh:mm tt")</div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="text-muted" style="font-size: 0.82rem;">
+                        <i class="bi bi-info-circle me-1"></i>Created on @selectedTask.CreatedAt.ToString("MMM dd, yyyy hh:mm tt"). Currently in <strong>@selectedTask.Status</strong>.
+                    </div>
+                }
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Update Status</label>
+                <select class="form-control" @onchange="UpdateStatus">
+                    <option value="0" selected="@(selectedTask.Status == TaskItemStatus.Pending)">Pending</option>
+                    <option value="1" selected="@(selectedTask.Status == TaskItemStatus.InProgress)">In Progress</option>
+                    <option value="2" selected="@(selectedTask.Status == TaskItemStatus.Completed)">Completed</option>
+                    <option value="3" selected="@(selectedTask.Status == TaskItemStatus.Cancelled)">Cancelled</option>
+                </select>
+            </div>
+
+            <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 12px; margin-top: 20px;">Attachments</h4>
+            @if (selectedTask.Attachments?.Any() == true)
+            {
+                <div class="attachments-list" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+                    @foreach (var att in selectedTask.Attachments)
+                    {
+                        <div class="attachment-item" style="display: flex; align-items: center; gap: 8px; padding: 8px; background: var(--bg-secondary); border-radius: 6px; width: 100%;">
+                            @if (att.ContentType != null && (att.ContentType.StartsWith("audio/") || att.FileName.EndsWith(".webm")))
+                            {
+                                <div class="audio-player-wrapper p-2 rounded" style="width: 100%;">
+                                    <div class="d-flex align-items-center mb-1">
+                                        <i class="bi bi-mic-fill text-danger me-2"></i> 
+                                        <span class="text-muted" style="font-size: 0.85rem;">Voice Note</span>
+                                    </div>
+                                    <audio controls style="width: 100%; height: 35px;">
+                                        <source src="@att.FilePath" type="@(att.ContentType ?? "audio/webm")">
+                                    </audio>
+                                </div>
+                            }
+                            else
+                            {
+                                <i class="bi @GetFileIcon(att.FileName)" style="font-size: 1.2rem; color: var(--primary);"></i>
+                                <a href="@att.FilePath" target="_blank" style="flex: 1; font-size: 0.88rem; color: var(--text-primary); text-decoration: none;">@att.FileName</a>
+                                <span style="font-size: 0.75rem; color: var(--text-muted);">@(att.FileSize / 1024) KB</span>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+            <div class="d-flex align-center gap-8 mb-20">
+                <InputFile OnChange="HandleFileUpload" class="form-control" style="font-size: 0.85rem;" />
+            </div>
+
+            <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 12px;">Comments</h4>
+            @if (selectedTask.Comments?.Any() == true)
+            {
+                @foreach (var c in selectedTask.Comments)
+                {
+                    <div style="padding: 10px; border-bottom: 1px solid var(--border-light);">
+                        <div class="d-flex align-center gap-8 mb-8">
+                            <strong style="font-size: 0.88rem;">@(c.User?.FullName ?? "Unknown")</strong>
+                            <span class="text-muted" style="font-size: 0.75rem;">@c.CreatedAt.ToString("MMM dd, hh:mm tt")</span>
+                        </div>
+                        <p style="font-size: 0.88rem; color: var(--text-secondary);">@c.Content</p>
+                    </div>
+                }
+            }
+
+            @if (!string.IsNullOrEmpty(commentError))
+            {
+                <div class="alert alert-danger mt-16" style="padding: 8px; font-size: 0.85rem;"><i class="bi bi-exclamation-circle"></i> @commentError</div>
+            }
+            <div class="d-flex gap-8 mt-16">
+                <input type="text" class="form-control" @bind="newComment" placeholder="Add a comment..." />
+                <button class="btn btn-primary" @onclick="AddComment">Post</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private IntraUserProfile? currentUser;
+    private List<TaskItem>? allTasks;
+    private List<IntraUserProfile>? allUsers;
+    private TaskItem? selectedTask;
+    private bool isAdmin;
+    private bool showCreateModal;
+    private string newTitle = "";
+    private string newDesc = "";
+    private int newPriority = 1;
+    private string newAssigneeId = "";
+    private List<string> selectedAssigneeIds = new();
+    private bool showUserDropdown = false;
+    private string userSearchFilter = "";
+    private bool sendEmail = true;
+    private bool isTitleAutoGenerated = false;
+
+    private string newComment = "";
+    private DateTime? newDueDate;
+    private bool isAiLoading = false;
+    private bool sendWhatsApp = true;
+    private string? toastMessage;
+    
+    private bool isRecording = false;
+    private InputFile? fileInput;
+    private List<TaskAttachment> pendingAttachments = new();
+
+    public class AudioRecordingResult
+    {
+        public string Base64 { get; set; } = "";
+        public string MimeType { get; set; } = "";
+    }
+
+    private string searchQuery = "";
+    private string filterInitiatedById = "";
+    private string filterAssignedToId = "";
+
+    private bool HasActiveFilters =>
+        !string.IsNullOrWhiteSpace(searchQuery) ||
+        !string.IsNullOrWhiteSpace(filterInitiatedById) ||
+        !string.IsNullOrWhiteSpace(filterAssignedToId);
+
+    private void ClearFilters()
+    {
+        searchQuery = "";
+        filterInitiatedById = "";
+        filterAssignedToId = "";
+    }
+
+    private IEnumerable<TaskItem> FilteredTasks
+    {
+        get
+        {
+            if (allTasks == null) return Enumerable.Empty<TaskItem>();
+            var q = allTasks.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(searchQuery))
+            {
+                var s = searchQuery.Trim();
+                q = q.Where(t =>
+                    (t.Title != null && t.Title.Contains(s, StringComparison.OrdinalIgnoreCase)) ||
+                    (t.Description != null && t.Description.Contains(s, StringComparison.OrdinalIgnoreCase)) ||
+                    (t.Assigner != null && t.Assigner.FullName != null && t.Assigner.FullName.Contains(s, StringComparison.OrdinalIgnoreCase)) ||
+                    (t.Assignee != null && t.Assignee.FullName != null && t.Assignee.FullName.Contains(s, StringComparison.OrdinalIgnoreCase)) ||
+                    (t.AssignedToNames != null && t.AssignedToNames.Contains(s, StringComparison.OrdinalIgnoreCase))
+                );
+            }
+
+            if (!string.IsNullOrWhiteSpace(filterInitiatedById))
+            {
+                q = q.Where(t => string.Equals(t.AssignedBy, filterInitiatedById, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(filterAssignedToId))
+            {
+                q = q.Where(t => IsTaskAssignedToUser(t, filterAssignedToId));
+            }
+
+            return q;
+        }
+    }
+
+    private async Task LoadTasks()
+    {
+        if (currentUser == null) return;
+        if (isAdmin)
+        {
+            // Administrator can see all tasks across all users
+            allTasks = await TaskService.GetAllTasksAsync();
+        }
+        else
+        {
+            // Regular user: ONLY see tasks assigned to them or initiated by them
+            allTasks = await TaskService.GetUserTasksAsync(currentUser.Id);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        await PermissionService.InitializeAsync();
+        isAdmin = PermissionService.IsAdministrator 
+            || user.IsInRole("Admin") 
+            || user.IsInRole("Administrator") 
+            || string.Equals(user.Identity?.Name, "admin", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(user.Identity?.Name, "administrator", StringComparison.OrdinalIgnoreCase)
+            || (user.Identity?.Name?.StartsWith("Admin", StringComparison.OrdinalIgnoreCase) == true);
+
+        var userId = user.Identity?.Name
+            ?? user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value;
+
+        if (!string.IsNullOrEmpty(userId))
+        {
+            currentUser = await IntraOfficeService.GetUserProfileAsync(userId);
+            currentUser ??= new IntraUserProfile { UserName = userId, FullUserName = userId };
+        }
+
+        var rawUsers = await IntraOfficeService.GetActiveUsersAsync();
+        allUsers = rawUsers.Where(u => u.IsActive).OrderBy(u => u.UserName).ToList();
+
+        await LoadTasks();
+
+        NotificationService.OnNotificationReceived += HandleTaskNotification;
+
+        _countdownTimer = new Timer(async _ =>
+        {
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
+    }
+
+    private async Task HandleTaskNotification(AppNotification notif)
+    {
+        if (currentUser == null) return;
+
+        if (notif.Category == NotificationCategory.Task)
+        {
+            // If admin or if task is related to current user
+            if (isAdmin || notif.TargetUserId == currentUser.Id || notif.SenderName == currentUser.FullName)
+            {
+                await LoadTasks();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    private async Task HandleNewAttachments(InputFileChangeEventArgs e)
+    {
+        foreach (var file in e.GetMultipleFiles(10))
+        {
+            var relativePath = await FileService.SaveFileToDiskAsync(file);
+            pendingAttachments.Add(new TaskAttachment
+            {
+                FileName = file.Name,
+                FilePath = relativePath,
+                FileSize = file.Size,
+                ContentType = file.ContentType,
+                UploadedAt = DateTime.UtcNow
+            });
+        }
+    }
+
+    private async Task ToggleRecording()
+    {
+        try
+        {
+            if (!isRecording)
+            {
+                var success = await JS.InvokeAsync<bool>("window.audioRecorder.startRecording");
+                if (success)
+                {
+                    isRecording = true;
+                    StateHasChanged();
+                }
+            }
+            else
+            {
+                isRecording = false;
+                StateHasChanged();
+                
+                var result = await JS.InvokeAsync<AudioRecordingResult>("window.audioRecorder.stopRecording");
+                if (result != null && !string.IsNullOrEmpty(result.Base64))
+                {
+                    var fileName = $"VoiceNote_{DateTime.Now:yyyyMMdd_HHmmss}.webm";
+                    var relativePath = await FileService.SaveBase64FileToDiskAsync(result.Base64, fileName);
+                    
+                    pendingAttachments.Add(new TaskAttachment
+                    {
+                        FileName = fileName,
+                        FilePath = relativePath,
+                        FileSize = (long)(result.Base64.Length * 0.75),
+                        ContentType = result.MimeType,
+                        UploadedAt = DateTime.UtcNow
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error toggling recording: {ex.Message}");
+        }
+    }
+
+    private async Task GenerateAiDraft()
+    {
+        if (string.IsNullOrWhiteSpace(newTitle))
+        {
+            await JS.InvokeVoidAsync("alert", "Please enter a Title first so the AI knows what to write about.");
+            return;
+        }
+
+        isAiLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var context = $"Priority: {newPriority}. Make it a clear, actionable task description.";
+            newDesc = await AiService.DraftContentAsync(newTitle, context);
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", "AI Error: " + ex.Message);
+        }
+
+        isAiLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task DeleteSelectedTask()
+    {
+        if (selectedTask != null && isAdmin)
+        {
+            await TaskService.DeleteTaskAsync(selectedTask.Id);
+            allTasks?.Remove(selectedTask);
+            selectedTask = null;
+            toastMessage = "Task deleted successfully!";
+            StateHasChanged();
+            
+            _ = Task.Delay(3000, _cts.Token).ContinueWith(_ =>
+            {
+                toastMessage = null;
+                InvokeAsync(StateHasChanged);
+            }, TaskContinuationOptions.OnlyOnRanToCompletion);
+        }
+    }
+
+    private void OpenCreateModal()
+    {
+        showCreateModal = true;
+        selectedAssigneeIds.Clear();
+        newAssigneeId = "";
+        userSearchFilter = "";
+        showUserDropdown = false;
+        isTitleAutoGenerated = false;
+        sendWhatsApp = true;
+        sendEmail = true;
+        newTitle = "";
+        newDesc = "";
+        newPriority = 1;
+        newDueDate = null;
+        pendingAttachments.Clear();
+    }
+
+    private void ToggleUserSelection(string userId)
+    {
+        if (selectedAssigneeIds.Contains(userId))
+        {
+            selectedAssigneeIds.Remove(userId);
+        }
+        else
+        {
+            selectedAssigneeIds.Add(userId);
+        }
+        newAssigneeId = selectedAssigneeIds.FirstOrDefault() ?? "";
+    }
+
+    private void ClearSelectedAssignees()
+    {
+        selectedAssigneeIds.Clear();
+        newAssigneeId = "";
+    }
+
+    private string GetAssigneesCaption()
+    {
+        if (allUsers == null || !selectedAssigneeIds.Any()) return "";
+        var names = allUsers
+            .Where(u => selectedAssigneeIds.Contains(u.Id))
+            .Select(u => !string.IsNullOrEmpty(u.FullUserName) && !string.Equals(u.FullUserName, u.UserName, StringComparison.OrdinalIgnoreCase)
+                ? $"{u.UserName} ({u.FullUserName})"
+                : u.UserName)
+            .ToList();
+
+        if (!names.Any()) return "";
+        if (names.Count == 1) return names[0];
+        if (names.Count == 2) return $"{names[0]} & {names[1]}";
+        return $"{string.Join(", ", names.Take(names.Count - 1))} & {names.Last()}";
+    }
+
+    private bool IsTaskAssignedToUser(TaskItem? task, string? userId)
+    {
+        if (task == null || string.IsNullOrWhiteSpace(userId)) return false;
+        if (string.Equals(task.AssignedTo, userId, StringComparison.OrdinalIgnoreCase)) return true;
+        if (task.Assignees != null && task.Assignees.Any(a => string.Equals(a.UserName, userId, StringComparison.OrdinalIgnoreCase))) return true;
+        if (!string.IsNullOrEmpty(task.AdditionalAssigneeIds) && ("," + task.AdditionalAssigneeIds + ",").IndexOf("," + userId + ",", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        return false;
+    }
+
+    private string GetTaskAssigneesDisplay(TaskItem? task)
+    {
+        if (task == null) return "Unassigned";
+        if (task.Assignees != null && task.Assignees.Any())
+        {
+            var names = task.Assignees
+                .Select(a => !string.IsNullOrWhiteSpace(a.FullUserName) ? a.FullUserName : a.UserName)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Distinct()
+                .ToList();
+            if (names.Count > 0)
+            {
+                return names.Count == 1 ? names[0] : $"{string.Join(", ", names.Take(names.Count - 1))} & {names.Last()}";
+            }
+        }
+        return !string.IsNullOrEmpty(task.AssignedToNames) ? task.AssignedToNames : (task.Assignee?.FullName ?? "Unassigned");
+    }
+
+    private bool isSavingTask = false;
+
+    private async Task CreateTask()
+    {
+        if (string.IsNullOrWhiteSpace(newTitle) || currentUser == null || isSavingTask) return;
+        isSavingTask = true;
+        try
+        {
+            var firstAssignee = selectedAssigneeIds.FirstOrDefault() ?? (string.IsNullOrEmpty(newAssigneeId) ? null : newAssigneeId);
+
+            var task = new TaskItem
+            {
+                Title = newTitle.Trim(),
+                Description = newDesc,
+                AssignedTo = firstAssignee,
+                AdditionalAssigneeIds = selectedAssigneeIds.Count > 1 ? string.Join(",", selectedAssigneeIds) : null,
+                AssignedToNames = GetAssigneesCaption(),
+                AssignedBy = currentUser.Id,
+                Priority = (TaskPriority)newPriority,
+                DueDate = newDueDate,
+                Attachments = pendingAttachments.ToList(),
+                Assignees = selectedAssigneeIds.Select(id => new TaskAssignee
+                {
+                    UserName = id,
+                    FullUserName = allUsers?.FirstOrDefault(u => u.Id == id)?.FullName ?? id
+                }).ToList()
+            };
+
+            // Close modal immediately and update state
+            showCreateModal = false;
+            StateHasChanged();
+
+            var createdTask = await TaskService.CreateTaskAsync(task, sendWhatsApp, null, sendEmail, selectedAssigneeIds);
+            newTitle = ""; newDesc = ""; newAssigneeId = ""; newPriority = 1; newDueDate = null;
+            selectedAssigneeIds.Clear();
+            pendingAttachments.Clear();
+            sendWhatsApp = true;
+            sendEmail = true;
+            await LoadTasks();
+
+            toastMessage = "Task created successfully!";
+            StateHasChanged();
+
+            _ = Task.Run(async () =>
+            {
+                try { await Task.Delay(4000, _cts.Token); toastMessage = null; await InvokeAsync(StateHasChanged); }
+                catch (OperationCanceledException) { }
+            });
+        }
+        catch (Exception ex)
+        {
+            toastMessage = $"Error: {ex.Message}";
+            _ = Task.Run(async () =>
+            {
+                try { await Task.Delay(5000, _cts.Token); toastMessage = null; await InvokeAsync(StateHasChanged); }
+                catch (OperationCanceledException) { }
+            });
+        }
+        finally
+        {
+            isSavingTask = false;
+        }
+    }
+
+    private async Task SelectTask(TaskItem task)
+    {
+        selectedTask = await TaskService.GetTaskByIdAsync(task.Id);
+        var isAssignedToCurrent = currentUser != null && IsTaskAssignedToUser(task, currentUser.Id);
+        if (!task.IsRead && isAssignedToCurrent)
+        {
+            task.IsRead = true;
+            if (selectedTask != null) selectedTask.IsRead = true;
+            await TaskService.MarkTaskAsReadAsync(task.Id, currentUser!.Id);
+            StateHasChanged();
+        }
+    }
+
+    private async Task MarkAllTasksRead()
+    {
+        if (currentUser == null) return;
+        await TaskService.MarkAllTasksAsReadAsync(currentUser.Id);
+        if (allTasks != null)
+        {
+            foreach (var t in allTasks.Where(t => IsTaskAssignedToUser(t, currentUser.Id)))
+            {
+                t.IsRead = true;
+            }
+        }
+        StateHasChanged();
+    }
+
+    private async Task UpdateStatus(ChangeEventArgs e)
+    {
+        if (selectedTask == null || e.Value == null || currentUser == null) return;
+        var status = (TaskItemStatus)int.Parse(e.Value.ToString()!);
+        await TaskService.UpdateStatusAsync(selectedTask.Id, status, currentUser.Id);
+        selectedTask = await TaskService.GetTaskByIdAsync(selectedTask.Id);
+        await LoadTasks();
+    }
+
+    private string? commentError;
+
+    private async Task AddComment()
+    {
+        commentError = null;
+        if (string.IsNullOrWhiteSpace(newComment))
+        {
+            commentError = "Please enter a comment before posting.";
+            return;
+        }
+        
+        if (selectedTask == null || currentUser == null) return;
+
+        await TaskService.AddCommentAsync(new TaskComment
+        {
+            TaskId = selectedTask.Id,
+            UserId = currentUser.Id,
+            Content = newComment.Trim()
+        });
+        newComment = "";
+        selectedTask = null; // Close the modal
+    }
+
+    private async Task HandleFileUpload(InputFileChangeEventArgs e)
+    {
+        if (selectedTask == null || currentUser == null) return;
+        var file = e.File;
+        if (file == null) return;
+        
+        var uploadDir = System.IO.Path.Combine(WebHostEnvironment.WebRootPath, "uploads", "tasks");
+        System.IO.Directory.CreateDirectory(uploadDir);
+        
+        var safeFileName = $"{Guid.NewGuid()}_{file.Name}";
+        var filePath = System.IO.Path.Combine(uploadDir, safeFileName);
+        
+        await using System.IO.FileStream fs = new(filePath, System.IO.FileMode.Create);
+        await file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024).CopyToAsync(fs); // 10MB max
+        
+        var attachment = new TaskAttachment
+        {
+            TaskId = selectedTask.Id,
+            FileName = file.Name, 
+            FilePath = $"/uploads/tasks/{safeFileName}",
+            FileSize = file.Size,
+            ContentType = file.ContentType
+        };
+        
+        await TaskService.AddAttachmentAsync(attachment);
+        selectedTask = await TaskService.GetTaskByIdAsync(selectedTask.Id);
+    }
+
+    private string GetFileIcon(string fileName)
+    {
+        var ext = Path.GetExtension(fileName).ToLower();
+        return ext switch
+        {
+            ".pdf" => "bi-file-earmark-pdf",
+            ".doc" or ".docx" => "bi-file-earmark-word",
+            ".xls" or ".xlsx" => "bi-file-earmark-excel",
+            ".png" or ".jpg" or ".jpeg" or ".gif" => "bi-file-earmark-image",
+            _ => "bi-file-earmark"
+        };
+    }
+
+    private string GetStatusIcon(TaskItemStatus s) => s switch
+    {
+        TaskItemStatus.Pending => "bi-clock",
+        TaskItemStatus.InProgress => "bi-arrow-repeat",
+        TaskItemStatus.Completed => "bi-check-circle-fill",
+        TaskItemStatus.Cancelled => "bi-x-circle",
+        _ => "bi-circle"
+    };
+
+    private string GetStatusLabel(TaskItemStatus s) => s switch
+    {
+        TaskItemStatus.Pending => "Pending",
+        TaskItemStatus.InProgress => "In Progress",
+        TaskItemStatus.Completed => "Completed",
+        TaskItemStatus.Cancelled => "Cancelled",
+        _ => "Unknown"
+    };
+
+    private string GetPriorityBadge(TaskPriority p) => p switch
+    {
+        TaskPriority.Low => "normal",
+        TaskPriority.Normal => "normal",
+        TaskPriority.High => "important",
+        TaskPriority.Urgent => "urgent",
+        _ => "normal"
+    };
+
+    private string GetStatusBadge(TaskItemStatus s) => s switch
+    {
+        TaskItemStatus.Pending => "pending",
+        TaskItemStatus.InProgress => "active",
+        TaskItemStatus.Completed => "completed",
+        TaskItemStatus.Cancelled => "inactive",
+        _ => "pending"
+    };
+
+    private string FormatDuration(TimeSpan ts)
+    {
+        if (ts.TotalSeconds < 0) ts = TimeSpan.Zero;
+        if (ts.TotalSeconds < 60) return $"{Math.Max(1, (int)ts.TotalSeconds)}s";
+        if (ts.TotalMinutes < 60) return $"{(int)ts.TotalMinutes}m {ts.Seconds}s";
+        if (ts.TotalHours < 24) return $"{(int)ts.TotalHours}h {ts.Minutes}m";
+        return $"{(int)ts.TotalDays}d {ts.Hours}h";
+    }
+
+    private string GetTimeToNextState(TaskItem task, TaskItemStatus from, TaskItemStatus to)
+    {
+        var history = task.StatusHistories?
+            .Where(h => h.FromStatus == from && h.ToStatus == to)
+            .OrderBy(h => h.ChangedAt)
+            .FirstOrDefault();
+
+        if (history != null)
+        {
+            return FormatDuration(TimeSpan.FromSeconds(history.DurationSeconds));
+        }
+
+        // Fallback calculations for historical tasks if history row isn't loaded
+        if (to == TaskItemStatus.InProgress)
+        {
+            var end = task.StartedAt ?? task.UpdatedAt;
+            if (end.HasValue && end.Value >= task.CreatedAt)
+            {
+                return FormatDuration(end.Value - task.CreatedAt);
+            }
+        }
+        else if (to == TaskItemStatus.Completed)
+        {
+            var end = task.CompletedAt ?? task.UpdatedAt;
+            if (end.HasValue && end.Value >= task.CreatedAt)
+            {
+                return FormatDuration(end.Value - task.CreatedAt);
+            }
+        }
+        else if (to == TaskItemStatus.Cancelled)
+        {
+            var end = task.UpdatedAt;
+            if (end.HasValue && end.Value >= task.CreatedAt)
+            {
+                return FormatDuration(end.Value - task.CreatedAt);
+            }
+        }
+
+        return "N/A";
+    }
+
+    private string GetTimeToComplete(TaskItem task)
+    {
+        var completeHistory = task.StatusHistories?
+            .Where(h => h.ToStatus == TaskItemStatus.Completed)
+            .OrderByDescending(h => h.ChangedAt)
+            .FirstOrDefault();
+
+        if (completeHistory != null && completeHistory.DurationSeconds > 0)
+        {
+            if (task.CompletedAt.HasValue && task.CompletedAt.Value >= task.CreatedAt)
+            {
+                return FormatDuration(task.CompletedAt.Value - task.CreatedAt);
+            }
+            return FormatDuration(TimeSpan.FromSeconds(completeHistory.DurationSeconds));
+        }
+
+        if (task.CompletedAt.HasValue && task.CompletedAt.Value >= task.CreatedAt)
+        {
+            return FormatDuration(task.CompletedAt.Value - task.CreatedAt);
+        }
+
+        return "N/A";
+    }
+
+    private string GetTimingBadgeClass(TaskItemStatus status) => status switch
+    {
+        TaskItemStatus.Pending => "timing-pending",
+        TaskItemStatus.InProgress => "timing-inprogress",
+        TaskItemStatus.Completed => "timing-completed",
+        TaskItemStatus.Cancelled => "timing-cancelled",
+        _ => "timing-default"
+    };
+
+    private string GetStatusStepDotClass(TaskItemStatus status) => status switch
+    {
+        TaskItemStatus.Pending => "bg-secondary",
+        TaskItemStatus.InProgress => "bg-primary",
+        TaskItemStatus.Completed => "bg-success",
+        TaskItemStatus.Cancelled => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private CancellationTokenSource _cts = new();
+    private Timer? _countdownTimer;
+
+    private record TaskCountdownInfo(string Text, string BadgeClass, string IconClass);
+
+    private TaskCountdownInfo GetTaskCountdown(TaskItem task)
+    {
+        if (!task.DueDate.HasValue)
+        {
+            return new TaskCountdownInfo("No deadline", "bg-light text-muted border", "bi bi-calendar");
+        }
+
+        var dueDate = task.DueDate.Value;
+        var now = DateTime.UtcNow;
+
+        if (task.Status == TaskItemStatus.Completed)
+        {
+            return new TaskCountdownInfo($"Completed ({dueDate:MMM dd})", "bg-success bg-opacity-10 text-success border border-success border-opacity-25", "bi bi-check-circle-fill");
+        }
+
+        if (task.Status == TaskItemStatus.Cancelled)
+        {
+            return new TaskCountdownInfo("Cancelled", "bg-secondary bg-opacity-10 text-muted border", "bi bi-x-circle");
+        }
+
+        if (now >= dueDate)
+        {
+            var overdue = now - dueDate;
+            string formatted = FormatTimeSpan(overdue);
+            return new TaskCountdownInfo($"Overdue by {formatted}", "bg-danger text-white fw-bold shadow-sm", "bi bi-exclamation-triangle-fill");
+        }
+
+        var remaining = dueDate - now;
+        var totalDuration = dueDate - task.CreatedAt;
+
+        // Check if 70% of time has elapsed
+        bool is70PercentElapsed = false;
+        if (totalDuration.TotalSeconds > 0)
+        {
+            var elapsed = now - task.CreatedAt;
+            is70PercentElapsed = (elapsed.TotalSeconds / totalDuration.TotalSeconds) >= 0.70;
+        }
+
+        string remainingText = $"{FormatTimeSpan(remaining)} left";
+
+        if (is70PercentElapsed)
+        {
+            return new TaskCountdownInfo(remainingText, "bg-warning text-dark border border-warning fw-semibold shadow-sm", "bi bi-clock-history");
+        }
+
+        return new TaskCountdownInfo(remainingText, "bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25", "bi bi-stopwatch");
+    }
+
+    private static string FormatTimeSpan(TimeSpan ts)
+    {
+        if (ts.TotalDays >= 1)
+        {
+            return $"{ts.Days}d {ts.Hours}h {ts.Minutes}m";
+        }
+        if (ts.TotalHours >= 1)
+        {
+            return $"{ts.Hours}h {ts.Minutes}m";
+        }
+        return $"{Math.Max(1, ts.Minutes)}m";
+    }
+
+    public void Dispose()
+    {
+        NotificationService.OnNotificationReceived -= HandleTaskNotification;
+        _countdownTimer?.Dispose();
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+}

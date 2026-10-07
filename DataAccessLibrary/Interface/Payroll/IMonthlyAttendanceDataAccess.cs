@@ -21,5 +21,10 @@ namespace DataAccessLibrary.Interface.Payroll
         /// Clears attendance & punches for a specific day.
         /// </summary>
         Task<bool> ClearDateAttendanceAsync(string empId, DateTime date);
+
+        /// <summary>
+        /// Checks if salary for the given year and month has already been finalized in MonthlySalaries table (Month-wide lock).
+        /// </summary>
+        Task<bool> IsSalaryFinalizedAsync(int year, int month);
     }
 }

@@ -54,12 +54,8 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
                 Filter.DtFrom = DateTime.Today;
                 Filter.DtTo = DateTime.Today;
                 Filter.PostingDate = DateTime.Today;
-
-                if (Lookups.DebitHeads.Any())
-                {
-                    SelectedDebitHead = Lookups.DebitHeads.First();
-                    Filter.DebitHeadAccNo = SelectedDebitHead.Id;
-                }
+                SelectedDebitHead = null;
+                Filter.DebitHeadAccNo = string.Empty;
             }
             catch (Exception ex)
             {
@@ -339,13 +335,13 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(Filter.DebitHeadAccNo))
+            if (SelectedDebitHead == null || string.IsNullOrWhiteSpace(Filter.DebitHeadAccNo))
             {
                 NotificationService.Notify(new Radzen.NotificationMessage
                 {
                     Severity = Radzen.NotificationSeverity.Warning,
                     Summary = "Missing Debit Head",
-                    Detail = "Please select a Debit Head account before posting.",
+                    Detail = "Please select a Debit Head (Account) before posting.",
                     Duration = 4000
                 });
                 return;
@@ -387,7 +383,7 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
                     // Print Posted Bill Report
                     await ReportNavigationService.PrintReportAsync(new ReportRequest
                     {
-                        ReportName = "MakerPostedBill.rpt",
+                        ReportName = "MakerPostedBillsRcvWise.rpt",
                         SelectionFormula = $"{{MakerPostedBills.EntryID}} = {result.BillEntryID}"
                     });
 

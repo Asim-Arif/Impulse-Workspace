@@ -19,6 +19,10 @@
                     </div>
                 </div>
                 <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 shadow-sm px-3" @onclick="OpenUserActivityReportModal" title="Print User Activity Report">
+                        <i class="fas fa-file-alt text-primary"></i>
+                        <span>User Activity Report</span>
+                    </button>
                     <button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1 shadow-sm" @onclick="SyncMenuOptionsAsync" disabled="@IsSyncing" title="Sync &amp; update system screen options catalog with all standard options">
                         @if (IsSyncing)
                         {
@@ -329,5 +333,8 @@
 
 <!-- Manage User Roles Modal -->
 <ManageRolesModal IsOpen="@IsManageRolesOpen" OnClose="CloseManageRolesModal" OnRolesChanged="HandleRolesChanged" />
+
+<!-- User Activity Report Parameter Modal -->
+<DateRangeWithSingleSelectModal @ref="userActivityModal" Title="User Activity Report" LabelText="Select User:" />
 
 

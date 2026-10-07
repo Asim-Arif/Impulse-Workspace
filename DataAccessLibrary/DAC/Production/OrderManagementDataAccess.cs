@@ -597,13 +597,12 @@ namespace DataAccessLibrary.DAC.Production
                         GROUP BY vr.Issuance_RefID, vrd.ItemCode
                     ) rcv ON vi.EntryID = rcv.Issuance_RefID AND vid.ItemCode = rcv.ItemCode
                     WHERE (vid.OrderNo = @OrderNo OR vid.OrderNo = @CleanOrderNo)
-                      AND (vid.ItemCode = @ItemCode OR (@CompItemCode IS NOT NULL AND @CompItemCode <> '' AND vid.ItemCode = @CompItemCode))
+                      AND vid.ItemCode = @CompItemCode
                       AND ISNULL(vi.MasterPONo, '') <> ''",
                     new { 
                         OrderNo = orderNo.Trim(), 
                         CleanOrderNo = orderNo.Trim().StartsWith("SO-") ? orderNo.Trim().Substring(3) : orderNo.Trim(),
-                        ItemCode = item.ItemCode?.Trim(), 
-                        CompItemCode = item.CompItemCode?.Trim() 
+                        CompItemCode = !string.IsNullOrWhiteSpace(item.CompItemCode) ? item.CompItemCode.Trim() : item.ItemCode?.Trim()
                     });
 
                 int poCount = (int)(poTotals?.PoCount ?? 0);
@@ -699,6 +698,8 @@ namespace DataAccessLibrary.DAC.Production
 
             using IDbConnection db = new SqlConnection(ConnectionString);
 
+            var effectiveCompItemCode = !string.IsNullOrWhiteSpace(compItemCode) ? compItemCode.Trim() : itemCode?.Trim();
+
             var sb = new StringBuilder(@"
                 SELECT 
                     vid.EntryID,
@@ -733,14 +734,10 @@ namespace DataAccessLibrary.DAC.Production
             p.Add("@OrderNo", orderNo.Trim());
             p.Add("@CleanOrderNo", orderNo.Trim().StartsWith("SO-") ? orderNo.Trim().Substring(3) : orderNo.Trim());
 
-            if (!string.IsNullOrWhiteSpace(itemCode))
+            if (!string.IsNullOrWhiteSpace(effectiveCompItemCode))
             {
-                sb.Append(@" AND (
-                    vid.ItemCode = @ItemCode 
-                    OR (@CompItemCode IS NOT NULL AND @CompItemCode <> '' AND vid.ItemCode = @CompItemCode)
-                )");
-                p.Add("@ItemCode", itemCode.Trim());
-                p.Add("@CompItemCode", compItemCode?.Trim());
+                sb.Append(" AND vid.ItemCode = @CompItemCode");
+                p.Add("@CompItemCode", effectiveCompItemCode);
             }
 
             sb.Append(" ORDER BY vi.DT DESC, vid.EntryID DESC");

@@ -1,0 +1,183 @@
+@page "/office"
+@page "/intraoffice"
+@page "/office/dashboard"
+@layout MainLayout
+@attribute [Authorize]
+@using Impulse.Services.IntraOffice
+@using DataAccessLibrary.Models.IntraOffice
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IIntraOfficeService IntraOfficeService
+@inject NavigationManager Nav
+
+<PageTitle>IntraOffice & CRM Dashboard | Impulse ERP</PageTitle>
+
+<div class="dashboard-shell">
+    <!-- Hero Header -->
+    <div class="dashboard-hero">
+        <div class="dashboard-icon-wrap" style="background: #eef2ff; color: #4338ca;">
+            <i class="fas fa-network-wired"></i>
+        </div>
+        <div class="flex-grow-1">
+            <div class="d-flex align-items-center gap-2">
+                <h1 class="dashboard-title">IntraOffice CRM</h1>
+                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 rounded-pill" style="font-size: 0.75rem;">
+                    <i class="fas fa-circle fa-2xs me-1 text-success"></i> LIVE
+                </span>
+            </div>
+            <p class="dashboard-subtitle">Corporate collaboration, executive minutes workflow, team tasks &amp; export CRM</p>
+        </div>
+    </div>
+
+    <!-- Featured Live Collaboration Workstation Tile -->
+    <div class="mb-4">
+        <a href="/office/hub" class="text-decoration-none">
+            <div class="card border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #064e3b 0%, #0f172a 50%, #1e1b4b 100%); border-radius: 14px; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 10px 25px rgba(0,0,0,0.15)';" onmouseout="this.style.transform='none'; this.style.boxShadow='none';">
+                <div class="card-body p-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <div style="width: 52px; height: 52px; border-radius: 12px; background: rgba(16, 185, 129, 0.2); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3);">
+                            <i class="fas fa-desktop"></i>
+                        </div>
+                        <div>
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 rounded-pill" style="font-size: 0.72rem;">
+                                    <i class="fas fa-circle fa-2xs me-1 text-success"></i> LIVE WORKPLACE
+                                </span>
+                                <span class="text-white-50 small">• Real-time SignalR Pulse</span>
+                            </div>
+                            <h4 class="fw-bold mb-1 text-white">Open Live Collaboration Hub</h4>
+                            <p class="text-white-50 mb-0 small">Access the interactive workstation: active task radar, upcoming WebRTC meetings, workload charts &amp; minutes sign-offs.</p>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="btn btn-success px-4 py-2 fw-semibold shadow-sm d-inline-flex align-items-center gap-2" style="border-radius: 10px;">
+                            <span>Launch Hub</span>
+                            <i class="fas fa-arrow-right"></i>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <!-- Section 1: Communication & Workplace -->
+    <div class="section-title-wrap mb-3">
+        <h6 class="text-uppercase fw-bold text-secondary tracking-wider mb-0" style="font-size: 0.78rem; letter-spacing: 0.5px;">
+            <i class="fas fa-comments text-primary me-2"></i>Communication &amp; Workplace
+        </h6>
+    </div>
+    <div class="dashboard-modules mb-4">
+        <a class="dash-card" href="/office/chat">
+            <i class="fas fa-comments" style="color: #2563eb;"></i>
+            <span>Group Discussions</span>
+        </a>
+        <a class="dash-card" href="/office/channels">
+            <i class="fas fa-hashtag" style="color: #0d9488;"></i>
+            <span>Team Channels</span>
+        </a>
+        <a class="dash-card" href="/office/messages">
+            <i class="fas fa-envelope" style="color: #d97706;"></i>
+            <span>Direct Messages</span>
+        </a>
+        <a class="dash-card" href="/office/tasks">
+            <i class="fas fa-tasks" style="color: #059669;"></i>
+            <span>Team Tasks</span>
+        </a>
+        <a class="dash-card" href="/office/announcements">
+            <i class="fas fa-bullhorn" style="color: #dc2626;"></i>
+            <span>Announcements</span>
+        </a>
+        <a class="dash-card" href="/office/meetings">
+            <i class="fas fa-video" style="color: #7c3aed;"></i>
+            <span>Video Meetings</span>
+        </a>
+        <a class="dash-card" href="/office/directory">
+            <i class="fas fa-address-book" style="color: #0284c7;"></i>
+            <span>Staff Directory</span>
+        </a>
+        <a class="dash-card" href="/office/ai-assistant">
+            <i class="fas fa-robot" style="color: #6366f1;"></i>
+            <span>AI Assistant</span>
+        </a>
+    </div>
+
+    <!-- Section 2: Executive Governance & Minutes -->
+    <div class="section-title-wrap mb-3">
+        <h6 class="text-uppercase fw-bold text-secondary tracking-wider mb-0" style="font-size: 0.78rem; letter-spacing: 0.5px;">
+            <i class="fas fa-file-signature text-warning me-2"></i>Executive Governance &amp; Minutes
+        </h6>
+    </div>
+    <div class="dashboard-modules mb-4">
+        <a class="dash-card" href="/office/minutes-approval">
+            <i class="fas fa-file-circle-plus" style="color: #059669;"></i>
+            <span>New Minute Memo</span>
+        </a>
+        <a class="dash-card" href="/office/minutes-list">
+            <i class="fas fa-file-signature" style="color: #d97706;"></i>
+            <span>Minutes Workflow</span>
+        </a>
+        <a class="dash-card" href="/office/admin/minute-types">
+            <i class="fas fa-tags" style="color: #64748b;"></i>
+            <span>Minute Types</span>
+        </a>
+    </div>
+
+    <!-- Section 3: Export CRM & Pipeline -->
+    <div class="section-title-wrap mb-3">
+        <h6 class="text-uppercase fw-bold text-secondary tracking-wider mb-0" style="font-size: 0.78rem; letter-spacing: 0.5px;">
+            <i class="fas fa-funnel-dollar text-success me-2"></i>Export CRM &amp; Sales
+        </h6>
+    </div>
+    <div class="dashboard-modules mb-4">
+        <a class="dash-card" href="/office/leads">
+            <i class="fas fa-funnel-dollar" style="color: #10b981;"></i>
+            <span>Leads &amp; Pipeline</span>
+        </a>
+        <a class="dash-card" href="/office/customer-360">
+            <i class="fas fa-users" style="color: #3b82f6;"></i>
+            <span>Customer 360° Hub</span>
+        </a>
+        <a class="dash-card" href="/office/reports">
+            <i class="fas fa-chart-line" style="color: #8b5cf6;"></i>
+            <span>CRM Reports</span>
+        </a>
+        <a class="dash-card" href="/office/templates">
+            <i class="fas fa-envelope-open-text" style="color: #06b6d4;"></i>
+            <span>Email Templates</span>
+        </a>
+    </div>
+
+    <!-- Section 4: Administration & Setup -->
+    <div class="section-title-wrap mb-3">
+        <h6 class="text-uppercase fw-bold text-secondary tracking-wider mb-0" style="font-size: 0.78rem; letter-spacing: 0.5px;">
+            <i class="fas fa-sliders-h text-secondary me-2"></i>Administration &amp; Diagnostics
+        </h6>
+    </div>
+    <div class="dashboard-modules mb-4">
+        <a class="dash-card" href="/office/admin/email-settings">
+            <i class="fas fa-envelope-cog" style="color: #64748b;"></i>
+            <span>Email &amp; SMTP Settings</span>
+        </a>
+        <a class="dash-card" href="/intraoffice/health">
+            <i class="fas fa-heartbeat" style="color: #ef4444;"></i>
+            <span>System Diagnostics</span>
+        </a>
+    </div>
+</div>
+
+<style>
+    .dashboard-shell { padding: 2rem; max-width: 1100px; }
+    .dashboard-hero { display: flex; align-items: center; gap: 1.25rem; margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e0e2ec; }
+    .dashboard-icon-wrap { width: 64px; height: 64px; border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 1.75rem; flex-shrink: 0; }
+    .dashboard-title { font-size: 2rem; font-weight: 700; color: #1b1b1f; margin: 0; line-height: 1.2; }
+    .dashboard-subtitle { color: #44474f; margin: 0.25rem 0 0; font-size: 0.95rem; }
+    
+    .section-title-wrap {
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 0.5rem;
+    }
+
+    .dashboard-modules { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; }
+    .dash-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; padding: 1.5rem 1rem; background: #ffffff; border: 1px solid #e0e2ec; border-radius: 16px; text-decoration: none; color: #1b1b1f; font-weight: 500; font-size: 0.875rem; text-align: center; transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease; cursor: pointer; }
+    .dash-card i { font-size: 1.75rem; }
+    .dash-card:hover { background: #f8fafc; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08); transform: translateY(-2px); color: #0f172a; text-decoration: none; }
+</style>

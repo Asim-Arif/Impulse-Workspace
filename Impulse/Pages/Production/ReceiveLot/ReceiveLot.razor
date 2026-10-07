@@ -35,9 +35,12 @@
         align-items: center !important;
         box-sizing: border-box !important;
         max-width: 100% !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
     }
     .blazored-typeahead__results {
-        z-index: 10000 !important;
+        z-index: 100000 !important;
     }
     .item-thumb-btn {
         width: 32px;
@@ -150,12 +153,12 @@
                 <!-- SECTION 2: FACTORY EMPLOYEES PANEL (IF IN-HOUSE FACTORY MAKER) -->
                 @if (LotHeader.IsFactoryMaker)
                 {
-                    <div class="card mb-3 border" style="background:#ffffff; border-radius:8px;">
+                    <div class="card mb-3 border" style="background:#ffffff; border-radius:8px; position: relative !important; z-index: 9999 !important;">
                         <div class="card-header py-2 bg-light fw-bold text-secondary" style="font-size:0.85rem; border-radius:8px 8px 0 0;">
                             <i class="fas fa-users me-1 text-primary"></i> In-House Factory Workers Selection
                         </div>
-                        <div class="card-body py-2">
-                            <div class="row g-2 align-items-center">
+                        <div class="card-body py-2" style="position: relative !important; z-index: 9999 !important; overflow: visible !important;">
+                            <div class="row g-2 align-items-center" style="position: relative !important; z-index: 9999 !important;">
                                 <div class="col-md-6">
                                     <BlazoredTypeahead SearchMethod="SearchEmployees"
                                                        @bind-Value="SelectedWorker"
@@ -166,7 +169,9 @@
                                         <SelectedTemplate Context="e">
                                             @if (e != null)
                                             {
-                                                @if (!string.IsNullOrEmpty(e.EmpID) && e.EmpID != "0") { <text>[@e.EmpID] </text> }@e.Name
+                                                <span class="text-truncate d-inline-block w-100" style="font-size: 0.85rem;">
+                                                    @if (!string.IsNullOrEmpty(e.EmpID) && e.EmpID != "0") { <text>[@e.EmpID] </text> }@e.Name
+                                                </span>
                                             }
                                         </SelectedTemplate>
                                         <ResultTemplate Context="e">
@@ -204,7 +209,7 @@
                 }
 
                 <!-- SECTION 3: LOT ITEMS & RECEIVING INPUT GRID -->
-                <div class="card mb-3 border" style="background:#ffffff; border-radius:8px;">
+                <div class="card mb-3 border" style="background:#ffffff; border-radius:8px; position: relative !important; z-index: 1 !important;">
                     <div class="card-header py-2 bg-light fw-bold text-secondary d-flex align-items-center justify-content-between" style="font-size:0.85rem; border-radius:8px 8px 0 0;">
                         <span><i class="fas fa-list-check me-1 text-primary"></i> Lot Items &amp; Receiving Input Lines (@Lines.Count)</span>
                         <span class="badge bg-success fs-6">Total Receiving Qty: @TotalReceivingQty.ToString("N0")</span>

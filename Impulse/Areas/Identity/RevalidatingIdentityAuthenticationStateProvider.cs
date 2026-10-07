@@ -28,12 +28,28 @@ namespace Impulse.Areas.Identity
         protected override async Task<bool> ValidateAuthenticationStateAsync(
             AuthenticationState authenticationState, CancellationToken cancellationToken)
         {
-            // Get the user manager from a new scope to ensure it fetches fresh data
+            var user = authenticationState?.User;
+            if (user?.Identity?.IsAuthenticated != true)
+            {
+                return false;
+            }
+
+            string? username = user.Identity.Name;
+            if (string.IsNullOrWhiteSpace(username))
+            {
+                return false;
+            }
+
             var scope = _scopeFactory.CreateScope();
             try
             {
-                var userManager = scope.ServiceProvider.GetRequiredService<UserManager<TUser>>();
-                return await ValidateSecurityStampAsync(userManager, authenticationState.User);
+                var userStore = scope.ServiceProvider.GetRequiredService<CustomUserStore>();
+                var dbUser = await userStore.GetUserByUsernameAsync(username);
+                return dbUser != null && dbUser.InActive != true;
+            }
+            catch
+            {
+                return false;
             }
             finally
             {
@@ -45,25 +61,6 @@ namespace Impulse.Areas.Identity
                 {
                     scope.Dispose();
                 }
-            }
-        }
-
-        private async Task<bool> ValidateSecurityStampAsync(UserManager<TUser> userManager, ClaimsPrincipal principal)
-        {
-            var user = await userManager.GetUserAsync(principal);
-            if (user == null)
-            {
-                return false;
-            }
-            else if (!userManager.SupportsUserSecurityStamp)
-            {
-                return true;
-            }
-            else
-            {
-                var principalStamp = principal.FindFirstValue(_options.ClaimsIdentity.SecurityStampClaimType);
-                var userStamp = await userManager.GetSecurityStampAsync(user);
-                return principalStamp == userStamp;
             }
         }
     }

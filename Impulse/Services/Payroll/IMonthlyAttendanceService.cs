@@ -10,5 +10,6 @@ namespace Impulse.Services.Payroll
         Task<List<MonthlyAttendanceDayRow>> GetMonthlyAttendanceAsync(string empId, int year, int month);
         Task<bool> SaveMonthlyAttendanceAsync(MonthlyAttendanceSaveDto input);
         Task<bool> ClearDateAttendanceAsync(string empId, DateTime date);
+        Task<bool> IsSalaryFinalizedAsync(int year, int month);
     }
 }

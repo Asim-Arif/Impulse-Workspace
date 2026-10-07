@@ -1,0 +1,437 @@
+@page "/office/announcements"
+@page "/announcements"
+@attribute [Authorize]
+@implements IDisposable
+@using DataAccessLibrary.Models.IntraOffice
+@using Impulse.Services.IntraOffice
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IIntraOfficeService IntraOfficeService
+@inject IAnnouncementService AnnouncementService
+@inject IJSRuntime JS
+@inject IFileService FileService
+@inject IAiService AiService
+
+<div class="topbar">
+    <h1 class="topbar-title"><i class="bi bi-megaphone-fill"></i> Announcements</h1>
+    <div class="topbar-actions">
+        @if (canCreate)
+        {
+            <button class="btn btn-primary btn-sm" @onclick="ShowCreateModal">
+                <i class="bi bi-plus-lg"></i> New Announcement
+            </button>
+        }
+    </div>
+</div>
+
+<div class="content-area">
+    @if (announcements != null)
+    {
+        @foreach (var ann in announcements)
+        {
+            var isAcknowledgedByMe = currentUser != null && ann.Acknowledgments.Any(ak => ak.UserId == currentUser.Id);
+            <div class="announcement-card @(ann.IsPinned ? "pinned" : "") @GetPriorityClass(ann.Priority)" style="@(isAcknowledgedByMe ? "background-color: rgba(0, 184, 148, 0.1); border-color: var(--success);" : "")">
+                <div class="announcement-title">
+                    @if (ann.IsPinned) { <i class="bi bi-pin-fill text-accent"></i> }
+                    @ann.Title
+                    <span class="priority-badge @GetBadgeClass(ann.Priority)">@ann.Priority</span>
+                    @if(isAcknowledgedByMe) {
+                        <span class="badge bg-success ms-2"><i class="bi bi-check-circle-fill"></i> Acknowledged</span>
+                    }
+                </div>
+                <div class="announcement-meta">
+                    <span><i class="bi bi-person"></i> @(ann.Author?.FullName ?? "Unknown")</span>
+                    <span><i class="bi bi-clock"></i> @ann.CreatedAt.ToString("MMM dd, yyyy hh:mm tt")</span>
+                    @if (ann.Department != null)
+                    {
+                        <span><i class="bi bi-building"></i> @ann.Department.Name</span>
+                    }
+                    else
+                    {
+                        <span><i class="bi bi-globe"></i> Company-wide</span>
+                    }
+                </div>
+                <div class="announcement-body">@ann.Content</div>
+                
+                @if (ann.Attachments != null && ann.Attachments.Any())
+                {
+                    <div class="announcement-attachments mt-3 d-flex flex-wrap gap-10">
+                        @foreach (var att in ann.Attachments)
+                        {
+                            if (att.ContentType != null && (att.ContentType.StartsWith("audio/") || att.FileName.EndsWith(".webm")))
+                            {
+                                <div class="audio-player-wrapper p-2 rounded" style="background: var(--bg-secondary); border: 1px solid var(--border-color); width: 100%;">
+                                    <div class="d-flex align-items-center mb-1">
+                                        <i class="bi bi-mic-fill text-danger me-2"></i> 
+                                        <span class="text-muted" style="font-size: 0.85rem;">Voice Note</span>
+                                    </div>
+                                    <audio controls style="width: 100%; height: 35px;">
+                                        <source src="@att.FilePath" type="@(att.ContentType ?? "audio/webm")">
+                                        Your browser does not support the audio element.
+                                    </audio>
+                                </div>
+                            }
+                            else
+                            {
+                                <a href="@att.FilePath" target="_blank" class="attachment-badge" style="display: flex; align-items: center; gap: 5px; padding: 5px 10px; background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-color); text-decoration: none; font-size: 0.85rem;">
+                                    <i class="bi bi-file-earmark-text text-primary"></i>
+                                    @att.FileName
+                                </a>
+                            }
+                        }
+                    </div>
+                }
+
+                @if (ann.Acknowledgments.Any())
+                {
+                    <div class="mt-3 p-2 rounded" style="background: var(--bg-body); border: 1px solid var(--border-color); font-size: 0.85rem;">
+                        <div class="text-muted mb-1"><i class="bi bi-check2-all"></i> Acknowledged by:</div>
+                        <ul class="list-unstyled mb-0 ms-2">
+                            @foreach (var ak in ann.Acknowledgments.OrderBy(a => a.AcknowledgedAt))
+                            {
+                                <li>
+                                    <i class="bi bi-person-check text-success"></i> <strong>@(ak.User?.FullName ?? "Unknown")</strong> 
+                                    <span class="text-muted ms-1">at @ak.AcknowledgedAt.ToLocalTime().ToString("MMM dd, yyyy hh:mm tt")</span>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+                
+                <div class="d-flex gap-8 mt-16 justify-content-between">
+                    <div>
+                        @if (!isAcknowledgedByMe)
+                        {
+                            <button class="btn btn-success btn-sm" @onclick="() => AcknowledgeAnnouncement(ann.Id)">
+                                <i class="bi bi-check2-circle"></i> Acknowledge
+                            </button>
+                        }
+                    </div>
+                    @if (canCreate)
+                    {
+                        <div class="d-flex gap-8">
+                            <button class="btn btn-ghost btn-sm" @onclick="() => TogglePin(ann.Id)">
+                                <i class="bi @(ann.IsPinned ? "bi-pin-fill" : "bi-pin")"></i>
+                                @(ann.IsPinned ? "Unpin" : "Pin")
+                            </button>
+                            <button class="btn btn-ghost btn-sm text-danger" @onclick="() => DeleteAnnouncement(ann.Id)">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (!announcements.Any())
+        {
+            <div class="empty-state">
+                <i class="bi bi-megaphone"></i>
+                <h3>No Announcements</h3>
+                <p>There are no announcements at this time.</p>
+            </div>
+        }
+    }
+</div>
+
+@if (showCreateModal)
+{
+    <div class="modal-overlay" @onclick="() => showCreateModal = false">
+        <div class="modal-content" @onclick:stopPropagation>
+            <div class="modal-header">
+                <h3 class="modal-title">Create Announcement</h3>
+                <button class="btn btn-ghost btn-icon" @onclick="() => showCreateModal = false"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Title</label>
+                <input type="text" class="form-control" @bind="newTitle" placeholder="Announcement title" />
+            </div>
+            <div class="form-group">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label class="form-label mb-0">Content</label>
+                    <button type="button" class="btn btn-ghost btn-sm" @onclick="GenerateAiDraft" disabled="@isAiLoading"><i class="bi bi-magic"></i> AI Draft</button>
+                </div>
+                <textarea class="form-control" @bind="newContent" placeholder="Write your announcement..." rows="5" disabled="@isAiLoading"></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Priority</label>
+                <select class="form-control" @bind="newPriority">
+                    <option value="0">Normal</option>
+                    <option value="1">Important</option>
+                    <option value="2">Critical</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Department (leave empty for company-wide)</label>
+                <select class="form-control" @bind="newDeptId">
+                    <option value="">All Departments</option>
+                    @if (departments != null)
+                    {
+                        @foreach (var d in departments)
+                        {
+                            <option value="@d.Id">@d.Name</option>
+                        }
+                    }
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Attachments & Voice Notes</label>
+                <div class="d-flex gap-8 align-items-center mb-2">
+                    <label for="ann-file-input" class="btn btn-outline-secondary btn-sm mb-0" style="cursor: pointer;">
+                        <i class="bi bi-paperclip"></i> Add Files
+                    </label>
+                    <button class="btn btn-sm @(isRecording ? "btn-danger recording-pulse" : "btn-outline-danger")" @onclick="ToggleRecording">
+                        <i class="bi bi-mic-fill"></i> @(isRecording ? "Recording..." : "Record Voice Note")
+                    </button>
+                    <InputFile id="ann-file-input" @ref="fileInput" OnChange="HandleFileSelected" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg" style="display: none;" multiple />
+                </div>
+                <div class="text-muted" style="font-size: 0.8rem;">Optional: Attach files or voice notes. Allowed files: PDF, Word, Excel, JPEG.</div>
+                
+                @if (pendingAttachments.Any())
+                {
+                    <div class="mt-2 d-flex flex-wrap gap-10">
+                        @foreach (var att in pendingAttachments)
+                        {
+                            <div class="pending-attachment-item" style="background: var(--surface-color); padding: 5px 10px; border-radius: 4px; font-size: 0.85rem; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 5px;">
+                                <i class="bi @(att.FileName.EndsWith(".webm") ? "bi-mic-fill text-danger" : "bi-file-earmark-text text-primary")"></i>
+                                <span style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@att.FileName</span>
+                                <button class="btn btn-sm text-danger" style="padding: 0; line-height: 1;" @onclick="() => pendingAttachments.Remove(att)" title="Remove">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="() => showCreateModal = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="CreateAnnouncement">Publish</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private IntraUserProfile? currentUser;
+    private List<Announcement>? announcements;
+    private List<IntraDepartment>? departments;
+    private bool canCreate;
+    private bool showCreateModal;
+    private bool isAiLoading;
+    private string newTitle = "", newContent = "";
+    private int newPriority;
+    private string newDeptId = "";
+
+    private bool isRecording = false;
+    private InputFile? fileInput;
+    private List<AnnouncementAttachment> pendingAttachments = new();
+
+    public class AudioRecordingResult
+    {
+        public string Base64 { get; set; } = "";
+        public string MimeType { get; set; } = "";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        AnnouncementService.OnAnnouncementUpdated += RefreshAnnouncements;
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userId = user.Identity?.Name
+            ?? user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value;
+
+        if (!string.IsNullOrEmpty(userId))
+        {
+            currentUser = await IntraOfficeService.GetUserProfileAsync(userId);
+            currentUser ??= new IntraUserProfile { UserName = userId, FullUserName = userId };
+        }
+
+        canCreate = user.Identity?.IsAuthenticated == true;
+        announcements = await AnnouncementService.GetActiveAnnouncementsAsync();
+        
+        if (currentUser != null)
+        {
+            await AnnouncementService.MarkAnnouncementsAsReadAsync(currentUser.Id);
+        }
+        
+        var depts = await IntraOfficeService.GetDepartmentsAsync();
+        departments = depts.Select(d => new IntraDepartment { Id = d.DeptId, Name = d.DeptName }).ToList();
+    }
+
+    private async void RefreshAnnouncements()
+    {
+        try
+        {
+            announcements = await AnnouncementService.GetActiveAnnouncementsAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error refreshing announcements: {ex.Message}");
+        }
+    }
+
+    public void Dispose()
+    {
+        AnnouncementService.OnAnnouncementUpdated -= RefreshAnnouncements;
+    }
+
+    private async Task AcknowledgeAnnouncement(int id)
+    {
+        if (currentUser == null) return;
+        await AnnouncementService.AcknowledgeAnnouncementAsync(id, currentUser.Id);
+        announcements = await AnnouncementService.GetActiveAnnouncementsAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ShowCreateModal()
+    {
+        try
+        {
+            newTitle = "";
+            newContent = "";
+            newPriority = 0;
+            newDeptId = "";
+            pendingAttachments.Clear();
+            showCreateModal = true;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error showing modal: {ex.Message}\n{ex.StackTrace}");
+        }
+    }
+
+    private async Task GenerateAiDraft()
+    {
+        if (string.IsNullOrWhiteSpace(newTitle))
+        {
+            await JS.InvokeVoidAsync("alert", "Please enter a Title first so the AI knows what to write about.");
+            return;
+        }
+
+        isAiLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var context = $"Priority: {(AnnouncementPriority)newPriority}";
+            newContent = await AiService.DraftContentAsync(newTitle, context);
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", "AI Error: " + ex.Message);
+        }
+
+        isAiLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task ToggleRecording()
+    {
+        try
+        {
+            if (!isRecording)
+            {
+                var success = await JS.InvokeAsync<bool>("window.audioRecorder.startRecording");
+                if (success)
+                {
+                    isRecording = true;
+                    StateHasChanged();
+                }
+            }
+            else
+            {
+                isRecording = false;
+                StateHasChanged();
+                
+                var result = await JS.InvokeAsync<AudioRecordingResult>("window.audioRecorder.stopRecording");
+                if (result != null && !string.IsNullOrEmpty(result.Base64))
+                {
+                    var fileName = $"VoiceNote_{DateTime.Now:yyyyMMdd_HHmmss}.webm";
+                    var relativePath = await FileService.SaveBase64FileToDiskAsync(result.Base64, fileName);
+                    
+                    pendingAttachments.Add(new AnnouncementAttachment
+                    {
+                        FileName = fileName,
+                        FilePath = relativePath,
+                        FileSize = (long)(result.Base64.Length * 0.75),
+                        ContentType = result.MimeType,
+                        UploadedAt = DateTime.UtcNow
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error toggling recording: {ex.Message}");
+        }
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        foreach (var file in e.GetMultipleFiles(5)) // Max 5 files
+        {
+            var relativePath = await FileService.SaveFileToDiskAsync(file);
+            pendingAttachments.Add(new AnnouncementAttachment
+            {
+                FileName = file.Name,
+                FilePath = relativePath,
+                FileSize = file.Size,
+                ContentType = file.ContentType,
+                UploadedAt = DateTime.UtcNow
+            });
+        }
+    }
+
+    private async Task CreateAnnouncement()
+    {
+        if (string.IsNullOrWhiteSpace(newTitle) || currentUser == null) return;
+
+        var ann = new Announcement
+        {
+            Title = newTitle.Trim(),
+            Content = newContent,
+            Priority = (AnnouncementPriority)newPriority,
+            CreatedBy = currentUser.Id,
+            DepartmentId = string.IsNullOrEmpty(newDeptId) ? null : newDeptId,
+            IsPinned = false,
+            Attachments = pendingAttachments.ToList()
+        };
+        
+        await AnnouncementService.CreateAnnouncementAsync(ann);
+        showCreateModal = false;
+        pendingAttachments.Clear();
+        announcements = await AnnouncementService.GetActiveAnnouncementsAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task TogglePin(int id)
+    {
+        await AnnouncementService.TogglePinAsync(id);
+        announcements = await AnnouncementService.GetActiveAnnouncementsAsync();
+    }
+
+    private async Task DeleteAnnouncement(int id)
+    {
+        await AnnouncementService.DeleteAnnouncementAsync(id);
+        announcements = await AnnouncementService.GetActiveAnnouncementsAsync();
+    }
+
+    private string GetPriorityClass(AnnouncementPriority p) => p switch
+    {
+        AnnouncementPriority.Important => "priority-important",
+        AnnouncementPriority.Critical => "priority-critical",
+        _ => ""
+    };
+
+    private string GetBadgeClass(AnnouncementPriority p) => p switch
+    {
+        AnnouncementPriority.Important => "important",
+        AnnouncementPriority.Critical => "critical",
+        _ => "normal"
+    };
+}

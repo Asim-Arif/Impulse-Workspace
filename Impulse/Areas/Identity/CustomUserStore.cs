@@ -1,4 +1,4 @@
-﻿using Azure.Core.Cryptography;
+using Azure.Core.Cryptography;
 using Impulse;
 using Impulse.Data;
 using Microsoft.AspNetCore.Identity;
@@ -19,25 +19,25 @@ namespace Impulse.Areas.Identity
             _userManager = userManager;
         }
 
+        public async Task<User?> GetUserByUsernameAsync(string username)
+        {
+            if (string.IsNullOrWhiteSpace(username)) return null;
+            var trimmed = username.Trim();
+            return await _context.Users.FirstOrDefaultAsync(u => u.UserName.ToLower() == trimmed.ToLower());
+        }
+
         public async Task<bool> ValidateCredentialsAsync(string username, string password)
         {
-            var user = await _context.Users.SingleOrDefaultAsync(u => u.UserName == username);
-            //var user = await _context.Users.SingleOrDefaultAsync(u => u.EmpID == empid);
-            if (user == null)
+            if (string.IsNullOrWhiteSpace(username) || password == null) return false;
+            var trimmed = username.Trim();
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.UserName.ToLower() == trimmed.ToLower());
+            if (user == null || user.InActive == true)
             {
                 return false;
             }
 
-            // Add your password hashing/validation logic here
-            //return await _userManager.CheckPasswordAsync(user, password);
-            //return user.Password == password;
-            //CryptRC4(FromHexDump(strPassword), "awmsial")
-            string strPassword="";
-            //strPassword=encryption.CryptRC4(user.Password, "awmsial");
-            strPassword = user.Password;
-            //return user.Password ==  password;
-            return strPassword == password;
-
+            string dbPassword = (user.Password ?? "").Trim();
+            return string.Equals(dbPassword, password.Trim(), StringComparison.Ordinal);
         }
     }
 }

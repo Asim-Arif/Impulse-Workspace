@@ -38,11 +38,13 @@ namespace Impulse.Pages.Accounts
         [Inject]
         protected IFinancialStatementService _financialstatementService { get; set; }
         [Inject]
-        protected IReportNavigationService ReportNavigationService { get; set; }
+        protected IReportNavigationService ReportNavigationService { get; set; } = default!;
         [Inject]
         private Radzen.NotificationService NotificationService { get; set; } = default!;
         [Inject]
         private SecurityService SecurityService { get; set; } = default!;
+        [Inject]
+        private Impulse.Services.WorkflowTasks.IWorkflowTaskEngine WorkflowTaskEngine { get; set; } = default!;
 
         private List<GenericDropDownModel> Accounts = new List<GenericDropDownModel>();
         private List<AccountsReportingModel> AccountsList = new List<AccountsReportingModel>();
@@ -187,21 +189,37 @@ namespace Impulse.Pages.Accounts
 
             if (CurrentVoucher != null)
             {
-                var LedgerDataFromDb = await _financialstatementService.DeleteVoucher_Adjustment(CurrentVoucher.VchrNo);
-                RefreshLedger();
-                StateHasChanged();
+                var LedgerDataFromDb = await AccountReportingAccess.GetVoucherData(CurrentVoucher.VchrNo);
+                LedgerDatafromDB_temp = LedgerDataFromDb.ToList();
+
+                SelectedVoucher = new AccountsReportingModel
+                {
+                    AccNo = account.AccNo,
+                    AccTitle = account.AccTitle,
+                    Debit = (decimal)account.Debit,
+                    Credit = (decimal)account.Credit,
+                    VchrNo = account.VchrNo,
+                    VDate = account.DT,
+                    Description = account.Description,
+                    GeneratedBy = account.UserName,
+                    MachineName = account.MachineName,
+                    UserName = userName
+                };
+
+                ShowModal = true;
+                IsEdit = true;
             }
         }
 
         private async Task DeleteVoucher()
         {
-            if (IsEdit==false)
+            if (IsEdit == false || CurrentVoucher == null || SelectedVoucher == null)
                 return;
             try
             {
                 if (string.IsNullOrWhiteSpace(SelectedVoucher.DeleteReason))
                 {
-                    await JS.InvokeVoidAsync("alert", "Please Enter Reason of Deletion.");
+                    NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Reason Required", "Please enter reason for deletion.");
                     return;
                 }
 
@@ -214,10 +232,15 @@ namespace Impulse.Pages.Accounts
                     return;
                 }
 
-                await AccountReportingAccess.DeleteVoucher(SelectedVoucher, CurrentVoucher.VchrNo,false);
+                await WorkflowTaskEngine.RequestVoucherDeletionAsync(
+                    CurrentVoucher.VchrNo, 
+                    userName, 
+                    SelectedVoucher.DeleteReason, 
+                    SelectedVoucher.MachineName);
+
+                NotificationService.Notify(Radzen.NotificationSeverity.Success, "Request Submitted", $"Deletion request for Voucher #{CurrentVoucher.VchrNo} has been submitted to the Directors for approval.");
 
                 ShowModal = false;
-                //SelectedVoucher = null;
                 CurrentVoucher = null;
                 HideModal();
                 RefreshLedger();
@@ -225,7 +248,8 @@ namespace Impulse.Pages.Accounts
             }
             catch (Exception ex)
             {
-                ShowModal =false;
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Error", $"Failed to submit deletion request: {ex.Message}");
+                ShowModal = false;
             }
         }
 

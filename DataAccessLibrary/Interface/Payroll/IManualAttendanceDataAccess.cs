@@ -15,5 +15,6 @@ namespace DataAccessLibrary.Interface.Payroll
         Task<bool> SaveManualAttendanceAsync(ManualAttendanceInputDto input);
         Task<bool> DeleteAttendanceAsync(string empId, DateTime date);
         Task<int> ReCalculateAttendanceAsync(DateTime dateFrom, DateTime dateTo, string deptId, string empId);
+        Task<bool> IsSalaryFinalizedAsync(int year, int month);
     }
 }

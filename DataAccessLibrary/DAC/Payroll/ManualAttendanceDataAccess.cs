@@ -295,5 +295,15 @@ namespace DataAccessLibrary.DAC.Payroll
         {
             return _takeAttendanceDataAccess.ReCalculateAttendanceAsync(dateFrom, dateTo, deptId, empId);
         }
+
+        public async Task<bool> IsSalaryFinalizedAsync(int year, int month)
+        {
+            using (var db = new SqlConnection(_connectionString))
+            {
+                const string sql = "SELECT TOP 1 1 FROM MonthlySalaries WHERE YEAR(DT) = @Year AND MONTH(DT) = @Month";
+                var result = await db.ExecuteScalarAsync<int?>(sql, new { Year = year, Month = month });
+                return result.HasValue && result.Value == 1;
+            }
+        }
     }
 }

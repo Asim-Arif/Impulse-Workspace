@@ -27,10 +27,14 @@
                     <i class="fas fa-calendar-alt me-2"></i> Monthly Attendance Editor
                 </h4>
                 <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm" @onclick="SaveMonthAsync" disabled="@(IsLoading || IsSaving || SelectedEmployee == null)">
+                    <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm" @onclick="SaveMonthAsync" disabled="@(IsLoading || IsSaving || IsSalaryFinalized || SelectedEmployee == null)">
                         @if (IsSaving)
                         {
                             <span class="spinner-border spinner-border-sm me-1"></span><span>Saving...</span>
+                        }
+                        else if (!IsDirectorOrAdmin)
+                        {
+                            <i class="fas fa-paper-plane me-1"></i><span>Request Save</span>
                         }
                         else
                         {
@@ -42,6 +46,16 @@
                     </button>
                 </div>
             </div>
+
+            @if (IsSalaryFinalized)
+            {
+                <div class="alert alert-danger py-2 px-3 mb-3 d-flex align-items-center" role="alert" style="border-radius: 8px; font-size: 0.875rem;">
+                    <i class="fas fa-lock me-2 fs-5"></i>
+                    <div>
+                        <strong>Month Finalized:</strong> Salary for <strong>@SelectedMonthYear</strong> has already been finalized in <code>MonthlySalaries</code>. All attendance edits and deletions are permanently locked.
+                    </div>
+                </div>
+            }
 
             <!-- Toolbar: Department, Employee, and Month Selector -->
             <div class="row g-3 align-items-end mb-4 toolbar-row">
@@ -170,12 +184,14 @@
                                         <input type="time" class="form-control form-control-sm text-center mx-auto"
                                                style="width:130px; height:32px;"
                                                value="@row.InTime"
+                                               disabled="@IsSalaryFinalized"
                                                @onchange="e => OnInTimeChanged(row, e)" />
                                     </td>
                                     <td class="text-center">
                                         <input type="time" class="form-control form-control-sm text-center mx-auto"
                                                style="width:130px; height:32px;"
                                                value="@row.OutTime"
+                                               disabled="@IsSalaryFinalized"
                                                @onchange="e => OnOutTimeChanged(row, e)" />
                                     </td>
                                     <td class="text-center fw-bold" style="color: #6610f2;">
@@ -185,6 +201,7 @@
                                         <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2"
                                                 style="font-size:0.75rem; height:28px;"
                                                 title="Clear Date Attendance"
+                                                disabled="@(IsSalaryFinalized || IsSaving)"
                                                 @onclick="() => ClearDateAsync(row)">
                                             <i class="fas fa-eraser"></i>
                                         </button>
@@ -199,3 +216,32 @@
         </div>
     </div>
 </div>
+
+<!-- Reason Modal for Approval Request -->
+@if (ShowReasonModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 1055;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-primary text-white py-2">
+                    <h6 class="modal-title fw-bold">
+                        <i class="fas fa-file-signature me-1"></i> @ReasonModalTitle
+                    </h6>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => ShowReasonModal = false"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <p class="small text-muted mb-2">
+                        Attendance modifications require Director approval. Please enter a detailed reason for this request.
+                    </p>
+                    <textarea class="form-control form-control-sm" rows="3" placeholder="Enter reason for monthly attendance modification..." @bind="ReasonText"></textarea>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => ShowReasonModal = false">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm px-3 fw-bold" @onclick="SubmitWorkflowRequestAsync" disabled="@(string.IsNullOrWhiteSpace(ReasonText) || IsSubmittingRequest)">
+                        <i class="fas fa-paper-plane me-1 @(IsSubmittingRequest ? "fa-spin" : "")"></i> Submit for Approval
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

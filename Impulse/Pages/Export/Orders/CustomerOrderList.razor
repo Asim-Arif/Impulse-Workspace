@@ -70,10 +70,10 @@
                                        Placeholder="All Customers"
                                        MaximumSuggestions="1000">
                         <SelectedTemplate Context="selectedCust">
-                            @selectedCust?.Name
+                            @selectedCust?.CustCode
                         </SelectedTemplate>
                         <ResultTemplate Context="cust">
-                            @cust.Name
+                            @cust.CustCode
                         </ResultTemplate>
                     </BlazoredTypeahead>
                 </div>
@@ -81,7 +81,7 @@
                 <!-- Country -->
                 <div class="col-md-2">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Country</label>
-                    <select class="form-select form-select-sm" value="@selectedCountryFilter" @onchange="OnCountryChanged">
+                    <select class="form-select form-select-sm" value="@selectedCountryFilter" @onchange="OnCountryChanged" disabled="@(!isDirector)">
                         <option value="<All Countries>">&lt;All Countries&gt;</option>
                         @foreach (var c in countries)
                         {
@@ -266,8 +266,8 @@
                                                     </td>
                                                     <td>@order.OrderType</td>
                                                     <td>@order.InternalRefNo</td>
-                                                    <td class="text-center">@order.DT.ToString("dd-MMM-yyyy")</td>
-                                                    <td class="text-center">@order.DeliveryDT.ToString("dd-MMM-yyyy")</td>
+                                                    <td class="text-center text-primary fw-medium">@order.DT.ToString("dd-MMM-yyyy")</td>
+                                                    <td class="text-center text-success fw-medium">@order.DeliveryDT.ToString("dd-MMM-yyyy")</td>
                                                     @if (!IsProductionMode)
                                                     {
                                                         <td class="text-end fw-semibold text-primary">@order.Curr @order.OrderAmt.ToString("N2")</td>

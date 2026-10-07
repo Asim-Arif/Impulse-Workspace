@@ -5,6 +5,7 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IIntraOfficeService IntraOfficeService
 @inject IAppNotificationService NotificationService
+@inject IJSRuntime JSRuntime
 @implements IDisposable
 
 <div class="notification-bell-container position-relative">
@@ -78,18 +79,87 @@
                 }
             </div>
 
-            <div class="notification-flyout-footer">
-                <span class="text-muted" style="font-size: 0.72rem;"><i class="fas fa-circle text-success me-1 fa-2xs"></i>Real-time alerts active</span>
+            <div class="notification-flyout-footer d-flex flex-column gap-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted" style="font-size: 0.72rem;"><i class="fas fa-circle text-success me-1 fa-2xs"></i>Real-time alerts active</span>
+                    <button type="button" class="btn btn-sm btn-primary py-0 px-2 fw-semibold shadow-sm" style="font-size: 0.72rem; border-radius: 6px;" @onclick="EnablePushNotifications">
+                        <i class="fas fa-mobile-alt me-1"></i>Link Device / Test Push
+                    </button>
+                </div>
+                @if (diagnosticSteps.Any())
+                {
+                    <div class="p-2 border rounded bg-white mt-1 shadow-sm" style="max-height: 220px; overflow-y: auto; font-size: 0.70rem;">
+                        <div class="fw-bold mb-1 border-bottom pb-1 d-flex justify-content-between">
+                            <span>Device Push Diagnostic Test:</span>
+                            <span class="@(pushStatusSuccess ? "text-success" : "text-danger")">@(pushStatusSuccess ? "✓ PASSED" : "✗ FAILED")</span>
+                        </div>
+                        @foreach (var s in diagnosticSteps)
+                        {
+                            <div class="d-flex align-items-start gap-1 mb-1">
+                                <span class="badge @(s.Passed ? "bg-success" : "bg-danger") px-1" style="font-size: 0.65rem;">@(s.Passed ? "PASS" : "FAIL")</span>
+                                <div>
+                                    <div class="fw-semibold text-dark">@s.Step</div>
+                                    <div class="text-muted" style="word-break: break-all;">@s.Details</div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else if (!string.IsNullOrEmpty(pushStatusFeedback))
+                {
+                    <div class="alert @(pushStatusSuccess ? "alert-success text-success" : "alert-warning text-warning") p-1 mb-0" style="font-size: 0.72rem; border-radius: 6px;">
+                        @(pushStatusSuccess ? "✓ " : "⚠ ")@pushStatusFeedback
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @if (pushPermission != "granted" && !promptDismissed && !string.IsNullOrEmpty(currentUserName))
+    {
+        <div class="position-fixed bottom-0 start-50 translate-middle-x p-3" style="z-index: 99999; max-width: 440px; width: 95%;">
+            <div class="card border-0 shadow-lg" style="background: rgba(30, 41, 59, 0.95); backdrop-filter: blur(10px); border-radius: 14px; color: #fff;">
+                <div class="card-body p-3 d-flex align-items-center justify-content-between gap-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="rounded-circle bg-primary bg-opacity-25 p-2 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
+                            <i class="fas fa-bell text-info"></i>
+                        </div>
+                        <div>
+                            <div class="fw-bold" style="font-size: 0.85rem;">Enable Notifications?</div>
+                            <div class="text-white-50" style="font-size: 0.75rem;">Get message & task alerts on this device.</div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-1">
+                        <button type="button" class="btn btn-sm btn-primary px-3 fw-semibold" style="font-size: 0.78rem; border-radius: 8px;" @onclick="EnablePushNotifications">
+                            Enable
+                        </button>
+                        <button type="button" class="btn btn-sm btn-link text-white-50 text-decoration-none p-1" @onclick="() => promptDismissed = true">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     }
 </div>
 
 @code {
+    private class DiagnosticStep
+    {
+        public string Step { get; set; } = "";
+        public bool Passed { get; set; }
+        public string Details { get; set; } = "";
+    }
+
     private bool notificationOpen;
+    private bool promptDismissed;
     private List<AppNotification> recentNotifications = new();
+    private List<DiagnosticStep> diagnosticSteps = new();
     private int totalUnreadNotifications;
     private string? currentUserName;
+    private string pushPermission = "unsupported";
+    private string? pushStatusFeedback;
+    private bool pushStatusSuccess;
 
     protected override async Task OnInitializedAsync()
     {
@@ -101,6 +171,78 @@
             currentUserName = user.Identity.Name ?? "";
             LoadNotifications();
             NotificationService.OnNotificationReceived += HandleLiveNotification;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !string.IsNullOrEmpty(currentUserName))
+        {
+            try
+            {
+                pushPermission = await JSRuntime.InvokeAsync<string>("impulsePush.getPermissionState");
+                if (pushPermission == "granted")
+                {
+                    var synced = await JSRuntime.InvokeAsync<bool>("impulsePush.init", currentUserName, currentUserName);
+                    if (synced)
+                    {
+                        pushStatusFeedback = "Device linked for background push";
+                        pushStatusSuccess = true;
+                    }
+                }
+                StateHasChanged();
+            }
+            catch
+            {
+                // Silently handle if browser does not support push
+            }
+        }
+    }
+
+    private async Task EnablePushNotifications()
+    {
+        if (!string.IsNullOrEmpty(currentUserName))
+        {
+            try
+            {
+                diagnosticSteps.Clear();
+                var result = await JSRuntime.InvokeAsync<System.Text.Json.JsonElement>("impulsePush.runDiagnostics", currentUserName, currentUserName);
+                pushPermission = await JSRuntime.InvokeAsync<string>("impulsePush.getPermissionState");
+
+                if (result.TryGetProperty("success", out var succProp))
+                {
+                    pushStatusSuccess = succProp.GetBoolean();
+                }
+
+                if (result.TryGetProperty("steps", out var stepsProp) && stepsProp.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    foreach (var item in stepsProp.EnumerateArray())
+                    {
+                        var stepName = item.TryGetProperty("step", out var s) ? s.GetString() ?? "" : "";
+                        var passed = item.TryGetProperty("passed", out var p) && p.GetBoolean();
+                        var details = item.TryGetProperty("details", out var d) ? d.GetString() ?? "" : "";
+                        diagnosticSteps.Add(new DiagnosticStep { Step = stepName, Passed = passed, Details = details });
+                    }
+                }
+
+                if (pushStatusSuccess)
+                {
+                    pushStatusFeedback = "Device linked successfully! Push alerts active.";
+                    promptDismissed = true;
+                }
+                else
+                {
+                    pushStatusFeedback = "Device link had issues. See details above.";
+                }
+
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                pushStatusFeedback = "Error: " + ex.Message;
+                pushStatusSuccess = false;
+                StateHasChanged();
+            }
         }
     }
 

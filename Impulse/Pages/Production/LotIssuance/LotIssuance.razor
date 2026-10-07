@@ -88,7 +88,7 @@
                     <div class="row g-3 align-items-center" style="position: relative !important; z-index: 1000 !important;">
                         
                         <!-- 1. Lot No Search Input (First Control) -->
-                        <div class="col-12 col-sm-auto">
+                        <div class="col-12 col-md-5">
                             <div class="d-flex align-items-center justify-content-between mb-1">
                                 <label class="form-label fw-bold text-primary mb-0" style="font-size:0.82rem;">
                                     <i class="fas fa-barcode me-1"></i>Enter Lot No. <span class="text-danger">*</span>
@@ -125,7 +125,7 @@
                         </div>
 
                         <!-- 2. Target Process (Read-Only / Disabled) -->
-                        <div class="col-12 col-sm-auto" style="min-width: 170px;">
+                        <div class="col-12 col-md-4">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
                                 Target Process
                             </label>
@@ -138,8 +138,20 @@
                             </select>
                         </div>
 
-                        <!-- 3. Target Maker / Vendor -->
-                        <div class="col-12 col-md">
+                        <!-- 3. Batch No (Auto-populated) -->
+                        <div class="col-12 col-md-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
+                                Batch No.
+                            </label>
+                            <input type="text" class="form-control form-control-sm fw-bold text-center bg-light"
+                                   @bind="BatchNo"
+                                   placeholder="Batch No..." />
+                        </div>
+                    </div>
+
+                    <!-- SECOND ROW: TARGET MAKER / VENDOR (FULL LINE) -->
+                    <div class="row g-3 align-items-center mt-1 pt-2 border-top" style="position: relative !important; z-index: 99998 !important;">
+                        <div class="col-12">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
                                 Target Maker / Vendor <span class="text-danger">*</span>
                             </label>
@@ -150,26 +162,18 @@
                                                MinimumLength="0"
                                                MaximumSuggestions="1000">
                                 <SelectedTemplate Context="m">
-                                    @m.DisplayText
+                                    <span class="text-truncate d-inline-block w-100" title="@m.DisplayText" style="font-size: 0.85rem;">
+                                        @m.DisplayText
+                                    </span>
                                 </SelectedTemplate>
                                 <ResultTemplate Context="m">
                                     @m.DisplayText
                                 </ResultTemplate>
                             </BlazoredTypeahead>
                         </div>
-
-                        <!-- 4. Batch No (Auto-populated) -->
-                        <div class="col-12 col-sm-auto" style="width: 140px;">
-                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
-                                Batch No.
-                            </label>
-                            <input type="text" class="form-control form-control-sm fw-bold text-center bg-light"
-                                   @bind="BatchNo"
-                                   placeholder="Batch No..." />
-                        </div>
                     </div>
 
-                    <!-- SECOND ROW: WORKER, COUNTED BY & CHECKBOX OPTIONS -->
+                    <!-- THIRD ROW: WORKER, COUNTED BY & RESET BUTTON -->
                     <div class="row g-3 align-items-center mt-1 pt-2 border-top" style="position: relative !important; z-index: 9999 !important;">
                         <!-- Single Worker (Saved in VendIssued.IssEmpID) -->
                         <div class="col-md-4">
@@ -185,8 +189,10 @@
                                 <SelectedTemplate Context="e">
                                     @if (e != null)
                                     {
-                                        @if (!string.IsNullOrEmpty(e.EmpID) && e.EmpID != "0") { <text>[@e.EmpID] </text> }@e.Name
-                                        <text> (Cap: @e.Capacity.ToString("N0"), Bal: @e.Balance.ToString("N0"))</text>
+                                        <span class="text-truncate d-inline-block w-100" style="font-size: 0.85rem;">
+                                            @if (!string.IsNullOrEmpty(e.EmpID) && e.EmpID != "0") { <text>[@e.EmpID] </text> }@e.Name
+                                            <text> (Cap: @e.Capacity.ToString("N0"), Bal: @e.Balance.ToString("N0"))</text>
+                                        </span>
                                     }
                                 </SelectedTemplate>
                                 <ResultTemplate Context="e">
@@ -234,7 +240,9 @@
                                 <SelectedTemplate Context="e">
                                     @if (e != null)
                                     {
-                                        @if (!string.IsNullOrEmpty(e.EmpID) && e.EmpID != "0") { <text>[@e.EmpID] </text> }@e.Name
+                                        <span class="text-truncate d-inline-block w-100" style="font-size: 0.85rem;">
+                                            @if (!string.IsNullOrEmpty(e.EmpID) && e.EmpID != "0") { <text>[@e.EmpID] </text> }@e.Name
+                                        </span>
                                     }
                                 </SelectedTemplate>
                                 <ResultTemplate Context="e">
@@ -496,4 +504,31 @@
         </div>
     </div>
 }
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+    .blazored-typeahead__results {
+        z-index: 100000 !important;
+    }
+</style>
 

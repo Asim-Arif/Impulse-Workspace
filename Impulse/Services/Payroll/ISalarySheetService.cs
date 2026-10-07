@@ -37,5 +37,10 @@ namespace Impulse.Services.Payroll
         /// Returns the number of department vouchers posted.
         /// </summary>
         Task<int> AddSalaryVouchersAsync(int year, int month);
+
+        /// <summary>
+        /// Populates the legacy PrintSalary table with current salary rows before printing reports.
+        /// </summary>
+        Task PopulatePrintSalaryTableAsync(int year, int month, bool isExternal, List<SalarySheetRowModel> rows);
     }
 }

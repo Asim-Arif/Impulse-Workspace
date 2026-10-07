@@ -1,4 +1,4 @@
-﻿@page "/accounts/transactionregister_adjustment"
+@page "/accounts/transactionregister_adjustment"
 @page "/accounts/transactionregister_adjustment/{p_VchrNo?}"
 
 @attribute [Authorize]
@@ -274,14 +274,20 @@
                     </div>
                     <div class="row">
                         <div class="col-md-12 mb-2">
-                            <label class="fw-semibold">Reason of Deletion :</label>
-                            <textarea class="form-control" rows="1" @bind="SelectedVoucher.DeleteReason"></textarea>
+                            <div class="alert alert-warning py-2 px-3 mb-2 small d-flex align-items-center">
+                                <i class="fas fa-info-circle me-2 fs-5 text-warning"></i>
+                                <span>Submitting this request will generate a task for the <strong>Director</strong> role. The voucher will only be deleted once approved by a Director.</span>
+                            </div>
+                            <label class="fw-semibold">Reason for Deletion <span class="text-danger">*</span> :</label>
+                            <textarea class="form-control" rows="2" @bind="SelectedVoucher.DeleteReason" placeholder="Enter detailed reason for deletion for Director review..."></textarea>
                         </div>
                     </div>
 
-                    <div class="mt-3 text-end">
-                        <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="DeleteVoucher">Delete!</button>
-                        <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="HideModal">Cancel</button>
+                    <div class="mt-3 text-end d-flex justify-content-end gap-2">
+                        <button class="btn btn-secondary btn-sm" @onclick="HideModal">Cancel</button>
+                        <button class="btn btn-danger btn-sm text-white fw-bold" @onclick="DeleteVoucher">
+                            <i class="fas fa-paper-plane me-1"></i> Submit Deletion Request
+                        </button>
                     </div>
 
                 </div>

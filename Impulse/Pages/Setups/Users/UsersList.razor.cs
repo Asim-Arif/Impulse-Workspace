@@ -3,7 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using DataAccessLibrary.Models.Setup;
+using DataAccessLibrary.Models.ViewModels;
+using Impulse.Services;
 using Impulse.Services.Setup;
+using Impulse.Shared.Components;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Radzen;
@@ -19,6 +22,9 @@ namespace Impulse.Pages.Setups.Users
         protected IUserPermissionService PermissionService { get; set; } = default!;
 
         [Inject]
+        protected IReportNavigationService ReportNavigationService { get; set; } = default!;
+
+        [Inject]
         protected NotificationService NotificationService { get; set; } = default!;
 
         [Inject]
@@ -26,6 +32,8 @@ namespace Impulse.Pages.Setups.Users
 
         [Inject]
         protected DataAccessLibrary.Interface.Setup.IUserRoleDataAccess UserRoleDataAccess { get; set; } = default!;
+
+        protected DateRangeWithSingleSelectModal userActivityModal = null!;
 
         protected List<UserModel> AllUsers { get; set; } = new();
         protected List<UserModel> FilteredUsers { get; set; } = new();
@@ -385,6 +393,73 @@ namespace Impulse.Pages.Setups.Users
             finally
             {
                 IsCopyingUser = false;
+            }
+        }
+
+        protected async Task OpenUserActivityReportModal()
+        {
+            try
+            {
+                if (AllUsers == null || AllUsers.Count == 0)
+                {
+                    AllUsers = await UserService.GetUsersAsync();
+                }
+
+                var userOptions = new List<GenericDropDownModel>();
+                userOptions.Add(new GenericDropDownModel { DropDownValue_ID = "", DropDownValue_Description = "<All Users>" });
+
+                var distinctUsers = AllUsers
+                    .Where(u => !string.IsNullOrWhiteSpace(u.UserName))
+                    .GroupBy(u => u.UserName)
+                    .Select(g => g.First())
+                    .OrderBy(u => u.UserName);
+
+                foreach (var u in distinctUsers)
+                {
+                    var desc = string.IsNullOrWhiteSpace(u.FullUserName)
+                        ? u.UserName
+                        : $"{u.UserName} ({u.FullUserName})";
+
+                    userOptions.Add(new GenericDropDownModel
+                    {
+                        DropDownValue_ID = u.UserName,
+                        DropDownValue_Description = desc
+                    });
+                }
+
+                var result = await userActivityModal.Show(userOptions, "User Activity Report");
+                if (result.Success)
+                {
+                    var req = new ReportRequest
+                    {
+                        ReportName = "User_Activity.rpt",
+                        Parameters = new Dictionary<string, object>
+                        {
+                            { "@DTFrom", result.DateFrom },
+                            { "@DTTo", result.DateTo },
+                            { "@UserName", result.SelectedValue ?? "" }
+                        }
+                    };
+
+                    await ReportNavigationService.PrintReportAsync(req);
+                    NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Report Dispatched",
+                        Detail = "User Activity report dispatched.",
+                        Duration = 3000
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error",
+                    Detail = $"Failed to generate report: {ex.Message}",
+                    Duration = 4000
+                });
             }
         }
     }

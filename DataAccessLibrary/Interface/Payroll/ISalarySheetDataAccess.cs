@@ -55,5 +55,10 @@ namespace DataAccessLibrary.Interface.Payroll
         /// Fetches default short term and long term advance account numbers from GeneralData.
         /// </summary>
         Task<(string ShortTermAccNo, string LongTermAccNo)> GetSalaryVoucherGeneralAccountsAsync();
+
+        /// <summary>
+        /// Populates the legacy PrintSalary table with current salary rows before printing reports.
+        /// </summary>
+        Task PopulatePrintSalaryTableAsync(int year, int month, bool isExternal, List<SalarySheetRowModel> rows);
     }
 }

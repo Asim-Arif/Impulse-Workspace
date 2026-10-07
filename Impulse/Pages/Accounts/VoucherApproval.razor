@@ -1,0 +1,313 @@
+@page "/accounts/voucher-approval"
+@page "/accounts/voucher-approval/{pVchrNo}"
+@using DataAccessLibrary.Models.ViewModels.Accounts
+@using DataAccessLibrary.Models.IntraOffice
+@using Impulse.Services.WorkflowTasks
+@using Impulse.Services
+@attribute [Authorize]
+
+<PageTitle>Impulse - Voucher Deletion Approvals</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <!-- Main Card -->
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-4">
+            
+            <!-- Page Header -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center bg-danger bg-opacity-10 text-danger" style="width: 44px; height: 44px;">
+                        <i class="fas fa-shield-alt fs-4"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-0 fw-bold text-dark">Voucher Deletion Approvals</h4>
+                        <div class="text-muted small">Director Review &amp; Workflow Governance Queue</div>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    @if (SelectedVoucherData.Count > 0 || !string.IsNullOrEmpty(CurrentVchrNo))
+                    {
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="ClearSelection">
+                            <i class="fas fa-arrow-left me-1"></i> Back to Queue
+                        </button>
+                    }
+                    <a href="/accounts/transactionregister" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-list me-1"></i> Transaction Register
+                    </a>
+                    <button class="btn btn-primary btn-sm" @onclick="LoadPendingRequestsAsync">
+                        <i class="fas fa-sync-alt me-1 @(IsLoading ? "fa-spin" : "")"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Error / Warning Alert -->
+            @if (!string.IsNullOrEmpty(ErrorMessage))
+            {
+                <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center mb-3 py-2 px-3 small rounded-3" role="alert">
+                    <i class="fas fa-exclamation-circle me-2 fs-5"></i>
+                    <div>@ErrorMessage</div>
+                    <button type="button" class="btn-close ms-auto" @onclick="() => ErrorMessage = null"></button>
+                </div>
+            }
+
+            @if (IsLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <div class="text-muted mt-2 small">Loading voucher approval data...</div>
+                </div>
+            }
+            else if (!string.IsNullOrEmpty(CurrentVchrNo))
+            {
+                <!-- ================= VOUCHER DETAIL REVIEW VIEW ================= -->
+                
+                <!-- Voucher Status & Info Hero Banner -->
+                <div class="p-3 mb-3 rounded-3 border" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-md-3">
+                            <span class="text-muted small d-block">Voucher Number</span>
+                            <span class="fw-bold fs-5 text-primary">#@CurrentVchrNo</span>
+                        </div>
+                        <div class="col-md-3">
+                            <span class="text-muted small d-block">Voucher Date</span>
+                            <span class="fw-semibold">@(SelectedVoucherHeader?.VDate.ToString("dd-MMM-yyyy") ?? "N/A")</span>
+                        </div>
+                        <div class="col-md-3">
+                            <span class="text-muted small d-block">Requested By (Originator)</span>
+                            <span class="fw-semibold text-dark">
+                                <i class="fas fa-user-circle text-secondary me-1"></i>@(ActiveTask?.AssignedBy ?? SelectedVoucherHeader?.UserName ?? "N/A")
+                            </span>
+                        </div>
+                        <div class="col-md-3 text-md-end">
+                            <span class="text-muted small d-block">Status</span>
+                            @if (ActiveTask == null || ActiveTask.Status == TaskItemStatus.Pending || ActiveTask.Status == TaskItemStatus.InProgress)
+                            {
+                                <span class="badge bg-warning text-dark px-3 py-2 rounded-pill">
+                                    <i class="fas fa-clock me-1"></i> Pending Director Review
+                                </span>
+                            }
+                            else if (ActiveTask.Status == TaskItemStatus.Completed)
+                            {
+                                <span class="badge bg-success px-3 py-2 rounded-pill">
+                                    <i class="fas fa-check-circle me-1"></i> Approved &amp; Deleted
+                                </span>
+                            }
+                            else if (ActiveTask.Status == TaskItemStatus.Cancelled)
+                            {
+                                <span class="badge bg-danger px-3 py-2 rounded-pill">
+                                    <i class="fas fa-times-circle me-1"></i> Deletion Rejected
+                                </span>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Deletion Reason Callout -->
+                    <div class="mt-3 p-2 bg-white rounded border border-warning">
+                        <div class="d-flex align-items-start gap-2">
+                            <i class="fas fa-exclamation-triangle text-warning fs-5 mt-1"></i>
+                            <div>
+                                <strong class="text-dark small">Reason for Deletion (Originator's Remarks):</strong>
+                                <div class="text-secondary small mt-1" style="white-space: pre-wrap;">@(GetFormattedDeletionReason())</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Voucher Transactions Table -->
+                <div class="table-responsive rounded-3 border mb-3" style="position: relative; z-index: 1;">
+                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                        <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                            <tr>
+                                <th style="width: 15%;">Account #</th>
+                                <th style="width: 35%;">Account Title</th>
+                                <th style="width: 25%;">Narration / Description</th>
+                                <th style="width: 12%;" class="text-end">Debit (PKR)</th>
+                                <th style="width: 13%;" class="text-end">Credit (PKR)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (SelectedVoucherData.Count == 0)
+                            {
+                                <tr>
+                                    <td colspan="5" class="text-center py-4 text-muted">
+                                        <i class="fas fa-info-circle me-1"></i> Voucher entries have already been deleted or no records found.
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var item in SelectedVoucherData)
+                                {
+                                    <tr>
+                                        <td class="fw-semibold">@item.AccNo</td>
+                                        <td>@item.AccTitle</td>
+                                        <td class="text-muted small">@item.Description</td>
+                                        <td class="text-end fw-semibold">@(item.Debit > 0 ? item.Debit.ToString("N2") : "-")</td>
+                                        <td class="text-end fw-semibold">@(item.Credit > 0 ? item.Credit.ToString("N2") : "-")</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                        <tfoot class="table-light fw-bold">
+                            <tr>
+                                <td colspan="3" class="text-end text-uppercase" style="font-size: 0.82rem;">Total Amount:</td>
+                                <td class="text-end text-primary">@TotalDebit.ToString("N2")</td>
+                                <td class="text-end text-primary">@TotalCredit.ToString("N2")</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- Original Creator Info Footer -->
+                <div class="d-flex align-items-center justify-content-between small text-muted mb-4 px-2">
+                    <div>
+                        <i class="fas fa-laptop me-1"></i> Station: <strong>@(SelectedVoucherHeader?.MachineName ?? "N/A")</strong>
+                    </div>
+                    <div>
+                        <i class="fas fa-user-edit me-1"></i> Original Entry User: <strong>@(SelectedVoucherHeader?.GeneratedBy ?? "N/A")</strong>
+                    </div>
+                </div>
+
+                <!-- Director Decision Action Panel -->
+                @if (IsDirector && (ActiveTask == null || ActiveTask.Status == TaskItemStatus.Pending || ActiveTask.Status == TaskItemStatus.InProgress))
+                {
+                    <div class="card border border-primary border-opacity-25 rounded-3 shadow-sm" style="background: #fdfdfd;">
+                        <div class="card-body p-3">
+                            <h6 class="fw-bold text-dark mb-2 d-flex align-items-center gap-2">
+                                <i class="fas fa-user-check text-primary"></i> Director Review &amp; Decision
+                            </h6>
+                            
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold text-secondary">Director Remarks / Justification (Optional for approval, required for rejection):</label>
+                                <textarea class="form-control form-control-sm" rows="2" @bind="DirectorRemarks" placeholder="Enter remarks or reason for decision..."></textarea>
+                            </div>
+
+                            <div class="d-flex align-items-center justify-content-end gap-2 flex-wrap">
+                                <button class="btn btn-outline-secondary btn-sm px-3" @onclick="ClearSelection" disabled="@IsProcessing">
+                                    <i class="fas fa-times me-1"></i> Close
+                                </button>
+                                
+                                <button class="btn btn-outline-danger btn-sm px-4 fw-semibold" @onclick="RejectRequestAsync" disabled="@IsProcessing">
+                                    <i class="fas fa-ban me-1"></i> Reject Deletion Request
+                                </button>
+
+                                <button class="btn btn-danger btn-sm px-4 fw-bold shadow-sm" @onclick="ApproveAndDeleteAsync" disabled="@IsProcessing">
+                                    @if (IsProcessing)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                        <span>Processing...</span>
+                                    }
+                                    else
+                                    {
+                                        <i class="fas fa-check-circle me-1"></i>
+                                        <span>Approve &amp; Delete Voucher</span>
+                                    }
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else if (!IsDirector && (ActiveTask == null || ActiveTask.Status == TaskItemStatus.Pending || ActiveTask.Status == TaskItemStatus.InProgress))
+                {
+                    <div class="alert alert-info d-flex align-items-center gap-2 py-2 px-3 small rounded-3 mb-0">
+                        <i class="fas fa-info-circle fs-5"></i>
+                        <div>This deletion request is currently waiting for a user with the <strong>Director</strong> role to approve or reject.</div>
+                    </div>
+                }
+                else if (ActiveTask != null && ActiveTask.Status == TaskItemStatus.Completed)
+                {
+                    <div class="alert alert-success d-flex align-items-center gap-2 py-2 px-3 small rounded-3 mb-0">
+                        <i class="fas fa-check-circle fs-5"></i>
+                        <div>This voucher deletion request was <strong>Approved and Deleted</strong> by <strong>@ActiveTask.CompletedBy</strong> on <strong>@(ActiveTask.CompletedAt?.ToString("dd-MMM-yyyy HH:mm") ?? "N/A")</strong>.</div>
+                    </div>
+                }
+                else if (ActiveTask != null && ActiveTask.Status == TaskItemStatus.Cancelled)
+                {
+                    <div class="alert alert-danger d-flex align-items-center gap-2 py-2 px-3 small rounded-3 mb-0">
+                        <i class="fas fa-times-circle fs-5"></i>
+                        <div>This voucher deletion request was <strong>Rejected</strong> by <strong>@ActiveTask.CompletedBy</strong> on <strong>@(ActiveTask.UpdatedAt?.ToString("dd-MMM-yyyy HH:mm") ?? "N/A")</strong>. The voucher remains intact in the ledger.</div>
+                    </div>
+                }
+            }
+            else
+            {
+                <!-- ================= PENDING REQUESTS QUEUE VIEW ================= -->
+                
+                <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                    <div>
+                        <span class="badge bg-primary rounded-pill px-3 py-2 fw-semibold" style="font-size: 0.85rem;">
+                            <i class="fas fa-inbox me-1"></i> Pending Requests: @PendingTasks.Count
+                        </span>
+                    </div>
+
+                    <div class="input-group input-group-sm" style="max-width: 320px;">
+                        <span class="input-group-text bg-light"><i class="fas fa-search text-muted"></i></span>
+                        <input type="text" class="form-control" placeholder="Search voucher #, originator, reason..." 
+                               @bind="SearchText" @bind:event="oninput" />
+                    </div>
+                </div>
+
+                @if (FilteredPendingTasks.Count == 0)
+                {
+                    <div class="text-center py-5 bg-light rounded-3 border">
+                        <div class="text-muted mb-2"><i class="fas fa-check-double fa-3x text-success"></i></div>
+                        <h6 class="fw-bold text-dark">No Pending Voucher Deletion Requests</h6>
+                        <p class="text-muted small mb-0">All voucher deletion workflows have been processed or queue is empty.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive rounded-3 border" style="position: relative; z-index: 1;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                <tr>
+                                    <th style="width: 12%;">Voucher #</th>
+                                    <th style="width: 15%;">Requested By</th>
+                                    <th style="width: 15%;">Date &amp; Time</th>
+                                    <th style="width: 38%;">Reason for Deletion</th>
+                                    <th style="width: 10%;" class="text-center">Priority</th>
+                                    <th style="width: 10%;" class="text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var task in FilteredPendingTasks)
+                                {
+                                    <tr style="cursor: pointer;" @onclick="() => SelectVoucherForReview(task.SourceEntityRefId)">
+                                        <td>
+                                            <span class="fw-bold text-primary">#@task.SourceEntityRefId</span>
+                                        </td>
+                                        <td>
+                                            <i class="fas fa-user-circle text-muted me-1"></i>@task.AssignedBy
+                                        </td>
+                                        <td class="text-muted small">
+                                            @task.CreatedAt.ToLocalTime().ToString("dd-MMM-yyyy hh:mm tt")
+                                        </td>
+                                        <td>
+                                            <div class="text-truncate" style="max-width: 420px;" title="@task.Description">
+                                                @task.Description
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 rounded-pill px-2 py-1" style="font-size: 0.72rem;">
+                                                Urgent
+                                            </span>
+                                        </td>
+                                        <td class="text-center" @onclick:stopPropagation="true">
+                                            <button class="btn btn-outline-primary btn-sm px-2 py-1" @onclick="() => SelectVoucherForReview(task.SourceEntityRefId)">
+                                                <i class="fas fa-eye me-1"></i> Review
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            }
+
+        </div>
+    </div>
+</div>

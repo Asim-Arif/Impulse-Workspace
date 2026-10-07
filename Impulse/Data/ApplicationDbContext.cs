@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Impulse.Data
@@ -19,5 +19,6 @@ namespace Impulse.Data
         public string UserName { get; set; }
         //public string EmpID { get; set; }
         public string Password { get; set; } 
+        public bool? InActive { get; set; }
     }
 }

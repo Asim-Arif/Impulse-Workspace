@@ -188,6 +188,8 @@ namespace Impulse.Pages.Payroll.SalarySheet
                     $"There are {negativeSalaries.Count} employees with negative net payable salaries.\nDo you want to Force Salary Finalization?");
                 if (!forceFinalize)
                 {
+                    IsSaving = false;
+                    await InvokeAsync(StateHasChanged);
                     return;
                 }
             }
@@ -198,6 +200,8 @@ namespace Impulse.Pages.Payroll.SalarySheet
                     $"Are you sure you want to finalize the salary sheet for {Filter.Month}/{Filter.Year}?");
                 if (!confirm)
                 {
+                    IsSaving = false;
+                    await InvokeAsync(StateHasChanged);
                     return;
                 }
             }
@@ -469,8 +473,18 @@ namespace Impulse.Pages.Payroll.SalarySheet
             };
         }
 
+        private async Task EnsurePrintSalaryPopulatedAsync()
+        {
+            if (SalaryRows != null && SalaryRows.Count > 0)
+            {
+                await _salarySheetService.PopulatePrintSalaryTableAsync(Filter.Year, Filter.Month, Filter.IsExternal, SalaryRows);
+            }
+        }
+
         private async Task PrintSalarySheetDetail(bool isNegative = false)
         {
+            await EnsurePrintSalaryPopulatedAsync();
+
             string reportName;
             if (companyName.Equals("Dr-Frgz", StringComparison.OrdinalIgnoreCase) ||
                 companyName.Equals("Banzai", StringComparison.OrdinalIgnoreCase) ||
@@ -526,6 +540,8 @@ namespace Impulse.Pages.Payroll.SalarySheet
 
         private async Task PrintSalarySheetSummary()
         {
+            await EnsurePrintSalaryPopulatedAsync();
+
             string selectionFormula = GetSalarySheetSelectionFormula(false);
             var formulaValues = GetSalaryReportFormulaValues(true);
 
@@ -541,6 +557,8 @@ namespace Impulse.Pages.Payroll.SalarySheet
 
         private async Task PrintSalarySheetInternal()
         {
+            await EnsurePrintSalaryPopulatedAsync();
+
             string selectionFormula = GetSalarySheetSelectionFormula(false);
             var formulaValues = GetSalaryReportFormulaValues();
 
@@ -556,6 +574,8 @@ namespace Impulse.Pages.Payroll.SalarySheet
 
         private async Task PrintLateEmpList()
         {
+            await EnsurePrintSalaryPopulatedAsync();
+
             string selectionFormula = GetSalarySheetSelectionFormula(false);
             var formulaValues = GetSalaryReportFormulaValues();
 
@@ -628,13 +648,15 @@ namespace Impulse.Pages.Payroll.SalarySheet
                 { "Hundreds", hundreds },
                 { "Fifties", fifties },
                 { "Tens", tens },
-                { "Fives", fives },
+                { "Fives", convenientOrOriginal(fives) },
                 { "Tows", twos },
                 { "Twos", twos },
                 { "Ones", ones },
                 { "TotalSal", $"'{totalSal:N0}'" }
             };
         }
+
+        private object convenientOrOriginal(long val) => val;
 
         private async Task PrintCurrencyDenomination()
         {
@@ -652,6 +674,8 @@ namespace Impulse.Pages.Payroll.SalarySheet
 
         private async Task PrintPaySlips(int reportType)
         {
+            await EnsurePrintSalaryPopulatedAsync();
+
             string reportName = reportType switch
             {
                 1 => ReportNames.Payroll.PaySlipRule9,
@@ -675,6 +699,8 @@ namespace Impulse.Pages.Payroll.SalarySheet
 
         private async Task PrintSalaryPacket()
         {
+            await EnsurePrintSalaryPopulatedAsync();
+
             string cond = "{VPaySlip.BankPymt}=False";
             string baseFilter = GetSalarySheetSelectionFormula(false);
             if (!string.IsNullOrEmpty(baseFilter))
@@ -694,6 +720,8 @@ namespace Impulse.Pages.Payroll.SalarySheet
 
         private async Task PrintPayslipsInternal()
         {
+            await EnsurePrintSalaryPopulatedAsync();
+
             string selectionFormula = GetSalarySheetSelectionFormula(false);
             var formulaValues = GetSalaryReportFormulaValues();
 
@@ -709,6 +737,8 @@ namespace Impulse.Pages.Payroll.SalarySheet
 
         private async Task PrintOTPaySheet()
         {
+            await EnsurePrintSalaryPopulatedAsync();
+
             string cond = "{@OHAmt}>0";
             string baseFilter = GetSalarySheetSelectionFormula(false);
             if (!string.IsNullOrEmpty(baseFilter))

@@ -217,6 +217,11 @@ namespace Impulse.Pages.Export.Orders
             isLoading = true;
             try
             {
+                if (!isDirector)
+                {
+                    selectedCountryFilter = "<All Countries>";
+                }
+
                 string custCode = selectedCustomerFilter?.CustCode ?? "0";
                 int compRefId = selectedCompanyFilter?.EntryID ?? 0;
 
@@ -285,7 +290,10 @@ namespace Impulse.Pages.Export.Orders
         public async Task<IEnumerable<CustomerLookupModel>> SearchCustomers(string searchText)
         {
             if (string.IsNullOrWhiteSpace(searchText)) return customers;
-            return await Task.FromResult(customers.Where(c => c.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase)).ToList());
+            return await Task.FromResult(customers.Where(c => 
+                (!string.IsNullOrEmpty(c.CustCode) && c.CustCode.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrEmpty(c.Name) && c.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+            ).ToList());
         }
 
         public async Task OnCustomerChanged(CustomerLookupModel? cust)
@@ -297,7 +305,14 @@ namespace Impulse.Pages.Export.Orders
 
         public async Task OnCountryChanged(ChangeEventArgs e)
         {
-            selectedCountryFilter = e.Value?.ToString() ?? "<All Countries>";
+            if (!isDirector)
+            {
+                selectedCountryFilter = "<All Countries>";
+            }
+            else
+            {
+                selectedCountryFilter = e.Value?.ToString() ?? "<All Countries>";
+            }
             await RefreshList();
         }
 

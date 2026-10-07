@@ -119,7 +119,7 @@ namespace DataAccessLibrary.DAC.Payroll
 
             sql += " ORDER BY v.DeptID, v.EmpID ASC";
 
-            var result = await db.QueryAsync<SalarySheetRowModel>(sql, parameters);
+            var result = await db.QueryAsync<SalarySheetRowModel>(sql, parameters, commandTimeout: 180);
             return result.ToList();
         }
 
@@ -129,7 +129,7 @@ namespace DataAccessLibrary.DAC.Payroll
 
             // Fetch department name map to ensure DeptName is never blank
             const string deptSql = "SELECT DeptID, Name FROM Departments";
-            var deptMap = (await db.QueryAsync<(string DeptID, string Name)>(deptSql))
+            var deptMap = (await db.QueryAsync<(string DeptID, string Name)>(deptSql, commandTimeout: 180))
                 .ToDictionary(x => x.DeptID, x => x.Name, StringComparer.OrdinalIgnoreCase);
 
             DateTime targetDate = new DateTime(filter.Year, filter.Month, DateTime.DaysInMonth(filter.Year, filter.Month));
@@ -148,7 +148,7 @@ namespace DataAccessLibrary.DAC.Payroll
                 parameters.Add("@EmpID", filter.EmpID == "0" ? "%" : filter.EmpID);
             }
 
-            var rawRows = await db.QueryAsync<dynamic>(spName, parameters, commandType: CommandType.StoredProcedure);
+            var rawRows = await db.QueryAsync<dynamic>(spName, parameters, commandType: CommandType.StoredProcedure, commandTimeout: 180);
 
             int monthDays = DateTime.DaysInMonth(filter.Year, filter.Month);
             List<SalarySheetRowModel> list = new List<SalarySheetRowModel>();
@@ -934,6 +934,116 @@ namespace DataAccessLibrary.DAC.Payroll
             string stAccNo = (await db.ExecuteScalarAsync<string>(stAccSql)) ?? "";
             string ltAccNo = (await db.ExecuteScalarAsync<string>(ltAccSql)) ?? "";
             return (stAccNo, ltAccNo);
+        }
+
+        public async Task PopulatePrintSalaryTableAsync(int year, int month, bool isExternal, List<SalarySheetRowModel> rows)
+        {
+            using IDbConnection db = new SqlConnection(_connectionString);
+            if (db.State != ConnectionState.Open) db.Open();
+
+            DateTime dtMonthStart = new DateTime(year, month, 1);
+            decimal hrsMultiple = isExternal ? 8m : 1m;
+
+            using IDbTransaction trans = db.BeginTransaction();
+            try
+            {
+                await db.ExecuteAsync("DELETE FROM PrintSalary", transaction: trans, commandTimeout: 180);
+
+                if (rows != null && rows.Count > 0)
+                {
+                    const string insertSql = @"
+                        INSERT INTO PrintSalary
+                            (EmpID, EmpName, BSal, Rate, ADays, AAmt, AAllow, AAllowAmt, SDays, SAmt, Leaves, LeaveAmt,
+                             OHrs, OAmt, LHrs, LAmt, Total, Tax, NetTtl, Paid, LongTerm, AdvSal, SocialAmt, Fine, Bonus,
+                             Balance, AdvPer, DT, PrevLTLoan, CasualLeaves, SickLeaves, AnnualLeaves, CompensatoryLeaves,
+                             WPLeaves, MaternityLeaves, HrsPerDay, EOBI, SundayOTHrs, SundayOTRate, FixAllowance,
+                             HoldSalaryAmt, PresentDays, LeaveDays, LateComingHrs, ShortHrs, AmtPaid, GPHrs, GPHrsAmt,
+                             DeptID, OTDinnerCount, OTDinnerAmount, DedOnePercent, PerformanceDedAmt, RejectionDedAmt,
+                             ShortHrsAmt, ZeroAbsentBonus, OTHrs_Original, LateHrs_Original, OTHrs_Net, LateHrs_Net)
+                        VALUES
+                            (@EmpID, @EmpName, @BSal, @Rate, @ADays, @AAmt, @AAllow, @AAllowAmt, @SDays, @SAmt, @Leaves, @LeaveAmt,
+                             @OHrs, @OAmt, @LHrs, @LAmt, @Total, @Tax, @NetTtl, @Paid, @LongTerm, @AdvSal, @SocialAmt, @Fine, @Bonus,
+                             @Balance, @AdvPer, @DT, @PrevLTLoan, @CasualLeaves, @SickLeaves, @AnnualLeaves, @CompensatoryLeaves,
+                             @WPLeaves, @MaternityLeaves, @HrsPerDay, @EOBI, @SundayOTHrs, @SundayOTRate, @FixAllowance,
+                             @HoldSalaryAmt, @PresentDays, @LeaveDays, @LateComingHrs, @ShortHrs, @AmtPaid, @GPHrs, @GPHrsAmt,
+                             @DeptID, @OTDinnerCount, @OTDinnerAmount, @DedOnePercent, @PerformanceDedAmt, @RejectionDedAmt,
+                             @ShortHrsAmt, @ZeroAbsentBonus, @OTHrs_Original, @LateHrs_Original, @OTHrs_Net, @LateHrs_Net)";
+
+                    foreach (var row in rows)
+                    {
+                        await db.ExecuteAsync(insertSql, new
+                        {
+                            EmpID = row.EmpID,
+                            EmpName = row.EmpName,
+                            BSal = (double)row.BasicSalary,
+                            Rate = (double)Math.Round(row.DailyRate / hrsMultiple, 2, MidpointRounding.AwayFromZero),
+                            ADays = row.DisplayAbsentDays != 0 ? row.DisplayAbsentDays * (double)hrsMultiple : row.AbsentDays * (double)hrsMultiple,
+                            AAmt = (double)row.AbsentDeductionAmount,
+                            AAllow = (double)row.AbsentAllowed,
+                            AAllowAmt = (double)row.AbsentAllowedAmount,
+                            SDays = row.LegacySalHrs != 0 ? row.LegacySalHrs : row.EarnedDays,
+                            SAmt = (double)row.EarnedSalary,
+                            Leaves = (row.LeaveDays * (double)hrsMultiple).ToString(),
+                            LeaveAmt = 0.0,
+                            OHrs = MinsToTime(row.OTHours),
+                            OAmt = (double)row.OTAmount,
+                            LHrs = MinsToTime(row.LegacyLateHrs != 0 ? row.LegacyLateHrs : row.LateComingHrs),
+                            LAmt = (double)row.LateAmount,
+                            Total = (double)row.GrossEarnings,
+                            Tax = (double)row.TaxDeduction,
+                            NetTtl = (double)row.NetEarnings,
+                            Paid = (double)row.ShortTermAdvanceDeduction,
+                            LongTerm = (double)row.LongTermLoanDeduction,
+                            AdvSal = (double)row.AdvSalaryPaid,
+                            SocialAmt = 0.0,
+                            Fine = (double)row.FineDeduction,
+                            Bonus = 0.0,
+                            Balance = (double)row.NetPayable,
+                            AdvPer = 0.0,
+                            DT = dtMonthStart,
+                            PrevLTLoan = (double)row.PrevLTLoanBalance,
+                            CasualLeaves = (byte)row.CasualLeaves,
+                            SickLeaves = (byte)row.SickLeaves,
+                            AnnualLeaves = (byte)row.AnnualLeaves,
+                            CompensatoryLeaves = (byte)row.CompensatoryLeaves,
+                            WPLeaves = (byte)row.WPLeaves,
+                            MaternityLeaves = (byte)row.MaternityLeaves,
+                            HrsPerDay = (float)row.HrsPerDay,
+                            EOBI = (double)row.EOBIDeduction,
+                            SundayOTHrs = (float)row.SundayOTHrs,
+                            SundayOTRate = (float)row.SundayOTRate,
+                            FixAllowance = (int)row.FixAllowance,
+                            HoldSalaryAmt = (int)row.HoldSalaryAmt,
+                            PresentDays = (float)(row.EarnedDays - row.LeaveDays),
+                            LeaveDays = (float)row.LeaveDays,
+                            LateComingHrs = (float)row.LateComingHrs,
+                            ShortHrs = (float)row.ShortHoursOnly,
+                            AmtPaid = (int)row.AmtPaid,
+                            GPHrs = (float)row.GPHrs,
+                            GPHrsAmt = (float)row.GPHrsDeduction,
+                            DeptID = row.DeptID,
+                            OTDinnerCount = row.OTDinnerCount,
+                            OTDinnerAmount = (int)row.OTDinnerAmount,
+                            DedOnePercent = (int)row.DedOnePercent,
+                            PerformanceDedAmt = 0,
+                            RejectionDedAmt = 0,
+                            ShortHrsAmt = (float)row.ShortAmount,
+                            ZeroAbsentBonus = (int)row.ZeroAbsentBonus,
+                            OTHrs_Original = (float)row.OTHrs_Original,
+                            LateHrs_Original = (float)row.LateHrs_Original,
+                            OTHrs_Net = (float)row.OTHrs_Net,
+                            LateHrs_Net = (float)row.LateHrs_Net
+                        }, transaction: trans, commandTimeout: 180);
+                    }
+                }
+
+                trans.Commit();
+            }
+            catch
+            {
+                trans.Rollback();
+                throw;
+            }
         }
     }
 }
