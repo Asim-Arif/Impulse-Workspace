@@ -1,4 +1,5 @@
 using BlazorContextMenu;
+using DataAccessLibrary.Interface.Setup;
 using DataAccessLibrary.Models.ViewModels.Production;
 using Impulse.Services;
 using Impulse.Services.Production;
@@ -19,6 +20,8 @@ namespace Impulse.Pages.Production.DispatchList
         [Inject] private Radzen.NotificationService NotificationService { get; set; } = default!;
         [Inject] private IReportNavigationService ReportNavigationService { get; set; } = default!;
         [Inject] private AuthenticationStateProvider AuthStateProvider { get; set; } = default!;
+        [Inject] private IUserRoleDataAccess UserRoleDataAccess { get; set; } = default!;
+        [Inject] private IUserDataAccess UserDataAccess { get; set; } = default!;
 
         // Lookups & Grid
         public List<LookupItemString> Customers { get; set; } = new List<LookupItemString>();
@@ -30,6 +33,7 @@ namespace Impulse.Pages.Production.DispatchList
 
         public bool IsLoading { get; set; } = false;
         public DispatchListSummaryItem? ContextRowItem { get; set; } = null;
+        protected bool isDirector = false;
 
         // Computed Properties
         public int TotalCartonsSum => DispatchLists.Sum(x => x.TotalCartons);
@@ -39,6 +43,7 @@ namespace Impulse.Pages.Production.DispatchList
         {
             try
             {
+                await CheckDirectorRoleAsync();
                 Customers = await DispatchService.GetCustomersAsync();
 
                 Filter.DateRangeIndex = 0;
@@ -56,6 +61,36 @@ namespace Impulse.Pages.Production.DispatchList
                     Detail = ex.Message,
                     Duration = 4000
                 });
+            }
+        }
+
+        private async Task CheckDirectorRoleAsync()
+        {
+            try
+            {
+                var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+                var user = authState.User;
+                if (user.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(user.Identity.Name))
+                {
+                    var dbUser = await UserDataAccess.GetUserByUserNameAsync(user.Identity.Name);
+                    if (dbUser != null)
+                    {
+                        if (dbUser.UserManagement == true)
+                        {
+                            isDirector = true;
+                            return;
+                        }
+                        var roles = await UserRoleDataAccess.GetRolesByUserIdAsync(dbUser.UserID);
+                        if (roles != null && roles.Any(r => r.Equals("Director", StringComparison.OrdinalIgnoreCase)))
+                        {
+                            isDirector = true;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error checking director role: {ex.Message}");
             }
         }
 

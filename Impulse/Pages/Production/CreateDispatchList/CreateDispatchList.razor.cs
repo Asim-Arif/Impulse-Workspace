@@ -1,4 +1,5 @@
 using BlazorContextMenu;
+using DataAccessLibrary.Interface.Setup;
 using DataAccessLibrary.Models.ViewModels.Production;
 using Impulse.Services;
 using Impulse.Services.Production;
@@ -19,6 +20,8 @@ namespace Impulse.Pages.Production.CreateDispatchList
         [Inject] private Radzen.NotificationService NotificationService { get; set; } = default!;
         [Inject] private IReportNavigationService ReportNavigationService { get; set; } = default!;
         [Inject] private AuthenticationStateProvider AuthStateProvider { get; set; } = default!;
+        [Inject] private IUserRoleDataAccess UserRoleDataAccess { get; set; } = default!;
+        [Inject] private IUserDataAccess UserDataAccess { get; set; } = default!;
 
         // Lookups
         public List<LookupItemString> Customers { get; set; } = new List<LookupItemString>();
@@ -48,6 +51,7 @@ namespace Impulse.Pages.Production.CreateDispatchList
         public bool IsSaving { get; set; } = false;
         public bool IsAllSelected { get; set; } = false;
         public bool IsAllStagedSelected { get; set; } = false;
+        protected bool isDirector = false;
 
         // Box Packaging Modal State (Tab 0 -> Tab 1)
         public bool ShowStageModal { get; set; } = false;
@@ -71,6 +75,7 @@ namespace Impulse.Pages.Production.CreateDispatchList
         {
             try
             {
+                await CheckDirectorRoleAsync();
                 Customers = await DispatchListService.GetCustomersAsync();
                 Makers = await DispatchListService.GetMakersAsync();
                 Articles = await DispatchListService.GetArticlesAsync();
@@ -119,6 +124,35 @@ namespace Impulse.Pages.Production.CreateDispatchList
             }
         }
 
+        private async Task CheckDirectorRoleAsync()
+        {
+            try
+            {
+                var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+                var user = authState.User;
+                if (user.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(user.Identity.Name))
+                {
+                    var dbUser = await UserDataAccess.GetUserByUserNameAsync(user.Identity.Name);
+                    if (dbUser != null)
+                    {
+                        if (dbUser.UserManagement == true)
+                        {
+                            isDirector = true;
+                            return;
+                        }
+                        var roles = await UserRoleDataAccess.GetRolesByUserIdAsync(dbUser.UserID);
+                        if (roles != null && roles.Any(r => r.Equals("Director", StringComparison.OrdinalIgnoreCase)))
+                        {
+                            isDirector = true;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error checking director role: {ex.Message}");
+            }
+        }
 
         public async Task<IEnumerable<LookupItemString>> SearchCustomers(string searchText)
         {

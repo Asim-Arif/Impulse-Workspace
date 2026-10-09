@@ -21,12 +21,19 @@ namespace Impulse.Pages.Production.ReceivingList
         [Inject] public AuthenticationStateProvider AuthenticationStateProvider { get; set; } = default!;
         [Inject] public IBlazorContextMenuService BlazorContextMenuService { get; set; } = default!;
         [Inject] public SecurityService SecurityService { get; set; } = default!;
+        [Inject] public Impulse.Services.WorkflowTasks.IWorkflowTaskEngine WorkflowTaskEngine { get; set; } = default!;
+        [Inject] public DataAccessLibrary.Interface.Production.IProductionDeletionDataAccess ProductionDeletionDataAccess { get; set; } = default!;
 
         // ─────────────────────────────────────────────────────────────
         // State
         // ─────────────────────────────────────────────────────────────
         public MakerRcvListFilter Filter { get; set; } = new MakerRcvListFilter();
         public List<MakerRcvListItem> AllItems { get; set; } = new List<MakerRcvListItem>();
+        public HashSet<long> PendingDeletionVrdEntryIds { get; set; } = new HashSet<long>();
+        public bool ShowDeleteReasonModal { get; set; } = false;
+        public string DeleteRequestReason { get; set; } = string.Empty;
+        public bool IsSubmittingDeleteRequest { get; set; } = false;
+        public MakerRcvListItem? DeletingItem { get; set; } = null;
         private string _clientSearchTerm = string.Empty;
         public string ClientSearchTerm
         {
@@ -191,6 +198,7 @@ namespace Impulse.Pages.Production.ReceivingList
                     (i.LotNo != null && i.LotNo.ToLower().Contains(term)) ||
                     (i.MasterPONo != null && i.MasterPONo.ToLower().Contains(term)) ||
                     (i.OrderNo != null && i.OrderNo.ToLower().Contains(term)) ||
+                    (i.InternalRefNo != null && i.InternalRefNo.ToLower().Contains(term)) ||
                     (i.BillNo != null && i.BillNo.ToLower().Contains(term))
                 ).ToList();
             }
@@ -248,6 +256,16 @@ namespace Impulse.Pages.Production.ReceivingList
                 AllItems = result.Items;
                 LastReportSql = result.ReportSql;
                 currentPage = 1;
+
+                try
+                {
+                    var pendingIds = await ProductionDeletionDataAccess.GetActivePendingVRDEntryIdsAsync();
+                    PendingDeletionVrdEntryIds = new HashSet<long>(pendingIds);
+                }
+                catch
+                {
+                    // Non-critical background failure
+                }
             }
             catch (Exception ex)
             {
@@ -393,14 +411,58 @@ namespace Impulse.Pages.Production.ReceivingList
             return authState.User.Identity?.Name ?? "Admin";
         }
 
-        // ─────────────────────────────────────────────────────────────
-        // Row-Specific Context Menu Actions
-        // ─────────────────────────────────────────────────────────────
+        private async Task<bool> CheckIfLotLockedAsync(MakerRcvListItem? item)
+        {
+            if (item == null) return false;
+
+            if (PendingDeletionVrdEntryIds.Contains(item.VRD_EntryID))
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Action Blocked",
+                    Detail = $"Lot #{item.LotNo} is locked because a deletion request is awaiting Director approval.",
+                    Duration = 5000
+                });
+                return true;
+            }
+
+            bool isLocked = await ProductionDeletionDataAccess.IsLotLockedAsync(item.LotNo ?? "", item.VRD_EntryID);
+            if (isLocked)
+            {
+                PendingDeletionVrdEntryIds.Add(item.VRD_EntryID);
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Action Blocked",
+                    Detail = $"Lot #{item.LotNo} is locked because a deletion request is awaiting Director approval.",
+                    Duration = 5000
+                });
+                return true;
+            }
+
+            return false;
+        }
 
         public async Task DeleteReceiving(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
             if (SelectedItem == null) return;
+
+            // Check if already locked / pending deletion
+            bool isAlreadyPending = await ProductionDeletionDataAccess.IsLotLockedAsync(SelectedItem.LotNo ?? "", SelectedItem.VRD_EntryID);
+            if (isAlreadyPending)
+            {
+                PendingDeletionVrdEntryIds.Add(SelectedItem.VRD_EntryID);
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Request Pending",
+                    Detail = $"A deletion request for Lot #{SelectedItem.LotNo} is already awaiting Director approval.",
+                    Duration = 5000
+                });
+                return;
+            }
 
             // Check for linked issuances
             int issCount = await RcvListService.CheckIssuanceExistsAsync(SelectedItem.VRD_EntryID);
@@ -416,7 +478,23 @@ namespace Impulse.Pages.Production.ReceivingList
                 return;
             }
 
-            // Verify Password via Global Security Service
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            string userName = authState.User.Identity?.Name ?? "Admin";
+            var user = authState.User;
+
+            bool requiresApproval = await WorkflowTaskEngine.IsApprovalRequiredAsync("DeleteLotAuthorization", userName, user);
+
+            if (requiresApproval)
+            {
+                // Non-exempt user -> Open reason modal
+                DeletingItem = SelectedItem;
+                DeleteRequestReason = string.Empty;
+                ShowDeleteReasonModal = true;
+                StateHasChanged();
+                return;
+            }
+
+            // Verify Password via Global Security Service for exempt users
             bool isAuthorized = await SecurityService.VerifyActionAsync("DeleteProdRcv");
 
             if (!isAuthorized)
@@ -425,7 +503,6 @@ namespace Impulse.Pages.Production.ReceivingList
                 return;
             }
 
-            string userName = await GetCurrentUserName();
             string machineName = Environment.MachineName;
 
             bool success = await RcvListService.DeleteReceivingAsync(SelectedItem.VRD_EntryID, userName, machineName);
@@ -443,10 +520,94 @@ namespace Impulse.Pages.Production.ReceivingList
             }
         }
 
+        public void CloseDeleteReasonModal()
+        {
+            ShowDeleteReasonModal = false;
+            DeletingItem = null;
+            DeleteRequestReason = string.Empty;
+        }
+
+        public async Task SubmitDeleteRequestAsync()
+        {
+            if (DeletingItem == null) return;
+
+            if (string.IsNullOrWhiteSpace(DeleteRequestReason))
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Validation", "Please provide a reason for the deletion request.");
+                return;
+            }
+
+            IsSubmittingDeleteRequest = true;
+            StateHasChanged();
+
+            try
+            {
+                var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                string userName = authState.User.Identity?.Name ?? "System";
+
+                var request = new ProductionDeletionRequestModel
+                {
+                    RequestType = "LotReceiving",
+                    EntityRefID = DeletingItem.VRD_EntryID,
+                    LotNo = DeletingItem.LotNo ?? "",
+                    OrderNo = DeletingItem.OrderNo,
+                    ItemCode = DeletingItem.ItemCode,
+                    ItemName = DeletingItem.ItemName,
+                    ProcessID = DeletingItem.ProcessID,
+                    ProcessName = DeletingItem.Description,
+                    MakerID = DeletingItem.VendID,
+                    MakerName = DeletingItem.VenderName,
+                    Qty = DeletingItem.RcvdQty,
+                    RequestedBy = userName,
+                    RequestedDT = DateTime.Now,
+                    Reason = DeleteRequestReason.Trim(),
+                    MachineName = Environment.MachineName,
+                    Status = "Pending"
+                };
+
+                int requestId = await WorkflowTaskEngine.RequestLotReceivingDeletionAsync(request);
+
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Success,
+                    Summary = "Request Submitted",
+                    Detail = $"Deletion request for Lot #{DeletingItem.LotNo} has been submitted to Director for approval (Request #{requestId}).",
+                    Duration = 5000
+                });
+
+                ShowDeleteReasonModal = false;
+                DeletingItem = null;
+                DeleteRequestReason = string.Empty;
+                await LoadDataAsync();
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Submission Failed",
+                    Detail = ex.Message,
+                    Duration = 5000
+                });
+            }
+            finally
+            {
+                IsSubmittingDeleteRequest = false;
+                StateHasChanged();
+            }
+        }
+
         public async Task CloseLot(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
             if (SelectedItem == null || !HasValidLotNo) return;
+            if (await CheckIfLotLockedAsync(SelectedItem)) return;
+
+            bool isAuthorized = await SecurityService.VerifyActionAsync("Close_Lot");
+            if (!isAuthorized)
+            {
+                return;
+            }
 
             string userName = await GetCurrentUserName();
             string machineName = Environment.MachineName;
@@ -475,10 +636,11 @@ namespace Impulse.Pages.Production.ReceivingList
             }
         }
 
-        public void OpenManualPTCPanel(ItemClickEventArgs args)
+        public async Task OpenManualPTCPanel(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
             if (SelectedItem == null || !HasValidLotNo) return;
+            if (await CheckIfLotLockedAsync(SelectedItem)) return;
 
             ManualPTCLotNo = SelectedItem.LotNo;
             ManualPTCValue = string.Empty;
@@ -623,6 +785,7 @@ namespace Impulse.Pages.Production.ReceivingList
         {
             ResolveRowItem(args);
             if (SelectedItem == null) return;
+            if (await CheckIfLotLockedAsync(SelectedItem)) return;
 
             SplitMode = 0;
             _selectedSplitCustomer = null;
@@ -1028,6 +1191,7 @@ namespace Impulse.Pages.Production.ReceivingList
         {
             ResolveRowItem(args);
             if (SelectedItem == null) return;
+            if (await CheckIfLotLockedAsync(SelectedItem)) return;
 
             try
             {
@@ -1764,6 +1928,8 @@ namespace Impulse.Pages.Production.ReceivingList
                 });
                 return;
             }
+
+            if (await CheckIfLotLockedAsync(SelectedItem)) return;
 
             string userName = await GetCurrentUserName();
             string machineName = Environment.MachineName;

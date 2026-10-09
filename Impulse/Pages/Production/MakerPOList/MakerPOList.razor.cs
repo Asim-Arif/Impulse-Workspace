@@ -26,9 +26,18 @@ namespace Impulse.Pages.Production.MakerPOList
         [Inject] public IBlazorContextMenuService BlazorContextMenuService { get; set; } = default!;
         [Inject] public IJSRuntime JSRuntime { get; set; } = default!;
         [Inject] public SecurityService SecurityService { get; set; } = default!;
+        [Inject] public Impulse.Services.WorkflowTasks.IWorkflowTaskEngine WorkflowTaskEngine { get; set; } = default!;
+        [Inject] public DataAccessLibrary.Interface.Production.IProductionDeletionDataAccess ProductionDeletionDataAccess { get; set; } = default!;
 
         public MakerPOListFilter Filter { get; set; } = new MakerPOListFilter();
         public List<MakerPOListItem> AllItems { get; set; } = new List<MakerPOListItem>();
+        public HashSet<long> PendingDeletionIssuanceEntryIds { get; set; } = new HashSet<long>();
+        public HashSet<string> PendingSkipProcessLotNos { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> PendingDeletionLotNos { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        public bool ShowDeleteReasonModal { get; set; } = false;
+        public string DeleteRequestReason { get; set; } = string.Empty;
+        public bool IsSubmittingDeleteRequest { get; set; } = false;
+        public List<MakerPOListItem> DeletingItems { get; set; } = new List<MakerPOListItem>();
         private string _clientSearchTerm = string.Empty;
         public string ClientSearchTerm
         {
@@ -175,7 +184,7 @@ namespace Impulse.Pages.Production.MakerPOList
 
         public bool SelectedHasMasterPO => SelectedItem != null && !string.IsNullOrWhiteSpace(SelectedItem.MasterPONo);
         public bool SelectedHasOrderNo => SelectedItem != null && !string.IsNullOrWhiteSpace(SelectedItem.OrderNo);
-        public bool CanCloseMakerPO => SelectedItem != null && string.IsNullOrWhiteSpace(SelectedItem.MasterPONo);
+        public bool CanCloseMakerPO => SelectedItem != null && !string.IsNullOrWhiteSpace(SelectedItem.MasterPONo);
         public bool HasValidLotNo => SelectedItem != null && !string.IsNullOrWhiteSpace(SelectedItem.LotNo) && SelectedItem.LotNo != "0";
         public bool HasPurchaserSelected => Filter.PurchaserEmpId != "0" && !string.IsNullOrWhiteSpace(Filter.PurchaserEmpId);
 
@@ -255,6 +264,23 @@ namespace Impulse.Pages.Production.MakerPOList
                 LastReportSql = result.ReportSql;
                 CheckedIds.Clear();
                 currentPage = 1;
+
+                try
+                {
+                    var pendingIdsTask = ProductionDeletionDataAccess.GetActivePendingIssuanceEntryIdsAsync();
+                    var pendingSkipLotsTask = ProductionDeletionDataAccess.GetActivePendingSkipProcessLotNosAsync();
+                    var pendingDelLotsTask = ProductionDeletionDataAccess.GetActivePendingDeletionLotNosAsync();
+
+                    await Task.WhenAll(pendingIdsTask, pendingSkipLotsTask, pendingDelLotsTask);
+
+                    PendingDeletionIssuanceEntryIds = new HashSet<long>(await pendingIdsTask);
+                    PendingSkipProcessLotNos = new HashSet<string>(await pendingSkipLotsTask, StringComparer.OrdinalIgnoreCase);
+                    PendingDeletionLotNos = new HashSet<string>(await pendingDelLotsTask, StringComparer.OrdinalIgnoreCase);
+                }
+                catch
+                {
+                    // Non-critical background failure
+                }
             }
             catch (Exception ex)
             {
@@ -523,6 +549,51 @@ namespace Impulse.Pages.Production.MakerPOList
             }
         }
 
+        private async Task<bool> CheckIfIssuanceLockedAsync(MakerPOListItem? item)
+        {
+            if (item == null) return false;
+
+            if (!string.IsNullOrWhiteSpace(item.LotNo) && PendingSkipProcessLotNos.Contains(item.LotNo))
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Action Blocked",
+                    Detail = $"Lot #{item.LotNo} is locked because a Skip Process request is awaiting Director approval.",
+                    Duration = 5000
+                });
+                return true;
+            }
+
+            if (PendingDeletionIssuanceEntryIds.Contains(item.EntryID) || (!string.IsNullOrWhiteSpace(item.LotNo) && PendingDeletionLotNos.Contains(item.LotNo)))
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Action Blocked",
+                    Detail = $"Order/Lot #{item.RecieptID} is locked because a deletion request is awaiting Director approval.",
+                    Duration = 5000
+                });
+                return true;
+            }
+
+            bool isLocked = await ProductionDeletionDataAccess.IsIssuanceLockedAsync(item.EntryID, item.LotNo);
+            if (isLocked)
+            {
+                PendingDeletionIssuanceEntryIds.Add(item.EntryID);
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Action Blocked",
+                    Detail = $"Order/Lot #{item.RecieptID} is locked because a deletion request is awaiting Director approval.",
+                    Duration = 5000
+                });
+                return true;
+            }
+
+            return false;
+        }
+
         public async Task DeleteSelected(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
@@ -543,18 +614,22 @@ namespace Impulse.Pages.Production.MakerPOList
                 return;
             }
 
-            // Verify Password via Global Security Service
-            bool isAuthorized = await SecurityService.VerifyActionAsync("DeleteProdIss");
-
-            if (!isAuthorized)
+            // Check if any selected item is already pending deletion
+            var alreadyPending = targetIds.Where(i => PendingDeletionIssuanceEntryIds.Contains(i.EntryID)).ToList();
+            if (alreadyPending.Any())
             {
-                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Unauthorized", "Incorrect password or action cancelled.");
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Request Pending",
+                    Detail = $"Order/Lot #{string.Join(", ", alreadyPending.Select(p => p.RecieptID))} is already awaiting Director approval.",
+                    Duration = 5000
+                });
                 return;
             }
 
-            int deletedCount = 0;
-            int skippedCount = 0;
-
+            // Pre-validate loans & receiving
+            var validTargets = new List<MakerPOListItem>();
             foreach (var item in targetIds)
             {
                 if (!string.IsNullOrWhiteSpace(item.MasterPONo))
@@ -569,7 +644,6 @@ namespace Impulse.Pages.Production.MakerPOList
                             Detail = $"Cannot delete Order #{item.RecieptID}: Short/Long term loan is issued.",
                             Duration = 5000
                         });
-                        skippedCount++;
                         continue;
                     }
                 }
@@ -579,11 +653,49 @@ namespace Impulse.Pages.Production.MakerPOList
                     int rcvCount = await MakerPOListService.CheckReceivingExistsAsync(item.EntryID);
                     if (rcvCount > 0)
                     {
-                        skippedCount++;
+                        NotificationService.Notify(new Radzen.NotificationMessage
+                        {
+                            Severity = Radzen.NotificationSeverity.Error,
+                            Summary = "Delete Blocked",
+                            Detail = $"Cannot delete Order #{item.RecieptID}: Goods have already been received against this order.",
+                            Duration = 5000
+                        });
                         continue;
                     }
                 }
 
+                validTargets.Add(item);
+            }
+
+            if (!validTargets.Any()) return;
+
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            string userName = authState.User.Identity?.Name ?? "Admin";
+            var user = authState.User;
+
+            bool requiresApproval = await WorkflowTaskEngine.IsApprovalRequiredAsync("DeleteProductionIssuance", userName, user);
+
+            if (requiresApproval)
+            {
+                DeletingItems = validTargets;
+                DeleteRequestReason = string.Empty;
+                ShowDeleteReasonModal = true;
+                StateHasChanged();
+                return;
+            }
+
+            // Verify Password via Global Security Service for exempt users
+            bool isAuthorized = await SecurityService.VerifyActionAsync("DeleteProdIss");
+
+            if (!isAuthorized)
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Unauthorized", "Incorrect password or action cancelled.");
+                return;
+            }
+
+            int deletedCount = 0;
+            foreach (var item in validTargets)
+            {
                 bool result = await MakerPOListService.DeleteIssuanceAsync(item.EntryID);
                 if (result)
                 {
@@ -595,11 +707,93 @@ namespace Impulse.Pages.Production.MakerPOList
             {
                 Severity = deletedCount > 0 ? Radzen.NotificationSeverity.Success : Radzen.NotificationSeverity.Warning,
                 Summary = "Delete Operation Complete",
-                Detail = $"Selected: {targetIds.Count}, Deleted: {deletedCount}, Skipped: {skippedCount}",
+                Detail = $"Selected: {validTargets.Count}, Deleted: {deletedCount}",
                 Duration = 5000
             });
 
             await LoadDataAsync();
+        }
+
+        public void CloseDeleteReasonModal()
+        {
+            ShowDeleteReasonModal = false;
+            DeletingItems.Clear();
+            DeleteRequestReason = string.Empty;
+        }
+
+        public async Task SubmitDeleteRequestAsync()
+        {
+            if (!DeletingItems.Any()) return;
+
+            if (string.IsNullOrWhiteSpace(DeleteRequestReason))
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Warning, "Validation", "Please provide a reason for the deletion request.");
+                return;
+            }
+
+            IsSubmittingDeleteRequest = true;
+            StateHasChanged();
+
+            try
+            {
+                var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                string userName = authState.User.Identity?.Name ?? "System";
+
+                int submittedCount = 0;
+                foreach (var item in DeletingItems)
+                {
+                    var request = new ProductionDeletionRequestModel
+                    {
+                        RequestType = "LotIssuance",
+                        EntityRefID = item.EntryID,
+                        LotNo = item.LotNo ?? "",
+                        OrderNo = item.MasterPONo ?? item.OrderNo,
+                        ItemCode = item.ItemID,
+                        ItemName = item.ItemName,
+                        ProcessID = item.ProcessID,
+                        ProcessName = item.Description,
+                        MakerID = item.VendID,
+                        MakerName = item.VenderName,
+                        Qty = item.TotalIssQty,
+                        RequestedBy = userName,
+                        RequestedDT = DateTime.Now,
+                        Reason = DeleteRequestReason.Trim(),
+                        MachineName = Environment.MachineName,
+                        Status = "Pending"
+                    };
+
+                    await WorkflowTaskEngine.RequestProductionIssuanceDeletionAsync(request);
+                    submittedCount++;
+                }
+
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Success,
+                    Summary = "Requests Submitted",
+                    Detail = $"{submittedCount} issuance deletion request(s) submitted to Director for approval.",
+                    Duration = 5000
+                });
+
+                ShowDeleteReasonModal = false;
+                DeletingItems.Clear();
+                DeleteRequestReason = string.Empty;
+                await LoadDataAsync();
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Submission Failed",
+                    Detail = ex.Message,
+                    Duration = 5000
+                });
+            }
+            finally
+            {
+                IsSubmittingDeleteRequest = false;
+                StateHasChanged();
+            }
         }
 
         public async Task CloseMakerPO(ItemClickEventArgs args)
@@ -617,6 +811,8 @@ namespace Impulse.Pages.Production.MakerPOList
                 });
                 return;
             }
+
+            if (await CheckIfIssuanceLockedAsync(SelectedItem)) return;
 
             if (!string.IsNullOrWhiteSpace(SelectedItem.LotNo) && SelectedItem.LotNo != "0")
             {
@@ -642,6 +838,12 @@ namespace Impulse.Pages.Production.MakerPOList
                 return;
             }
 
+            bool isAuthorized = await SecurityService.VerifyActionAsync("CloseMakerPO");
+            if (!isAuthorized)
+            {
+                return;
+            }
+
             bool success = await MakerPOListService.CloseMakerPOAsync(SelectedItem.EntryID, SelectedItem.MasterPONo);
             if (success)
             {
@@ -656,7 +858,13 @@ namespace Impulse.Pages.Production.MakerPOList
             }
         }
 
-        public void EditPromises(ItemClickEventArgs args)
+        public bool IsEditPromisesModalOpen { get; set; } = false;
+        public bool IsLoadingPromises { get; set; } = false;
+        public bool IsSavingPromises { get; set; } = false;
+        public List<MakerPOReturnDateItemDto> ReturnDatesList { get; set; } = new();
+        public MakerPOListItem? SelectedItemForPromises { get; set; }
+
+        public async Task EditPromises(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
             if (SelectedItem == null)
@@ -670,25 +878,98 @@ namespace Impulse.Pages.Production.MakerPOList
                 });
                 return;
             }
-            if (string.IsNullOrWhiteSpace(SelectedItem.MasterPONo))
+
+            SelectedItemForPromises = SelectedItem;
+            IsEditPromisesModalOpen = true;
+            IsLoadingPromises = true;
+
+            try
+            {
+                ReturnDatesList = await MakerPOListService.GetMakerPOReturnDatesAsync(SelectedItem.EntryID);
+            }
+            catch (Exception ex)
             {
                 NotificationService.Notify(new Radzen.NotificationMessage
                 {
-                    Severity = Radzen.NotificationSeverity.Warning,
-                    Summary = "No Master PO",
-                    Detail = "The selected order does not have a Master PO #.",
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Error Loading Return Dates",
+                    Detail = ex.Message,
                     Duration = 4000
                 });
+            }
+            finally
+            {
+                IsLoadingPromises = false;
+            }
+        }
+
+        public void CloseEditPromisesModal()
+        {
+            IsEditPromisesModalOpen = false;
+            ReturnDatesList.Clear();
+            SelectedItemForPromises = null;
+        }
+
+        public async Task SavePromisesAsync()
+        {
+            if (SelectedItemForPromises == null || !ReturnDatesList.Any())
+            {
+                CloseEditPromisesModal();
                 return;
             }
 
-            NotificationService.Notify(new Radzen.NotificationMessage
+            IsSavingPromises = true;
+            try
             {
-                Severity = Radzen.NotificationSeverity.Info,
-                Summary = "Edit Promises",
-                Detail = $"Editing promises for Master PO #{SelectedItem.MasterPONo}.",
-                Duration = 3000
-            });
+                var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                string userName = authState.User.Identity?.Name ?? "Admin";
+                string machineName = Environment.MachineName;
+
+                bool success = await MakerPOListService.UpdateMakerPOReturnDatesAsync(
+                    SelectedItemForPromises.EntryID,
+                    ReturnDatesList,
+                    userName,
+                    machineName
+                );
+
+                if (success)
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Success,
+                        Summary = "Return Dates Updated",
+                        Detail = $"Return dates updated successfully for Master PO #{SelectedItemForPromises.MasterPONo}.",
+                        Duration = 4000
+                    });
+
+                    CloseEditPromisesModal();
+                    await LoadDataAsync();
+                }
+                else
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Warning,
+                        Summary = "Update Incomplete",
+                        Detail = "No records were updated.",
+                        Duration = 4000
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Error Updating Return Dates",
+                    Detail = ex.Message,
+                    Duration = 5000
+                });
+            }
+            finally
+            {
+                IsSavingPromises = false;
+            }
         }
 
         public void AddBookmark(ItemClickEventArgs args)

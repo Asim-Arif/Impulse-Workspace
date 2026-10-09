@@ -162,13 +162,16 @@ namespace DataAccessLibrary.DAC.Dashboard
 
             // 4. Open Maker POs
             string openPoSql = @"
-                SELECT EntryID, RecieptID, VenderName AS MakerName, OrderNo, Qty, ReturnDT, MasterPONo
+                SELECT VItemOpenPOs.EntryID, VItemOpenPOs.RecieptID, VItemOpenPOs.VenderName AS MakerName,
+                       VItemOpenPOs.OrderNo, ISNULL(FCustomerOrders.InternalRefNo, VItemOpenPOs.OrderNo) AS InternalRefNo,
+                       VItemOpenPOs.Qty, VItemOpenPOs.ReturnDT, VItemOpenPOs.MasterPONo
                 FROM VItemOpenPOs
-                WHERE ItemCode = @ItemCode";
+                LEFT OUTER JOIN FCustomerOrders ON VItemOpenPOs.OrderNo = FCustomerOrders.OrderNo
+                WHERE VItemOpenPOs.ItemCode = @ItemCode";
 
             if (!string.IsNullOrWhiteSpace(filterOrderNo))
-                openPoSql += " AND OrderNo = @FilterOrderNo";
-            openPoSql += " ORDER BY ReturnDT ASC";
+                openPoSql += " AND VItemOpenPOs.OrderNo = @FilterOrderNo";
+            openPoSql += " ORDER BY VItemOpenPOs.ReturnDT ASC";
 
             var openPos = await db.QueryAsync<OpenPOItem>(openPoSql, new { ItemCode = itemCode, FilterOrderNo = filterOrderNo });
             data.OpenPOs = openPos.ToList();

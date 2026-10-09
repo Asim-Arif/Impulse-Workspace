@@ -38,7 +38,7 @@ namespace DataAccessLibrary.DAC.Production
                 FROM FCustomerOrders co WITH (NOLOCK)
                 LEFT JOIN ForeignCustomers c WITH (NOLOCK) ON co.CustCode = c.CustCode
                 WHERE ISNULL(co.CustCode, '') <> ''
-                ORDER BY CustName ASC";
+                ORDER BY co.CustCode ASC";
 
             return (await db.QueryAsync<TrackingCustomerLookupItem>(sql)).ToList();
         }
@@ -54,7 +54,7 @@ namespace DataAccessLibrary.DAC.Production
                     co.DT
                 FROM FCustomerOrders co WITH (NOLOCK)
                 WHERE (@CustCode IS NULL OR @CustCode = '' OR co.CustCode = @CustCode)
-                ORDER BY co.DT DESC, co.OrderNo DESC";
+                ORDER BY co.DT DESC, co.InternalRefNo DESC, co.OrderNo DESC";
 
             return (await db.QueryAsync<TrackingOrderLookupItem>(sql, new { CustCode = custCode })).ToList();
         }
@@ -124,7 +124,7 @@ namespace DataAccessLibrary.DAC.Production
                 p.Add("@CustCode", filter.CustCode.Trim());
             }
 
-            // OrderNo
+            // OrderNo / InternalRefNo
             if (!string.IsNullOrWhiteSpace(filter.OrderNo))
             {
                 string orderNo = filter.OrderNo.Trim();
@@ -134,6 +134,10 @@ namespace DataAccessLibrary.DAC.Production
 
                 p.Add("@OrderNo", orderNo);
                 p.Add("@CleanOrderNo", cleanOrderNo);
+            }
+            if (!string.IsNullOrWhiteSpace(filter.InternalRefNo))
+            {
+                p.Add("@InternalRefNo", filter.InternalRefNo.Trim());
             }
 
             // Hub
@@ -255,6 +259,7 @@ namespace DataAccessLibrary.DAC.Production
                     ISNULL(i.ItemName, ls.ItemCode) AS ItemName,
                     ISNULL(i.ItemSize, '') AS ItemSize,
                     ls.OrderNo,
+                    ISNULL(co.InternalRefNo, '') AS InternalRefNo,
                     co.CustCode,
                     ISNULL(c.Name, co.CustCode) AS CustomerName,
                     ls.ProcessID,
@@ -304,9 +309,13 @@ namespace DataAccessLibrary.DAC.Production
                 queryBuilder.Append(" AND co.CustCode = @CustCode");
             }
 
-            if (!string.IsNullOrWhiteSpace(filter.OrderNo))
+            if (!string.IsNullOrWhiteSpace(filter.InternalRefNo))
             {
-                queryBuilder.Append(" AND (ls.OrderNo = @OrderNo OR ls.OrderNo = @CleanOrderNo)");
+                queryBuilder.Append(" AND (co.InternalRefNo = @InternalRefNo OR ls.OrderNo = @InternalRefNo)");
+            }
+            else if (!string.IsNullOrWhiteSpace(filter.OrderNo))
+            {
+                queryBuilder.Append(" AND (ls.OrderNo = @OrderNo OR ls.OrderNo = @CleanOrderNo OR co.InternalRefNo = @OrderNo)");
             }
 
             if (!string.IsNullOrWhiteSpace(filter.HubName))

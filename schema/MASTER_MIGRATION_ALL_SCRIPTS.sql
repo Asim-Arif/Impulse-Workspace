@@ -5024,3 +5024,145 @@ BEGIN
     END
 END
 GO
+
+-- ============================================================================
+-- Workflow Configurations & Governance Framework
+-- ============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'WorkflowConfigurations')
+BEGIN
+    CREATE TABLE [dbo].[WorkflowConfigurations] (
+        [WorkflowCode]   VARCHAR(50)   NOT NULL,
+        [WorkflowName]   VARCHAR(100)  NOT NULL,
+        [Module]         VARCHAR(50)   NOT NULL,
+        [Description]    VARCHAR(255)  NULL,
+        [IsEnabled]      BIT           NOT NULL CONSTRAINT [DF_WFConfig_IsEnabled] DEFAULT (1),
+        [ApproverRole]   VARCHAR(50)   NOT NULL CONSTRAINT [DF_WFConfig_ApproverRole] DEFAULT ('Director'),
+        [UpdatedDate]    DATETIME      NOT NULL CONSTRAINT [DF_WFConfig_UpdatedDate] DEFAULT (GETDATE()),
+        [UpdatedBy]      VARCHAR(50)   NULL,
+
+        CONSTRAINT [PK_WorkflowConfigurations] PRIMARY KEY CLUSTERED ([WorkflowCode] ASC)
+    );
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'WorkflowExemptRoles')
+BEGIN
+    CREATE TABLE [dbo].[WorkflowExemptRoles] (
+        [ID]           INT          IDENTITY(1,1) NOT NULL,
+        [WorkflowCode] VARCHAR(50)  NOT NULL,
+        [RoleName]     VARCHAR(50)  NOT NULL,
+
+        CONSTRAINT [PK_WorkflowExemptRoles] PRIMARY KEY CLUSTERED ([ID] ASC),
+        CONSTRAINT [FK_WorkflowExemptRoles_Config] FOREIGN KEY ([WorkflowCode]) 
+            REFERENCES [dbo].[WorkflowConfigurations] ([WorkflowCode]) ON DELETE CASCADE,
+        CONSTRAINT [UQ_WorkflowExemptRoles_Code_Role] UNIQUE ([WorkflowCode], [RoleName])
+    );
+END
+GO
+
+-- Seed Master Workflow Configurations
+IF NOT EXISTS (SELECT 1 FROM [dbo].[WorkflowConfigurations] WHERE [WorkflowCode] = 'AttendanceApproval')
+    INSERT INTO [dbo].[WorkflowConfigurations] ([WorkflowCode], [WorkflowName], [Module], [Description], [IsEnabled], [ApproverRole])
+    VALUES ('AttendanceApproval', 'Attendance Edit / Delete Approval', 'Payroll', 'Requires Director approval when non-exempt users modify or delete attendance records.', 1, 'Director');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[WorkflowConfigurations] WHERE [WorkflowCode] = 'MakerRateChange')
+    INSERT INTO [dbo].[WorkflowConfigurations] ([WorkflowCode], [WorkflowName], [Module], [Description], [IsEnabled], [ApproverRole])
+    VALUES ('MakerRateChange', 'Maker Item Rate Change Approval', 'Production', 'Requires Director approval when non-exempt users edit maker assignment rates.', 1, 'Director');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[WorkflowConfigurations] WHERE [WorkflowCode] = 'DeleteLotAuthorization')
+    INSERT INTO [dbo].[WorkflowConfigurations] ([WorkflowCode], [WorkflowName], [Module], [Description], [IsEnabled], [ApproverRole])
+    VALUES ('DeleteLotAuthorization', 'Delete Lot Authorization Approval', 'Production', 'Requires Director approval when non-exempt users request to un-authorize or delete a lot authorization.', 1, 'Director');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[WorkflowConfigurations] WHERE [WorkflowCode] = 'DeleteProductionIssuance')
+    INSERT INTO [dbo].[WorkflowConfigurations] ([WorkflowCode], [WorkflowName], [Module], [Description], [IsEnabled], [ApproverRole])
+    VALUES ('DeleteProductionIssuance', 'Delete Production Issuance Approval', 'Production', 'Requires Director approval when non-exempt users request deletion of an issued Lot or Master PO.', 1, 'Director');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[WorkflowConfigurations] WHERE [WorkflowCode] = 'SkipProcess')
+    INSERT INTO [dbo].[WorkflowConfigurations] ([WorkflowCode], [WorkflowName], [Module], [Description], [IsEnabled], [ApproverRole])
+    VALUES ('SkipProcess', 'Skip Production Process Approval', 'Production', 'Requires Director approval when non-exempt users request to skip a sequential production process on a lot item.', 1, 'Director');
+GO
+
+-- Seed Default Exempt Roles (Direct-Save without approval)
+DECLARE @ExemptList TABLE (Code VARCHAR(50), RoleName VARCHAR(50));
+INSERT INTO @ExemptList (Code, RoleName) VALUES
+    ('AttendanceApproval', 'Director'),
+    ('AttendanceApproval', 'Admin'),
+    ('AttendanceApproval', 'Administrator'),
+
+    ('MakerRateChange', 'Director'),
+    ('MakerRateChange', 'Admin'),
+    ('MakerRateChange', 'Administrator'),
+
+    ('DeleteLotAuthorization', 'Director'),
+    ('DeleteLotAuthorization', 'Admin'),
+    ('DeleteLotAuthorization', 'Administrator'),
+
+    ('DeleteProductionIssuance', 'Director'),
+    ('DeleteProductionIssuance', 'Admin'),
+    ('DeleteProductionIssuance', 'Administrator'),
+
+    ('SkipProcess', 'Director'),
+    ('SkipProcess', 'Admin'),
+    ('SkipProcess', 'Administrator');
+
+INSERT INTO [dbo].[WorkflowExemptRoles] ([WorkflowCode], [RoleName])
+SELECT e.Code, e.RoleName
+FROM @ExemptList e
+WHERE NOT EXISTS (
+    SELECT 1 FROM [dbo].[WorkflowExemptRoles] r 
+    WHERE r.WorkflowCode = e.Code AND r.RoleName = e.RoleName
+);
+GO
+
+-- ====================================================================================================
+-- SCRIPT: Production Deletion Requests Table & Lock Check Function
+-- ====================================================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'ProductionDeletionRequests')
+BEGIN
+    CREATE TABLE [dbo].[ProductionDeletionRequests] (
+        [Id] INT IDENTITY(1,1) PRIMARY KEY,
+        [RequestType] VARCHAR(50) NOT NULL, -- 'LotReceiving', 'LotIssuance', 'MasterPOIssuance', 'SkipProcess'
+        [EntityRefID] BIGINT NOT NULL,       -- VRD_EntryID, Issuance EntryID, etc.
+        [LotNo] VARCHAR(50) NOT NULL,
+        [OrderNo] VARCHAR(50) NULL,
+        [ItemCode] VARCHAR(50) NULL,
+        [ItemName] NVARCHAR(200) NULL,
+        [ProcessID] INT NULL,
+        [ProcessName] NVARCHAR(100) NULL,
+        [MakerID] BIGINT NULL,
+        [MakerName] NVARCHAR(150) NULL,
+        [Qty] NUMERIC(18,2) NOT NULL DEFAULT 0,
+        [RequestedBy] VARCHAR(50) NOT NULL,
+        [RequestedDT] DATETIME NOT NULL DEFAULT GETDATE(),
+        [Reason] NVARCHAR(500) NOT NULL,
+        [MachineName] VARCHAR(100) NULL,
+        [Status] VARCHAR(20) NOT NULL DEFAULT 'Pending', -- 'Pending', 'Approved', 'Rejected', 'Cancelled'
+        [ReviewedBy] VARCHAR(50) NULL,
+        [ReviewedDT] DATETIME NULL,
+        [DirectorRemarks] NVARCHAR(500) NULL,
+        [TaskId] INT NULL
+    );
+
+    CREATE INDEX IX_ProdDelReq_Active ON [dbo].[ProductionDeletionRequests] ([EntityRefID], [Status]);
+    CREATE INDEX IX_ProdDelReq_LotNo ON [dbo].[ProductionDeletionRequests] ([LotNo], [Status]);
+    CREATE INDEX IX_ProdDelReq_TypeStatus ON [dbo].[ProductionDeletionRequests] ([RequestType], [Status]);
+END
+GO
+
+CREATE OR ALTER FUNCTION [dbo].[fn_IsLotPendingDeletion] (@LotNo VARCHAR(50), @VRD_EntryID BIGINT = 0)
+RETURNS BIT
+AS
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM dbo.ProductionDeletionRequests WITH (NOLOCK)
+        WHERE Status = 'Pending'
+          AND (
+              (@VRD_EntryID > 0 AND EntityRefID = @VRD_EntryID)
+              OR (@VRD_EntryID = 0 AND LotNo = @LotNo)
+          )
+    )
+        RETURN 1;
+    RETURN 0;
+END
+GO
+

@@ -42,5 +42,35 @@ namespace Impulse.Services.WorkflowTasks
         Task<bool> RejectAttendanceActionAsync(int taskId, string rejectedByDirectorUserName, string rejectionReason);
         Task<List<DataAccessLibrary.Models.IntraOffice.TaskItem>> GetPendingAttendanceTasksAsync();
         Task<DataAccessLibrary.Models.ViewModels.Payroll.AttendanceWorkflowRequestDto?> GetAttendanceTaskDetailsAsync(int taskId);
+
+        // Maker Item Rate Approval Workflow
+        Task<int> RequestMakerItemRateChangeAsync(DataAccessLibrary.Models.ViewModels.Production.MakerItemRateWorkflowRequestDto request);
+        Task<bool> ApproveMakerItemRateActionAsync(int taskId, string approvedByDirectorUserName, string? directorRemarks = null);
+        Task<bool> RejectMakerItemRateActionAsync(int taskId, string rejectedByDirectorUserName, string rejectionReason);
+        Task<List<DataAccessLibrary.Models.IntraOffice.TaskItem>> GetPendingMakerRateTasksAsync();
+        Task<DataAccessLibrary.Models.ViewModels.Production.MakerItemRateWorkflowRequestDto?> GetMakerRateTaskDetailsAsync(int taskId);
+
+        // Production Deletion Requests Workflow (Lot Receiving, Issuance, etc.)
+        Task<int> RequestLotReceivingDeletionAsync(DataAccessLibrary.Models.ViewModels.Production.ProductionDeletionRequestModel request);
+        Task<bool> ApproveLotReceivingDeletionAsync(int requestId, string approvedByDirectorUserName, string? directorRemarks = null);
+        Task<bool> RejectLotReceivingDeletionAsync(int requestId, string rejectedByDirectorUserName, string rejectionReason);
+        Task<List<DataAccessLibrary.Models.ViewModels.Production.ProductionDeletionRequestModel>> GetPendingLotDeletionRequestsAsync();
+        Task<DataAccessLibrary.Models.ViewModels.Production.ProductionDeletionRequestModel?> GetLotDeletionRequestDetailsAsync(int requestId);
+
+        // Production Issuance Deletion Workflow
+        Task<int> RequestProductionIssuanceDeletionAsync(DataAccessLibrary.Models.ViewModels.Production.ProductionDeletionRequestModel request);
+        Task<bool> ApproveProductionIssuanceDeletionAsync(int requestId, string approvedByDirectorUserName, string? directorRemarks = null);
+        Task<bool> RejectProductionIssuanceDeletionAsync(int requestId, string rejectedByDirectorUserName, string rejectionReason);
+        Task<List<DataAccessLibrary.Models.ViewModels.Production.ProductionDeletionRequestModel>> GetPendingIssuanceDeletionRequestsAsync();
+
+        // Skip Process Governance Workflow
+        Task<int> RequestSkipProcessAsync(DataAccessLibrary.Models.ViewModels.Production.ProductionDeletionRequestModel request);
+        Task<bool> ApproveSkipProcessAsync(int requestId, string approvedByDirectorUserName, string? directorRemarks = null);
+        Task<bool> RejectSkipProcessAsync(int requestId, string rejectedByDirectorUserName, string rejectionReason);
+        Task<List<DataAccessLibrary.Models.ViewModels.Production.ProductionDeletionRequestModel>> GetPendingSkipProcessRequestsAsync();
+
+        // Governance Workflow Config Checks
+        Task<bool> IsApprovalRequiredAsync(string workflowCode, string userName, System.Security.Claims.ClaimsPrincipal? claimsPrincipal = null);
+        Task<DataAccessLibrary.Models.Setup.WorkflowConfigurationModel?> GetWorkflowConfigAsync(string workflowCode);
     }
 }

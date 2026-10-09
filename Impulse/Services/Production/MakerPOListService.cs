@@ -28,5 +28,7 @@ namespace Impulse.Services.Production
         public Task<int> CheckReceivingExistsAsync(long entryId) => _dataAccess.CheckReceivingExistsAsync(entryId);
         public Task<bool> DeleteIssuanceAsync(long entryId) => _dataAccess.DeleteIssuanceAsync(entryId);
         public Task<bool> GetUserRightAsync(string rightName, string userName) => _dataAccess.GetUserRightAsync(rightName, userName);
+        public Task<List<MakerPOReturnDateItemDto>> GetMakerPOReturnDatesAsync(long entryId) => _dataAccess.GetMakerPOReturnDatesAsync(entryId);
+        public Task<bool> UpdateMakerPOReturnDatesAsync(long entryId, List<MakerPOReturnDateItemDto> returnDates, string userName, string machineName) => _dataAccess.UpdateMakerPOReturnDatesAsync(entryId, returnDates, userName, machineName);
     }
 }

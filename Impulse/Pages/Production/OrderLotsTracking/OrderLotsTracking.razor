@@ -260,15 +260,15 @@
                     <option value="">-- All Customers --</option>
                     @foreach (var c in Customers)
                     {
-                        <option value="@c.CustCode">@c.DisplayCust</option>
+                        <option value="@c.CustCode">@c.CustCode</option>
                     }
                 </select>
             </div>
 
-            <!-- Order Filter -->
+            <!-- Order / Internal Ref Filter -->
             <div class="col-lg-3 col-md-6">
                 <label class="form-label form-label-sm fw-bold text-secondary mb-1">
-                    <i class="fas fa-file-invoice me-1"></i> Order No
+                    <i class="fas fa-file-invoice me-1"></i> Internal Ref No
                 </label>
                 <select class="form-select form-select-sm" 
                         value="@(Filter.OrderNo ?? "")" 
@@ -277,7 +277,7 @@
                             var ord = Orders.FirstOrDefault(o => o.OrderNo == val);
                             await OnOrderSelected(ord);
                         })">
-                    <option value="">-- All Orders --</option>
+                    <option value="">-- All Internal Ref Nos --</option>
                     @foreach (var o in Orders)
                     {
                         <option value="@o.OrderNo">@o.DisplayText</option>
@@ -378,7 +378,7 @@
                     <tr>
                         <th style="width: 40px;">#</th>
                         <th>Lot No</th>
-                        <th>Order No</th>
+                        <th>Internal Ref No</th>
                         <th>Customer</th>
                         <th>Article / Item</th>
                         <th>Current Process</th>
@@ -426,11 +426,11 @@
                                 </td>
                                 <td>
                                     <span class="badge bg-primary text-white" style="font-size: 0.82rem;">
-                                        @currentItem.OrderNo
+                                        @(string.IsNullOrWhiteSpace(currentItem.InternalRefNo) ? currentItem.OrderNo : currentItem.InternalRefNo)
                                     </span>
                                 </td>
                                 <td>
-                                    <span class="fw-semibold text-dark">@currentItem.DisplayCustomer</span>
+                                    <span class="fw-semibold text-dark">@currentItem.CustCode</span>
                                 </td>
                                 <td>
                                     <div class="fw-semibold text-dark text-truncate" style="max-width: 220px;" title="@currentItem.FullArticle">

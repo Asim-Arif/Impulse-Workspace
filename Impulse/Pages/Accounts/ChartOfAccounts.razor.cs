@@ -582,7 +582,7 @@ namespace Impulse.Pages.Accounts
         private void GoToIndexPage()
         {
             // Navigate to the financial dashboard
-            Navigation.NavigateTo("/financial", true);
+            Navigation.NavigateTo("/financial");
         }
 
 

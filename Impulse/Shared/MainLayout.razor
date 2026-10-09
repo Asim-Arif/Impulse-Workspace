@@ -839,7 +839,8 @@
     private async Task Submit()
     {
         var correctPass = await DB.getDatabasePasswordAsync(CurrentSetting);
-        if (UserInput == correctPass)
+
+        if (!string.IsNullOrEmpty(UserInput) && !string.IsNullOrEmpty(correctPass) && UserInput == correctPass)
         {
             IsShowingPrompt = false;
             _tcs.SetResult(true);

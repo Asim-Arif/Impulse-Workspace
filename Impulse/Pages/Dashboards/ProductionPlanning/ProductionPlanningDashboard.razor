@@ -57,7 +57,7 @@
             <div class="card border-0 bg-light p-2 mb-3 rounded-3" style="position: relative !important; z-index: 9999 !important;">
                 <div class="row g-2 align-items-end">
                     <!-- Customer Lookup -->
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Customer</label>
                         <select class="form-select form-select-sm" @bind="SelectedCustCode" @bind:after="OnCustomerChanged">
                             @foreach (var c in Customers)
@@ -67,19 +67,8 @@
                         </select>
                     </div>
 
-                    <!-- Country Lookup -->
-                    <div class="col-md-2">
-                        <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Country</label>
-                        <select class="form-select form-select-sm" @bind="SelectedCountry" @bind:after="OnCountryChanged" disabled="@(SelectedCustCode == "0")">
-                            @foreach (var country in Countries)
-                            {
-                                <option value="@country">@country</option>
-                            }
-                        </select>
-                    </div>
-
                     <!-- Article / Item Typeahead -->
-                    <div class="col-md-5">
+                    <div class="col-md-6">
                         <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
                             Article / Item <span class="text-danger">*</span>
                         </label>
@@ -750,8 +739,12 @@
         <span class="win11-menu-item">Print PTC</span>
     </Item>
     <Item OnClick="@((e) => PrintPTC((e.Data as RunningLotItem)?.LotNo, true))">
-        <span class="win11-icon"><i class="fas fa-receipt text-info"></i></span>
+        <span class="win11-icon"><i class="fas fa-file-alt text-secondary"></i></span>
         <span class="win11-menu-item">Print PTC Mini</span>
+    </Item>
+    <Item OnClick="@((e) => PrintPTCWithPrice((e.Data as RunningLotItem)?.LotNo))">
+        <span class="win11-icon"><i class="fas fa-file-invoice-dollar text-success"></i></span>
+        <span class="win11-menu-item">Print PTC (With Price)</span>
     </Item>
     <Item OnClick="@((e) => PrintRunningLotsReport())">
         <span class="win11-icon"><i class="fas fa-file-lines text-secondary"></i></span>
@@ -765,13 +758,25 @@
 </ContextMenu>
 
 <ContextMenu Id="poContextMenu" Template="Win11Style">
-    <Item OnClick="@((e) => PrintMakerPO((e.Data as OpenPOItem)?.MasterPONo))">
-        <span class="win11-icon"><i class="fas fa-print text-primary"></i></span>
-        <span class="win11-menu-item">Print PO</span>
+    <Item OnClick="@((e) => PrintMasterPOOffice((e.Data as OpenPOItem)?.MasterPONo))">
+        <span class="win11-icon"><i class="fas fa-copy text-primary"></i></span>
+        <span class="win11-menu-item">Master PO (Office Copy)</span>
+    </Item>
+    <Item OnClick="@((e) => PrintMasterPOMaker((e.Data as OpenPOItem)?.MasterPONo))">
+        <span class="win11-icon"><i class="fas fa-copy text-primary"></i></span>
+        <span class="win11-menu-item">Master PO (Maker Copy)</span>
+    </Item>
+    <Item OnClick="@((e) => PrintMasterPOAccounts((e.Data as OpenPOItem)?.MasterPONo))">
+        <span class="win11-icon"><i class="fas fa-copy text-primary"></i></span>
+        <span class="win11-menu-item">Master PO (Accounts Copy)</span>
+    </Item>
+    <Item OnClick="@((e) => PrintMasterPOHideRate((e.Data as OpenPOItem)?.MasterPONo))">
+        <span class="win11-icon"><i class="fas fa-eye-slash text-secondary"></i></span>
+        <span class="win11-menu-item">Master PO (Hide Rate)</span>
     </Item>
     <Item OnClick="@((e) => PrintMasterPOStatus((e.Data as OpenPOItem)?.MasterPONo))">
-        <span class="win11-icon"><i class="fas fa-chart-pie text-info"></i></span>
-        <span class="win11-menu-item">Print Master PO Status</span>
+        <span class="win11-icon"><i class="fas fa-info-circle text-info"></i></span>
+        <span class="win11-menu-item">Master PO Status</span>
     </Item>
     <div class="dropdown-divider"></div>
     <Item OnClick="@((e) => CloseMakerPOPrompt((e.Data as OpenPOItem)?.EntryID ?? 0))">

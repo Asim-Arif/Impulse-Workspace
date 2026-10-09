@@ -172,6 +172,7 @@ namespace Impulse.Constants
             public const string OrderStatusLogEx = Folder + "OrderStatusLog_Ex.rpt";
             public const string OrderPurchasePlanningLog = Folder + "OrderPurchasePlanningLog.rpt";
             public const string UrgentRequest = Folder + "UrgentRequest.rpt";
+            public const string OrderCheckSheet = Folder + "OrderCheckSheet.rpt";
         }
 
         // Stock Subfolder

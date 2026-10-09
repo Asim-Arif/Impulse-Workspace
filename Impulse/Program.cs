@@ -515,6 +515,7 @@ builder.Services.AddHttpClient<Impulse.Services.IntraOffice.IAiService, Impulse.
 // Setup & User Management Registrations
 builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IUserDataAccess, DataAccessLibrary.DAC.Setup.UserDataAccess>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IUserRoleDataAccess, DataAccessLibrary.DAC.Setup.UserRoleDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IWorkflowConfigurationDataAccess, DataAccessLibrary.DAC.Setup.WorkflowConfigurationDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Setup.IUserService, Impulse.Services.Setup.UserService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IUserPermissionDataAccess, DataAccessLibrary.DAC.Setup.UserPermissionDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Setup.IUserPermissionService, Impulse.Services.Setup.UserPermissionService>();
@@ -526,6 +527,7 @@ builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IPushNotificationDa
 builder.Services.AddScoped<Impulse.Services.Notifications.IWebPushNotificationService, Impulse.Services.Notifications.WebPushNotificationService>();
 
 // Workflow & Task Management Engine
+builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IProductionDeletionDataAccess, DataAccessLibrary.DAC.Production.ProductionDeletionDataAccess>();
 builder.Services.AddScoped<Impulse.Services.WorkflowTasks.IWorkflowTaskEngine, Impulse.Services.WorkflowTasks.WorkflowTaskEngine>();
 
 // WhatsApp Gateway Microservice Process Supervisor

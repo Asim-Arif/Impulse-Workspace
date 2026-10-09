@@ -237,6 +237,11 @@ namespace Impulse.Pages.Export.Orders
                     ViewType
                 );
 
+                if (!isDirector)
+                {
+                    allOrders = allOrders.Where(o => o.AuthorizationStatus == "Authorized").ToList();
+                }
+
                 // Recalculate totals
                 totalAmtPKR = allOrders.Sum(o => o.OrderAmt * (o.ExchRate ?? 1));
                 highlightedOrder = null;
@@ -738,6 +743,39 @@ namespace Impulse.Pages.Export.Orders
                 }
             };
             await ReportNavigation.PrintReportAsync(request);
+        }
+
+        private async Task PrintOrderCheckSheet(string orderNo)
+        {
+            try
+            {
+                string currentUserName = await GetLoggedInUserNameAsync();
+                var parameters = new Dictionary<string, object>
+                {
+                    { "@OrderNo", orderNo }
+                };
+
+                var formulaValues = new Dictionary<string, object>
+                {
+                    { "UserName", $"'{currentUserName}'" },
+                    { "ComputerName", $"'{Environment.MachineName}'" },
+                    { "ProductionOrder", IsProductionMode ? "True" : "False" }
+                };
+
+                var request = new ReportRequest
+                {
+                    ReportName = ReportNames.Export.OrderCheckSheet,
+                    SelectionFormula = $"{{CustOrders.OrderNo}}='{orderNo}'",
+                    Parameters = parameters,
+                    FormulaValues = formulaValues
+                };
+
+                await ReportNavigation.PrintReportAsync(request);
+            }
+            catch (Exception ex)
+            {
+                NotificationServiceManager.ShowError("Report Failed", ex.Message);
+            }
         }
 
         private async Task PrintOrderBalanceReportCT(string orderNo)

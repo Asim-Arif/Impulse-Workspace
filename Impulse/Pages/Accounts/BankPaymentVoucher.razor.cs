@@ -58,7 +58,13 @@ namespace Impulse.Pages.Accounts
 
             bankAccounts = await _voucherService.GetBankAccounts();
             ChequeTypes = await _voucherService.GetValuesForDropDown("EnumValues", "EnumValue", "EnumDescription", " WHERE EnumName='BPV_Cheque_Type' ORDER BY EnumValue");
-            
+
+            var defaultBank = (p_bankId > 0 ? bankAccounts.FirstOrDefault(b => b.BankID == p_bankId) : null)
+                              ?? bankAccounts.FirstOrDefault(b => b.DefaultBank);
+            if (defaultBank != null)
+            {
+                await SelectedResultChanged_BankAccounts(defaultBank);
+            }
         }
         // This method handles the timer expiration
         private void HideSuccessMessage(object state)
@@ -362,6 +368,14 @@ namespace Impulse.Pages.Accounts
         private async Task ResetForm()
         {
             await InitializeData();
+
+            var defaultBank = (p_bankId > 0 ? bankAccounts.FirstOrDefault(b => b.BankID == p_bankId) : null)
+                              ?? bankAccounts.FirstOrDefault(b => b.DefaultBank);
+            if (defaultBank != null)
+            {
+                await SelectedResultChanged_BankAccounts(defaultBank);
+            }
+
             //Following 4 lines are used to clear fileinput
             bClearInputFile = true;
             StateHasChanged();
@@ -372,7 +386,7 @@ namespace Impulse.Pages.Accounts
 
         private void GoToIndexPage()
         {
-            Navigation.NavigateTo("/financial", true);
+            Navigation.NavigateTo("/financial");
         }
 
         private IBrowserFile selectedFile;

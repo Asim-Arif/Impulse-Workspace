@@ -284,11 +284,11 @@
                         </div>
                         <div class="col-md-2">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Unit Rate (Pcs)</label>
-                            <input type="number" step="0.01" class="form-control form-control-sm text-end fw-bold text-success" @bind="LineRate" placeholder="0.00" />
+                            <input type="text" class="form-control form-control-sm text-end fw-bold text-success bg-light" value="@FormatRate(LineRate)" readonly />
                         </div>
                         <div class="col-md-2">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Rate (Dozen)</label>
-                            <input type="text" class="form-control form-control-sm text-end text-muted" value="@((LineRate * 12m).ToString("N2"))" readonly />
+                            <input type="text" class="form-control form-control-sm text-end text-muted bg-light" value="@FormatRate(LineRate * 12m)" readonly />
                         </div>
                         <div class="col-md-2">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Expected Return Date</label>
@@ -341,9 +341,9 @@
                                         <td class="fw-bold text-primary">@line.ItemCode</td>
                                         <td>@line.ItemName</td>
                                         <td class="text-end fw-bold text-dark">@line.IssQty.ToString("N0")</td>
-                                        <td class="text-end fw-bold text-success">@line.Rate.ToString("N2")</td>
-                                        <td class="text-end text-secondary">@line.RateDozen.ToString("N2")</td>
-                                        <td class="text-end fw-bold text-primary">@line.Value.ToString("N2")</td>
+                                        <td class="text-end fw-bold text-success">@FormatRate(line.Rate)</td>
+                                        <td class="text-end text-secondary">@FormatRate(line.RateDozen)</td>
+                                        <td class="text-end fw-bold text-primary">@FormatValue(line.Value)</td>
                                         <td>@line.ReturnDT.ToString("dd-MMM-yyyy")</td>
                                         <td><span class="badge bg-light text-dark border">@(string.IsNullOrEmpty(line.LotNo) ? "-" : line.LotNo)</span></td>
                                         <td class="text-muted small">@line.Remarks</td>
@@ -371,7 +371,7 @@
                                         <td colspan="4" class="text-end">Total Summary:</td>
                                         <td class="text-end text-dark fs-6">@TotalStagedQty.ToString("N0")</td>
                                         <td colspan="2"></td>
-                                        <td class="text-end text-primary fs-6">@TotalStagedValue.ToString("N2")</td>
+                                        <td class="text-end text-primary fs-6">@FormatValue(TotalStagedValue)</td>
                                         <td colspan="4"></td>
                                     </tr>
                                 </tfoot>
@@ -476,8 +476,8 @@
                                                 <td>@hist.ItemName</td>
                                                 <td>@hist.DT.ToString("dd-MMM-yyyy")</td>
                                                 <td class="text-end fw-bold text-dark">@hist.IssQty.ToString("N0")</td>
-                                                <td class="text-end text-success fw-bold">@hist.Rate.ToString("N2")</td>
-                                                <td class="text-end text-primary fw-bold">@hist.IssValue.ToString("N2")</td>
+                                                <td class="text-end text-success fw-bold">@FormatRate(hist.Rate)</td>
+                                                <td class="text-end text-primary fw-bold">@FormatValue(hist.IssValue)</td>
                                                 <td>@hist.ReturnDT.ToString("dd-MMM-yyyy")</td>
                                             </tr>
                                         }

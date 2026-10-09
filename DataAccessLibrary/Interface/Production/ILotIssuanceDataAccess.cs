@@ -14,5 +14,7 @@ namespace DataAccessLibrary.Interface.Production
         Task<List<ProcessPOLookupModel>> GetSubsequentProcessesForSkipAsync(string itemCode, int currentProcessId, bool isReworkLot, int repairType);
         Task<bool> SkipProcessAsync(string itemCode, int currentProcessId, int newProcessId, string lotNo);
         Task<List<EmployeeLookupModel>> GetEmployeesWithCapacityAsync(int processId);
+        Task<long> GetFactoryMakerVendIdAsync();
+        Task<decimal> GetItemRateAsync(long vendId, int processId, string itemId);
     }
 }

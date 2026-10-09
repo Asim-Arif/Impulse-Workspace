@@ -21,5 +21,6 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public bool IsFactoryMaker { get; set; }
         public bool AlreadyReceived { get; set; }
         public bool AuthRequired { get; set; }
+        public bool IsIssuancePendingDeletion { get; set; }
     }
 }

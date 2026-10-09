@@ -48,6 +48,7 @@ namespace Impulse.Pages.Production.OrderLotsTracking
                 return list.Where(l =>
                     (l.LotNo != null && l.LotNo.ToLowerInvariant().Contains(term)) ||
                     (l.OrderNo != null && l.OrderNo.ToLowerInvariant().Contains(term)) ||
+                    (l.InternalRefNo != null && l.InternalRefNo.ToLowerInvariant().Contains(term)) ||
                     (l.CustCode != null && l.CustCode.ToLowerInvariant().Contains(term)) ||
                     (l.CustomerName != null && l.CustomerName.ToLowerInvariant().Contains(term)) ||
                     (l.ItemCode != null && l.ItemCode.ToLowerInvariant().Contains(term)) ||
@@ -133,6 +134,7 @@ namespace Impulse.Pages.Production.OrderLotsTracking
             // Reload orders for this customer
             SelectedOrder = null;
             Filter.OrderNo = null;
+            Filter.InternalRefNo = null;
             Orders = await TrackingService.GetOrdersLookupAsync(Filter.CustCode);
 
             await LoadDataAsync();
@@ -142,6 +144,7 @@ namespace Impulse.Pages.Production.OrderLotsTracking
         {
             SelectedOrder = order;
             Filter.OrderNo = order?.OrderNo;
+            Filter.InternalRefNo = order?.InternalRefNo;
             await LoadDataAsync();
         }
 
@@ -187,7 +190,8 @@ namespace Impulse.Pages.Production.OrderLotsTracking
                 DateFilterMode = 0,
                 DtFrom = DateTime.Today.AddDays(-30),
                 DtTo = DateTime.Today,
-                IncludeCompleted = false
+                IncludeCompleted = false,
+                InternalRefNo = null
             };
             SelectedCustomer = null;
             SelectedOrder = null;

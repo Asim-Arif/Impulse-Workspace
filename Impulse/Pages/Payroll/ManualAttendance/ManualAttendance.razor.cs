@@ -64,32 +64,8 @@ namespace Impulse.Pages.Payroll.ManualAttendance
                     CurrentUserName = authState.User.Identity.Name ?? "System";
                     var user = authState.User;
                     
-                    bool isRoleMatch = user.IsInRole("Director") || user.IsInRole("Admin") || user.IsInRole("Administrator") || user.IsInRole("SuperAdmin");
-                    bool isNameMatch = string.Equals(CurrentUserName, "admin", StringComparison.OrdinalIgnoreCase) || string.Equals(CurrentUserName, "administrator", StringComparison.OrdinalIgnoreCase);
-
-                    if (isRoleMatch || isNameMatch)
-                    {
-                        IsDirectorOrAdmin = true;
-                    }
-                    else
-                    {
-                        var dbUser = await UserDataAccess.GetUserByUserNameAsync(CurrentUserName);
-                        if (dbUser != null)
-                        {
-                            if (dbUser.UserManagement == true)
-                            {
-                                IsDirectorOrAdmin = true;
-                            }
-                            else
-                            {
-                                var userRoles = await UserRoleDataAccess.GetRolesByUserIdAsync(dbUser.UserID);
-                                if (userRoles != null && userRoles.Any(r => r.Equals("Director", StringComparison.OrdinalIgnoreCase) || r.Equals("Admin", StringComparison.OrdinalIgnoreCase) || r.Equals("Administrator", StringComparison.OrdinalIgnoreCase)))
-                                {
-                                    IsDirectorOrAdmin = true;
-                                }
-                            }
-                        }
-                    }
+                    bool requiresApproval = await WorkflowTaskEngine.IsApprovalRequiredAsync("AttendanceApproval", CurrentUserName, user);
+                    IsDirectorOrAdmin = !requiresApproval;
                 }
 
                 Employees = await AttendanceService.GetActiveEmployeesAsync();
@@ -230,15 +206,17 @@ namespace Impulse.Pages.Payroll.ManualAttendance
             }
 
             // If user is Director/Admin -> Direct Bypass
-            if (IsDirectorOrAdmin)
+            // OR if this is a brand-new entry (no existing attendance logs on this date) -> Instant Direct Save
+            bool hasExistingAttendance = AttendanceDetails.Any();
+            if (IsDirectorOrAdmin || !hasExistingAttendance)
             {
                 await ExecuteDirectSaveAsync();
                 return;
             }
 
-            // Regular operator -> Request Approval
+            // Modifying an existing attendance record as a regular operator -> Request Approval
             PendingActionType = AttendanceWorkflowActionType.ManualSave;
-            ReasonModalTitle = $"Request Attendance Save - [{SelectedEmployee.EmpID}] {SelectedEmployee.Name}";
+            ReasonModalTitle = $"Request Attendance Edit - [{SelectedEmployee.EmpID}] {SelectedEmployee.Name}";
             ReasonText = string.Empty;
             ShowReasonModal = true;
         }

@@ -141,7 +141,7 @@ namespace DataAccessLibrary.DAC.Production
             // STEP 11: ShowMasterPOOnly
             if (filter.ShowMasterPOOnly)
             {
-                whereClause += " AND VVendIssued.MasterPONo IS NOT NULL";
+                whereClause += " AND ISNULL(RTRIM(LTRIM(VVendIssued.MasterPONo)), '') <> '' AND VVendIssued.MasterPONo <> '0' AND (VVendIssued.LotNo = '0' OR VVendIssued.LotNo IS NULL OR VVendIssued.LotNo = '')";
             }
 
             // STEP 12: MasterPOOpen
@@ -371,6 +371,118 @@ namespace DataAccessLibrary.DAC.Production
             catch
             {
                 return false;
+            }
+        }
+
+        public async Task<List<MakerPOReturnDateItemDto>> GetMakerPOReturnDatesAsync(long entryId)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            const string sql = @"
+                SELECT 
+                    rd.EntryID,
+                    rd.VIS_RefID,
+                    rd.ReturnDT,
+                    ISNULL(rd.IssQty, 0) AS IssQty,
+                    ISNULL(vid.Rate, 0) AS Rate,
+                    ISNULL(rd.Remarks, '') AS Remarks,
+                    ISNULL(vid.ItemCode, '') AS ItemCode,
+                    ISNULL(i.ItemName, vid.ItemCode) AS ItemName
+                FROM VendIssdDetail_ReturnDTs rd WITH (NOLOCK)
+                INNER JOIN VendIssdDetail vid WITH (NOLOCK) ON vid.EntryID = rd.VIS_RefID
+                LEFT JOIN Items i WITH (NOLOCK) ON vid.ItemCode = i.ItemID
+                WHERE vid.RefID = @EntryID
+                ORDER BY rd.EntryID ASC";
+
+            var rows = (await db.QueryAsync<MakerPOReturnDateItemDto>(sql, new { EntryID = entryId })).ToList();
+
+            // Set original values for comparison during save
+            foreach (var r in rows)
+            {
+                r.OriginalReturnDT = r.ReturnDT;
+                r.OriginalIssQty = r.IssQty;
+                r.OriginalRate = r.Rate;
+                r.OriginalRemarks = r.Remarks ?? string.Empty;
+            }
+
+            return rows;
+        }
+
+        public async Task<bool> UpdateMakerPOReturnDatesAsync(long entryId, List<MakerPOReturnDateItemDto> returnDates, string userName, string machineName)
+        {
+            if (returnDates == null || !returnDates.Any())
+                return false;
+
+            using var con = new SqlConnection(ConnectionString);
+            await con.OpenAsync();
+            using var trans = con.BeginTransaction();
+
+            try
+            {
+                const string updateReturnDtSql = @"
+                    UPDATE VendIssdDetail_ReturnDTs 
+                    SET ReturnDT = @ReturnDT, IssQty = @IssQty, Remarks = @Remarks 
+                    WHERE EntryID = @EntryID;";
+
+                const string updateDetailSql = @"
+                    UPDATE VendIssdDetail 
+                    SET Rate = @Rate, IssQty = @IssQty 
+                    WHERE EntryID = @VIS_RefID;";
+
+                const string insertRevisionSql = @"
+                    INSERT INTO VendIssdDetail_ReturnDTs_Revisions (
+                        VIS_RD_RefID, ReturnDT, UserName, MachineName, Remarks, 
+                        Qty_Old, Qty_New, Rate_Old, Rate_New, DTEntry
+                    ) VALUES (
+                        @VIS_RD_RefID, @ReturnDT, @UserName, @MachineName, @Remarks,
+                        @Qty_Old, @Qty_New, @Rate_Old, @Rate_New, GETDATE()
+                    );";
+
+                foreach (var item in returnDates)
+                {
+                    await con.ExecuteAsync(updateReturnDtSql, new
+                    {
+                        ReturnDT = item.ReturnDT,
+                        IssQty = item.IssQty,
+                        Remarks = item.Remarks ?? string.Empty,
+                        EntryID = item.EntryID
+                    }, trans);
+
+                    await con.ExecuteAsync(updateDetailSql, new
+                    {
+                        Rate = item.Rate,
+                        IssQty = item.IssQty,
+                        VIS_RefID = item.VIS_RefID
+                    }, trans);
+
+                    // Check if date, qty, or rate changed to log revision
+                    bool isDateChanged = item.ReturnDT?.Date != item.OriginalReturnDT?.Date;
+                    bool isQtyChanged = item.IssQty != item.OriginalIssQty;
+                    bool isRateChanged = Math.Abs(item.Rate - item.OriginalRate) > 0.0001f;
+
+                    if (isDateChanged || isQtyChanged || isRateChanged)
+                    {
+                        await con.ExecuteAsync(insertRevisionSql, new
+                        {
+                            VIS_RD_RefID = item.EntryID,
+                            ReturnDT = item.OriginalReturnDT,
+                            UserName = userName,
+                            MachineName = machineName,
+                            Remarks = item.OriginalRemarks ?? string.Empty,
+                            Qty_Old = item.OriginalIssQty,
+                            Qty_New = item.IssQty,
+                            Rate_Old = item.OriginalRate,
+                            Rate_New = item.Rate
+                        }, trans);
+                    }
+                }
+
+                trans.Commit();
+                return true;
+            }
+            catch
+            {
+                trans.Rollback();
+                throw;
             }
         }
     }

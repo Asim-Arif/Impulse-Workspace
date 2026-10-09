@@ -53,5 +53,15 @@ namespace Impulse.Services.Production
         {
             return _dataAccess.GetEmployeesWithCapacityAsync(processId);
         }
+
+        public Task<long> GetFactoryMakerVendIdAsync()
+        {
+            return _dataAccess.GetFactoryMakerVendIdAsync();
+        }
+
+        public Task<decimal> GetItemRateAsync(long vendId, int processId, string itemId)
+        {
+            return _dataAccess.GetItemRateAsync(vendId, processId, itemId);
+        }
     }
 }

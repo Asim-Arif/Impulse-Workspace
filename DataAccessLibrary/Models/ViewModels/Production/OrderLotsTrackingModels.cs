@@ -7,6 +7,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
     {
         public string? CustCode { get; set; }
         public string? OrderNo { get; set; }
+        public string? InternalRefNo { get; set; }
         public string? HubName { get; set; }
         public int DateRangeType { get; set; } = 3; // 0=All, 1=Today, 2=Last 15d, 3=Last 30d, 4=Last 60d, 5=Last 90d, 6=Custom
         public int DateFilterMode { get; set; } = 0; // 0=Order Date, 1=Target Date
@@ -25,9 +26,10 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string FullArticle => $"{ItemCode} {ItemName} {ItemSize}".Trim();
 
         public string OrderNo { get; set; } = string.Empty;
+        public string InternalRefNo { get; set; } = string.Empty;
         public string CustCode { get; set; } = string.Empty;
         public string CustomerName { get; set; } = string.Empty;
-        public string DisplayCustomer => !string.IsNullOrEmpty(CustCode) ? $"[{CustCode}] {CustomerName}" : CustomerName;
+        public string DisplayCustomer => CustCode;
 
         public int ProcessID { get; set; }
         public string ProcessName { get; set; } = string.Empty;
@@ -104,7 +106,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
     {
         public string CustCode { get; set; } = string.Empty;
         public string CustName { get; set; } = string.Empty;
-        public string DisplayCust => !string.IsNullOrEmpty(CustCode) ? $"[{CustCode}] {CustName}" : CustName;
+        public string DisplayCust => CustCode;
     }
 
     public class TrackingOrderLookupItem
@@ -113,6 +115,6 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string InternalRefNo { get; set; } = string.Empty;
         public string CustCode { get; set; } = string.Empty;
         public DateTime? DT { get; set; }
-        public string DisplayText => !string.IsNullOrEmpty(InternalRefNo) ? $"{OrderNo} ({InternalRefNo})" : OrderNo;
+        public string DisplayText => !string.IsNullOrEmpty(InternalRefNo) ? InternalRefNo : OrderNo;
     }
 }

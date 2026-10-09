@@ -34,7 +34,13 @@ namespace DataAccessLibrary.DAC.Production
                                   VI.Authorized, ISNULL(VI.Closed, 0) AS Closed, ISNULL(VI.IssEmpID, '') AS IssEmpID,
                                    CASE WHEN M.VenderName LIKE '%FACTORY%' OR M.VendID1 LIKE '%FAC%' OR M.VendID = 79 OR M.VendID = 129 OR M.VendID = (SELECT TOP 1 CAST(DataValue AS BIGINT) FROM GeneralData WHERE DataName = 'FactoryMaker') THEN 1 ELSE 0 END AS IsFactoryMaker,
                                    CASE WHEN (SELECT COUNT(VRD.EntryID) FROM VendRcvdDetail VRD WHERE VRD.Issue_RefID = VID.EntryID AND VRD.LotNo = VID.LotNo) > 0 THEN 1 ELSE 0 END AS AlreadyReceived,
-                                   ISNULL(P.AuthRequired, 0) AS AuthRequired
+                                   ISNULL(P.AuthRequired, 0) AS AuthRequired,
+                                   CASE WHEN EXISTS (
+                                       SELECT 1 FROM dbo.ProductionDeletionRequests PDR WITH (NOLOCK)
+                                       WHERE PDR.Status = 'Pending' 
+                                         AND PDR.RequestType IN ('LotIssuance', 'MasterPOIssuance')
+                                         AND (PDR.EntityRefID = VI.EntryID OR PDR.LotNo = VID.LotNo)
+                                   ) THEN 1 ELSE 0 END AS IsIssuancePendingDeletion
                             FROM VendIssdDetail VID
                            INNER JOIN VendIssued VI ON VI.EntryID = VID.RefID
                            LEFT JOIN VMakers M ON VI.VendID = M.VendID
@@ -65,15 +71,38 @@ namespace DataAccessLibrary.DAC.Production
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
             db.Open();
+
+            // Safety check: ensure issuance is not pending deletion
+            if (header.IssuanceRefID > 0)
+            {
+                const string lockCheckSql = @"
+                    SELECT TOP 1 LotNo FROM dbo.ProductionDeletionRequests WITH (NOLOCK)
+                    WHERE Status = 'Pending' 
+                      AND RequestType IN ('LotIssuance', 'MasterPOIssuance')
+                      AND (EntityRefID = @IssuanceRefID OR LotNo = @LotNo)";
+
+                string firstLineLotNo = lines.FirstOrDefault()?.LotNo ?? "";
+                var pendingLotNo = await db.ExecuteScalarAsync<string>(lockCheckSql, new
+                {
+                    IssuanceRefID = header.IssuanceRefID,
+                    LotNo = firstLineLotNo
+                });
+
+                if (!string.IsNullOrWhiteSpace(pendingLotNo))
+                {
+                    throw new InvalidOperationException($"Cannot receive Lot #{pendingLotNo}: The production issuance is locked under a pending Director deletion request.");
+                }
+            }
+
             using var trans = db.BeginTransaction();
 
             try
             {
                 // 1. Insert Header into VendReceived
                 string insertHeaderSql = @"INSERT INTO VendReceived (
-                                                VendID, DT, RecieptID, UserID, ProcessID, Issuance_RefID, OverTime, UserName, MachineName, TemperValue
+                                                VendID, DT, RecieptID, UserID, ProcessID, Issuance_RefID, OverTime, UserName, MachineName, TemperValue, EmpID
                                            ) VALUES (
-                                                @VendID, GETDATE(), '', @UserID, @ProcessID, @IssuanceRefID, @OverTime, @UserName, @MachineName, @TemperValue
+                                                @VendID, GETDATE(), '', @UserID, @ProcessID, @IssuanceRefID, @OverTime, @UserName, @MachineName, @TemperValue, @EmpID
                                            );
                                            SELECT SCOPE_IDENTITY();";
 
@@ -86,7 +115,8 @@ namespace DataAccessLibrary.DAC.Production
                     OverTime = header.OverTime ? 1 : 0,
                     UserName = userName,
                     MachineName = machineName,
-                    header.TemperValue
+                    header.TemperValue,
+                    EmpID = header.CheckedByEmpID ?? ""
                 }, trans);
 
                 // 2. Insert Factory Employees
@@ -142,10 +172,10 @@ namespace DataAccessLibrary.DAC.Production
                     // Insert into VendRcvdDetail
                     string insertLineSql = @"INSERT INTO VendRcvdDetail (
                                                 RefID, RecieptID, ItemCode, NextProcessID, RcvdQty, IssQty, Wastage, Rate,
-                                                LotNo, ReqAuth, OrderNo, CountedBy, Issue_RefID, ProcessID, RcvdWeight, ReWorkLot, Repair_RefID
+                                                LotNo, ReqAuth, OrderNo, CountedBy, Issue_RefID, ProcessID, RcvdWeight, ReWorkLot, Repair_RefID, Insp_EmpID
                                              ) VALUES (
                                                 @RefID, @RecieptID, @ItemCode, @NextProcessID, @RcvdQty, 0, 0, @Rate,
-                                                @LotNo, @ReqAuth, @OrderNo, @CountedBy, @IssueRefID, @ProcessID, 0, @ReWorkLot, @RepairType
+                                                @LotNo, @ReqAuth, @OrderNo, @CountedBy, @IssueRefID, @ProcessID, 0, @ReWorkLot, @RepairType, @InspEmpID
                                              );";
 
                     await db.ExecuteAsync(insertLineSql, new
@@ -163,7 +193,8 @@ namespace DataAccessLibrary.DAC.Production
                         IssueRefID = line.VendIssdDetailEntryID,
                         line.ProcessID,
                         ReWorkLot = line.ReWorkLot,
-                        RepairType = line.RepairType
+                        RepairType = line.RepairType,
+                        InspEmpID = line.Insp_EmpID ?? ""
                     }, trans);
 
                     // Update VendIssdDetail only if authorization is NOT required

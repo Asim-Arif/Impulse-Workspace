@@ -48,7 +48,7 @@ namespace DataAccessLibrary.DAC.Accounts
             {
                 using (IDbConnection db = new SqlConnection(_connectionString))
                 {
-                    string sql = @"SELECT BankID,AccNo,AccTitle FROM VBankAccounts ORDER BY VBankAccounts.AccTitle";
+                    string sql = @"SELECT BankID,AccNo,AccTitle,Bank,Branch,BankAccNo,DefaultBank,AllowOD,ODAmt FROM VBankAccounts ORDER BY VBankAccounts.AccTitle";
                     return (await db.QueryAsync<BankAccountInfo>(sql)).ToList();
                 }
             }
@@ -166,7 +166,7 @@ namespace DataAccessLibrary.DAC.Accounts
             {
                 using (IDbConnection db = new SqlConnection(_connectionString))
                 {
-                    string sql = @"SELECT BankID,AccNo,AccTitle,Bank,Branch,City,BankAccNo,DefaultBank,AllowOD,ODAmt,ODRate
+                    string sql = @"SELECT BankID,AccNo,AccTitle,Bank,Branch,BankAccNo,DefaultBank,AllowOD,ODAmt
                                  FROM VBankAccounts ORDER BY DefaultBank DESC,Bank ASC";
                     return (await db.QueryAsync<BankAccountInfo>(sql)).ToList();
                 }

@@ -128,7 +128,10 @@
                                 <th class="text-center" style="width: 110px;">Total Cartons</th>
                                 <th style="width: 150px;">Status</th>
                                 <th>Customer</th>
-                                <th>Country</th>
+                                @if (isDirector)
+                                {
+                                    <th>Country</th>
+                                }
                                 <th class="text-center" style="width: 110px;">Total Qty</th>
                                 <th>Created By</th>
                             </tr>
@@ -137,7 +140,7 @@
                             @if (IsLoading)
                             {
                                 <tr>
-                                    <td colspan="9" class="text-center py-4 text-muted">
+                                    <td colspan="@(isDirector ? 9 : 8)" class="text-center py-4 text-muted">
                                         <span class="spinner-border spinner-border-sm me-1" role="status"></span> Loading dispatch lists...
                                     </td>
                                 </tr>
@@ -145,7 +148,7 @@
                             else if (!DispatchLists.Any())
                             {
                                 <tr>
-                                    <td colspan="9" class="text-center py-4 text-muted">
+                                    <td colspan="@(isDirector ? 9 : 8)" class="text-center py-4 text-muted">
                                         <i class="fas fa-info-circle me-1"></i> No dispatch lists found matching your filter criteria.
                                     </td>
                                 </tr>
@@ -183,7 +186,10 @@
                                             }
                                         </td>
                                         <td class="fw-semibold text-dark">@item.CustCode</td>
-                                        <td>@item.Country</td>
+                                        @if (isDirector)
+                                        {
+                                            <td>@item.Country</td>
+                                        }
                                         <td class="text-center fw-bold text-success">@item.TotalQty.ToString("N0")</td>
                                         <td class="text-muted small">@item.UserName</td>
                                     </ContextMenuTrigger>
@@ -196,7 +202,10 @@
                                 <td class="text-center text-primary">@TotalCartonsSum Cartons</td>
                                 <td></td>
                                 <td>@DispatchLists.Count Lists</td>
-                                <td></td>
+                                @if (isDirector)
+                                {
+                                    <td></td>
+                                }
                                 <td class="text-center text-success">@TotalPiecesSum.ToString("N0") Pcs</td>
                                 <td></td>
                             </tr>

@@ -38,6 +38,11 @@ else
     [Parameter(CaptureUnmatchedValues = true)]
     public Dictionary<string, object>? AdditionalAttributes { get; set; }
 
+    protected override async Task OnInitializedAsync()
+    {
+        await PermissionService.InitializeAsync();
+    }
+
     private bool IsAllowed
     {
         get

@@ -248,7 +248,6 @@
                             <th>Return Dates</th>
                             <th>Lot No.</th>
                             <th>Master PO</th>
-                            <th>Order No.</th>
                             <th>Int. Ref</th>
                         </tr>
                     </thead>
@@ -256,7 +255,7 @@
                         @if (IsLoading)
                         {
                             <tr>
-                                <td colspan="15" class="text-center py-4 text-muted">
+                                <td colspan="14" class="text-center py-4 text-muted">
                                     <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div> Loading Maker POs...
                                 </td>
                             </tr>
@@ -264,7 +263,7 @@
                         else if (!FilteredItems.Any())
                         {
                             <tr>
-                                <td colspan="15" class="text-center py-4 text-muted">
+                                <td colspan="14" class="text-center py-4 text-muted">
                                     <i class="fas fa-info-circle me-1"></i> No issuance records found matching filters.
                                 </td>
                             </tr>
@@ -307,7 +306,15 @@
                                     <td>@currentItem.FullArticle</td>
                                     <td class="text-end fw-bold">@currentItem.TotalValue.ToString("N2")</td>
                                     <td class="text-center">
-                                        @if (currentItem.Authorized)
+                                        @if (!string.IsNullOrWhiteSpace(currentItem.LotNo) && PendingSkipProcessLotNos.Contains(currentItem.LotNo))
+                                        {
+                                            <span class="badge bg-warning text-dark"><i class="fas fa-forward me-1"></i>Pending Skip</span>
+                                        }
+                                        else if (PendingDeletionIssuanceEntryIds.Contains(currentItem.EntryID) || (!string.IsNullOrWhiteSpace(currentItem.LotNo) && PendingDeletionLotNos.Contains(currentItem.LotNo)))
+                                        {
+                                            <span class="badge bg-danger text-white"><i class="fas fa-trash-alt me-1"></i>Pending Deletion</span>
+                                        }
+                                        else if (currentItem.Authorized)
                                         {
                                             <span class="badge bg-success"><i class="fas fa-check me-1"></i>Authorized</span>
                                         }
@@ -324,7 +331,6 @@
                                             <span class="badge bg-primary text-white">@currentItem.MasterPONo</span>
                                         }
                                     </td>
-                                    <td>@currentItem.OrderNo</td>
                                     <td>@currentItem.InternalRefNo</td>
                                 </ContextMenuTrigger>
                             }
@@ -469,7 +475,237 @@
     <Item OnClick="@PrintSFStock"><i class="fas fa-warehouse text-secondary me-2"></i> SF Stock Report (Store-wise)</Item>
 </ContextMenu>
 
+<!-- Edit Return Dates / Promises Modal (Bulletproof Fixed Overlay) -->
+@if (IsEditPromisesModalOpen)
+{
+    <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(6px); z-index: 99999; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;">
+        <div class="shadow-lg border-0" style="width: 1100px; max-width: 96vw; max-height: 90vh; background: #ffffff; border-radius: 14px; display: flex; flex-direction: column; overflow: hidden;">
+            
+            <!-- Modal Header -->
+            <div class="py-3 px-4 border-bottom d-flex align-items-center justify-content-between" style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); flex-shrink: 0;">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-primary text-white shadow-sm" style="width: 42px; height: 42px; font-size: 1.2rem;">
+                        <i class="fas fa-calendar-alt"></i>
+                    </div>
+                    <div>
+                        <div class="d-flex align-items-center gap-2">
+                            <h5 class="fw-bold mb-0 text-dark">Return Dates / Promises</h5>
+                            @if (!string.IsNullOrWhiteSpace(SelectedItemForPromises?.MasterPONo))
+                            {
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 font-monospace" style="font-size: 0.85rem;">
+                                    Master PO #@SelectedItemForPromises.MasterPONo
+                                </span>
+                            }
+                        </div>
+                        <div class="small text-muted mt-1">
+                            <i class="fas fa-user-tag me-1 text-secondary"></i>@(SelectedItemForPromises?.DisplayMaker ?? "Maker")
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close shadow-none" aria-label="Close" @onclick="CloseEditPromisesModal" disabled="@IsSavingPromises"></button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-4" style="background: #fafafa; overflow-y: auto; flex-grow: 1;">
+                @if (IsLoadingPromises)
+                {
+                    <div class="text-center py-5 text-muted">
+                        <div class="spinner-border text-primary me-2" role="status" style="width: 2rem; height: 2rem;"></div>
+                        <div class="mt-2 fw-semibold">Loading Return Dates...</div>
+                    </div>
+                }
+                else if (!ReturnDatesList.Any())
+                {
+                    <div class="card border border-warning-subtle bg-warning-subtle p-3 text-center text-dark rounded-3">
+                        <i class="fas fa-exclamation-circle text-warning fa-2x mb-2"></i>
+                        <div class="fw-bold">No Return Date Records Found</div>
+                        <small class="text-muted">No promise items are registered for this issuance.</small>
+                    </div>
+                }
+                else
+                {
+                    <div class="card border shadow-sm rounded-3 overflow-hidden bg-white mb-0">
+                        <div class="table-responsive" style="max-height: 52vh; overflow-y: auto;">
+                            <table class="table align-middle promise-edit-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 45px;" class="text-center">#</th>
+                                        <th style="min-width: 260px;">Item / Article</th>
+                                        <th style="width: 170px;">Return Date</th>
+                                        <th style="width: 120px;" class="text-end">Quantity</th>
+                                        <th style="width: 120px;" class="text-end">Rate</th>
+                                        <th style="min-width: 200px;">Remarks</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @{ int sNo = 1; }
+                                    @foreach (var rd in ReturnDatesList)
+                                    {
+                                        var currentRd = rd;
+                                        <tr>
+                                            <td class="text-center text-muted fw-bold small">@(sNo++)</td>
+                                            <td>
+                                                <div class="fw-bold text-dark text-truncate" style="max-width: 280px;" title="@currentRd.ItemCode">
+                                                    @currentRd.ItemCode
+                                                </div>
+                                                <div class="small text-muted text-truncate" style="max-width: 280px;" title="@currentRd.ItemName">
+                                                    @currentRd.ItemName
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <input type="date" class="form-control promise-control" @bind="currentRd.ReturnDT" disabled="@IsSavingPromises" />
+                                            </td>
+                                            <td>
+                                                <input type="number" class="form-control promise-control text-end font-monospace fw-semibold" @bind="currentRd.IssQty" disabled="@IsSavingPromises" />
+                                            </td>
+                                            <td>
+                                                <input type="number" step="0.01" class="form-control promise-control text-end font-monospace" @bind="currentRd.Rate" disabled="@IsSavingPromises" />
+                                            </td>
+                                            <td>
+                                                <input type="text" class="form-control promise-control" @bind="currentRd.Remarks" placeholder="Enter remarks..." disabled="@IsSavingPromises" />
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="py-3 px-4 bg-white border-top d-flex justify-content-between align-items-center" style="flex-shrink: 0;">
+                <div class="d-flex align-items-center gap-3">
+                    @if (ReturnDatesList.Any())
+                    {
+                        <div class="badge bg-light text-dark border px-3 py-2 fw-semibold" style="font-size: 0.85rem;">
+                            <i class="fas fa-boxes me-1 text-primary"></i> Total Promised Qty: <span class="fw-bold text-primary ms-1">@ReturnDatesList.Sum(x => x.IssQty).ToString("N0")</span>
+                        </div>
+                        <span class="text-muted small">@ReturnDatesList.Count line @(ReturnDatesList.Count == 1 ? "item" : "items")</span>
+                    }
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-3 py-2 d-flex align-items-center gap-1 shadow-sm" style="border-radius: 8px; font-weight: 600;" @onclick="CloseEditPromisesModal" disabled="@IsSavingPromises">
+                        <i class="fas fa-times me-1"></i> Close
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary px-4 py-2 d-flex align-items-center gap-1 shadow" style="border-radius: 8px; font-weight: 600;" @onclick="SavePromisesAsync" disabled="@(IsSavingPromises || !ReturnDatesList.Any())">
+                        @if (IsSavingPromises)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            <span>Updating...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-check me-1"></i>
+                            <span>Update</span>
+                        }
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+}
+
+<!-- Deletion Reason Modal Dialog (Director Approval Required) -->
+@if (ShowDeleteReasonModal && DeletingItems.Any())
+{
+    <div class="modal fade show d-block" tabindex="-1" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); z-index: 999999 !important;">
+        <div class="modal-dialog modal-dialog-centered" style="z-index: 1000000 !important; max-width: 540px;">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; background: rgba(255, 255, 255, 0.98); backdrop-filter: blur(12px);">
+                <div class="modal-header border-bottom py-2 bg-warning bg-opacity-10" style="border-radius: 12px 12px 0 0;">
+                    <h6 class="modal-title fw-bold text-dark mb-0">
+                        <i class="fas fa-user-shield text-warning me-2"></i>Director Approval Required
+                    </h6>
+                    <button type="button" class="btn-close btn-sm" @onclick="CloseDeleteReasonModal" disabled="@IsSubmittingDeleteRequest"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div class="alert alert-warning py-2 px-3 small mb-3 border-0" style="border-radius: 8px;">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        Deleting production issuances requires Director approval. Receiving against these order(s) will be locked while awaiting review.
+                    </div>
+                    <div class="card bg-light border-0 p-2 mb-3 small" style="border-radius: 8px; max-height: 180px; overflow-y: auto;">
+                        <div class="fw-bold text-secondary mb-1 border-bottom pb-1">Selected Issuances (@DeletingItems.Count)</div>
+                        @foreach (var itm in DeletingItems)
+                        {
+                            <div class="d-flex justify-content-between align-items-center py-1 border-bottom border-light">
+                                <div>
+                                    <strong class="text-primary">#@itm.RecieptID</strong>
+                                    <span class="text-dark ms-1">@itm.ItemName</span>
+                                    <span class="text-muted ms-1">(@itm.DisplayMaker)</span>
+                                </div>
+                                <span class="badge bg-success">@itm.TotalIssQty.ToString("N0")</span>
+                            </div>
+                        }
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold text-secondary mb-1">
+                            Reason for Deletion Request <span class="text-danger">*</span>
+                        </label>
+                        <textarea class="form-control form-control-sm" rows="3"
+                                  placeholder="Enter a detailed explanation for why this issuance should be deleted..."
+                                  @bind="DeleteRequestReason"
+                                  disabled="@IsSubmittingDeleteRequest"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-top py-2 d-flex justify-content-between">
+                    <button type="button" class="btn btn-sm btn-secondary" @onclick="CloseDeleteReasonModal" disabled="@IsSubmittingDeleteRequest">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                    <button type="button" class="btn btn-sm btn-warning fw-bold px-3 text-dark" @onclick="SubmitDeleteRequestAsync" disabled="@IsSubmittingDeleteRequest">
+                        @if (IsSubmittingDeleteRequest)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-paper-plane me-1"></i>
+                        }
+                        Submit for Approval
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 <style>
+    .promise-edit-table {
+        width: 100% !important;
+        margin-bottom: 0 !important;
+    }
+    .promise-edit-table thead th {
+        background-color: #f8fafc !important;
+        color: #475569 !important;
+        font-weight: 700 !important;
+        font-size: 0.76rem !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+        padding: 10px 12px !important;
+        border-bottom: 1.5px solid #e2e8f0 !important;
+        white-space: nowrap !important;
+    }
+    .promise-edit-table tbody td {
+        padding: 8px 12px !important;
+        vertical-align: middle !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+    }
+    .promise-control {
+        height: 34px !important;
+        border-radius: 6px !important;
+        border: 1px solid #cbd5e1 !important;
+        font-size: 0.86rem !important;
+        padding: 4px 10px !important;
+        background-color: #ffffff !important;
+        box-shadow: none !important;
+        width: 100% !important;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+    }
+    .promise-control:focus {
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+        outline: none !important;
+    }
     .win11-context-menu-container {
         max-height: 45vh !important;
         overflow-y: auto !important;

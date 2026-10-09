@@ -1,12 +1,15 @@
 @page "/financial"
+@page "/financialdashboard"
 @attribute [Authorize]
 
 @using Impulse.Shared.Components
 @using Impulse.Services
+@using Impulse.Services.Setup
 @using DataAccessLibrary.Models.ViewModels
 @using DataAccessLibrary.Models.ReportModels
 @inject IReportNavigationService ReportNavigation
 @inject IAccountReportingAccessService AccountReportingService
+@inject IUserPermissionService PermissionService
 
 <PageTitle>Financial Dashboard</PageTitle>
 
@@ -241,6 +244,11 @@
 @code {
     private DateRangeModal rangeModal = null!;
     private DateSingleModal singleModal = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await PermissionService.InitializeAsync();
+    }
 
     private async Task ShowIncomeStatement(bool bShowDetail)
     {

@@ -67,4 +67,26 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public DateTime DTEntry { get; set; }
         public string Remarks { get; set; } = string.Empty;
     }
+
+    public class MakerItemRateWorkflowRequestDto
+    {
+        public int TaskId { get; set; }
+        public long EntryID { get; set; }
+        public long VendID { get; set; }
+        public string MakerName { get; set; } = string.Empty;
+        public int ProcessID { get; set; }
+        public string ProcessName { get; set; } = string.Empty;
+        public string ItemID { get; set; } = string.Empty;
+        public string ItemName { get; set; } = string.Empty;
+        public decimal OldRate { get; set; }
+        public decimal NewRate { get; set; }
+        public decimal OldRateDozen => OldRate * 12m;
+        public decimal NewRateDozen => NewRate * 12m;
+        public decimal RateDifference => NewRate - OldRate;
+        public string AssignedUnit { get; set; } = "Pcs";
+        public string Remarks { get; set; } = string.Empty;
+        public string Reason { get; set; } = string.Empty;
+        public string OriginatorUserName { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
 }

@@ -56,7 +56,7 @@
                     <!-- ROW 1: Customer, Country, Maker, Article (Wide) -->
                     <div class="row g-2 align-items-end mb-2">
                         <!-- Customer Selector -->
-                        <div class="col-md-3">
+                        <div class="@(isDirector ? "col-md-3" : "col-md-4")">
                             <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
                                 <i class="fas fa-user-tie text-primary me-1"></i> Customer <span class="text-danger">*</span>
                             </label>
@@ -83,22 +83,25 @@
                             </div>
                         </div>
 
-                        <!-- Country Selector (Cascading) -->
-                        <div class="col-md-2">
-                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
-                                <i class="fas fa-globe text-primary me-1"></i> Country
-                            </label>
-                            <select class="form-select form-select-sm" @bind="Filter.Country" @bind:after="LoadLotsAsync" disabled="@(!Countries.Any())">
-                                <option value="">-- All Countries --</option>
-                                @foreach (var c in Countries)
-                                {
-                                    <option value="@c">@c</option>
-                                }
-                            </select>
-                        </div>
+                        @if (isDirector)
+                        {
+                            <!-- Country Selector (Cascading - Director Only) -->
+                            <div class="col-md-2">
+                                <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
+                                    <i class="fas fa-globe text-primary me-1"></i> Country
+                                </label>
+                                <select class="form-select form-select-sm" @bind="Filter.Country" @bind:after="LoadLotsAsync" disabled="@(!Countries.Any())">
+                                    <option value="">-- All Countries --</option>
+                                    @foreach (var c in Countries)
+                                    {
+                                        <option value="@c">@c</option>
+                                    }
+                                </select>
+                            </div>
+                        }
 
                         <!-- Maker Selector -->
-                        <div class="col-md-3">
+                        <div class="@(isDirector ? "col-md-3" : "col-md-4")">
                             <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
                                 <i class="fas fa-industry text-primary me-1"></i> Maker
                             </label>
@@ -332,7 +335,7 @@
                     <div class="col-md-4 d-flex align-items-center gap-2">
                         <span class="fw-bold text-secondary">Customer:</span>
                         <span class="badge bg-primary fs-6">@(SelectedCustomer?.Name ?? Filter.CustCode)</span>
-                        @if (!string.IsNullOrEmpty(Filter.Country))
+                        @if (isDirector && !string.IsNullOrEmpty(Filter.Country))
                         {
                             <span class="badge bg-info text-dark fs-6">@Filter.Country</span>
                         }

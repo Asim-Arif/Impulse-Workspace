@@ -1,4 +1,4 @@
-﻿using DataAccessLibrary;
+using DataAccessLibrary;
 using DataAccessLibrary.Interface.Accounts;
 using Impulse;
 using Microsoft.PowerBI.Api.Models;
@@ -28,10 +28,16 @@ namespace Impulse.Services
         }
         public async Task<string> getDatabasePasswordAsync(string strDataSetting)
         {
-            string strRawPassword= await _dbHelper.getDatabasePasswordAsync(strDataSetting);
-            string strPassword= encryption.CryptRC4(strRawPassword, "awmsial");
+            var (rawPassword, isEncrypted) = await _dbHelper.getSecuritySettingAsync(strDataSetting);
+            if (string.IsNullOrEmpty(rawPassword))
+                return string.Empty;
 
-            return strPassword;
+            if (isEncrypted)
+            {
+                return encryption.CryptRC4(rawPassword, "AwmWrangler");
+            }
+
+            return rawPassword;
         }
         public int ExecuteDirectInsertUpdate(string strQuery)
         { 

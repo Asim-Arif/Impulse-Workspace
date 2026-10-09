@@ -90,4 +90,24 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
     }
+
+    public class MakerPOReturnDateItemDto
+    {
+        public int EntryID { get; set; }
+        public int VIS_RefID { get; set; }
+        public DateTime? ReturnDT { get; set; }
+        public int IssQty { get; set; }
+        public float Rate { get; set; }
+        public string Remarks { get; set; } = string.Empty;
+
+        // Context from line
+        public string ItemCode { get; set; } = string.Empty;
+        public string ItemName { get; set; } = string.Empty;
+
+        // Original tracking for revision logging
+        public DateTime? OriginalReturnDT { get; set; }
+        public int OriginalIssQty { get; set; }
+        public float OriginalRate { get; set; }
+        public string OriginalRemarks { get; set; } = string.Empty;
+    }
 }

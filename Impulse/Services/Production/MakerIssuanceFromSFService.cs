@@ -39,6 +39,11 @@ namespace Impulse.Services.Production
             return _dataAccess.GetUnshippedOrdersForItemAsync(itemId);
         }
 
+        public Task<decimal> GetItemRateAsync(long vendId, int processId, int returnProcessId, string itemId)
+        {
+            return _dataAccess.GetItemRateAsync(vendId, processId, returnProcessId, itemId);
+        }
+
         public Task<long> SaveSFIssuanceAsync(CreateSFIssuanceHeaderModel header, List<CreateSFIssuanceLineModel> lines, string userName, int userId, string machineName)
         {
             return _dataAccess.SaveSFIssuanceAsync(header, lines, userName, userId, machineName);

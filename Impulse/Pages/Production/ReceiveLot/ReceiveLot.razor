@@ -42,6 +42,37 @@
     .blazored-typeahead__results {
         z-index: 100000 !important;
     }
+    .table-typeahead .blazored-typeahead {
+        height: 31px !important;
+        font-size: 0.82rem !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .table-typeahead .blazored-typeahead__input,
+    .table-typeahead .blazored-typeahead__controls {
+        height: 29px !important;
+        font-size: 0.82rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .table-typeahead .blazored-typeahead__input-mask,
+    .table-typeahead .blazored-typeahead__input-mask-wrapper {
+        height: 29px !important;
+        font-size: 0.82rem !important;
+        display: flex !important;
+        align-items: center !important;
+        padding-left: 6px !important;
+        box-sizing: border-box !important;
+    }
+    .table-typeahead .blazored-typeahead__results {
+        max-height: 220px !important;
+        font-size: 0.82rem !important;
+        min-width: 260px !important;
+        width: 100% !important;
+        z-index: 99999 !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+    }
     .item-thumb-btn {
         width: 32px;
         height: 32px;
@@ -107,7 +138,7 @@
             <!-- SECTION 1: LOT HEADER SUMMARY PANEL -->
             @if (LotHeader != null)
             {
-                <div class="card mb-3 border" style="background:#f8f9fb; border-radius:8px;">
+                <div class="card mb-3 border" style="background:#f8f9fb; border-radius:8px; position: relative !important; z-index: 1000 !important; overflow: visible !important;">
                     <div class="card-header py-2 bg-light fw-bold text-secondary d-flex align-items-center justify-content-between" style="font-size:0.85rem; border-radius:8px 8px 0 0;">
                         <span><i class="fas fa-box me-1 text-primary"></i> Lot Details — Lot No: @LotHeader.LotNo (PO: @LotHeader.RecieptID)</span>
                         @if (LotHeader.AlreadyReceived)
@@ -147,18 +178,48 @@
                                 </button>
                             </div>
                         </div>
+
+                        <!-- SECOND ROW: CHECKED BY EMPLOYEE (MANDATORY) -->
+                        <div class="row g-3 align-items-center mt-1 pt-2 border-top" style="position: relative !important; z-index: 1000 !important;">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
+                                    <i class="fas fa-user-check me-1 text-primary"></i>Checked by <span class="text-danger">*</span>
+                                </label>
+                                <BlazoredTypeahead SearchMethod="SearchCheckedByEmployees"
+                                                   @bind-Value="SelectedCheckedBy"
+                                                   Placeholder="Select checked by employee..."
+                                                   EnableDropDown="true"
+                                                   MinimumLength="0"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="e">
+                                        @if (e != null)
+                                        {
+                                            <span class="text-truncate d-inline-block w-100" style="font-size: 0.85rem;">
+                                                @if (!string.IsNullOrEmpty(e.EmpID) && e.EmpID != "0") { <text>[@e.EmpID] </text> }@e.Name
+                                            </span>
+                                        }
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="e">
+                                        @if (e != null)
+                                        {
+                                            @if (!string.IsNullOrEmpty(e.EmpID) && e.EmpID != "0") { <text>[@e.EmpID] </text> }@e.Name @(string.IsNullOrEmpty(e.Designation) ? "" : $"({e.Designation})")
+                                        }
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- SECTION 2: FACTORY EMPLOYEES PANEL (IF IN-HOUSE FACTORY MAKER) -->
                 @if (LotHeader.IsFactoryMaker)
                 {
-                    <div class="card mb-3 border" style="background:#ffffff; border-radius:8px; position: relative !important; z-index: 9999 !important;">
+                    <div class="card mb-3 border" style="background:#ffffff; border-radius:8px; position: relative !important; z-index: 900 !important; overflow: visible !important;">
                         <div class="card-header py-2 bg-light fw-bold text-secondary" style="font-size:0.85rem; border-radius:8px 8px 0 0;">
                             <i class="fas fa-users me-1 text-primary"></i> In-House Factory Workers Selection
                         </div>
-                        <div class="card-body py-2" style="position: relative !important; z-index: 9999 !important; overflow: visible !important;">
-                            <div class="row g-2 align-items-center" style="position: relative !important; z-index: 9999 !important;">
+                        <div class="card-body py-2" style="position: relative !important; z-index: 900 !important; overflow: visible !important;">
+                            <div class="row g-2 align-items-center" style="position: relative !important; z-index: 900 !important;">
                                 <div class="col-md-6">
                                     <BlazoredTypeahead SearchMethod="SearchEmployees"
                                                        @bind-Value="SelectedWorker"
@@ -215,22 +276,22 @@
                         <span class="badge bg-success fs-6">Total Receiving Qty: @TotalReceivingQty.ToString("N0")</span>
                     </div>
                     <div class="card-body p-0">
-                        <div class="table-responsive" style="max-height: 350px;">
+                        <div class="table-responsive" style="min-height: 240px; max-height: 450px;">
                             <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
-                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
                                     <tr>
-                                        <th style="width: 40px;">#</th>
-                                        <th style="width: 48px;" class="text-center">Pic</th>
-                                        <th>Order No</th>
-                                        <th>Item Code</th>
+                                        <th style="width: 35px;">#</th>
+                                        <th style="width: 44px;" class="text-center">Pic</th>
+                                        <th style="width: 85px;">Order No</th>
+                                        <th style="width: 110px;">Item Code</th>
                                         <th>Item Name</th>
-                                        <th class="text-end">Issued Qty</th>
-                                        <th class="text-end">Prev Rcvd</th>
-                                        <th class="text-end">Pending Qty</th>
-                                        <th class="text-end" style="width: 140px;">Receiving Qty</th>
-                                        <th style="width: 180px;">Counted By (Optional)</th>
-                                        <th class="text-end">Rate (Pcs)</th>
-                                        <th class="text-end">Receiving Value</th>
+                                        <th class="text-end" style="width: 75px;">Issued Qty</th>
+                                        <th class="text-end" style="width: 75px;">Prev Rcvd</th>
+                                        <th class="text-end" style="width: 75px;">Pending Qty</th>
+                                        <th class="text-end" style="width: 95px;">Receiving Qty</th>
+                                        <th style="width: 250px; min-width: 220px;">Counted By <span class="text-danger">*</span></th>
+                                        <th class="text-end" style="width: 85px;">Rate (Pcs)</th>
+                                        <th class="text-end" style="width: 105px;">Receiving Value</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -238,8 +299,8 @@
                                     @foreach (var line in Lines)
                                     {
                                         <tr>
-                                            <td class="fw-bold text-muted">@(idx++)</td>
-                                            <td class="text-center py-1">
+                                            <td class="fw-bold text-muted" style="width: 35px;">@(idx++)</td>
+                                            <td class="text-center py-1" style="width: 44px;">
                                                 @if (!string.IsNullOrEmpty(line.ItemPicBase64))
                                                 {
                                                     <img src="@line.ItemPicBase64" class="item-thumb-btn" alt="Pic" @onclick="() => OpenImagePreview(line.ItemPicBase64, line.ItemCode)" title="Click to enlarge" />
@@ -249,25 +310,45 @@
                                                     <span class="text-muted" style="font-size: 0.75rem;"><i class="fas fa-image text-black-50"></i></span>
                                                 }
                                             </td>
-                                            <td class="fw-semibold">@(string.IsNullOrEmpty(line.OrderNo) ? "-" : line.OrderNo)</td>
-                                            <td class="fw-bold text-primary">@line.ItemCode</td>
+                                            <td class="fw-semibold" style="width: 85px;">@(string.IsNullOrEmpty(line.OrderNo) ? "-" : line.OrderNo)</td>
+                                            <td class="fw-bold text-primary" style="width: 110px;">@line.ItemCode</td>
                                             <td>@line.ItemName</td>
-                                            <td class="text-end fw-semibold text-secondary">@line.IssQty.ToString("N0")</td>
-                                            <td class="text-end text-muted">@line.PrevRcvdQty.ToString("N0")</td>
-                                            <td class="text-end fw-bold text-danger">@line.PendingQty.ToString("N0")</td>
-                                            <td class="text-end">
+                                            <td class="text-end fw-semibold text-secondary" style="width: 75px;">@line.IssQty.ToString("N0")</td>
+                                            <td class="text-end text-muted" style="width: 75px;">@line.PrevRcvdQty.ToString("N0")</td>
+                                            <td class="text-end fw-bold text-danger" style="width: 75px;">@line.PendingQty.ToString("N0")</td>
+                                            <td class="text-end" style="width: 95px;">
                                                 <input type="number" class="form-control form-control-sm text-end fw-bold text-success border-success bg-light"
                                                        @bind="line.ReceivingQty"
                                                        readonly
                                                        placeholder="0" />
                                             </td>
-                                            <td>
-                                                <input type="text" class="form-control form-control-sm"
-                                                       @bind="line.CountedBy"
-                                                       placeholder="Counted by..." />
+                                            <td style="width: 250px; min-width: 220px;" class="table-typeahead py-1">
+                                                <BlazoredTypeahead SearchMethod="SearchCheckedByEmployees"
+                                                                   @bind-Value="line.SelectedCountedBy"
+                                                                   Placeholder="Select employee..."
+                                                                   EnableDropDown="true"
+                                                                   MinimumLength="0"
+                                                                   MaximumSuggestions="1000">
+                                                    <SelectedTemplate Context="e">
+                                                        @if (e != null)
+                                                        {
+                                                            <span class="text-truncate d-inline-block w-100" style="font-size: 0.8rem;">
+                                                                @if (!string.IsNullOrEmpty(e.EmpID) && e.EmpID != "0") { <text>[@e.EmpID] </text> }@e.Name
+                                                            </span>
+                                                        }
+                                                    </SelectedTemplate>
+                                                    <ResultTemplate Context="e">
+                                                        @if (e != null)
+                                                        {
+                                                            <span style="font-size: 0.8rem;">
+                                                                @if (!string.IsNullOrEmpty(e.EmpID) && e.EmpID != "0") { <text>[@e.EmpID] </text> }@e.Name @(string.IsNullOrEmpty(e.Designation) ? "" : $"({e.Designation})")
+                                                            </span>
+                                                        }
+                                                    </ResultTemplate>
+                                                </BlazoredTypeahead>
                                             </td>
-                                            <td class="text-end fw-semibold text-dark">@line.Rate.ToString("N2")</td>
-                                            <td class="text-end fw-bold text-primary">@((line.ReceivingQty * line.Rate).ToString("N2"))</td>
+                                            <td class="text-end fw-semibold text-dark" style="width: 85px;">@line.Rate.ToString("N2")</td>
+                                            <td class="text-end fw-bold text-primary" style="width: 105px;">@((line.ReceivingQty * line.Rate).ToString("N2"))</td>
                                         </tr>
                                     }
 

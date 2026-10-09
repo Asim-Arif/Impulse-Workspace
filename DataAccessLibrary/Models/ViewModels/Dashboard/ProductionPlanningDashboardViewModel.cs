@@ -65,6 +65,7 @@ namespace DataAccessLibrary.Models.ViewModels.Dashboard
         public string ReceiptID { get; set; } = string.Empty;
         public string MakerName { get; set; } = string.Empty;
         public string OrderNo { get; set; } = string.Empty;
+        public string InternalRefNo { get; set; } = string.Empty;
         public long Qty { get; set; }
         public DateTime? ReturnDT { get; set; }
         public string MasterPONo { get; set; } = string.Empty;

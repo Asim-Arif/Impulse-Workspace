@@ -300,6 +300,14 @@
                     <button type="button" class="btn-close" @onclick="CloseEditModal"></button>
                 </div>
                 <div class="modal-body py-3">
+                    @if (!IsDirectorOrAdmin && EditRateValue != EditingItem.Rate)
+                    {
+                        <div class="alert alert-warning py-2 px-3 small mb-3 border-0 shadow-xs rounded-3" style="background:#fff8e6; color:#856404; font-size:0.8rem;">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            <strong>Director Approval Required:</strong> You are changing the piece rate from <strong>@EditingItem.Rate.ToString("N2")</strong> to <strong>@EditRateValue.ToString("N2")</strong>. This change will not take effect immediately; a workflow task and notification will be sent to the Director for approval.
+                        </div>
+                    }
+
                     <div class="mb-2">
                         <span class="fw-bold">Item Name:</span> @EditingItem.ItemName
                     </div>
@@ -310,6 +318,16 @@
                         <div class="form-text text-end" style="font-size:0.75rem;">Rate per Dozen: <strong>@((EditRateValue * 12m).ToString("N2"))</strong></div>
                     </div>
 
+                    @if (!IsDirectorOrAdmin && EditRateValue != EditingItem.Rate)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
+                                Reason for Rate Change <span class="text-danger">*</span>
+                            </label>
+                            <textarea class="form-control form-control-sm" rows="2" @bind="RateChangeReason" placeholder="Enter reason for rate change request..."></textarea>
+                        </div>
+                    }
+
                     <div class="mb-3">
                         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Remarks</label>
                         <textarea class="form-control form-control-sm" rows="3" @bind="EditRemarksValue" placeholder="Enter remarks..."></textarea>
@@ -317,12 +335,22 @@
                 </div>
                 <div class="modal-footer py-2" style="background:#f8f9fb; border-radius: 0 0 12px 12px;">
                     <button type="button" class="btn btn-sm btn-outline-secondary px-3" @onclick="CloseEditModal">Cancel</button>
-                    <button type="button" class="btn btn-sm btn-primary px-3" @onclick="SaveEditModal" disabled="@IsSavingEdit">
+                    <button type="button" class="btn btn-sm @(!IsDirectorOrAdmin && EditRateValue != EditingItem.Rate ? "btn-warning" : "btn-primary") px-3" @onclick="SaveEditModal" disabled="@IsSavingEdit">
                         @if (IsSavingEdit)
                         {
                             <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <span>@(!IsDirectorOrAdmin && EditRateValue != EditingItem.Rate ? "Submitting..." : "Saving...")</span>
                         }
-                        Save Changes
+                        else if (!IsDirectorOrAdmin && EditRateValue != EditingItem.Rate)
+                        {
+                            <i class="fas fa-paper-plane me-1"></i>
+                            <span>Request Rate Change</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-check me-1"></i>
+                            <span>Save Changes</span>
+                        }
                     </button>
                 </div>
             </div>

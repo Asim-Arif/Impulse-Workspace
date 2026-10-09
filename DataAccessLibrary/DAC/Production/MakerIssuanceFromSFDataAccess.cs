@@ -93,6 +93,38 @@ namespace DataAccessLibrary.DAC.Production
             return (await db.QueryAsync<UnshippedOrderLookupModel>(sql, new { ItemId = itemId })).ToList();
         }
 
+        public async Task<decimal> GetItemRateAsync(long vendId, int processId, int returnProcessId, string itemId)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+
+            // 1. Check if this Maker is a Factory Maker via GeneralData ('FactoryMaker')
+            const string factoryMakerSql = "SELECT TOP 1 DataValue FROM GeneralData WHERE DataName = 'FactoryMaker'";
+            string? factoryMakerVal = await db.ExecuteScalarAsync<string>(factoryMakerSql);
+            if (!string.IsNullOrWhiteSpace(factoryMakerVal) && long.TryParse(factoryMakerVal, out long factoryMakerId) && factoryMakerId == vendId)
+            {
+                return 0m;
+            }
+
+            // 2. Fetch rate from VendAssItems for selected maker, process & item
+            const string rateSql = @"
+                SELECT TOP 1 ISNULL(Rate, 0)
+                FROM VendAssItems
+                WHERE VendID = @VendId
+                  AND ItemID = @ItemId
+                  AND (ProcessID = @ReturnProcessId OR ProcessID = @ProcessId)
+                ORDER BY CASE WHEN ProcessID = @ReturnProcessId THEN 1 ELSE 2 END";
+
+            decimal? rate = await db.ExecuteScalarAsync<decimal?>(rateSql, new
+            {
+                VendId = vendId,
+                ProcessId = processId,
+                ReturnProcessId = returnProcessId != 0 ? returnProcessId : processId,
+                ItemId = itemId
+            });
+
+            return rate ?? 0m;
+        }
+
         public async Task<long> SaveSFIssuanceAsync(CreateSFIssuanceHeaderModel header, List<CreateSFIssuanceLineModel> lines, string userName, int userId, string machineName)
         {
             using IDbConnection db = new SqlConnection(ConnectionString);

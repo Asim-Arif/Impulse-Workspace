@@ -11,6 +11,7 @@ namespace Impulse.Services.Production
         Task<List<SFStockItemLookupModel>> GetAvailableSFItemsAsync(int processId = 0, long vendId = 0, int returnProcessId = 0);
         Task<List<SFStockOpeningLocationModel>> GetStockOpeningLocationsForItemAsync(string itemId, int processId);
         Task<List<UnshippedOrderLookupModel>> GetUnshippedOrdersForItemAsync(string itemId);
+        Task<decimal> GetItemRateAsync(long vendId, int processId, int returnProcessId, string itemId);
         Task<long> SaveSFIssuanceAsync(CreateSFIssuanceHeaderModel header, List<CreateSFIssuanceLineModel> lines, string userName, int userId, string machineName);
     }
 }

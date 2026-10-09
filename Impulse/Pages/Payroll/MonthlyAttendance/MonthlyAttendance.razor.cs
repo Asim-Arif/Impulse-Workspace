@@ -66,32 +66,8 @@ namespace Impulse.Pages.Payroll.MonthlyAttendance
                     CurrentUserName = authState.User.Identity.Name ?? "System";
                     var user = authState.User;
                     
-                    bool isRoleMatch = user.IsInRole("Director") || user.IsInRole("Admin") || user.IsInRole("Administrator") || user.IsInRole("SuperAdmin");
-                    bool isNameMatch = string.Equals(CurrentUserName, "admin", StringComparison.OrdinalIgnoreCase) || string.Equals(CurrentUserName, "administrator", StringComparison.OrdinalIgnoreCase);
-
-                    if (isRoleMatch || isNameMatch)
-                    {
-                        IsDirectorOrAdmin = true;
-                    }
-                    else
-                    {
-                        var dbUser = await UserDataAccess.GetUserByUserNameAsync(CurrentUserName);
-                        if (dbUser != null)
-                        {
-                            if (dbUser.UserManagement == true)
-                            {
-                                IsDirectorOrAdmin = true;
-                            }
-                            else
-                            {
-                                var userRoles = await UserRoleDataAccess.GetRolesByUserIdAsync(dbUser.UserID);
-                                if (userRoles != null && userRoles.Any(r => r.Equals("Director", StringComparison.OrdinalIgnoreCase) || r.Equals("Admin", StringComparison.OrdinalIgnoreCase) || r.Equals("Administrator", StringComparison.OrdinalIgnoreCase)))
-                                {
-                                    IsDirectorOrAdmin = true;
-                                }
-                            }
-                        }
-                    }
+                    bool requiresApproval = await WorkflowTaskEngine.IsApprovalRequiredAsync("AttendanceApproval", CurrentUserName, user);
+                    IsDirectorOrAdmin = !requiresApproval;
                 }
 
                 AllDepartments = await EmployeeService.GetDepartmentsAsync(false);
@@ -221,6 +197,20 @@ namespace Impulse.Pages.Payroll.MonthlyAttendance
             row.IsModified = true;
         }
 
+        private bool HasExistingAttendanceEdits()
+        {
+            var modifiedRows = DayRows.Where(r => r.IsModified).ToList();
+            foreach (var mod in modifiedRows)
+            {
+                var orig = OriginalDayRows.FirstOrDefault(r => r.Date.Date == mod.Date.Date);
+                if (orig != null && (!string.IsNullOrWhiteSpace(orig.InTime) || !string.IsNullOrWhiteSpace(orig.OutTime)))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private async Task ClearDateAsync(MonthlyAttendanceDayRow row)
         {
             if (SelectedEmployee == null) return;
@@ -231,6 +221,20 @@ namespace Impulse.Pages.Payroll.MonthlyAttendance
                 return;
             }
 
+            var orig = OriginalDayRows.FirstOrDefault(r => r.Date.Date == row.Date.Date);
+            bool hadExistingAttendance = orig != null && (!string.IsNullOrWhiteSpace(orig.InTime) || !string.IsNullOrWhiteSpace(orig.OutTime));
+
+            // If it had no attendance in the first place, just clear the local row
+            if (!hadExistingAttendance)
+            {
+                row.InTime = string.Empty;
+                row.OutTime = string.Empty;
+                row.Status = "Absent";
+                row.OtHours = 0;
+                row.IsModified = false;
+                return;
+            }
+
             // If user is Director/Admin -> Direct Bypass
             if (IsDirectorOrAdmin)
             {
@@ -238,7 +242,7 @@ namespace Impulse.Pages.Payroll.MonthlyAttendance
                 return;
             }
 
-            // Regular operator -> Request Approval
+            // Regular operator modifying existing attendance -> Request Approval
             PendingClearRow = row;
             PendingActionType = AttendanceWorkflowActionType.MonthlyClearDate;
             ReasonModalTitle = $"Request Clear Attendance - [{SelectedEmployee.EmpID}] {SelectedEmployee.Name} ({row.Date:dd-MMM-yyyy})";
@@ -285,14 +289,14 @@ namespace Impulse.Pages.Payroll.MonthlyAttendance
                 return;
             }
 
-            // If user is Director/Admin -> Direct Bypass
-            if (IsDirectorOrAdmin)
+            // If user is Director/Admin OR all modified rows are brand-new entries (no prior punches on those dates)
+            if (IsDirectorOrAdmin || !HasExistingAttendanceEdits())
             {
                 await ExecuteDirectSaveMonthAsync();
                 return;
             }
 
-            // Regular operator -> Request 1 Consolidated Monthly Approval
+            // Regular operator modifying existing attendance -> Request 1 Consolidated Monthly Approval
             PendingClearRow = null;
             PendingActionType = AttendanceWorkflowActionType.MonthlySave;
             ReasonModalTitle = $"Request Monthly Attendance Save - [{SelectedEmployee.EmpID}] {SelectedEmployee.Name} ({SelectedMonthYear})";

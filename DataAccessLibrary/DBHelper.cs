@@ -1,4 +1,4 @@
-﻿using Dapper;
+using Dapper;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Primitives;
 using System;
@@ -178,14 +178,27 @@ namespace DataAccessLibrary
         }
         public async Task<string> getDatabasePasswordAsync(string strSetting)
         {
+            var setting = await getSecuritySettingAsync(strSetting);
+            return setting.Password;
+        }
+
+        public async Task<(string Password, bool PasswordEncrypted)> getSecuritySettingAsync(string strSetting)
+        {
             string connectionString = _config.GetConnectionString("DefaultConnection");
-            string strResult = string.Empty;
             using (IDbConnection connection = new SqlConnection(connectionString))
             {
-                string strSQL = "SELECT Password FROM Security WHERE SettingName=@Setting";
-                strResult = await connection.ExecuteScalarAsync<string>(strSQL, new { Setting = strSetting });
+                string strSQL = @"SELECT TOP 1 Password, ISNULL(PasswordEncrypted, 0) AS PasswordEncrypted 
+                                  FROM Security 
+                                  WHERE LTRIM(RTRIM(SettingName)) = @Setting";
+                var result = await connection.QueryFirstOrDefaultAsync<dynamic>(strSQL, new { Setting = strSetting?.Trim() });
+                if (result != null)
+                {
+                    string pass = result.Password != null ? (string)result.Password : string.Empty;
+                    bool isEncrypted = result.PasswordEncrypted != null && (bool)result.PasswordEncrypted;
+                    return (pass, isEncrypted);
+                }
 
-                return strResult ?? string.Empty;
+                return (string.Empty, false);
             }
         }
         public async Task<int> ExecuteAsync(string sql, object? param = null)

@@ -277,7 +277,7 @@ namespace Impulse.Pages.Accounts
 
         private void GoToIndexPage()
         {
-            Navigation.NavigateTo("/financial", true);
+            Navigation.NavigateTo("/financial");
         }
 
         private IBrowserFile selectedFile;

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Components.Authorization;
 using DataAccessLibrary.Models.ViewModels.Production;
+using DataAccessLibrary.Interface.Setup;
 using Impulse.Services.Production;
 using Impulse.Services;
 
@@ -35,12 +36,37 @@ namespace Impulse.Pages.Production.LotIssuance
         [Inject]
         public IHttpContextAccessor HttpContextAccessor { get; set; } = default!;
 
+        [Inject]
+        public IUserDataAccess UserDataAccess { get; set; } = default!;
+
+        [Inject]
+        public IUserRoleDataAccess UserRoleDataAccess { get; set; } = default!;
+
+        [Inject]
+        public Impulse.Services.WorkflowTasks.IWorkflowTaskEngine WorkflowTaskEngine { get; set; } = default!;
+
+        public bool IsDirectorOrAdmin { get; set; } = false;
+        public string CurrentUserName { get; set; } = "System";
+        private long _factoryMakerVendId = 0;
+
         public string SearchLotNo { get; set; } = string.Empty;
         public int SelectedProcessID { get; set; } = 0;
         public string BatchNo { get; set; } = string.Empty;
         public List<ProcessPOLookupModel> Processes { get; set; } = new List<ProcessPOLookupModel>();
 
-        public MakerPOLookupModel? SelectedMaker { get; set; }
+        private MakerPOLookupModel? _selectedMaker;
+        public MakerPOLookupModel? SelectedMaker
+        {
+            get => _selectedMaker;
+            set
+            {
+                if (_selectedMaker != value)
+                {
+                    _selectedMaker = value;
+                    _ = OnMakerChangedAsync(value);
+                }
+            }
+        }
         public List<MakerPOLookupModel> AvailableMakers { get; set; } = new List<MakerPOLookupModel>();
 
         public bool SampleProvided { get; set; } = false;
@@ -60,9 +86,11 @@ namespace Impulse.Pages.Production.LotIssuance
         public bool IsSaving { get; set; } = false;
 
         public bool IsFactoryMaker => SelectedMaker != null &&
-            (SelectedMaker.VenderName.Contains("FACTORY", StringComparison.OrdinalIgnoreCase) ||
-             SelectedMaker.VendID1.Contains("FAC", StringComparison.OrdinalIgnoreCase) ||
-             SelectedMaker.VendID == 79);
+            (_factoryMakerVendId > 0
+                ? SelectedMaker.VendID == _factoryMakerVendId
+                : (SelectedMaker.VenderName.Contains("FACTORY", StringComparison.OrdinalIgnoreCase) ||
+                   SelectedMaker.VendID1.Contains("FAC", StringComparison.OrdinalIgnoreCase) ||
+                   SelectedMaker.VendID == 79));
 
         public bool ShowImagePreviewModal { get; set; } = false;
         public string PreviewImageBase64 { get; set; } = string.Empty;
@@ -73,16 +101,101 @@ namespace Impulse.Pages.Production.LotIssuance
         public List<ProcessPOLookupModel> AvailableSkipProcesses { get; set; } = new List<ProcessPOLookupModel>();
         public int SelectedSkipProcessID { get; set; } = 0;
         public AvailableLotIssuanceItemModel? SelectedItemForSkip { get; set; }
+        public bool IsSkipApprovalRequired { get; set; } = true;
+        public string SkipProcessReason { get; set; } = string.Empty;
 
         public decimal TotalAvailableQty => StagedItems.Sum(i => i.AvailableQty);
         public decimal TotalIssuanceQty => StagedItems.Sum(i => i.IssuanceQty);
         public decimal TotalIssuanceValue => StagedItems.Sum(i => i.IssuanceQty * i.Rate);
 
+        public string FormatRate(decimal rate)
+        {
+            return IsDirectorOrAdmin ? rate.ToString("N2") : "*";
+        }
+
+        public string FormatValue(decimal value)
+        {
+            return IsDirectorOrAdmin ? value.ToString("N2") : "*";
+        }
+
         protected override async Task OnInitializedAsync()
         {
+            try
+            {
+                _factoryMakerVendId = await LotIssuanceService.GetFactoryMakerVendIdAsync();
+
+                var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                if (authState?.User?.Identity?.IsAuthenticated == true)
+                {
+                    CurrentUserName = authState.User.Identity.Name ?? "System";
+                    var user = authState.User;
+
+                    bool isRoleMatch = user.IsInRole("Director") || user.IsInRole("Admin") || user.IsInRole("Administrator") || user.IsInRole("SuperAdmin");
+                    bool isNameMatch = string.Equals(CurrentUserName, "admin", StringComparison.OrdinalIgnoreCase) || string.Equals(CurrentUserName, "administrator", StringComparison.OrdinalIgnoreCase);
+
+                    if (isRoleMatch || isNameMatch)
+                    {
+                        IsDirectorOrAdmin = true;
+                    }
+                    else
+                    {
+                        var dbUser = await UserDataAccess.GetUserByUserNameAsync(CurrentUserName);
+                        if (dbUser != null)
+                        {
+                            var userRoles = await UserRoleDataAccess.GetRolesByUserIdAsync(dbUser.UserID);
+                            if (userRoles != null && userRoles.Any(r => r.Equals("Director", StringComparison.OrdinalIgnoreCase) || r.Equals("Admin", StringComparison.OrdinalIgnoreCase) || r.Equals("Administrator", StringComparison.OrdinalIgnoreCase)))
+                            {
+                                IsDirectorOrAdmin = true;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error checking user roles in LotIssuance: {ex.Message}");
+            }
+
             Processes = await LotIssuanceService.GetProcessesAsync();
             AllEmployees = await MakerPOService.GetEmployeesAsync();
             AvailableEmployees = new List<EmployeeLookupModel>(AllEmployees);
+        }
+
+        private async Task OnMakerChangedAsync(MakerPOLookupModel? maker)
+        {
+            if (maker == null)
+            {
+                foreach (var item in StagedItems)
+                {
+                    item.Rate = 0m;
+                }
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
+            await RefreshStagedItemsRatesAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+
+        private async Task RefreshStagedItemsRatesAsync()
+        {
+            if (SelectedMaker == null || !StagedItems.Any())
+                return;
+
+            if (IsFactoryMaker)
+            {
+                foreach (var item in StagedItems)
+                {
+                    item.Rate = 0m;
+                }
+                return;
+            }
+
+            foreach (var item in StagedItems)
+            {
+                int procId = item.TargetProcessID > 0 ? item.TargetProcessID : SelectedProcessID;
+                item.Rate = await LotIssuanceService.GetItemRateAsync(SelectedMaker.VendID, procId, item.ItemCode);
+            }
         }
 
         private async Task LoadEmployeesForProcessAsync(int processId)
@@ -263,6 +376,11 @@ namespace Impulse.Pages.Production.LotIssuance
                 {
                     item.IssuanceQty = item.AvailableQty;
                     StagedItems.Add(item);
+                }
+
+                if (SelectedMaker != null)
+                {
+                    await RefreshStagedItemsRatesAsync();
                 }
 
                 NotificationService.Notify(new Radzen.NotificationMessage
@@ -485,6 +603,13 @@ namespace Impulse.Pages.Production.LotIssuance
 
             try
             {
+                var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                string userName = authState.User.Identity?.Name ?? "User";
+                var user = authState.User;
+
+                IsSkipApprovalRequired = await WorkflowTaskEngine.IsApprovalRequiredAsync("SkipProcess", userName, user);
+                SkipProcessReason = string.Empty;
+
                 AvailableSkipProcesses = await LotIssuanceService.GetSubsequentProcessesForSkipAsync(
                     SelectedItemForSkip.ItemCode,
                     SelectedItemForSkip.TargetProcessID,
@@ -524,6 +649,7 @@ namespace Impulse.Pages.Production.LotIssuance
             AvailableSkipProcesses.Clear();
             SelectedSkipProcessID = 0;
             SelectedItemForSkip = null;
+            SkipProcessReason = string.Empty;
         }
 
         public async Task ConfirmSkipProcessAsync()
@@ -540,6 +666,91 @@ namespace Impulse.Pages.Production.LotIssuance
                 return;
             }
 
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            string userName = authState.User.Identity?.Name ?? "User";
+            var user = authState.User;
+
+            bool requiresApproval = await WorkflowTaskEngine.IsApprovalRequiredAsync("SkipProcess", userName, user);
+
+            if (requiresApproval)
+            {
+                if (string.IsNullOrWhiteSpace(SkipProcessReason))
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Warning,
+                        Summary = "Reason Required",
+                        Detail = "Please provide a reason for the skip process request.",
+                        Duration = 4000
+                    });
+                    return;
+                }
+
+                IsSkippingProcess = true;
+                StateHasChanged();
+
+                try
+                {
+                    var targetProc = AvailableSkipProcesses.FirstOrDefault(p => p.ProcessID == SelectedSkipProcessID);
+                    var request = new ProductionDeletionRequestModel
+                    {
+                        RequestType = "SkipProcess",
+                        EntityRefID = SelectedItemForSkip.VendIssdDetailEntryID,
+                        LotNo = SelectedItemForSkip.LotNo,
+                        OrderNo = SelectedItemForSkip.OrderNo,
+                        ItemCode = SelectedItemForSkip.ItemCode,
+                        ItemName = SelectedItemForSkip.ItemName,
+                        ProcessID = SelectedItemForSkip.TargetProcessID,
+                        ProcessName = SelectedItemForSkip.TargetProcessName,
+                        TargetProcessID = SelectedSkipProcessID,
+                        TargetProcessName = targetProc?.Description ?? $"Process #{SelectedSkipProcessID}",
+                        Qty = SelectedItemForSkip.AvailableQty,
+                        RequestedBy = userName,
+                        RequestedDT = DateTime.Now,
+                        Reason = SkipProcessReason.Trim(),
+                        MachineName = Environment.MachineName,
+                        Status = "Pending"
+                    };
+
+                    await WorkflowTaskEngine.RequestSkipProcessAsync(request);
+
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Success,
+                        Summary = "Request Submitted",
+                        Detail = $"Skip process request for Lot [{SelectedItemForSkip.LotNo}] submitted to Director for approval.",
+                        Duration = 5000
+                    });
+
+                    CloseSkipProcessModal();
+
+                    // Clear staged lot from screen since it is now locked awaiting Director approval
+                    StagedItems.Clear();
+                    SearchLotNo = string.Empty;
+                    SelectedProcessID = 0;
+                    SelectedMaker = null;
+                    AvailableMakers.Clear();
+                }
+                catch (Exception ex)
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Error,
+                        Summary = "Submission Failed",
+                        Detail = ex.Message,
+                        Duration = 5000
+                    });
+                }
+                finally
+                {
+                    IsSkippingProcess = false;
+                    StateHasChanged();
+                }
+
+                return;
+            }
+
+            // Direct execution for exempt users (Director / Admin)
             IsSkippingProcess = true;
             try
             {
@@ -592,6 +803,7 @@ namespace Impulse.Pages.Production.LotIssuance
             finally
             {
                 IsSkippingProcess = false;
+                StateHasChanged();
             }
         }
     }

@@ -41,9 +41,12 @@ namespace Impulse.Pages.Production.ReceiveLot
         public LotSearchResultModel? LotHeader { get; set; }
         public List<MasterPOLineItemModel> Lines { get; set; } = new List<MasterPOLineItemModel>();
 
+        public List<EmployeeLookupModel> AllEmployees { get; set; } = new List<EmployeeLookupModel>();
         public List<EmployeeLookupModel> AvailableEmployees { get; set; } = new List<EmployeeLookupModel>();
         public EmployeeLookupModel? SelectedWorker { get; set; }
         public List<EmployeeLookupModel> SelectedWorkers { get; set; } = new List<EmployeeLookupModel>();
+
+        public EmployeeLookupModel? SelectedCheckedBy { get; set; }
 
         public bool PrintSlip { get; set; } = true;
         public bool IsSearching { get; set; } = false;
@@ -72,6 +75,12 @@ namespace Impulse.Pages.Production.ReceiveLot
         public decimal TotalPendingQty => Lines.Sum(l => l.PendingQty);
         public decimal TotalReceivingQty => Lines.Sum(l => l.ReceivingQty);
         public decimal TotalReceivingValue => Lines.Sum(l => l.ReceivingQty * l.Rate);
+
+        protected override async Task OnInitializedAsync()
+        {
+            AllEmployees = await MakerPOService.GetEmployeesAsync();
+            AvailableEmployees = new List<EmployeeLookupModel>(AllEmployees);
+        }
 
         public async Task HandleSearchKeyUp(KeyboardEventArgs e)
         {
@@ -127,6 +136,20 @@ namespace Impulse.Pages.Production.ReceiveLot
                     return;
                 }
 
+                if (searchResult.IsIssuancePendingDeletion)
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Error,
+                        Summary = "Issuance Locked",
+                        Detail = $"Lot [{searchResult.LotNo}] issuance is currently awaiting Director deletion approval. Receiving is locked.",
+                        Duration = 6000
+                    });
+                    LotHeader = null;
+                    Lines.Clear();
+                    return;
+                }
+
                 if (searchResult.AlreadyReceived)
                 {
                     NotificationService.Notify(new Radzen.NotificationMessage
@@ -152,7 +175,7 @@ namespace Impulse.Pages.Production.ReceiveLot
 
                 if (LotHeader.IsFactoryMaker)
                 {
-                    AvailableEmployees = await MakerPOService.GetEmployeesAsync();
+                    AvailableEmployees = new List<EmployeeLookupModel>(AllEmployees);
                 }
 
                 NotificationService.Notify(new Radzen.NotificationMessage
@@ -193,6 +216,20 @@ namespace Impulse.Pages.Production.ReceiveLot
                                            || (e.Designation != null && e.Designation.Contains(searchText, StringComparison.OrdinalIgnoreCase))));
         }
 
+        public Task<IEnumerable<EmployeeLookupModel>> SearchCheckedByEmployees(string searchText)
+        {
+            if (AllEmployees == null || !AllEmployees.Any())
+                return Task.FromResult(Enumerable.Empty<EmployeeLookupModel>());
+
+            if (string.IsNullOrWhiteSpace(searchText))
+                return Task.FromResult<IEnumerable<EmployeeLookupModel>>(AllEmployees);
+
+            return Task.FromResult<IEnumerable<EmployeeLookupModel>>(
+                AllEmployees.Where(e => (e.Name != null && e.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                                     || (e.EmpID != null && e.EmpID.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                                     || (e.Designation != null && e.Designation.Contains(searchText, StringComparison.OrdinalIgnoreCase))));
+        }
+
         public void AddWorker()
         {
             if (SelectedWorker != null && !SelectedWorkers.Any(w => w.EmpID == SelectedWorker.EmpID))
@@ -215,6 +252,7 @@ namespace Impulse.Pages.Production.ReceiveLot
             Lines.Clear();
             SelectedWorkers.Clear();
             SelectedWorker = null;
+            SelectedCheckedBy = null;
         }
 
         public async Task SaveReceiving()
@@ -243,6 +281,18 @@ namespace Impulse.Pages.Production.ReceiveLot
                 return;
             }
 
+            if (SelectedCheckedBy == null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Checked by Required",
+                    Detail = "Please select 'Checked by' before saving the entry.",
+                    Duration = 4000
+                });
+                return;
+            }
+
             var activeReceivingLines = Lines.Where(l => l.ReceivingQty > 0).ToList();
             if (!activeReceivingLines.Any())
             {
@@ -254,6 +304,21 @@ namespace Impulse.Pages.Production.ReceiveLot
                     Duration = 4000
                 });
                 return;
+            }
+
+            foreach (var line in activeReceivingLines)
+            {
+                if (line.SelectedCountedBy == null && string.IsNullOrWhiteSpace(line.CountedBy))
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Warning,
+                        Summary = "Counted By Required",
+                        Detail = $"Please select 'Counted By' employee for item [{line.ItemCode}].",
+                        Duration = 4000
+                    });
+                    return;
+                }
             }
 
             foreach (var line in activeReceivingLines)
@@ -304,6 +369,7 @@ namespace Impulse.Pages.Production.ReceiveLot
                     ProcessID = LotHeader.ProcessID,
                     DT = DateTime.Today,
                     MillCertNo = MillCertNo,
+                    CheckedByEmpID = SelectedCheckedBy?.EmpID ?? "",
                     FactoryEmpIDs = SelectedWorkers.Select(w => w.EmpID).ToList()
                 };
 
@@ -314,7 +380,8 @@ namespace Impulse.Pages.Production.ReceiveLot
                     OrderNo = l.OrderNo,
                     Rate = l.Rate,
                     RcvdQty = l.ReceivingQty,
-                    CountedBy = l.CountedBy,
+                    CountedBy = l.SelectedCountedBy?.Name ?? (!string.IsNullOrWhiteSpace(l.CountedBy) ? l.CountedBy : (SelectedCheckedBy?.Name ?? "")),
+                    Insp_EmpID = l.SelectedCountedBy?.EmpID ?? (!string.IsNullOrWhiteSpace(l.Insp_EmpID) ? l.Insp_EmpID : (SelectedCheckedBy?.EmpID ?? "")),
                     LotNo = string.IsNullOrWhiteSpace(l.LotNo) ? LotHeader.LotNo : l.LotNo,
                     ReWorkLot = l.ReWorkLot,
                     RepairType = l.RepairType,

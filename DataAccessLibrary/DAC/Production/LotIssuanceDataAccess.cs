@@ -35,14 +35,18 @@ namespace DataAccessLibrary.DAC.Production
         public async Task<List<MakerPOLookupModel>> GetMakersForProcessAsync(int processId)
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
-            string sql = @"SELECT M.VendID, ISNULL(M.VendID1, '') AS VendID1, M.VenderName,
-                                  ISNULL(B.MakerCapacity, 0) AS MakerCapacity, ISNULL(B.Balance, 0) AS Balance
-                           FROM VMakers M
-                           LEFT JOIN VMakerBalances B ON M.VendID = B.VendID
-                           WHERE M.Active = 1 
-                             AND (M.VendID IN (SELECT VendID FROM MakerProcesses WHERE ProcessID = @ProcessID)
-                                  OR M.VendID = 79 OR M.VenderName LIKE '%FACTORY%' OR M.VendID1 LIKE '%FAC%')
-                           ORDER BY M.VenderName";
+            string sql = @"
+                DECLARE @FactoryMakerID BIGINT = 0;
+                SELECT TOP 1 @FactoryMakerID = TRY_CAST(DataValue AS BIGINT) FROM GeneralData WHERE DataName = 'FactoryMaker';
+
+                SELECT M.VendID, ISNULL(M.VendID1, '') AS VendID1, M.VenderName,
+                       ISNULL(B.MakerCapacity, 0) AS MakerCapacity, ISNULL(B.Balance, 0) AS Balance
+                FROM VMakers M
+                LEFT JOIN VMakerBalances B ON M.VendID = B.VendID
+                WHERE M.Active = 1 
+                  AND (M.VendID IN (SELECT VendID FROM MakerProcesses WHERE ProcessID = @ProcessID)
+                       OR M.VendID = @FactoryMakerID OR M.VendID = 79 OR M.VenderName LIKE '%FACTORY%' OR M.VendID1 LIKE '%FAC%')
+                ORDER BY M.VenderName";
 
             return (await db.QueryAsync<MakerPOLookupModel>(sql, new { ProcessID = processId })).ToList();
         }
@@ -51,6 +55,38 @@ namespace DataAccessLibrary.DAC.Production
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
             string trimmedLotNo = lotNo.Trim();
+
+            // 0. Check if this lot has any pending governance approval requests (SkipProcess, LotIssuance, LotReceiving)
+            const string pendingCheckSql = @"
+                SELECT TOP 1 RequestType, MakerName AS TargetProcessName, Reason 
+                FROM dbo.ProductionDeletionRequests WITH (NOLOCK)
+                WHERE Status = 'Pending' AND LotNo = @LotNo";
+
+            var pendingReq = await db.QueryFirstOrDefaultAsync<(string RequestType, string? TargetProcessName, string Reason)>(
+                pendingCheckSql, new { LotNo = trimmedLotNo });
+
+            if (!string.IsNullOrWhiteSpace(pendingReq.RequestType))
+            {
+                if (pendingReq.RequestType == "SkipProcess")
+                {
+                    return new LotIssuanceLookupResultModel
+                    {
+                        IsFound = true,
+                        AlreadyIssued = true,
+                        Message = $"Lot No [{trimmedLotNo}] is locked awaiting Director approval for Skip Process" +
+                                  (!string.IsNullOrWhiteSpace(pendingReq.TargetProcessName) ? $" to '{pendingReq.TargetProcessName}'." : ".")
+                    };
+                }
+                else
+                {
+                    return new LotIssuanceLookupResultModel
+                    {
+                        IsFound = true,
+                        AlreadyIssued = true,
+                        Message = $"Lot No [{trimmedLotNo}] is locked awaiting Director deletion approval."
+                    };
+                }
+            }
 
             // 1. Get the latest receiving record in VendRcvdDetail for this Lot No
             string rcvdSql = @"SELECT TOP 1 VRD.EntryID AS VendIssdDetailEntryID, ISNULL(VRD.OrderNo, '') AS OrderNo, VRD.ItemCode, ISNULL(I.ItemName, '') AS ItemName,
@@ -362,6 +398,48 @@ namespace DataAccessLibrary.DAC.Production
                 ORDER BY e.Name";
 
             return (await db.QueryAsync<EmployeeLookupModel>(sql, new { ProcessID = processId })).ToList();
+        }
+
+        public async Task<long> GetFactoryMakerVendIdAsync()
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            const string sql = "SELECT TOP 1 DataValue FROM GeneralData WHERE DataName = 'FactoryMaker'";
+            string? val = await db.ExecuteScalarAsync<string>(sql);
+            if (!string.IsNullOrWhiteSpace(val) && long.TryParse(val, out long makerId))
+            {
+                return makerId;
+            }
+            return 0;
+        }
+
+        public async Task<decimal> GetItemRateAsync(long vendId, int processId, string itemId)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+
+            // 1. Check if Factory Maker via GeneralData ('FactoryMaker')
+            const string factoryMakerSql = "SELECT TOP 1 DataValue FROM GeneralData WHERE DataName = 'FactoryMaker'";
+            string? factoryMakerVal = await db.ExecuteScalarAsync<string>(factoryMakerSql);
+            if (!string.IsNullOrWhiteSpace(factoryMakerVal) && long.TryParse(factoryMakerVal, out long factoryMakerId) && factoryMakerId == vendId)
+            {
+                return 0m;
+            }
+
+            // 2. Fetch rate from VendAssItems for selected maker, process & item
+            const string rateSql = @"
+                SELECT TOP 1 ISNULL(Rate, 0)
+                FROM VendAssItems
+                WHERE VendID = @VendId
+                  AND ProcessID = @ProcessId
+                  AND ItemID = @ItemId";
+
+            decimal? rate = await db.ExecuteScalarAsync<decimal?>(rateSql, new
+            {
+                VendId = vendId,
+                ProcessId = processId,
+                ItemId = itemId
+            });
+
+            return rate ?? 0m;
         }
     }
 }

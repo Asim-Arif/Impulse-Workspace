@@ -55,6 +55,7 @@ namespace Impulse.Pages.Dashboards.ProductionPlanning
         [Inject] public NotificationService NotificationService { get; set; } = default!;
         [Inject] public DialogService DialogService { get; set; } = default!;
         [Inject] public NavigationManager NavigationManager { get; set; } = default!;
+        [Inject] public SecurityService SecurityService { get; set; } = default!;
 
         // Slicer Filters
         public List<LookupItemString> Customers { get; set; } = new();
@@ -106,23 +107,15 @@ namespace Impulse.Pages.Dashboards.ProductionPlanning
             }
         }
 
-        public async Task OnCustomerChanged()
+        public Task OnCustomerChanged()
         {
-            try
-            {
-                SelectedArticle = null;
-                DashboardData = null;
-                FilterOrderNo = null;
-                SelectedStageFilter = null;
-                ClearChartData();
-
-                Countries = await DashboardService.GetCountriesByCustomerAsync(SelectedCustCode);
-                SelectedCountry = Countries.FirstOrDefault() ?? "<Comp>";
-            }
-            catch (Exception ex)
-            {
-                NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load countries: {ex.Message}");
-            }
+            SelectedArticle = null;
+            DashboardData = null;
+            FilterOrderNo = null;
+            SelectedStageFilter = null;
+            ClearChartData();
+            SelectedCountry = "<Comp>";
+            return Task.CompletedTask;
         }
 
         public Task OnCountryChanged()
@@ -409,6 +402,12 @@ namespace Impulse.Pages.Dashboards.ProductionPlanning
         {
             if (string.IsNullOrWhiteSpace(lotNo)) return;
 
+            bool isAuthorized = await SecurityService.VerifyActionAsync("Close_Lot");
+            if (!isAuthorized)
+            {
+                return;
+            }
+
             bool? confirmed = await DialogService.Confirm($"Are you sure you want to close Lot #{lotNo}?", "Close Production Lot",
                 new ConfirmOptions { OkButtonText = "Yes, Close Lot", CancelButtonText = "Cancel" });
 
@@ -433,6 +432,12 @@ namespace Impulse.Pages.Dashboards.ProductionPlanning
         public async Task CloseMakerPOPrompt(long entryId)
         {
             if (entryId == 0) return;
+
+            bool isAuthorized = await SecurityService.VerifyActionAsync("CloseMakerPO");
+            if (!isAuthorized)
+            {
+                return;
+            }
 
             bool? confirmed = await DialogService.Confirm("Are you sure you want to close this Maker Purchase Order?", "Close Maker PO",
                 new ConfirmOptions { OkButtonText = "Yes, Close PO", CancelButtonText = "Cancel" });
@@ -549,8 +554,31 @@ namespace Impulse.Pages.Dashboards.ProductionPlanning
             {
                 await ReportNavigationService.PrintReportAsync(new ReportRequest
                 {
-                    ReportName = mini ? "PTC_Mini.rpt" : "PTCQEL.rpt",
-                    SelectionFormula = $"{{VFOrderItemPTC.LotNo}}='{lotNo}'"
+                    ReportName = mini ? "PTCQEL_Mini.rpt" : "PTCQel.rpt",
+                    Parameters = new Dictionary<string, object>
+                    {
+                        { "@LotNo", lotNo }
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Print Error", ex.Message);
+            }
+        }
+
+        public async Task PrintPTCWithPrice(string? lotNo)
+        {
+            if (string.IsNullOrWhiteSpace(lotNo)) return;
+            try
+            {
+                await ReportNavigationService.PrintReportAsync(new ReportRequest
+                {
+                    ReportName = "PTCQELWithPrice.rpt",
+                    Parameters = new Dictionary<string, object>
+                    {
+                        { "@LotNo", lotNo }
+                    }
                 });
             }
             catch (Exception ex)
@@ -595,13 +623,73 @@ namespace Impulse.Pages.Dashboards.ProductionPlanning
 
         public async Task PrintMakerPO(string? masterPONo)
         {
+            await PrintMasterPOMaker(masterPONo);
+        }
+
+        public async Task PrintMasterPOOffice(string? masterPONo)
+        {
             if (string.IsNullOrWhiteSpace(masterPONo)) return;
             try
             {
                 await ReportNavigationService.PrintReportAsync(new ReportRequest
                 {
                     ReportName = "IssList.rpt",
-                    SelectionFormula = $"{{VendIssued.MasterPONo}}='{masterPONo}'"
+                    SelectionFormula = $"{{VendIssued.MasterPONo}} = '{masterPONo}'",
+                    FormulaValues = new Dictionary<string, object> { { "Copy", "'OFFICE COPY'" } }
+                });
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Print Error", ex.Message);
+            }
+        }
+
+        public async Task PrintMasterPOMaker(string? masterPONo)
+        {
+            if (string.IsNullOrWhiteSpace(masterPONo)) return;
+            try
+            {
+                await ReportNavigationService.PrintReportAsync(new ReportRequest
+                {
+                    ReportName = "IssList.rpt",
+                    SelectionFormula = $"{{VendIssued.MasterPONo}} = '{masterPONo}'",
+                    FormulaValues = new Dictionary<string, object> { { "Copy", "'MAKER COPY'" } }
+                });
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Print Error", ex.Message);
+            }
+        }
+
+        public async Task PrintMasterPOAccounts(string? masterPONo)
+        {
+            if (string.IsNullOrWhiteSpace(masterPONo)) return;
+            try
+            {
+                await ReportNavigationService.PrintReportAsync(new ReportRequest
+                {
+                    ReportName = "IssList.rpt",
+                    SelectionFormula = $"{{VendIssued.MasterPONo}} = '{masterPONo}'",
+                    FormulaValues = new Dictionary<string, object> { { "Copy", "'ACCOUNTS COPY'" } }
+                });
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Print Error", ex.Message);
+            }
+        }
+
+        public async Task PrintMasterPOHideRate(string? masterPONo)
+        {
+            if (string.IsNullOrWhiteSpace(masterPONo)) return;
+            try
+            {
+                await ReportNavigationService.PrintReportAsync(new ReportRequest
+                {
+                    ReportName = "IssList.rpt",
+                    SelectionFormula = $"{{VendIssued.MasterPONo}} = '{masterPONo}'",
+                    FormulaValues = new Dictionary<string, object> { { "HideRate", true } }
                 });
             }
             catch (Exception ex)
@@ -618,7 +706,7 @@ namespace Impulse.Pages.Dashboards.ProductionPlanning
                 await ReportNavigationService.PrintReportAsync(new ReportRequest
                 {
                     ReportName = "MasterPOStatus.rpt",
-                    SelectionFormula = $"{{VendIssued.MasterPONo}}='{masterPONo}'"
+                    SelectionFormula = $"{{VendIssued.MasterPONo}} = '{masterPONo}'"
                 });
             }
             catch (Exception ex)

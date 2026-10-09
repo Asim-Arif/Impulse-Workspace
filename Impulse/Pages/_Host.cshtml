@@ -64,6 +64,18 @@
     <!-- Radzen Blazor JS -->
     <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
 
+    <!-- Cross-Tab Authentication Sync -->
+    <script src="js/auth-sync.js"></script>
+    <script>
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <text>
+            window.initTabAuthSync('@User.Identity.Name');
+            window.notifyAuthChange('login', '@User.Identity.Name');
+            </text>
+        }
+    </script>
+
     <script>
         window.showBootstrapModal = (el) => {
             var modal = new bootstrap.Modal(el);

@@ -20,5 +20,7 @@ namespace DataAccessLibrary.Interface.Production
         Task<int> CheckReceivingExistsAsync(long entryId);
         Task<bool> DeleteIssuanceAsync(long entryId);
         Task<bool> GetUserRightAsync(string rightName, string userName);
+        Task<List<MakerPOReturnDateItemDto>> GetMakerPOReturnDatesAsync(long entryId);
+        Task<bool> UpdateMakerPOReturnDatesAsync(long entryId, List<MakerPOReturnDateItemDto> returnDates, string userName, string machineName);
     }
 }

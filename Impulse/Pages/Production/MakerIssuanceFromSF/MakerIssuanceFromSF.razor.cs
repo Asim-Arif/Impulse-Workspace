@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Http;
 using DataAccessLibrary.Models.ViewModels.Production;
+using DataAccessLibrary.Interface.Setup;
 using Impulse.Services.Production;
 using Impulse.Services;
 
@@ -35,6 +36,15 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
         [Inject]
         public IHttpContextAccessor HttpContextAccessor { get; set; } = default!;
 
+        [Inject]
+        public IUserDataAccess UserDataAccess { get; set; } = default!;
+
+        [Inject]
+        public IUserRoleDataAccess UserRoleDataAccess { get; set; } = default!;
+
+        public bool IsDirectorOrAdmin { get; set; } = false;
+        public string CurrentUserName { get; set; } = "System";
+
         public CreateSFIssuanceHeaderModel Header { get; set; } = new CreateSFIssuanceHeaderModel();
 
         public List<ProcessPOLookupModel> Processes { get; set; } = new List<ProcessPOLookupModel>();
@@ -52,7 +62,19 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
             }
         }
 
-        public ProcessPOLookupModel? SelectedReturnProcess { get; set; }
+        private ProcessPOLookupModel? _selectedReturnProcess;
+        public ProcessPOLookupModel? SelectedReturnProcess
+        {
+            get => _selectedReturnProcess;
+            set
+            {
+                if (_selectedReturnProcess != value)
+                {
+                    _selectedReturnProcess = value;
+                    _ = OnReturnProcessChangedAsync(value);
+                }
+            }
+        }
 
         public List<MakerPOLookupModel> Makers { get; set; } = new List<MakerPOLookupModel>();
         private MakerPOLookupModel? _selectedMaker;
@@ -110,8 +132,52 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
         public decimal TotalStagedQty => StagedLines.Sum(l => l.IssQty);
         public decimal TotalStagedValue => StagedLines.Sum(l => l.Value);
 
+        public string FormatRate(decimal rate)
+        {
+            return IsDirectorOrAdmin ? rate.ToString("N2") : "****";
+        }
+
+        public string FormatValue(decimal value)
+        {
+            return IsDirectorOrAdmin ? value.ToString("N2") : "****";
+        }
+
         protected override async Task OnInitializedAsync()
         {
+            try
+            {
+                var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                if (authState?.User?.Identity?.IsAuthenticated == true)
+                {
+                    CurrentUserName = authState.User.Identity.Name ?? "System";
+                    var user = authState.User;
+
+                    bool isRoleMatch = user.IsInRole("Director") || user.IsInRole("Admin") || user.IsInRole("Administrator") || user.IsInRole("SuperAdmin");
+                    bool isNameMatch = string.Equals(CurrentUserName, "admin", StringComparison.OrdinalIgnoreCase) || string.Equals(CurrentUserName, "administrator", StringComparison.OrdinalIgnoreCase);
+
+                    if (isRoleMatch || isNameMatch)
+                    {
+                        IsDirectorOrAdmin = true;
+                    }
+                    else
+                    {
+                        var dbUser = await UserDataAccess.GetUserByUserNameAsync(CurrentUserName);
+                        if (dbUser != null)
+                        {
+                            var userRoles = await UserRoleDataAccess.GetRolesByUserIdAsync(dbUser.UserID);
+                            if (userRoles != null && userRoles.Any(r => r.Equals("Director", StringComparison.OrdinalIgnoreCase) || r.Equals("Admin", StringComparison.OrdinalIgnoreCase) || r.Equals("Administrator", StringComparison.OrdinalIgnoreCase)))
+                            {
+                                IsDirectorOrAdmin = true;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error checking user roles in MakerIssuanceFromSF: {ex.Message}");
+            }
+
             await LoadInitialLookupsAsync();
         }
 
@@ -190,6 +256,7 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
 
                 LineIssQty = lotResult.SplitQty;
                 LineRemarks = lotResult.Remarks;
+                await RefreshLineRateAsync();
 
                 NotificationService.Notify(new Radzen.NotificationMessage
                 {
@@ -220,9 +287,9 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
             if (process != null)
             {
                 Header.ProcessID = process.ProcessID;
-                if (SelectedReturnProcess == null)
+                if (_selectedReturnProcess == null)
                 {
-                    SelectedReturnProcess = process;
+                    _selectedReturnProcess = process;
                 }
                 Makers = await MakerPOService.GetMakersForProcessAsync(process.ProcessID);
             }
@@ -232,6 +299,18 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
             int retProcId = SelectedReturnProcess?.ProcessID ?? 0;
             AvailableSFItems = await SFIssuanceService.GetAvailableSFItemsAsync(procId, vendId, retProcId);
 
+            await RefreshLineRateAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+
+        private async Task OnReturnProcessChangedAsync(ProcessPOLookupModel? returnProcess)
+        {
+            int procId = SelectedProcess?.ProcessID ?? 0;
+            long vendId = SelectedMaker?.VendID ?? 0;
+            int retProcId = returnProcess?.ProcessID ?? 0;
+            AvailableSFItems = await SFIssuanceService.GetAvailableSFItemsAsync(procId, vendId, retProcId);
+
+            await RefreshLineRateAsync();
             await InvokeAsync(StateHasChanged);
         }
 
@@ -253,6 +332,7 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
             int retProcId = SelectedReturnProcess?.ProcessID ?? 0;
             AvailableSFItems = await SFIssuanceService.GetAvailableSFItemsAsync(procId, vendId, retProcId);
 
+            await RefreshLineRateAsync();
             await InvokeAsync(StateHasChanged);
         }
 
@@ -282,7 +362,32 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
                     SelectedOrder = UnshippedOrders.First();
                 }
             }
+
+            await RefreshLineRateAsync();
             await InvokeAsync(StateHasChanged);
+        }
+
+        private async Task RefreshLineRateAsync()
+        {
+            if (SelectedMaker == null || SelectedItem == null || SelectedProcess == null)
+            {
+                LineRate = 0m;
+                return;
+            }
+
+            try
+            {
+                LineRate = await SFIssuanceService.GetItemRateAsync(
+                    SelectedMaker.VendID,
+                    SelectedProcess.ProcessID,
+                    SelectedReturnProcess?.ProcessID ?? SelectedProcess.ProcessID,
+                    SelectedItem.ItemID);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching line rate: {ex.Message}");
+                LineRate = 0m;
+            }
         }
 
         public Task<IEnumerable<ProcessPOLookupModel>> SearchProcesses(string searchText)

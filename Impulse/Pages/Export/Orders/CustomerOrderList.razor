@@ -199,8 +199,14 @@
                                             <th style="width: 50px;" class="text-center">S#</th>
                                             <th>Company</th>
                                             <th>Customer</th>
-                                            <th>Country</th>
-                                            <th>Order #</th>
+                                            @if (isDirector)
+                                            {
+                                                <th>Country</th>
+                                            }
+                                            @if (!IsProductionMode)
+                                            {
+                                                <th>Order #</th>
+                                            }
                                             <th class="text-center">Auth</th>
                                             <th>Type</th>
                                             <th>Int. Ref #</th>
@@ -224,7 +230,7 @@
                                         @if (!allOrders.Any())
                                         {
                                             <tr>
-                                                <td colspan="@(IsProductionMode ? 17 : 19)" class="text-center text-muted py-4">No customer orders found matching these filters.</td>
+                                                <td colspan="@(IsProductionMode ? (isDirector ? 16 : 15) : (isDirector ? 19 : 18))" class="text-center text-muted py-4">No customer orders found matching these filters.</td>
                                             </tr>
                                         }
                                         else
@@ -242,8 +248,14 @@
                                                     <td class="text-center text-secondary">@(idx++)</td>
                                                     <td>@order.CompanyName</td>
                                                     <td>@order.CustCode</td>
-                                                    <td>@order.Country</td>
-                                                    <td class="fw-semibold">@order.OrderNo</td>
+                                                    @if (isDirector)
+                                                    {
+                                                        <td>@order.Country</td>
+                                                    }
+                                                    @if (!IsProductionMode)
+                                                    {
+                                                        <td class="fw-semibold">@order.OrderNo</td>
+                                                    }
                                                     <td class="text-center">
                                                         @if (order.AuthorizationStatus == "Authorized")
                                                         {
@@ -434,6 +446,9 @@
         <Item class="win11-menu-item" OnClick="@(() => PrintCustomerPO(order.OrderNo))">
             <i class="fas fa-file-invoice fa-fw win11-icon"></i> Print Customer Order
         </Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintOrderCheckSheet(order.OrderNo))">
+            <i class="fas fa-clipboard-check fa-fw win11-icon"></i> Print Checksheet
+        </Item>
 
         <div class="win11-divider"></div>
         <div class="win11-section-header">Planning &amp; Manufacturing</div>
@@ -449,9 +464,12 @@
         <Item class="win11-menu-item" OnClick="@(() => PrintOrderWrangler(order.OrderNo, printBalance: true))">
             <i class="fas fa-balance-scale fa-fw win11-icon"></i> Print Production Order Balance
         </Item>
-        <Item class="win11-menu-item" OnClick="@(() => PrintProductionExportCost(order.OrderNo))">
-            <i class="fas fa-dollar-sign fa-fw win11-icon"></i> Print Production Export Cost
-        </Item>
+        @if (!IsProductionMode)
+        {
+            <Item class="win11-menu-item" OnClick="@(() => PrintProductionExportCost(order.OrderNo))">
+                <i class="fas fa-dollar-sign fa-fw win11-icon"></i> Print Production Export Cost
+            </Item>
+        }
         <Item class="win11-menu-item" OnClick="@(() => PrintScoreBoard(order.OrderNo))">
             <i class="fas fa-tachometer-alt fa-fw win11-icon"></i> Score Board Report
         </Item>

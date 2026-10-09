@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 
 namespace DataAccessLibrary
 {
@@ -16,6 +16,7 @@ namespace DataAccessLibrary
         Task<List<T>> GetListAsync<T>(string strFieldName, string strTableName, string strCondition = "", IDbConnection? existingDb = null, IDbTransaction? existingTrans = null);
         Task<string> getGeneralDataValueAsync(string strDataSetting);
         Task<string> getDatabasePasswordAsync(string strSetting);
+        Task<(string Password, bool PasswordEncrypted)> getSecuritySettingAsync(string strSetting);
         Task<int> ExecuteAsync(string sql, object? param = null);
         Task<bool> getSingleBoolValueasync(string strFieldName, string strTableName, string strCondition = "");
 

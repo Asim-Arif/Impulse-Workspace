@@ -69,7 +69,7 @@ namespace Impulse.Pages.Accounts
 
         private void GoToIndexPage()
         {
-            Navigation.NavigateTo("/financialdashboard");
+            Navigation.NavigateTo("/financial");
         }
 
         private async Task PrintCashBookReport()

@@ -35,6 +35,8 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string LotNo { get; set; } = string.Empty;
         public decimal ReceivingQty { get; set; }
         public string CountedBy { get; set; } = string.Empty;
+        public string Insp_EmpID { get; set; } = string.Empty;
+        public EmployeeLookupModel? SelectedCountedBy { get; set; }
         public int ReWorkLot { get; set; }
         public int RepairType { get; set; }
         public int ReturnProcessID { get; set; }
@@ -50,6 +52,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public bool OverTime { get; set; } = false;
         public string TemperValue { get; set; } = string.Empty;
         public string MillCertNo { get; set; } = string.Empty;
+        public string CheckedByEmpID { get; set; } = string.Empty;
         public List<string> FactoryEmpIDs { get; set; } = new List<string>();
     }
 
@@ -61,6 +64,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public decimal Rate { get; set; }
         public decimal RcvdQty { get; set; }
         public string CountedBy { get; set; } = string.Empty;
+        public string Insp_EmpID { get; set; } = string.Empty;
         public string LotNo { get; set; } = string.Empty;
         public int ReWorkLot { get; set; } = 0;
         public int RepairType { get; set; } = 0;
