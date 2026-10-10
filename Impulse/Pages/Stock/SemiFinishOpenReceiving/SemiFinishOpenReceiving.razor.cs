@@ -16,6 +16,47 @@ namespace Impulse.Pages.Stock.SemiFinishOpenReceiving
     public partial class SemiFinishOpenReceiving : ComponentBase
     {
         [Inject] private NavigationManager NavigationManager { get; set; }
+        [Inject] private Impulse.Services.IDBHelperService DbHelper { get; set; }
+
+        // Security Password Protection
+        private bool showPasswordModal = false;
+        private string passwordSettingName = "Delete_Semi_Finish_Opening";
+        private string enteredPassword = string.Empty;
+        private string passwordError = string.Empty;
+        private Func<Task>? postPasswordAction = null;
+
+        private void CheckPasswordThenExecute(string settingName, Func<Task> action)
+        {
+            passwordSettingName = settingName;
+            enteredPassword = string.Empty;
+            passwordError = string.Empty;
+            postPasswordAction = action;
+            showPasswordModal = true;
+        }
+
+        private async Task VerifyPasswordAndExecute()
+        {
+            try
+            {
+                string correctPassword = await DbHelper.getDatabasePasswordAsync(passwordSettingName);
+                if (enteredPassword == (correctPassword ?? string.Empty))
+                {
+                    showPasswordModal = false;
+                    if (postPasswordAction != null)
+                    {
+                        await postPasswordAction.Invoke();
+                    }
+                }
+                else
+                {
+                    passwordError = "Incorrect password. Please try again.";
+                }
+            }
+            catch (Exception ex)
+            {
+                passwordError = $"Error validating password: {ex.Message}";
+            }
+        }
 
         private bool IsLoadingInitialData = true;
         private bool IsLoadingGrid = false;
@@ -293,7 +334,13 @@ namespace Impulse.Pages.Stock.SemiFinishOpenReceiving
             }
         }
 
-        private async Task ConfirmDelete(SemiFinishOpeningModel item)
+        private void ConfirmDelete(SemiFinishOpeningModel item)
+        {
+            if (item == null) return;
+            CheckPasswordThenExecute("Delete_Semi_Finish_Opening", async () => await PerformDelete(item));
+        }
+
+        private async Task PerformDelete(SemiFinishOpeningModel item)
         {
             if (item == null) return;
 
@@ -347,11 +394,11 @@ namespace Impulse.Pages.Stock.SemiFinishOpenReceiving
             }
         }
 
-        private async Task OnContextDelete(ItemClickEventArgs e)
+        private void OnContextDelete(ItemClickEventArgs e)
         {
             if (e.Data is SemiFinishOpeningModel item)
             {
-                await ConfirmDelete(item);
+                ConfirmDelete(item);
             }
         }
     }

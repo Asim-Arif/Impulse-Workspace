@@ -58,6 +58,49 @@ namespace Impulse.Pages.Stock.RMPO
         [Inject]
         private BlazorContextMenu.IBlazorContextMenuService BlazorContextMenuService { get; set; }
 
+        [Inject]
+        private IDBHelperService DbHelper { get; set; }
+
+        // Security Password Protection
+        private bool showPasswordModal = false;
+        private string passwordSettingName = "RM_PO_Handling";
+        private string enteredPassword = string.Empty;
+        private string passwordError = string.Empty;
+        private Func<Task>? postPasswordAction = null;
+
+        private void CheckPasswordThenExecute(string settingName, Func<Task> action)
+        {
+            passwordSettingName = settingName;
+            enteredPassword = string.Empty;
+            passwordError = string.Empty;
+            postPasswordAction = action;
+            showPasswordModal = true;
+        }
+
+        private async Task VerifyPasswordAndExecute()
+        {
+            try
+            {
+                string correctPassword = await DbHelper.getDatabasePasswordAsync(passwordSettingName);
+                if (enteredPassword == (correctPassword ?? string.Empty))
+                {
+                    showPasswordModal = false;
+                    if (postPasswordAction != null)
+                    {
+                        await postPasswordAction.Invoke();
+                    }
+                }
+                else
+                {
+                    passwordError = "Incorrect password. Please try again.";
+                }
+            }
+            catch (Exception ex)
+            {
+                passwordError = $"Error validating password: {ex.Message}";
+            }
+        }
+
         protected override async Task OnInitializedAsync()
         {
             Filter.DateRangeIndex = 0; // Last 15 Days
@@ -126,20 +169,26 @@ namespace Impulse.Pages.Stock.RMPO
 
         private void EditPO(RMPOListViewModel item)
         {
-            NavigationManager.NavigateTo($"/stock/new-rm-po?OrderNo={item.OrderNo}&returnUrl=/stock/rmpolist");
+            if (item.Final == true)
+            {
+                NotificationService.ShowWarning("Warning", "PO is closed, Can't Edit.");
+                return;
+            }
+
+            CheckPasswordThenExecute("RM_PO_Handling", () =>
+            {
+                NavigationManager.NavigateTo($"/stock/new-rm-po?OrderNo={item.OrderNo}&returnUrl=/stock/rmpolist");
+                return Task.CompletedTask;
+            });
         }
 
         private async Task OnEditPO(BlazorContextMenu.ItemClickEventArgs e)
         {
             if (e.Data is RMPOListViewModel item)
             {
-                if (item.Final == true)
-                {
-                    NotificationService.ShowWarning("Warning", "PO is closed, Can't Edit.");
-                    return;
-                }
                 EditPO(item);
             }
+            await Task.CompletedTask;
         }
 
         private async Task OnDeletePO(BlazorContextMenu.ItemClickEventArgs e)
@@ -152,47 +201,61 @@ namespace Impulse.Pages.Stock.RMPO
                     return;
                 }
 
-                bool confirmed = await JS.InvokeAsync<bool>("confirm", "Are you sure you want to delete this order?");
-                if (confirmed)
+                CheckPasswordThenExecute("RM_PO_Handling", async () =>
                 {
-                    try
+                    bool confirmed = await JS.InvokeAsync<bool>("confirm", "Are you sure you want to delete this order?");
+                    if (confirmed)
                     {
-                        await VendOrderService.DeleteVendOrderAsync(item.OrderNo);
-                        NotificationService.ShowSuccess("Success", "Order deleted.");
-                        await LoadData();
+                        try
+                        {
+                            await VendOrderService.DeleteVendOrderAsync(item.OrderNo);
+                            NotificationService.ShowSuccess("Success", "Order deleted.");
+                            await LoadData();
+                        }
+                        catch (Exception ex)
+                        {
+                            NotificationService.ShowError("Error", ex.Message);
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        NotificationService.ShowError("Error", ex.Message);
-                    }
-                }
+                });
             }
+            await Task.CompletedTask;
         }
 
         private async Task OnEndPO(BlazorContextMenu.ItemClickEventArgs e)
         {
             if (e.Data is RMPOListViewModel item)
             {
-                bool confirmed = await JS.InvokeAsync<bool>("confirm", "Are you sure to end this purchase order?");
-                if (confirmed)
+                if (item.Final == true)
                 {
-                    try
+                    NotificationService.ShowWarning("Warning", "PO is already closed.");
+                    return;
+                }
+
+                CheckPasswordThenExecute("RM_PO_Handling", async () =>
+                {
+                    bool confirmed = await JS.InvokeAsync<bool>("confirm", "Are you sure to end this purchase order?");
+                    if (confirmed)
                     {
-                        var order = await VendOrderService.GetVendOrderAsync(item.OrderNo);
-                        if (order != null)
+                        try
                         {
-                            order.Final = true;
-                            await VendOrderService.SaveVendOrderAsync(order);
-                            NotificationService.ShowSuccess("Success", "PO closed successfully.");
-                            await LoadData();
+                            var order = await VendOrderService.GetVendOrderAsync(item.OrderNo);
+                            if (order != null)
+                            {
+                                order.Final = true;
+                                await VendOrderService.SaveVendOrderAsync(order);
+                                NotificationService.ShowSuccess("Success", "PO closed successfully.");
+                                await LoadData();
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            NotificationService.ShowError("Error", ex.Message);
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        NotificationService.ShowError("Error", ex.Message);
-                    }
-                }
+                });
             }
+            await Task.CompletedTask;
         }
 
         private async Task ShowOptionsMenu(Microsoft.AspNetCore.Components.Web.MouseEventArgs e)

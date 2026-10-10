@@ -16,14 +16,21 @@ namespace Impulse.Pages.Stock
         [Inject] private IReportNavigationService ReportNavigation { get; set; } = null!;
         [Inject] private IBlazorContextMenuService BlazorContextMenuService { get; set; } = null!;
         [Inject] private NavigationManager NavigationManager { get; set; } = null!;
+        [Inject] private DataAccessLibrary.Interface.Stock.IRMDataAccess RMDataAccess { get; set; } = null!;
 
         /// <summary>Legacy frmRM.ShowMe(p_bSampling) — /rmlist vs /rmlist/true</summary>
         [Parameter] public bool Sampling { get; set; }
+
+        [Parameter]
+        [SupplyParameterFromQuery(Name = "filter")]
+        public string? Filter { get; set; }
 
         private bool isLoading = true;
         private bool showInactive = false;   // legacy mnuShowAll (checked = show all incl. inactive)
         private bool showPicture = false;
         private string searchText = string.Empty;
+        private string thresholdFilter = "all"; // "all", "min", "reorder", "max", "breaches"
+        private StockBreachSummaryDto breachSummary = new();
 
         // Dropdown Lists
         private List<RMGroupViewModel> groups = new();
@@ -55,8 +62,23 @@ namespace Impulse.Pages.Stock
 
         protected override async Task OnInitializedAsync()
         {
+            if (!string.IsNullOrWhiteSpace(Filter))
+            {
+                thresholdFilter = Filter.Trim().ToLowerInvariant();
+            }
+
             await LoadFilters();
             await LoadData();
+        }
+
+        protected override async Task OnParametersSetAsync()
+        {
+            if (!string.IsNullOrWhiteSpace(Filter) && Filter.Trim().ToLowerInvariant() != thresholdFilter)
+            {
+                thresholdFilter = Filter.Trim().ToLowerInvariant();
+                currentPage = 1;
+                await LoadData();
+            }
         }
 
         private async Task LoadFilters()
@@ -69,11 +91,20 @@ namespace Impulse.Pages.Stock
                     "RMID, RMID1, RMName, RMSize, SizeUnit",
                     "RM",
                     $"WHERE Sampling = {SamplingFlag} ORDER BY RMID1");
+
+                breachSummary = await RMDataAccess.GetStockBreachSummaryAsync();
             }
             catch (Exception ex)
             {
                 NotificationService.ShowError("Error Loading Filters", ex.Message);
             }
+        }
+
+        public async Task SetThresholdFilter(string filter)
+        {
+            thresholdFilter = filter;
+            currentPage = 1;
+            await LoadData();
         }
 
         private async Task LoadData()
@@ -104,6 +135,27 @@ namespace Impulse.Pages.Stock
                 {
                     string s = searchText.Replace("'", "''");
                     condition += $" AND (RMID1 LIKE '%{s}%' OR RMName LIKE '%{s}%')";
+                }
+
+                if (thresholdFilter == "min" || thresholdFilter == "minstock")
+                {
+                    condition += " AND (ISNULL(VRM.QtyInStock, 0) <= VRM.MinLevel AND ISNULL(VRM.MinLevel, 0) > 0)";
+                }
+                else if (thresholdFilter == "reorder")
+                {
+                    condition += " AND (ISNULL(VRM.QtyInStock, 0) <= VRM.ReorderPoint AND ISNULL(VRM.ReorderPoint, 0) > 0 AND (VRM.MinLevel IS NULL OR ISNULL(VRM.QtyInStock, 0) > VRM.MinLevel))";
+                }
+                else if (thresholdFilter == "max" || thresholdFilter == "maxstock")
+                {
+                    condition += " AND (ISNULL(VRM.QtyInStock, 0) >= VRM.MaxLevel AND ISNULL(VRM.MaxLevel, 0) > 0)";
+                }
+                else if (thresholdFilter == "breaches")
+                {
+                    condition += @" AND (
+                        (ISNULL(VRM.QtyInStock, 0) <= VRM.MinLevel AND ISNULL(VRM.MinLevel, 0) > 0)
+                        OR (ISNULL(VRM.QtyInStock, 0) <= VRM.ReorderPoint AND ISNULL(VRM.ReorderPoint, 0) > 0 AND (VRM.MinLevel IS NULL OR ISNULL(VRM.QtyInStock, 0) > VRM.MinLevel))
+                        OR (ISNULL(VRM.QtyInStock, 0) >= VRM.MaxLevel AND ISNULL(VRM.MaxLevel, 0) > 0)
+                    )";
                 }
 
                 allItems = await DbHelper.GetListAsync<RMListItemModel>(

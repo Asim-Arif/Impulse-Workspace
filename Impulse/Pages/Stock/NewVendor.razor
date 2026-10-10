@@ -51,19 +51,20 @@
 
                     <div class="row g-3">
                         <!-- General Info Panel -->
-                        <div class="col-md-6">
+                        <div class="col-md-6" style="position: relative; z-index: 1050;">
                             <div class="card h-100 border" style="background:#f8f9fb; border-radius:8px;">
                                 <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; border-radius:8px 8px 0 0; font-size:0.85rem; letter-spacing:0.03em;">
                                     <i class="fas fa-info-circle me-1 text-primary"></i> General Information
                                 </div>
                                 <div class="card-body py-2">
-                                    <div class="row g-2 align-items-end mb-2">
+                                    <div class="row g-2 align-items-end mb-2" style="position: relative; z-index: 1055;">
                                         <div class="col-md-12">
                                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Category <span class="text-danger">*</span></label>
                                             <BlazoredTypeahead SearchMethod="SearchCategories"
                                                                @bind-Value="SelectedCategory"
                                                                Placeholder="Search category..."
-                                                               EnableDropDown="true">
+                                                               EnableDropDown="true"
+                                                               MaximumSuggestions="1000">
                                                 <SelectedTemplate Context="category">
                                                     @category.AccTitle
                                                 </SelectedTemplate>
@@ -245,3 +246,26 @@
         </div>
     </div>
 </div>
+
+<style>
+    .blazored-typeahead {
+        font-size: 0.82rem !important;
+        border-radius: 4px !important;
+    }
+
+    .blazored-typeahead__results {
+        position: absolute !important;
+        z-index: 99999 !important;
+        max-height: 250px !important;
+        overflow-y: auto !important;
+        background: #ffffff !important;
+        border: 1px solid #ced4da !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+        border-radius: 6px !important;
+    }
+
+    .blazored-typeahead__result {
+        padding: 6px 12px !important;
+        font-size: 0.85rem !important;
+    }
+</style>

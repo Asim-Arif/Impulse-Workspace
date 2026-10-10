@@ -34,11 +34,23 @@
     </div>
     <div class="col-md-3">
         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Customer PO No</label>
-        <input type="text" class="form-control form-control-sm" @bind="Order.CustomerPONo" />
+        <BlazoredTypeahead SearchMethod="SearchCustomerOrders"
+                           @bind-Value="SelectedCustomerOrder"
+                           placeholder="Search Customer PO..."
+                           class="w-100 blazored-typeahead"
+                           EnableDropDown="true"
+                           MaximumSuggestions="1000">
+            <SelectedTemplate Context="po">
+                @po.OrderNo
+            </SelectedTemplate>
+            <ResultTemplate Context="po">
+                @po.OrderNo
+            </ResultTemplate>
+        </BlazoredTypeahead>
     </div>
 </div>
 
-<div class="row g-2 mb-3">
+<div class="row g-2 mb-3 dropdown-row" style="position: relative !important; z-index: 9998 !important;">
     <!-- Second Row: Dates, Attn, Pay Terms, Dept, Req No -->
     <div class="col-md-2">
         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Order Date</label>
@@ -50,15 +62,51 @@
     </div>
     <div class="col-md-2">
         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Attn Person</label>
-        <input type="text" class="form-control form-control-sm" @bind="Order.AttnPerson" />
+        <BlazoredTypeahead SearchMethod="SearchEmployees"
+                           @bind-Value="SelectedAttnPerson"
+                           placeholder="Search Employee..."
+                           class="w-100 blazored-typeahead"
+                           EnableDropDown="true"
+                           MaximumSuggestions="1000">
+            <SelectedTemplate Context="emp">
+                @if (!string.IsNullOrEmpty(emp.EmpID) && emp.EmpID != "0") { <text>[@emp.EmpID] </text> }@emp.Name
+            </SelectedTemplate>
+            <ResultTemplate Context="emp">
+                @if (!string.IsNullOrEmpty(emp.EmpID) && emp.EmpID != "0") { <span class="font-monospace text-primary me-1">[@emp.EmpID]</span> }@emp.Name
+            </ResultTemplate>
+        </BlazoredTypeahead>
     </div>
     <div class="col-md-2">
         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Payment Terms</label>
-        <input type="text" class="form-control form-control-sm" @bind="Order.PaymentTerms" />
+        <BlazoredTypeahead SearchMethod="SearchPaymentTerms"
+                           @bind-Value="SelectedPaymentTerm"
+                           placeholder="Search Terms..."
+                           class="w-100 blazored-typeahead"
+                           EnableDropDown="true"
+                           MaximumSuggestions="1000">
+            <SelectedTemplate Context="term">
+                @term.PaymentTerms
+            </SelectedTemplate>
+            <ResultTemplate Context="term">
+                @term.PaymentTerms
+            </ResultTemplate>
+        </BlazoredTypeahead>
     </div>
     <div class="col-md-2">
         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Department</label>
-        <input type="text" class="form-control form-control-sm" @bind="Order.Department" />
+        <BlazoredTypeahead SearchMethod="SearchDepartments"
+                           @bind-Value="SelectedDepartment"
+                           placeholder="Search Dept..."
+                           class="w-100 blazored-typeahead"
+                           EnableDropDown="true"
+                           MaximumSuggestions="1000">
+            <SelectedTemplate Context="dept">
+                @dept.Name
+            </SelectedTemplate>
+            <ResultTemplate Context="dept">
+                @dept.Name
+            </ResultTemplate>
+        </BlazoredTypeahead>
     </div>
     <div class="col-md-2">
         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Req No</label>
@@ -120,19 +168,19 @@
 </div>
 
 <div class="row g-2 align-items-end mb-3 dropdown-row" style="position: relative !important; z-index: 9999 !important;">
-    <div class="col-md-4">
+    <div class="@(Order.POType > 0 ? "col-md-3" : "col-md-4")">
         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Select Material</label>
         <BlazoredTypeahead SearchMethod="SearchMaterials"
                            @bind-Value="SelectedMaterial"
-                           placeholder="Search Materials..."
+                           placeholder="Search Materials by code or name..."
                            class="w-100 blazored-typeahead"
                            EnableDropDown="true"
                            MaximumSuggestions="1000">
             <SelectedTemplate Context="mat">
-                @mat.RMName
+                [@mat.RMID1] @mat.RMName
             </SelectedTemplate>
             <ResultTemplate Context="mat">
-                @mat.RMName (@mat.Unit)
+                <span class="font-monospace text-primary me-1">[@mat.RMID1]</span> @mat.RMName @(!string.IsNullOrEmpty(mat.Unit) ? $"({mat.Unit})" : "")
             </ResultTemplate>
         </BlazoredTypeahead>
     </div>
@@ -140,24 +188,28 @@
 
     @if (Order.POType > 0)
     {
-        <div class="col-md-3">
+        <div class="col-md-2">
             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">For Material</label>
             <BlazoredTypeahead SearchMethod="SearchMaterials"
                                @bind-Value="SelectedForMaterial"
-                               placeholder="Search Material..."
+                               placeholder="Search Material by code or name..."
                                class="w-100 blazored-typeahead"
                                EnableDropDown="true"
                                MaximumSuggestions="1000">
                 <SelectedTemplate Context="mat">
-                    @mat.RMName
+                    [@mat.RMID1] @mat.RMName
                 </SelectedTemplate>
                 <ResultTemplate Context="mat">
-                    @mat.RMName
+                    <span class="font-monospace text-primary me-1">[@mat.RMID1]</span> @mat.RMName @(!string.IsNullOrEmpty(mat.Unit) ? $"({mat.Unit})" : "")
                 </ResultTemplate>
             </BlazoredTypeahead>
         </div>
     }
 
+    <div class="col-md-1">
+        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;" title="Most recent purchase rate for this vendor">Prev Rate</label>
+        <input type="text" class="form-control form-control-sm text-end bg-light text-muted font-monospace fw-bold" value="@(PreviousRate.HasValue ? PreviousRate.Value.ToString("0.##") : "-")" readonly placeholder="-" />
+    </div>
     <div class="col-md-1">
         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Price</label>
         <input type="number" class="form-control form-control-sm text-end" @bind="NewRate" step="0.01" />
@@ -166,7 +218,7 @@
         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Quantity</label>
         <input type="number" class="form-control form-control-sm text-end" @bind="NewQty" step="0.01" />
     </div>
-    <div class="col-md-2">
+    <div class="@(Order.POType > 0 ? "col-md-3" : "col-md-4")">
         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Remarks</label>
         <input type="text" class="form-control form-control-sm" @bind="NewItemRemarks" />
     </div>
@@ -301,7 +353,9 @@
         overflow: hidden !important;
     }
     .blazored-typeahead__results {
-        z-index: 1050 !important;
+        z-index: 99999 !important;
+        max-height: 250px !important;
+        overflow-y: auto !important;
     }
     .blazored-typeahead__input-icon {
         padding: 0 0.5rem !important;

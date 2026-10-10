@@ -19,6 +19,7 @@ public class LogoutModel : PageModel
     }
     public async Task<IActionResult> OnGetAsync(string? returnUrl = null)
     {
+        await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         _logger.LogInformation("User signed out.");
         if (!string.IsNullOrEmpty(returnUrl))
@@ -29,6 +30,7 @@ public class LogoutModel : PageModel
     }
     public async Task<IActionResult> OnPostAsync(string? returnUrl = null)
     {
+        await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         _logger.LogInformation("User signed out.");
         return RedirectToPage("Login");

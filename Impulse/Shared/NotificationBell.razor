@@ -114,33 +114,6 @@
             </div>
         </div>
     }
-
-    @if (pushPermission != "granted" && !promptDismissed && !string.IsNullOrEmpty(currentUserName))
-    {
-        <div class="position-fixed bottom-0 start-50 translate-middle-x p-3" style="z-index: 99999; max-width: 440px; width: 95%;">
-            <div class="card border-0 shadow-lg" style="background: rgba(30, 41, 59, 0.95); backdrop-filter: blur(10px); border-radius: 14px; color: #fff;">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between gap-3">
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="rounded-circle bg-primary bg-opacity-25 p-2 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
-                            <i class="fas fa-bell text-info"></i>
-                        </div>
-                        <div>
-                            <div class="fw-bold" style="font-size: 0.85rem;">Enable Notifications?</div>
-                            <div class="text-white-50" style="font-size: 0.75rem;">Get message & task alerts on this device.</div>
-                        </div>
-                    </div>
-                    <div class="d-flex align-items-center gap-1">
-                        <button type="button" class="btn btn-sm btn-primary px-3 fw-semibold" style="font-size: 0.78rem; border-radius: 8px;" @onclick="EnablePushNotifications">
-                            Enable
-                        </button>
-                        <button type="button" class="btn btn-sm btn-link text-white-50 text-decoration-none p-1" @onclick="() => promptDismissed = true">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    }
 </div>
 
 @code {
@@ -304,6 +277,7 @@
         NotificationCategory.Minute => "cat-min",
         NotificationCategory.Meeting => "cat-meet",
         NotificationCategory.Task => "cat-task",
+        NotificationCategory.Stock => "cat-task",
         _ => "cat-sys"
     };
 
@@ -314,6 +288,7 @@
         NotificationCategory.Minute => "fas fa-file-signature text-warning",
         NotificationCategory.Meeting => "fas fa-video text-purple",
         NotificationCategory.Task => "fas fa-tasks text-success",
+        NotificationCategory.Stock => "fas fa-boxes text-warning",
         _ => "fas fa-bell text-secondary"
     };
 

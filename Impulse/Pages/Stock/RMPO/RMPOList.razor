@@ -87,7 +87,7 @@
 
             <!-- Filters -->
             <div class="row g-2 align-items-end mb-3 dropdown-row" style="position: relative; z-index: 10000;">
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Vendor</label>
                     <BlazoredTypeahead SearchMethod="SearchVendors"
                                        @bind-Value="SelectedVendor"
@@ -98,7 +98,7 @@
                         <ResultTemplate>@context.VendorName</ResultTemplate>
                     </BlazoredTypeahead>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Material</label>
                     <BlazoredTypeahead SearchMethod="SearchMaterials"
                                        @bind-Value="SelectedMaterial"
@@ -119,6 +119,13 @@
                     </select>
                 </div>
                 <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">PO No.</label>
+                    <input type="text" class="form-control form-control-sm" @bind="Filter.OrderNo" placeholder="Search PO No..." />
+                </div>
+            </div>
+
+            <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-2">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Range</label>
                     <select class="form-select form-select-sm" @bind="Filter.DateRangeIndex" @bind:after="OnDateRangeChanged">
                         <option value="0">Last 15 Days</option>
@@ -130,13 +137,6 @@
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">PO No.</label>
-                    <input type="text" class="form-control form-control-sm" @bind="Filter.OrderNo" />
-                </div>
-            </div>
-
-            <div class="row g-2 align-items-end mb-3">
-                <div class="col-md-2">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">From</label>
                     <input type="date" class="form-control form-control-sm" @bind="Filter.DateFrom" disabled="@(Filter.DateRangeIndex != 5)" />
                 </div>
@@ -144,7 +144,7 @@
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">To</label>
                     <input type="date" class="form-control form-control-sm" @bind="Filter.DateTo" disabled="@(Filter.DateRangeIndex != 5)" />
                 </div>
-                <div class="col-md-8 d-flex align-items-center gap-3">
+                <div class="col-md-6 d-flex align-items-center gap-3 pb-1">
                     <div class="form-check mb-0">
                         <input class="form-check-input" type="checkbox" id="chkOpenPOs" @bind="Filter.ShowOpenPOsOnly">
                         <label class="form-check-label text-secondary fw-bold" style="font-size: 0.8rem;" for="chkOpenPOs">Open PO Only</label>
@@ -284,3 +284,30 @@
 </ContextMenu>
 
 <InputFile id="pdfFileInput" style="display:none;" OnChange="OnPdfFileSelected" accept="application/pdf" />
+
+<!-- ── Modal: Password Prompt Dialog ── -->
+@if (showPasswordModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.45); backdrop-filter: blur(4px); z-index: 10050;">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header bg-warning text-dark border-0 py-2" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <h6 class="modal-title fw-bold"><i class="fas fa-lock me-2"></i>Authorization Required</h6>
+                    <button type="button" class="btn-close" @onclick="() => showPasswordModal = false"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <p class="text-secondary mb-2" style="font-size: 0.85rem;">Please enter security password:</p>
+                    <input type="password" class="form-control form-control-sm" @bind="enteredPassword" placeholder="Password..." @onkeyup="@(async (e) => { if (e.Key == "Enter") await VerifyPasswordAndExecute(); })" autofocus />
+                    @if (!string.IsNullOrEmpty(passwordError))
+                    {
+                        <div class="text-danger mt-1" style="font-size: 0.75rem;">@passwordError</div>
+                    }
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => showPasswordModal = false">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm" @onclick="VerifyPasswordAndExecute">Submit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

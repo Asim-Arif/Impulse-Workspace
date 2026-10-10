@@ -19,7 +19,8 @@ namespace Impulse.Services.IntraOffice
         Meeting,
         Task,
         System,
-        Lead
+        Lead,
+        Stock
     }
 
     public class AppNotification

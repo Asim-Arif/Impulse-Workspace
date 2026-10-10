@@ -5166,3 +5166,133 @@ BEGIN
 END
 GO
 
+-- ----------------------------------------------------------------------------------------------------
+-- RM_PO_Payment_Terms: Table for Raw Material PO payment terms lookup
+-- ----------------------------------------------------------------------------------------------------
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[RM_PO_Payment_Terms]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[RM_PO_Payment_Terms](
+        [EntryID] [int] IDENTITY(1,1) NOT NULL,
+        [PaymentTerms] [varchar](50) NOT NULL,
+        CONSTRAINT [PK_RM_PO_Payment_Terms] PRIMARY KEY CLUSTERED ([PaymentTerms] ASC)
+    );
+
+    INSERT INTO [dbo].[RM_PO_Payment_Terms] ([PaymentTerms])
+    VALUES ('Cash'), ('Credit');
+END
+GO
+
+-- ----------------------------------------------------------------------------------------------------
+-- Security Setting: RM_PO_Handling
+-- ----------------------------------------------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM dbo.Security WHERE SettingName = 'RM_PO_Handling')
+BEGIN
+    INSERT INTO dbo.Security (SettingName, Password, PasswordEncrypted)
+    VALUES ('RM_PO_Handling', '', 0);
+END
+GO
+
+-- ----------------------------------------------------------------------------------------------------
+-- Security Setting: Delete_RM_Receiving
+-- ----------------------------------------------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM dbo.Security WHERE SettingName = 'Delete_RM_Receiving')
+BEGIN
+    INSERT INTO dbo.Security (SettingName, Password, PasswordEncrypted)
+    VALUES ('Delete_RM_Receiving', '', 0);
+END
+GO
+
+-- ----------------------------------------------------------------------------------------------------
+-- Security Setting: Delete_RM_Issuance
+-- ----------------------------------------------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM dbo.Security WHERE SettingName = 'Delete_RM_Issuance')
+BEGIN
+    IF EXISTS (SELECT 1 FROM dbo.Security WHERE SettingName = 'DeleteRMIssuance')
+    BEGIN
+        INSERT INTO dbo.Security (SettingName, Password, PasswordEncrypted)
+        SELECT 'Delete_RM_Issuance', Password, PasswordEncrypted FROM dbo.Security WHERE SettingName = 'DeleteRMIssuance';
+    END
+    ELSE
+    BEGIN
+        INSERT INTO dbo.Security (SettingName, Password, PasswordEncrypted)
+        VALUES ('Delete_RM_Issuance', '', 0);
+    END
+END
+GO
+
+-- ----------------------------------------------------------------------------------------------------
+-- Security Setting: Delete_Semi_Finish_Opening
+-- ----------------------------------------------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM dbo.Security WHERE SettingName = 'Delete_Semi_Finish_Opening')
+BEGIN
+    INSERT INTO dbo.Security (SettingName, Password, PasswordEncrypted)
+    VALUES ('Delete_Semi_Finish_Opening', '', 0);
+END
+GO
+
+-- ----------------------------------------------------------------------------------------------------
+-- Table: RawMaterialIssuance - Add Entry_Type, Vendor_AccNo, Vendor_PO_No, FCO_OrderNo, Vendor_VchrNo
+-- ----------------------------------------------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'RawMaterialIssuance' AND COLUMN_NAME = 'Entry_Type')
+BEGIN
+    ALTER TABLE dbo.RawMaterialIssuance ADD Entry_Type INT NULL DEFAULT 0;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'RawMaterialIssuance' AND COLUMN_NAME = 'Vendor_AccNo')
+BEGIN
+    ALTER TABLE dbo.RawMaterialIssuance ADD Vendor_AccNo VARCHAR(50) NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'RawMaterialIssuance' AND COLUMN_NAME = 'Vendor_PO_No')
+BEGIN
+    ALTER TABLE dbo.RawMaterialIssuance ADD Vendor_PO_No VARCHAR(50) NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'RawMaterialIssuance' AND COLUMN_NAME = 'FCO_OrderNo')
+BEGIN
+    ALTER TABLE dbo.RawMaterialIssuance ADD FCO_OrderNo VARCHAR(50) NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'RawMaterialIssuance' AND COLUMN_NAME = 'Vendor_VchrNo')
+BEGIN
+    ALTER TABLE dbo.RawMaterialIssuance ADD Vendor_VchrNo VARCHAR(50) NULL;
+END
+GO
+
+-- ----------------------------------------------------------------------------------------------------
+-- View: VRawMaterialIssuanceList - ensure Total_Issued_Qty and TEmpID are included
+-- ----------------------------------------------------------------------------------------------------
+CREATE OR ALTER VIEW [dbo].[VRawMaterialIssuanceList]
+AS
+SELECT        dbo.RawMaterialIssuance.IssNo, dbo.RawMaterialIssuance.DT, dbo.RawMaterialIssuance.EntryDT, dbo.RawMaterialIssuance.UserName, dbo.RawMaterialIssuance.ComputerName, dbo.RawMaterialIssuance.VI_RefID, 
+                         dbo.RawMaterialIssuance.IssdToEmpID, dbo.RawMaterialIssuance.VchrNo, dbo.RawMaterialIssuance.VO_OrderNo, dbo.RawMaterialIssuance.AuthorizedByEmpID, dbo.RawMaterialIssuance.EntryID, 
+                         dbo.VEmp.name AS IssdToEmpName, 
+                         ISNULL(dbo.Makers.VenderName, VVendersAndMakers.AccTitle) AS VenderName, 
+                         TInner1.RM, dbo.VEmp.deptid, 
+                         ISNULL(dbo.VendIssued.VendID, VVendersAndMakers.VendID) AS VendID, 
+                         dbo.RawMaterialIssuance.Remarks, dbo.RawMaterialIssuance.Entry_Type, 
+                         dbo.RawMaterialIssuance.Vendor_AccNo, dbo.RawMaterialIssuance.Vendor_PO_No, dbo.RawMaterialIssuance.Vendor_VchrNo, dbo.RawMaterialIssuance.FCO_OrderNo,
+                         VVendersAndMakers.AccTitle AS Debit_Note_Vendor,
+                         TInner1.Total_Issued_Qty,
+                         TEmpID.IssdToEmpIDOnly
+FROM            dbo.Makers RIGHT OUTER JOIN
+                         dbo.VendIssued ON dbo.Makers.VendID = dbo.VendIssued.VendID RIGHT OUTER JOIN
+                         dbo.RawMaterialIssuance ON dbo.VendIssued.EntryID = dbo.RawMaterialIssuance.VI_RefID
+                         OUTER APPLY (SELECT CASE WHEN CHARINDEX('}', dbo.RawMaterialIssuance.IssdToEmpID) > 2 
+                                                  THEN SUBSTRING(dbo.RawMaterialIssuance.IssdToEmpID, 2, CHARINDEX('}', dbo.RawMaterialIssuance.IssdToEmpID) - 2)
+                                                  ELSE dbo.RawMaterialIssuance.IssdToEmpID END AS IssdToEmpIDOnly) TEmpID
+                         LEFT OUTER JOIN
+                         dbo.VEmp ON TEmpID.IssdToEmpIDOnly = dbo.VEmp.empid LEFT OUTER JOIN
+                             (SELECT        IssNo, MAX('{' + RMID1 + '} ' + RMName) AS RM, SUM(Qty) AS Total_Issued_Qty
+                               FROM            dbo.VRawMaterialIssuance
+                               GROUP BY IssNo) AS TInner1 ON dbo.RawMaterialIssuance.IssNo = TInner1.IssNo
+LEFT JOIN VVendersAndMakers ON dbo.RawMaterialIssuance.Vendor_AccNo = VVendersAndMakers.AccNo
+GO
+
+
+
+

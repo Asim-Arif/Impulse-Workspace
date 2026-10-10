@@ -268,6 +268,7 @@ builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IMaterialPlacementD
 builder.Services.AddScoped<Impulse.Services.Stock.IMaterialPlacementService, Impulse.Services.Stock.MaterialPlacementService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IRMDataAccess, DataAccessLibrary.DAC.Stock.RMDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Stock.IRMService, Impulse.Services.Stock.RMService>();
+builder.Services.AddScoped<Impulse.Services.Stock.IStockNotificationService, Impulse.Services.Stock.StockNotificationService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IMaterialPlacementListDataAccess, DataAccessLibrary.DAC.Stock.MaterialPlacementListDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Stock.IMaterialPlacementListService, Impulse.Services.Stock.MaterialPlacementListService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Stock.IVendorBillingListDataAccess, DataAccessLibrary.DAC.Stock.VendorBillingListDataAccess>();
@@ -362,6 +363,7 @@ builder.Services.AddScoped<Impulse.Services.Stock.IPpcStockAdjustmentService, Im
 builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IHubWorkflowDataAccess, DataAccessLibrary.DAC.Production.HubWorkflowDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Production.IHubWorkflowOrchestrator, Impulse.Services.Production.HubWorkflowOrchestrator>();
 builder.Services.AddHostedService<Impulse.Services.WorkflowTasks.TaskDueMonitoringBackgroundService>();
+builder.Services.AddHostedService<Impulse.Services.Stock.StockLevelMonitoringBackgroundService>();
 
 
 builder.Services.AddScoped<DataAccessLibrary.Interface.Company.IItemDataAccess, DataAccessLibrary.DAC.Company.ItemDataAccess>();

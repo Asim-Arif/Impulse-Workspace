@@ -9,10 +9,14 @@ namespace Impulse.Services.Stock
     public class RMIssuanceService : IRMIssuanceService
     {
         private readonly IRMIssuanceDataAccess _dataAccess;
+        private readonly IStockNotificationService _stockNotificationService;
 
-        public RMIssuanceService(IRMIssuanceDataAccess dataAccess)
+        public RMIssuanceService(
+            IRMIssuanceDataAccess dataAccess,
+            IStockNotificationService stockNotificationService)
         {
             _dataAccess = dataAccess;
+            _stockNotificationService = stockNotificationService;
         }
 
         public async Task<IEnumerable<MakerLookupModel>> GetMakersAsync()
@@ -64,7 +68,24 @@ namespace Impulse.Services.Stock
 
         public async Task<string> SaveIssuanceTransactionAsync(RMIssuanceSaveRequest request)
         {
-            return await _dataAccess.SaveIssuanceTransactionAsync(request);
+            var issNo = await _dataAccess.SaveIssuanceTransactionAsync(request);
+
+            if (!string.IsNullOrWhiteSpace(issNo) && request?.Rows != null)
+            {
+                var processedCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var row in request.Rows)
+                {
+                    if (!string.IsNullOrWhiteSpace(row.RMID1) && processedCodes.Add(row.RMID1.Trim()))
+                    {
+                        _ = _stockNotificationService.CheckAndNotifyStockMovementAsync(
+                            row.RMID1.Trim(), 
+                            "RM Issuance", 
+                            issNo);
+                    }
+                }
+            }
+
+            return issNo;
         }
     }
 }

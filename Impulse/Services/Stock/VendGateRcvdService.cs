@@ -8,10 +8,14 @@ namespace Impulse.Services.Stock
     public class VendGateRcvdService : IVendGateRcvdService
     {
         private readonly IVendGateRcvdDataAccess _dataAccess;
+        private readonly IStockNotificationService _stockNotificationService;
 
-        public VendGateRcvdService(IVendGateRcvdDataAccess dataAccess)
+        public VendGateRcvdService(
+            IVendGateRcvdDataAccess dataAccess,
+            IStockNotificationService stockNotificationService)
         {
             _dataAccess = dataAccess;
+            _stockNotificationService = stockNotificationService;
         }
 
         public async Task<List<object>> GetVendorsWithPendingOrdersAsync()
@@ -36,7 +40,24 @@ namespace Impulse.Services.Stock
 
         public async Task<string> SaveVendorReceivingAsync(VendGateRcvdSaveRequest request, string currentUser)
         {
-            return await _dataAccess.SaveVendorReceivingAsync(request, currentUser);
+            var rcvNo = await _dataAccess.SaveVendorReceivingAsync(request, currentUser);
+
+            if (!string.IsNullOrWhiteSpace(rcvNo) && request?.ReceivedItems != null)
+            {
+                var processedCodes = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+                foreach (var item in request.ReceivedItems)
+                {
+                    if (!string.IsNullOrWhiteSpace(item.MaterialID) && processedCodes.Add(item.MaterialID.Trim()))
+                    {
+                        _ = _stockNotificationService.CheckAndNotifyStockMovementAsync(
+                            item.MaterialID.Trim(),
+                            "Vendor Receiving",
+                            rcvNo);
+                    }
+                }
+            }
+
+            return rcvNo;
         }
     }
 }

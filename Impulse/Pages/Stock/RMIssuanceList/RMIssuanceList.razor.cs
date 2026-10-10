@@ -17,6 +17,53 @@ namespace Impulse.Pages.Stock.RMIssuanceList
         [Inject] private Impulse.Services.INotificationService NotificationService { get; set; }
         [Inject] private NavigationManager NavigationManager { get; set; }
         [Inject] private IBlazorContextMenuService BlazorContextMenuService { get; set; }
+        [Inject] private Impulse.Services.IDBHelperService DbHelper { get; set; }
+
+        // Security Password Protection
+        private bool showPasswordModal = false;
+        private string passwordSettingName = "Delete_RM_Issuance";
+        private string enteredPassword = string.Empty;
+        private string passwordError = string.Empty;
+        private Func<Task>? postPasswordAction = null;
+
+        private void CheckPasswordThenExecute(string settingName, Func<Task> action)
+        {
+            passwordSettingName = settingName;
+            enteredPassword = string.Empty;
+            passwordError = string.Empty;
+            postPasswordAction = action;
+            showPasswordModal = true;
+        }
+
+        private async Task VerifyPasswordAndExecute()
+        {
+            try
+            {
+                string correctPassword = await DbHelper.getDatabasePasswordAsync(passwordSettingName);
+                if (string.IsNullOrEmpty(correctPassword) && passwordSettingName == "Delete_RM_Issuance")
+                {
+                    var altPassword = await DbHelper.getDatabasePasswordAsync("DeleteRMIssuance");
+                    if (!string.IsNullOrEmpty(altPassword)) correctPassword = altPassword;
+                }
+
+                if (enteredPassword == (correctPassword ?? string.Empty))
+                {
+                    showPasswordModal = false;
+                    if (postPasswordAction != null)
+                    {
+                        await postPasswordAction.Invoke();
+                    }
+                }
+                else
+                {
+                    passwordError = "Incorrect password. Please try again.";
+                }
+            }
+            catch (Exception ex)
+            {
+                passwordError = $"Error validating password: {ex.Message}";
+            }
+        }
 
         // State
         private bool IsLoading { get; set; } = false;
@@ -147,28 +194,32 @@ namespace Impulse.Pages.Stock.RMIssuanceList
         {
             if (e.Data is RMIssuanceListRowModel row)
             {
-                bool confirm = await NotificationService.ShowQuestionNotification("Delete Issuance", $"Are you sure you want to delete issuance {row.IssNo}?");
-                if (confirm)
+                CheckPasswordThenExecute("Delete_RM_Issuance", async () =>
                 {
-                    try
+                    bool confirm = await NotificationService.ShowQuestionNotification("Delete Issuance", $"Are you sure you want to delete issuance {row.IssNo}?");
+                    if (confirm)
                     {
-                        bool success = await RMIssuanceListService.DeleteIssuanceAsync(row.IssNo);
-                        if (success)
+                        try
                         {
-                            NotificationService.ShowSuccess("Deleted", "Issuance deleted successfully.");
-                            await RefreshData();
+                            bool success = await RMIssuanceListService.DeleteIssuanceAsync(row.IssNo);
+                            if (success)
+                            {
+                                NotificationService.ShowSuccess("Deleted", "Issuance deleted successfully.");
+                                await RefreshData();
+                            }
+                            else
+                            {
+                                NotificationService.ShowError("Error", "Failed to delete issuance.");
+                            }
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            NotificationService.ShowError("Error", "Failed to delete issuance.");
+                            NotificationService.ShowError("Error", ex.Message);
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        NotificationService.ShowError("Error", ex.Message);
-                    }
-                }
+                });
             }
+            await Task.CompletedTask;
         }
 
         // Search Methods

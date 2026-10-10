@@ -278,6 +278,10 @@ namespace Impulse.Pages.Stock.RMIssuance
                 }
                 Request.IssdToEmpID = SelectedEmployee.Display;
                 Request.MakerVendID = 0;
+                Request.Vendor_AccNo = "";
+                Request.Entry_Type = 0;
+                Request.Vendor_PO_No = "";
+                Request.FCO_OrderNo = "";
             }
             else
             {
@@ -287,7 +291,11 @@ namespace Impulse.Pages.Stock.RMIssuance
                     return;
                 }
                 Request.MakerVendID = SelectedMaker.VendID;
-                Request.IssdToEmpID = ""; 
+                Request.Vendor_AccNo = SelectedMaker.AccNo ?? SelectedMaker.VendID1 ?? "";
+                Request.IssdToEmpID = "";
+                Request.Entry_Type = 0;
+                Request.Vendor_PO_No = "";
+                Request.FCO_OrderNo = "";
             }
 
             if (AuthorizedBy == null)

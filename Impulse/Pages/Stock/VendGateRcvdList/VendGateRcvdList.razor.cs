@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using DataAccessLibrary.Models.ViewModels.Stock;
+using Impulse.Services;
 using Impulse.Services.Stock;
 using Radzen;
 using BlazorContextMenu;
@@ -13,9 +14,52 @@ namespace Impulse.Pages.Stock.VendGateRcvdList
 {
     public partial class VendGateRcvdList : ComponentBase
     {
+        [Inject]
+        private IDBHelperService DbHelper { get; set; }
+
         private List<VendGateRcvdListViewModel> ReceivingList;
         private bool IsLoading = false;
         private bool IsSampleList = false;
+
+        // Security Password Protection
+        private bool showPasswordModal = false;
+        private string passwordSettingName = "Delete_RM_Receiving";
+        private string enteredPassword = string.Empty;
+        private string passwordError = string.Empty;
+        private Func<Task>? postPasswordAction = null;
+
+        private void CheckPasswordThenExecute(string settingName, Func<Task> action)
+        {
+            passwordSettingName = settingName;
+            enteredPassword = string.Empty;
+            passwordError = string.Empty;
+            postPasswordAction = action;
+            showPasswordModal = true;
+        }
+
+        private async Task VerifyPasswordAndExecute()
+        {
+            try
+            {
+                string correctPassword = await DbHelper.getDatabasePasswordAsync(passwordSettingName);
+                if (enteredPassword == (correctPassword ?? string.Empty))
+                {
+                    showPasswordModal = false;
+                    if (postPasswordAction != null)
+                    {
+                        await postPasswordAction.Invoke();
+                    }
+                }
+                else
+                {
+                    passwordError = "Incorrect password. Please try again.";
+                }
+            }
+            catch (Exception ex)
+            {
+                passwordError = $"Error validating password: {ex.Message}";
+            }
+        }
 
         public class ListFilter
         {
@@ -160,17 +204,25 @@ namespace Impulse.Pages.Stock.VendGateRcvdList
         {
             if (e.Data is VendGateRcvdListViewModel item)
             {
-                try
+                CheckPasswordThenExecute("Delete_RM_Receiving", async () =>
                 {
-                    await VendGateRcvdListService.DeleteReceivingAsync(item.RcvID);
-                    NotificationService.ShowSuccess("Success", "Deleted Successfully.");
-                    await LoadDataAsync();
-                }
-                catch (Exception ex)
-                {
-                    NotificationService.ShowError("Error", ex.Message);
-                }
+                    bool confirmed = await JS.InvokeAsync<bool>("confirm", "Are you sure you want to delete this receiving entry?");
+                    if (confirmed)
+                    {
+                        try
+                        {
+                            await VendGateRcvdListService.DeleteReceivingAsync(item.RcvID);
+                            NotificationService.ShowSuccess("Success", "Deleted Successfully.");
+                            await LoadDataAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            NotificationService.ShowError("Error", ex.Message);
+                        }
+                    }
+                });
             }
+            await Task.CompletedTask;
         }
 
         private void OnInspectionEntry(BlazorContextMenu.ItemClickEventArgs e)

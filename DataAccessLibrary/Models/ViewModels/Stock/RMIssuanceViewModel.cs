@@ -13,6 +13,12 @@ namespace DataAccessLibrary.Models.ViewModels.Stock
         public string AuthorizedByEmpID { get; set; } // Combo display text "{EmpID} Name" (legacy format)
         public string Remarks { get; set; }
 
+        // Legacy fields for Maker / Vendor / PO tracking
+        public int Entry_Type { get; set; } = 0; // 0 = Regular, 1 = Debit Note
+        public string Vendor_AccNo { get; set; }
+        public string Vendor_PO_No { get; set; }
+        public string FCO_OrderNo { get; set; }
+
         public List<RMIssuanceDetailRow> Rows { get; set; } = new List<RMIssuanceDetailRow>();
 
         public string UserName { get; set; }
@@ -40,7 +46,9 @@ namespace DataAccessLibrary.Models.ViewModels.Stock
     public class MakerLookupModel
     {
         public int VendID { get; set; }
+        public string VendID1 { get; set; }
         public string VenderName { get; set; }
+        public string AccNo { get; set; }
     }
 
     public class EmployeeLookupModel

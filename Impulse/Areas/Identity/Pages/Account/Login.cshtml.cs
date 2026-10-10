@@ -88,6 +88,7 @@ namespace Impulse.Areas.Identity.Pages.Account
             returnUrl ??= Url.Content("~/"); // Clear the existing external cookie to ensure a clean login process
             /*await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
             ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();*/
+            await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             ReturnUrl = returnUrl;
         }
@@ -170,7 +171,7 @@ namespace Impulse.Areas.Identity.Pages.Account
                             claims.Add(new Claim(ClaimTypes.Role, "Director"));
                     }
 
-                    var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+                    var claimsIdentity = new ClaimsIdentity(claims, IdentityConstants.ApplicationScheme);
                     var principal = new ClaimsPrincipal(claimsIdentity);
 
                     var authProperties = new AuthenticationProperties 
@@ -179,6 +180,7 @@ namespace Impulse.Areas.Identity.Pages.Account
                         ExpiresUtc = DateTimeOffset.UtcNow.AddDays(30)
                     };
 
+                    await HttpContext.SignInAsync(IdentityConstants.ApplicationScheme, principal, authProperties);
                     await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
                     
                     _logger.LogInformation("User authenticated with claims: {Claims}", string.Join(", ", claims.Select(c => c.Type + ": " + c.Value)));

@@ -22,7 +22,14 @@ namespace DataAccessLibrary.DAC.Stock
         public async Task<IEnumerable<MakerLookupModel>> GetMakersAsync()
         {
             using IDbConnection db = new SqlConnection(_connectionString);
-            string sql = "SELECT VendID, (VendID1 + ' ' + VenderName) AS VenderName FROM Makers ORDER BY VendID1";
+            string sql = @"
+                SELECT m.VendID, 
+                       m.VendID1, 
+                       (m.VendID1 + ' ' + m.VenderName) AS VenderName, 
+                       ISNULL(v.AccNo, m.VendID1) AS AccNo
+                FROM Makers m
+                LEFT JOIN VVendersAndMakers v ON m.VendID = v.VendID
+                ORDER BY m.VendID1";
             return await db.QueryAsync<MakerLookupModel>(sql);
         }
 
@@ -120,8 +127,14 @@ namespace DataAccessLibrary.DAC.Stock
 
                 // 2. Insert Header
                 string headerSql = @"
-                    INSERT INTO RawMaterialIssuance (IssNo, DT, UserName, ComputerName, VI_RefID, IssdToEmpID, AuthorizedByEmpID, VO_OrderNo, Remarks)
-                    VALUES (@IssNo, @DT, @UserName, @ComputerName, @VI_RefID, @IssdToEmpID, @AuthorizedByEmpID, @VO_OrderNo, @Remarks)";
+                    INSERT INTO RawMaterialIssuance (
+                        IssNo, DT, UserName, ComputerName, VI_RefID, IssdToEmpID, AuthorizedByEmpID, VO_OrderNo, Remarks,
+                        Entry_Type, Vendor_AccNo, Vendor_PO_No, FCO_OrderNo
+                    )
+                    VALUES (
+                        @IssNo, @DT, @UserName, @ComputerName, @VI_RefID, @IssdToEmpID, @AuthorizedByEmpID, @VO_OrderNo, @Remarks,
+                        @Entry_Type, @Vendor_AccNo, @Vendor_PO_No, @FCO_OrderNo
+                    )";
                 
                 await db.ExecuteAsync(headerSql, new
                 {
@@ -133,7 +146,11 @@ namespace DataAccessLibrary.DAC.Stock
                     request.IssdToEmpID,
                     request.AuthorizedByEmpID,
                     VO_OrderNo = "", // Legacy used it optionally for chkRMPOs
-                    request.Remarks
+                    request.Remarks,
+                    request.Entry_Type,
+                    Vendor_AccNo = request.Vendor_AccNo ?? "",
+                    Vendor_PO_No = request.Vendor_PO_No ?? "",
+                    FCO_OrderNo = request.FCO_OrderNo ?? ""
                 }, transaction);
 
                 // 3. Insert Details & Update stock
