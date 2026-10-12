@@ -177,6 +177,14 @@ namespace DataAccessLibrary.DAC.Production
                 whereClause += " AND (MPB_D_EntryID IS NULL)";
             }
 
+            // ── STEP 16.5: Pending (Dispatch / Trf) ──────────────────
+            if (filter.PendingFinalTransferOnly)
+            {
+                whereClause += @" AND ISNULL(NextProcessID, 0) = 0
+                                  AND IsLotClosed = 0
+                                  AND ((RcvdQty - ISNULL(Wastage, 0) - ISNULL(LostQty, 0)) > (DispatchQty + StoreTransferQty))";
+            }
+
             // ── STEP 17: Build final SQL (ShowLastOnly changes structure) ──
             string sql;
             if (filter.ShowLastOnly)
@@ -195,7 +203,10 @@ namespace DataAccessLibrary.DAC.Production
             }
             else
             {
-                sql = $"SELECT VVendReceivingList.* FROM VVendReceivingList {whereClause} ORDER BY DT";
+                sql = $@"SELECT VVendReceivingList.*
+                         FROM VVendReceivingList
+                         {whereClause}
+                         ORDER BY DT";
             }
 
             var items = (await db.QueryAsync<MakerRcvListItem>(sql, parameters)).ToList();

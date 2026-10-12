@@ -169,6 +169,10 @@
                         <input class="form-check-input" type="checkbox" id="chkShowLastOnly" @bind="Filter.ShowLastOnly" @bind:after="OnFilterChanged" />
                         <label class="form-check-label fw-semibold text-info" for="chkShowLastOnly">Last Process Done</label>
                     </div>
+                    <div class="form-check form-check-inline mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkPendingFinalTransfer" @bind="Filter.PendingFinalTransferOnly" @bind:after="OnFilterChanged" />
+                        <label class="form-check-label fw-semibold text-warning" for="chkPendingFinalTransfer">Pending (Dispatch/Trf)</label>
+                    </div>
                 </div>
             </div>
 
@@ -203,6 +207,25 @@
                             <i class="fas fa-redo me-1"></i> Re-Work: <strong>@TotalReWorkQty.ToString("N0")</strong>
                         </span>
                     }
+                    @if (TotalDispatchQty > 0 || TotalStoreTransferQty > 0)
+                    {
+                        <span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-1" style="font-size: 0.78rem;">
+                            <i class="fas fa-truck-loading me-1"></i> Dsp: <strong>@TotalDispatchQty.ToString("N0")</strong> | Trf: <strong>@TotalStoreTransferQty.ToString("N0")</strong>
+                        </span>
+                    }
+                    @if (SelectedVrdEntryIds.Any())
+                    {
+                        <span class="badge bg-dark px-2 py-1" style="font-size: 0.78rem;">
+                            <i class="fas fa-check-square me-1"></i> Selected: <strong>@SelectedVrdEntryIds.Count.ToString("N0")</strong>
+                            <button type="button" class="btn btn-link text-white p-0 ms-1 text-decoration-none" @onclick="ClearSelection" title="Clear Selection"><i class="fas fa-times-circle"></i></button>
+                        </span>
+                    }
+                    else if (TotalCount > 0)
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 0.75rem; height: 24px;" @onclick="SelectAllFiltered" title="Check All Records">
+                            <i class="fas fa-check-double me-1"></i>Check All
+                        </button>
+                    }
                     <span class="badge bg-secondary ms-1">Records: @TotalCount.ToString("N0")</span>
                 </div>
             </div>
@@ -212,6 +235,9 @@
                 <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
                     <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
                         <tr>
+                            <th style="width: 38px;" class="text-center">
+                                <input type="checkbox" class="form-check-input" checked="@IsAllSelected" @onchange="ToggleSelectAll" title="Select / Clear Current Page" />
+                            </th>
                             <th style="width: 40px;">#</th>
                             <th>Maker</th>
                             <th>Receipt ID</th>
@@ -222,6 +248,7 @@
                             <th class="text-end">Rcvd Qty</th>
                             <th class="text-end">Wastage</th>
                             <th class="text-end">Re-Work</th>
+                            <th class="text-center" style="min-width: 140px;">Dispatch/Trf</th>
                             <th class="text-center">Status</th>
                             <th>Lot No.</th>
                             <th>Master PO</th>
@@ -233,7 +260,7 @@
                         @if (IsLoading)
                         {
                             <tr>
-                                <td colspan="15" class="text-center py-4 text-muted">
+                                <td colspan="17" class="text-center py-4 text-muted">
                                     <div class="spinner-border spinner-border-sm text-success me-2" role="status"></div> Loading Receiving List...
                                 </td>
                             </tr>
@@ -241,7 +268,7 @@
                         else if (!FilteredItems.Any())
                         {
                             <tr>
-                                <td colspan="15" class="text-center py-4 text-muted">
+                                <td colspan="17" class="text-center py-4 text-muted">
                                     <i class="fas fa-info-circle me-1"></i> No receiving records found matching filters.
                                 </td>
                             </tr>
@@ -259,6 +286,11 @@
                                                     @oncontextmenu="@(() => SelectRow(currentItem))"
                                                     class="@($"{GetRowClass(currentItem)} {(isSelected ? "table-primary" : "")}")"
                                                     style="cursor: pointer;">
+                                    <td class="text-center" @onclick:stopPropagation>
+                                        <input type="checkbox" class="form-check-input"
+                                               checked="@SelectedVrdEntryIds.Contains(currentItem.VRD_EntryID)"
+                                               @onchange="@((ChangeEventArgs e) => ToggleRowSelection(currentItem.VRD_EntryID, (bool)(e.Value ?? false)))" />
+                                    </td>
                                     <td>@(index++)</td>
                                     <td class="fw-semibold">@currentItem.DisplayMaker</td>
                                     <td><span class="badge bg-light text-dark border">@currentItem.RecieptID</span></td>
@@ -282,6 +314,29 @@
                                     <td class="text-end fw-bold">@currentItem.RcvdQty.ToString("N0")</td>
                                     <td class="text-end">@(currentItem.WastageTotal > 0 ? currentItem.WastageTotal.ToString("N0") : "")</td>
                                     <td class="text-end">@(currentItem.ReWorkQty > 0 ? currentItem.ReWorkQty.ToString("N0") : "")</td>
+                                    <td class="text-center">
+                                        @if (currentItem.DispatchQty > 0 || currentItem.StoreTransferQty > 0)
+                                        {
+                                            <div class="d-flex align-items-center justify-content-center gap-1 flex-wrap">
+                                                @if (currentItem.DispatchQty > 0)
+                                                {
+                                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle" title="Dispatched: @currentItem.DispatchQty.ToString("N0")">
+                                                        <i class="fas fa-truck me-1"></i>Dsp: @currentItem.DispatchQty.ToString("N0")
+                                                    </span>
+                                                }
+                                                @if (currentItem.StoreTransferQty > 0)
+                                                {
+                                                    <span class="badge bg-info-subtle text-info border border-info-subtle" title="Store Transfer: @currentItem.StoreTransferQty.ToString("N0")">
+                                                        <i class="fas fa-warehouse me-1"></i>Trf: @currentItem.StoreTransferQty.ToString("N0")
+                                                    </span>
+                                                }
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
                                     <td class="text-center">
                                         @if (PendingDeletionVrdEntryIds.Contains(currentItem.VRD_EntryID))
                                         {
@@ -812,8 +867,6 @@
                         </div>
                     </div>
                 </div>
-            }
-
             }
 
         </div>

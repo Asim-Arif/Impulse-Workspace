@@ -1,6 +1,7 @@
 @using Impulse.Services.IntraOffice
 @using Microsoft.AspNetCore.Components.Authorization
 @using DataAccessLibrary.Models.IntraOffice
+@using System.Security.Claims
 @inject IAppNotificationService NotificationService
 @inject IIntraOfficeService IntraOfficeService
 @inject AuthenticationStateProvider AuthStateProvider
@@ -227,32 +228,178 @@
     }
 
     private readonly List<ActiveToast> activeToasts = new();
+    private readonly HashSet<string> seenNotificationIds = new(StringComparer.OrdinalIgnoreCase);
     private string? currentUserId;
     private string? currentUserName;
+    private readonly HashSet<string> currentUserRoles = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> currentUserAliases = new(StringComparer.OrdinalIgnoreCase);
     private IntraUserProfile? currentUserProfile;
+    private System.Threading.Timer? pollTimer;
+    private DateTime sessionStartTime = DateTime.UtcNow;
+    private bool isDisposed;
 
     protected override async Task OnInitializedAsync()
     {
-        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
-        if (user.Identity?.IsAuthenticated == true)
-        {
-            currentUserId = user.Identity.Name
-                ?? user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-                ?? user.FindFirst("sub")?.Value;
-            currentUserName = user.Identity.Name;
+        AuthStateProvider.AuthenticationStateChanged += OnAuthStateChanged;
+        NotificationService.OnNotificationReceived += HandleNotificationReceived;
 
-            if (!string.IsNullOrEmpty(currentUserId))
+        await RefreshAuthStateAsync();
+
+        // Seed initial notifications so we don't spam old notifications as toasts on startup
+        if (!string.IsNullOrEmpty(currentUserName) || currentUserAliases.Count > 0)
+        {
+            try
             {
-                try
+                var userKey = currentUserName ?? currentUserId ?? "";
+                var recents = NotificationService.GetRecentNotifications(userKey, currentUserAliases);
+                lock (seenNotificationIds)
                 {
-                    currentUserProfile = await IntraOfficeService.GetUserProfileAsync(currentUserId);
+                    foreach (var n in recents)
+                    {
+                        // Any notification older than 1 minute or already read is marked as seen
+                        if (n.CreatedAt < sessionStartTime.AddSeconds(-60) || n.IsRead)
+                        {
+                            seenNotificationIds.Add(n.Id);
+                        }
+                    }
                 }
-                catch { }
             }
+            catch { }
         }
 
-        NotificationService.OnNotificationReceived += HandleNotificationReceived;
+        StartPolling();
+    }
+
+    private void OnAuthStateChanged(Task<AuthenticationState> task)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await RefreshAuthStateAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task RefreshAuthStateAsync()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                currentUserName = user.Identity.Name?.Trim();
+                currentUserId = (user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                    ?? user.FindFirst("sub")?.Value
+                    ?? currentUserName)?.Trim();
+
+                currentUserRoles.Clear();
+                foreach (var claim in user.FindAll(ClaimTypes.Role))
+                {
+                    if (!string.IsNullOrWhiteSpace(claim.Value))
+                    {
+                        currentUserRoles.Add(claim.Value.Trim());
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(currentUserName))
+                {
+                    try
+                    {
+                        currentUserProfile = await IntraOfficeService.GetUserProfileAsync(currentUserName);
+                    }
+                    catch { }
+                }
+
+                RebuildUserAliases();
+            }
+            else
+            {
+                currentUserName = null;
+                currentUserId = null;
+                currentUserProfile = null;
+                currentUserRoles.Clear();
+                currentUserAliases.Clear();
+            }
+        }
+        catch { }
+    }
+
+    private void RebuildUserAliases()
+    {
+        currentUserAliases.Clear();
+        if (!string.IsNullOrWhiteSpace(currentUserName)) currentUserAliases.Add(currentUserName.Trim());
+        if (!string.IsNullOrWhiteSpace(currentUserId)) currentUserAliases.Add(currentUserId.Trim());
+        if (currentUserProfile != null)
+        {
+            if (!string.IsNullOrWhiteSpace(currentUserProfile.UserName)) currentUserAliases.Add(currentUserProfile.UserName.Trim());
+            if (!string.IsNullOrWhiteSpace(currentUserProfile.EmpID)) currentUserAliases.Add(currentUserProfile.EmpID.Trim());
+            if (currentUserProfile.UserID > 0) currentUserAliases.Add(currentUserProfile.UserID.ToString());
+            if (!string.IsNullOrWhiteSpace(currentUserProfile.FullName)) currentUserAliases.Add(currentUserProfile.FullName.Trim());
+        }
+        foreach (var r in currentUserRoles)
+        {
+            if (!string.IsNullOrWhiteSpace(r)) currentUserAliases.Add(r.Trim());
+        }
+    }
+
+    private void StartPolling()
+    {
+        pollTimer?.Dispose();
+        // Poll every 5 seconds to guarantee cross-computer / cross-instance toast delivery
+        pollTimer = new System.Threading.Timer(async _ =>
+        {
+            if (isDisposed) return;
+            await CheckForNewNotificationsAsync();
+        }, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+    }
+
+    private async Task CheckForNewNotificationsAsync()
+    {
+        if (string.IsNullOrEmpty(currentUserName) && currentUserAliases.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            var userKey = currentUserName ?? currentUserId ?? "";
+            var recents = NotificationService.GetRecentNotifications(userKey, currentUserAliases);
+            if (recents == null || recents.Count == 0) return;
+
+            var newUnreadNotifications = new List<AppNotification>();
+
+            lock (seenNotificationIds)
+            {
+                foreach (var notif in recents)
+                {
+                    if (notif == null || notif.IsRead) continue;
+                    if (seenNotificationIds.Contains(notif.Id)) continue;
+
+                    // Show notifications created recently (within last 5 minutes or since session started)
+                    if (notif.CreatedAt >= sessionStartTime.AddMinutes(-5))
+                    {
+                        if (MatchesCurrentUser(notif.TargetUserId) && !IsSentByMe(notif))
+                        {
+                            seenNotificationIds.Add(notif.Id);
+                            newUnreadNotifications.Add(notif);
+                        }
+                    }
+                    else
+                    {
+                        seenNotificationIds.Add(notif.Id);
+                    }
+                }
+            }
+
+            foreach (var notif in newUnreadNotifications)
+            {
+                await ShowToastAsync(notif);
+            }
+        }
+        catch
+        {
+            // Ignore polling errors
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -271,40 +418,44 @@
         }
     }
 
-    private bool MatchesCurrentUser(string targetUserId)
+    private bool MatchesCurrentUser(string? targetUserId)
     {
-        if (string.IsNullOrEmpty(targetUserId)) return true;
-        if (!string.IsNullOrEmpty(currentUserId) && string.Equals(targetUserId, currentUserId, StringComparison.OrdinalIgnoreCase)) return true;
-        if (!string.IsNullOrEmpty(currentUserName) && string.Equals(targetUserId, currentUserName, StringComparison.OrdinalIgnoreCase)) return true;
+        if (string.IsNullOrWhiteSpace(targetUserId)) return true; // Broadcast
+        var trimmed = targetUserId.Trim();
+        if (currentUserAliases.Contains(trimmed)) return true;
+        if (!string.IsNullOrEmpty(currentUserName) && string.Equals(trimmed, currentUserName, StringComparison.OrdinalIgnoreCase)) return true;
+        if (!string.IsNullOrEmpty(currentUserId) && string.Equals(trimmed, currentUserId, StringComparison.OrdinalIgnoreCase)) return true;
+        if (currentUserRoles.Contains(trimmed)) return true;
         if (currentUserProfile != null)
         {
-            if (string.Equals(targetUserId, currentUserProfile.UserName, StringComparison.OrdinalIgnoreCase)) return true;
-            if (string.Equals(targetUserId, currentUserProfile.Id, StringComparison.OrdinalIgnoreCase)) return true;
-            if (currentUserProfile.UserID > 0 && string.Equals(targetUserId, currentUserProfile.UserID.ToString(), StringComparison.OrdinalIgnoreCase)) return true;
+            if (string.Equals(trimmed, currentUserProfile.UserName, StringComparison.OrdinalIgnoreCase)) return true;
+            if (string.Equals(trimmed, currentUserProfile.EmpID, StringComparison.OrdinalIgnoreCase)) return true;
+            if (currentUserProfile.UserID > 0 && string.Equals(trimmed, currentUserProfile.UserID.ToString(), StringComparison.OrdinalIgnoreCase)) return true;
         }
         return false;
     }
 
     private bool IsSentByMe(AppNotification notification)
     {
-        if (!string.IsNullOrEmpty(notification.SenderName))
+        if (!string.IsNullOrWhiteSpace(notification.SenderName))
         {
-            if (!string.IsNullOrEmpty(currentUserName) && string.Equals(notification.SenderName, currentUserName, StringComparison.OrdinalIgnoreCase)) return true;
-            if (!string.IsNullOrEmpty(currentUserId) && string.Equals(notification.SenderName, currentUserId, StringComparison.OrdinalIgnoreCase)) return true;
-            if (currentUserProfile != null && !string.IsNullOrEmpty(currentUserProfile.FullName) && string.Equals(notification.SenderName, currentUserProfile.FullName, StringComparison.OrdinalIgnoreCase)) return true;
+            var sender = notification.SenderName.Trim();
+            if (!string.IsNullOrEmpty(currentUserName) && string.Equals(sender, currentUserName, StringComparison.OrdinalIgnoreCase)) return true;
+            if (!string.IsNullOrEmpty(currentUserId) && string.Equals(sender, currentUserId, StringComparison.OrdinalIgnoreCase)) return true;
+            if (currentUserProfile != null && !string.IsNullOrEmpty(currentUserProfile.FullName) && string.Equals(sender, currentUserProfile.FullName, StringComparison.OrdinalIgnoreCase)) return true;
         }
         return false;
     }
 
     private async Task HandleNotificationReceived(AppNotification notification)
     {
-        if (notification == null) return;
+        if (notification == null || isDisposed) return;
 
         // Skip internal READ_SYNC signals
         if (notification.Message == "READ_SYNC") return;
 
         // Check if notification is meant for this user
-        if (!string.IsNullOrEmpty(notification.TargetUserId))
+        if (!string.IsNullOrWhiteSpace(notification.TargetUserId))
         {
             if (!MatchesCurrentUser(notification.TargetUserId))
             {
@@ -320,7 +471,17 @@
             }
         }
 
-        // Add toast
+        lock (seenNotificationIds)
+        {
+            if (seenNotificationIds.Contains(notification.Id)) return;
+            seenNotificationIds.Add(notification.Id);
+        }
+
+        await ShowToastAsync(notification);
+    }
+
+    private async Task ShowToastAsync(AppNotification notification)
+    {
         var toast = new ActiveToast
         {
             Notification = notification
@@ -328,6 +489,8 @@
 
         await InvokeAsync(() =>
         {
+            if (activeToasts.Any(t => t.Notification.Id == notification.Id)) return;
+
             activeToasts.Insert(0, toast);
             if (activeToasts.Count > 5)
             {
@@ -347,36 +510,35 @@
             return;
         }
 
-        // Play audio chime for notifications (with dedicated meeting alert sound)
-        try
+        // Play audio chime and browser notification safely in background
+        _ = Task.Run(async () =>
         {
-            if (notification.Category == NotificationCategory.Meeting)
+            try
             {
-                await JSRuntime.InvokeVoidAsync("playMeetingAlertSound");
+                if (notification.Category == NotificationCategory.Meeting)
+                {
+                    await JSRuntime.InvokeVoidAsync("playMeetingAlertSound");
+                }
+                else
+                {
+                    await JSRuntime.InvokeVoidAsync("playNotificationSound");
+                }
             }
-            else
+            catch { }
+
+            try
             {
-                await JSRuntime.InvokeVoidAsync("playNotificationSound");
+                await JSRuntime.InvokeVoidAsync("showNotification", notification.Title, notification.Message);
             }
-        }
-        catch { }
+            catch { }
+        });
 
-        // Also trigger browser notification if allowed
-        try
-        {
-            await JSRuntime.InvokeVoidAsync("showNotification", notification.Title, notification.Message);
-        }
-        catch { }
-
-        // Auto dismiss: 14 seconds for meeting alerts, 7 seconds for regular
-        var dismissMs = notification.Category == NotificationCategory.Meeting ? 14000 : 7000;
+        // Auto dismiss: 20 seconds for task/meeting alerts, 15 seconds for regular notifications
+        var dismissMs = (notification.Category == NotificationCategory.Meeting || notification.Category == NotificationCategory.Task) ? 20000 : 15000;
         _ = Task.Run(async () =>
         {
             await Task.Delay(dismissMs);
-            await InvokeAsync(() =>
-            {
-                DismissToast(toast.Id);
-            });
+            await InvokeAsync(() => DismissToast(toast.Id));
         });
     }
 
@@ -438,6 +600,9 @@
 
     public void Dispose()
     {
+        isDisposed = true;
+        pollTimer?.Dispose();
         NotificationService.OnNotificationReceived -= HandleNotificationReceived;
+        AuthStateProvider.AuthenticationStateChanged -= OnAuthStateChanged;
     }
 }

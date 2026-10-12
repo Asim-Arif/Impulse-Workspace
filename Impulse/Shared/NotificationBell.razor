@@ -1,6 +1,7 @@
 @using Impulse.Services.IntraOffice
 @using DataAccessLibrary.Models.IntraOffice
 @using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IIntraOfficeService IntraOfficeService
@@ -130,21 +131,122 @@
     private List<DiagnosticStep> diagnosticSteps = new();
     private int totalUnreadNotifications;
     private string? currentUserName;
+    private string? currentUserId;
+    private readonly HashSet<string> currentUserRoles = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> currentUserAliases = new(StringComparer.OrdinalIgnoreCase);
+    private IntraUserProfile? currentUserProfile;
+    private System.Threading.Timer? bellPollTimer;
+    private bool isDisposed;
     private string pushPermission = "unsupported";
     private string? pushStatusFeedback;
     private bool pushStatusSuccess;
 
     protected override async Task OnInitializedAsync()
     {
-        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
+        AuthStateProvider.AuthenticationStateChanged += OnAuthStateChanged;
+        NotificationService.OnNotificationReceived += HandleLiveNotification;
 
-        if (user.Identity?.IsAuthenticated == true)
+        await RefreshAuthStateAsync();
+        StartPolling();
+    }
+
+    private void OnAuthStateChanged(Task<AuthenticationState> task)
+    {
+        _ = InvokeAsync(async () =>
         {
-            currentUserName = user.Identity.Name ?? "";
-            LoadNotifications();
-            NotificationService.OnNotificationReceived += HandleLiveNotification;
+            await RefreshAuthStateAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task RefreshAuthStateAsync()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                currentUserName = user.Identity.Name?.Trim() ?? "";
+                currentUserId = (user.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+                    ?? user.FindFirst("sub")?.Value 
+                    ?? currentUserName)?.Trim();
+
+                currentUserRoles.Clear();
+                foreach (var claim in user.FindAll(ClaimTypes.Role))
+                {
+                    if (!string.IsNullOrWhiteSpace(claim.Value))
+                    {
+                        currentUserRoles.Add(claim.Value.Trim());
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(currentUserName))
+                {
+                    try
+                    {
+                        currentUserProfile = await IntraOfficeService.GetUserProfileAsync(currentUserName);
+                    }
+                    catch { }
+                }
+
+                RebuildUserAliases();
+                LoadNotifications();
+            }
+            else
+            {
+                currentUserName = null;
+                currentUserId = null;
+                currentUserProfile = null;
+                currentUserRoles.Clear();
+                currentUserAliases.Clear();
+                recentNotifications.Clear();
+                totalUnreadNotifications = 0;
+            }
         }
+        catch { }
+    }
+
+    private void RebuildUserAliases()
+    {
+        currentUserAliases.Clear();
+        if (!string.IsNullOrWhiteSpace(currentUserName)) currentUserAliases.Add(currentUserName.Trim());
+        if (!string.IsNullOrWhiteSpace(currentUserId)) currentUserAliases.Add(currentUserId.Trim());
+        if (currentUserProfile != null)
+        {
+            if (!string.IsNullOrWhiteSpace(currentUserProfile.UserName)) currentUserAliases.Add(currentUserProfile.UserName.Trim());
+            if (!string.IsNullOrWhiteSpace(currentUserProfile.EmpID)) currentUserAliases.Add(currentUserProfile.EmpID.Trim());
+            if (currentUserProfile.UserID > 0) currentUserAliases.Add(currentUserProfile.UserID.ToString());
+            if (!string.IsNullOrWhiteSpace(currentUserProfile.FullName)) currentUserAliases.Add(currentUserProfile.FullName.Trim());
+        }
+        foreach (var r in currentUserRoles)
+        {
+            if (!string.IsNullOrWhiteSpace(r)) currentUserAliases.Add(r.Trim());
+        }
+    }
+
+    private void StartPolling()
+    {
+        bellPollTimer?.Dispose();
+        // Periodically refresh notification badge across multiple devices/tabs
+        bellPollTimer = new System.Threading.Timer(async _ =>
+        {
+            if (isDisposed) return;
+            if (string.IsNullOrEmpty(currentUserName) && currentUserAliases.Count == 0) return;
+
+            try
+            {
+                var userKey = currentUserName ?? currentUserId ?? "";
+                var unread = NotificationService.GetUnreadCount(userKey, currentUserAliases);
+                if (unread != totalUnreadNotifications)
+                {
+                    totalUnreadNotifications = unread;
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+            catch { }
+        }, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -221,17 +323,36 @@
 
     private void LoadNotifications()
     {
-        if (!string.IsNullOrEmpty(currentUserName))
+        if (!string.IsNullOrEmpty(currentUserName) || currentUserAliases.Count > 0)
         {
-            recentNotifications = NotificationService.GetRecentNotifications(currentUserName);
-            totalUnreadNotifications = NotificationService.GetUnreadCount(currentUserName);
+            var userKey = currentUserName ?? currentUserId ?? "";
+            recentNotifications = NotificationService.GetRecentNotifications(userKey, currentUserAliases);
+            totalUnreadNotifications = NotificationService.GetUnreadCount(userKey, currentUserAliases);
         }
+    }
+
+    private bool MatchesCurrentUser(string? targetUserId)
+    {
+        if (string.IsNullOrWhiteSpace(targetUserId)) return true; // Broadcast
+        var trimmed = targetUserId.Trim();
+        if (currentUserAliases.Contains(trimmed)) return true;
+        if (!string.IsNullOrEmpty(currentUserName) && string.Equals(trimmed, currentUserName, StringComparison.OrdinalIgnoreCase)) return true;
+        if (!string.IsNullOrEmpty(currentUserId) && string.Equals(trimmed, currentUserId, StringComparison.OrdinalIgnoreCase)) return true;
+        if (currentUserRoles.Contains(trimmed)) return true;
+        if (currentUserProfile != null)
+        {
+            if (string.Equals(trimmed, currentUserProfile.UserName, StringComparison.OrdinalIgnoreCase)) return true;
+            if (string.Equals(trimmed, currentUserProfile.EmpID, StringComparison.OrdinalIgnoreCase)) return true;
+            if (currentUserProfile.UserID > 0 && string.Equals(trimmed, currentUserProfile.UserID.ToString(), StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
     }
 
     private async Task HandleLiveNotification(AppNotification notif)
     {
-        if (!string.IsNullOrEmpty(currentUserName) && 
-            (string.IsNullOrEmpty(notif.TargetUserId) || string.Equals(notif.TargetUserId.Trim(), currentUserName.Trim(), StringComparison.OrdinalIgnoreCase)))
+        if (notif == null || isDisposed) return;
+
+        if (MatchesCurrentUser(notif.TargetUserId))
         {
             LoadNotifications();
             await InvokeAsync(StateHasChanged);
@@ -249,19 +370,21 @@
 
     private void MarkAllNotificationsRead()
     {
-        if (!string.IsNullOrEmpty(currentUserName))
+        if (!string.IsNullOrEmpty(currentUserName) || currentUserAliases.Count > 0)
         {
-            NotificationService.MarkAllAsRead(currentUserName);
+            var userKey = currentUserName ?? currentUserId ?? "";
+            NotificationService.MarkAllAsRead(userKey, currentUserAliases);
             LoadNotifications();
         }
     }
 
     private void OnNotificationClick(AppNotification notif)
     {
-        if (!string.IsNullOrEmpty(currentUserName))
+        if (!string.IsNullOrEmpty(currentUserName) || currentUserAliases.Count > 0)
         {
-            NotificationService.MarkAsRead(notif.Id, currentUserName);
-            totalUnreadNotifications = NotificationService.GetUnreadCount(currentUserName);
+            var userKey = currentUserName ?? currentUserId ?? "";
+            NotificationService.MarkAsRead(notif.Id, userKey, currentUserAliases);
+            totalUnreadNotifications = NotificationService.GetUnreadCount(userKey, currentUserAliases);
         }
         notificationOpen = false;
         if (!string.IsNullOrEmpty(notif.ActionUrl))
@@ -283,7 +406,7 @@
 
     private string GetCategoryIcon(NotificationCategory category) => category switch
     {
-        NotificationCategory.Message => "fas fa-comments text-primary",
+        NotificationCategory.Message => "fas fa-comment text-primary",
         NotificationCategory.Announcement => "fas fa-bullhorn text-danger",
         NotificationCategory.Minute => "fas fa-file-signature text-warning",
         NotificationCategory.Meeting => "fas fa-video text-purple",
@@ -303,7 +426,10 @@
 
     public void Dispose()
     {
+        isDisposed = true;
+        bellPollTimer?.Dispose();
         NotificationService.OnNotificationReceived -= HandleLiveNotification;
+        AuthStateProvider.AuthenticationStateChanged -= OnAuthStateChanged;
     }
 }
 

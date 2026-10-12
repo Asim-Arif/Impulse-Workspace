@@ -82,6 +82,16 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string BillNo { get; set; } = string.Empty;
         public bool IsBilled => MPB_D_EntryID.HasValue;
 
+        // Dispatch & Store Transfer
+        public decimal StoreTransferQty { get; set; }
+        public decimal DispatchQty { get; set; }
+        public int? NextProcessID { get; set; }
+        public bool IsLotClosed { get; set; }
+
+        public bool IsLastProcess => !NextProcessID.HasValue || NextProcessID.Value == 0;
+        public decimal TotalFinalQty => StoreTransferQty + DispatchQty;
+        public decimal BalanceQty => (RcvdQty - Wastage - LostQty) - TotalFinalQty;
+
         // Extra
         public string Employees { get; set; } = string.Empty;
         public string Empoloyees
@@ -123,6 +133,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public bool BilledOnly { get; set; }
         public bool NonBilledOnly { get; set; }
         public bool ShowLastOnly { get; set; }
+        public bool PendingFinalTransferOnly { get; set; }
     }
 
     public class ChangeOrderNoRequest

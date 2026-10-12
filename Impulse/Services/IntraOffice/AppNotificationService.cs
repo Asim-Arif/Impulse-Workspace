@@ -42,10 +42,10 @@ namespace Impulse.Services.IntraOffice
     {
         event Func<AppNotification, Task>? OnNotificationReceived;
         Task SendNotificationAsync(AppNotification notification);
-        List<AppNotification> GetRecentNotifications(string userId);
-        int GetUnreadCount(string userId);
-        void MarkAsRead(string notificationId, string userId);
-        void MarkAllAsRead(string userId);
+        List<AppNotification> GetRecentNotifications(string userId, IEnumerable<string>? aliases = null);
+        int GetUnreadCount(string userId, IEnumerable<string>? aliases = null);
+        void MarkAsRead(string notificationId, string userId, IEnumerable<string>? aliases = null);
+        void MarkAllAsRead(string userId, IEnumerable<string>? aliases = null);
     }
 
     public class AppNotificationService : IAppNotificationService
@@ -68,6 +68,26 @@ namespace Impulse.Services.IntraOffice
 
         private IDbConnection CreateConnection() => new SqlConnection(_connectionString);
 
+        private static List<string> BuildIdentifierList(string userId, IEnumerable<string>? aliases)
+        {
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrWhiteSpace(userId))
+            {
+                set.Add(userId.Trim().ToLowerInvariant());
+            }
+            if (aliases != null)
+            {
+                foreach (var a in aliases)
+                {
+                    if (!string.IsNullOrWhiteSpace(a))
+                    {
+                        set.Add(a.Trim().ToLowerInvariant());
+                    }
+                }
+            }
+            return set.ToList();
+        }
+
         public async Task SendNotificationAsync(AppNotification notification)
         {
             try
@@ -84,21 +104,35 @@ namespace Impulse.Services.IntraOffice
                 _logger.LogError(ex, "Failed to persist AppNotification #{Id} to SQL database", notification.Id);
             }
 
-            // Real-time dispatch to active client circuits
+            // Real-time parallel dispatch to active client circuits (with per-subscriber timeout)
             if (OnNotificationReceived != null)
             {
                 var delegates = OnNotificationReceived.GetInvocationList();
-                foreach (Func<AppNotification, Task> handler in delegates)
+                _ = Task.Run(async () =>
                 {
-                    try
+                    var tasks = delegates.Select(async d =>
                     {
-                        await handler(notification);
-                    }
-                    catch
-                    {
-                        // Ignore disconnected circuit errors
-                    }
-                }
+                        try
+                        {
+                            var handler = (Func<AppNotification, Task>)d;
+                            var handlerTask = handler(notification);
+                            var timeoutTask = Task.Delay(4000);
+                            if (await Task.WhenAny(handlerTask, timeoutTask) == handlerTask)
+                            {
+                                await handlerTask;
+                            }
+                            else
+                            {
+                                _logger.LogWarning("Notification dispatch handler timed out (4s) for circuit subscriber on notification #{Id}", notification.Id);
+                            }
+                        }
+                        catch
+                        {
+                            // Ignore disconnected circuit errors
+                        }
+                    });
+                    await Task.WhenAll(tasks);
+                });
             }
 
             // Web Push notification to mobile/background devices
@@ -123,28 +157,55 @@ namespace Impulse.Services.IntraOffice
             }
         }
 
-        public List<AppNotification> GetRecentNotifications(string userId)
+        public List<AppNotification> GetRecentNotifications(string userId, IEnumerable<string>? aliases = null)
         {
             try
             {
+                var identifiers = BuildIdentifierList(userId, aliases);
                 using var db = CreateConnection();
-                const string sql = @"
-                    SELECT TOP 30 
-                        Id, 
-                        Category, 
-                        Title, 
-                        Message, 
-                        SenderName, 
-                        TargetUserId, 
-                        ActionUrl, 
-                        CreatedAt, 
-                        IsRead, 
-                        IsReadReceipt
-                    FROM AppNotifications
-                    WHERE (TargetUserId IS NULL OR LOWER(LTRIM(RTRIM(TargetUserId))) = LOWER(LTRIM(RTRIM(@UserId))))
-                    ORDER BY CreatedAt DESC;";
+                string sql;
+                object param;
 
-                return db.Query<AppNotification>(sql, new { UserId = userId?.Trim() }).ToList();
+                if (identifiers.Count > 0)
+                {
+                    sql = @"
+                        SELECT TOP 30 
+                            Id, 
+                            Category, 
+                            Title, 
+                            Message, 
+                            SenderName, 
+                            TargetUserId, 
+                            ActionUrl, 
+                            CreatedAt, 
+                            IsRead, 
+                            IsReadReceipt
+                        FROM AppNotifications
+                        WHERE (TargetUserId IS NULL OR LOWER(LTRIM(RTRIM(TargetUserId))) IN @UserIdentifiers)
+                        ORDER BY CreatedAt DESC;";
+                    param = new { UserIdentifiers = identifiers };
+                }
+                else
+                {
+                    sql = @"
+                        SELECT TOP 30 
+                            Id, 
+                            Category, 
+                            Title, 
+                            Message, 
+                            SenderName, 
+                            TargetUserId, 
+                            ActionUrl, 
+                            CreatedAt, 
+                            IsRead, 
+                            IsReadReceipt
+                        FROM AppNotifications
+                        WHERE TargetUserId IS NULL
+                        ORDER BY CreatedAt DESC;";
+                    param = new { };
+                }
+
+                return db.Query<AppNotification>(sql, param).ToList();
             }
             catch (Exception ex)
             {
@@ -153,18 +214,34 @@ namespace Impulse.Services.IntraOffice
             }
         }
 
-        public int GetUnreadCount(string userId)
+        public int GetUnreadCount(string userId, IEnumerable<string>? aliases = null)
         {
             try
             {
+                var identifiers = BuildIdentifierList(userId, aliases);
                 using var db = CreateConnection();
-                const string sql = @"
-                    SELECT COUNT(*) 
-                    FROM AppNotifications
-                    WHERE (TargetUserId IS NULL OR LOWER(LTRIM(RTRIM(TargetUserId))) = LOWER(LTRIM(RTRIM(@UserId))))
-                      AND IsRead = 0;";
+                string sql;
+                object param;
 
-                return db.ExecuteScalar<int>(sql, new { UserId = userId?.Trim() });
+                if (identifiers.Count > 0)
+                {
+                    sql = @"
+                        SELECT COUNT(*) 
+                        FROM AppNotifications
+                        WHERE (TargetUserId IS NULL OR LOWER(LTRIM(RTRIM(TargetUserId))) IN @UserIdentifiers)
+                          AND IsRead = 0;";
+                    param = new { UserIdentifiers = identifiers };
+                }
+                else
+                {
+                    sql = @"
+                        SELECT COUNT(*) 
+                        FROM AppNotifications
+                        WHERE TargetUserId IS NULL AND IsRead = 0;";
+                    param = new { };
+                }
+
+                return db.ExecuteScalar<int>(sql, param);
             }
             catch (Exception ex)
             {
@@ -173,18 +250,34 @@ namespace Impulse.Services.IntraOffice
             }
         }
 
-        public void MarkAsRead(string notificationId, string userId)
+        public void MarkAsRead(string notificationId, string userId, IEnumerable<string>? aliases = null)
         {
             try
             {
+                var identifiers = BuildIdentifierList(userId, aliases);
                 using var db = CreateConnection();
-                const string sql = @"
-                    UPDATE AppNotifications 
-                    SET IsRead = 1 
-                    WHERE Id = @NotificationId 
-                      AND (TargetUserId IS NULL OR LOWER(LTRIM(RTRIM(TargetUserId))) = LOWER(LTRIM(RTRIM(@UserId))));";
+                string sql;
+                object param;
 
-                db.Execute(sql, new { NotificationId = notificationId, UserId = userId?.Trim() });
+                if (identifiers.Count > 0)
+                {
+                    sql = @"
+                        UPDATE AppNotifications 
+                        SET IsRead = 1 
+                        WHERE Id = @NotificationId 
+                          AND (TargetUserId IS NULL OR LOWER(LTRIM(RTRIM(TargetUserId))) IN @UserIdentifiers);";
+                    param = new { NotificationId = notificationId, UserIdentifiers = identifiers };
+                }
+                else
+                {
+                    sql = @"
+                        UPDATE AppNotifications 
+                        SET IsRead = 1 
+                        WHERE Id = @NotificationId;";
+                    param = new { NotificationId = notificationId };
+                }
+
+                db.Execute(sql, param);
             }
             catch (Exception ex)
             {
@@ -192,18 +285,34 @@ namespace Impulse.Services.IntraOffice
             }
         }
 
-        public void MarkAllAsRead(string userId)
+        public void MarkAllAsRead(string userId, IEnumerable<string>? aliases = null)
         {
             try
             {
+                var identifiers = BuildIdentifierList(userId, aliases);
                 using var db = CreateConnection();
-                const string sql = @"
-                    UPDATE AppNotifications 
-                    SET IsRead = 1 
-                    WHERE (TargetUserId IS NULL OR LOWER(LTRIM(RTRIM(TargetUserId))) = LOWER(LTRIM(RTRIM(@UserId))))
-                      AND IsRead = 0;";
+                string sql;
+                object param;
 
-                db.Execute(sql, new { UserId = userId?.Trim() });
+                if (identifiers.Count > 0)
+                {
+                    sql = @"
+                        UPDATE AppNotifications 
+                        SET IsRead = 1 
+                        WHERE (TargetUserId IS NULL OR LOWER(LTRIM(RTRIM(TargetUserId))) IN @UserIdentifiers)
+                          AND IsRead = 0;";
+                    param = new { UserIdentifiers = identifiers };
+                }
+                else
+                {
+                    sql = @"
+                        UPDATE AppNotifications 
+                        SET IsRead = 1 
+                        WHERE TargetUserId IS NULL AND IsRead = 0;";
+                    param = new { };
+                }
+
+                db.Execute(sql, param);
             }
             catch (Exception ex)
             {

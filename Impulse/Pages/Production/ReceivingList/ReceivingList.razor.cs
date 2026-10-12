@@ -83,6 +83,58 @@ namespace Impulse.Pages.Production.ReceivingList
         public decimal TotalRcvdQty => FilteredItems.Sum(i => i.RcvdQty);
         public decimal TotalWastageQty => FilteredItems.Sum(i => i.WastageTotal);
         public decimal TotalReWorkQty => FilteredItems.Sum(i => i.ReWorkQty);
+        public decimal TotalStoreTransferQty => FilteredItems.Sum(i => i.StoreTransferQty);
+        public decimal TotalDispatchQty => FilteredItems.Sum(i => i.DispatchQty);
+
+        // Row Selection State (Checkboxes matching legacy frmMakerRcvList.frm)
+        public HashSet<long> SelectedVrdEntryIds { get; set; } = new();
+
+        public bool IsAllSelected =>
+            PagedItems.Any() && PagedItems.All(i => SelectedVrdEntryIds.Contains(i.VRD_EntryID));
+
+        public void ToggleSelectAll(ChangeEventArgs e)
+        {
+            bool check = (bool)(e.Value ?? false);
+            if (check)
+            {
+                foreach (var item in PagedItems)
+                {
+                    SelectedVrdEntryIds.Add(item.VRD_EntryID);
+                }
+            }
+            else
+            {
+                foreach (var item in PagedItems)
+                {
+                    SelectedVrdEntryIds.Remove(item.VRD_EntryID);
+                }
+            }
+        }
+
+        public void ToggleRowSelection(long vrdEntryId, bool isChecked)
+        {
+            if (isChecked)
+            {
+                SelectedVrdEntryIds.Add(vrdEntryId);
+            }
+            else
+            {
+                SelectedVrdEntryIds.Remove(vrdEntryId);
+            }
+        }
+
+        public void SelectAllFiltered()
+        {
+            foreach (var item in FilteredItems)
+            {
+                SelectedVrdEntryIds.Add(item.VRD_EntryID);
+            }
+        }
+
+        public void ClearSelection()
+        {
+            SelectedVrdEntryIds.Clear();
+        }
 
         // Manual PTC panel
         public bool ShowManualPTCPanel { get; set; } = false;
@@ -1653,6 +1705,7 @@ namespace Impulse.Pages.Production.ReceivingList
             if (Filter.ShowLastOnly) parts.Add("Last Process Done");
             if (Filter.RepairLots) parts.Add("Repair Lots");
             if (Filter.RejectionLots) parts.Add("Rejection Lots");
+            if (Filter.PendingFinalTransferOnly) parts.Add("Pending (Dispatch/Trf)");
 
             return string.Join(" | ", parts);
         }
@@ -1732,6 +1785,13 @@ namespace Impulse.Pages.Production.ReceivingList
             }
 
 
+            // 6. Category Filter (CatID)
+            if (Filter.ItemCatIds != null && Filter.ItemCatIds.Any())
+            {
+                var cats = Filter.ItemCatIds.Select(c => $"'{c.Replace("'", "''")}'");
+                conditions.Add($"{{VVendReceivingList.CatID}} in [{string.Join(",", cats)}]");
+            }
+
             // 7. Repair / Rejection
             if (Filter.RepairLots && Filter.RejectionLots)
             {
@@ -1744,6 +1804,12 @@ namespace Impulse.Pages.Production.ReceivingList
             else if (Filter.RejectionLots)
             {
                 conditions.Add("{VVendReceivingList.Wastage} > 0");
+            }
+
+            // 8. Pending (Dispatch / Trf)
+            if (Filter.PendingFinalTransferOnly)
+            {
+                conditions.Add("(isnull({VVendReceivingList.NextProcessID}) or {VVendReceivingList.NextProcessID} = 0) and {VVendReceivingList.IsLotClosed} = false and (({VVendReceivingList.RcvdQty} - (if isnull({VVendReceivingList.Wastage}) then 0 else {VVendReceivingList.Wastage}) - (if isnull({VVendReceivingList.LostQty}) then 0 else {VVendReceivingList.LostQty})) > ({VVendReceivingList.DispatchQty} + {VVendReceivingList.StoreTransferQty}))");
             }
 
             return conditions.Any() ? string.Join(" and ", conditions) : string.Empty;
@@ -1812,13 +1878,13 @@ namespace Impulse.Pages.Production.ReceivingList
         public async Task PrintListSelection(ItemClickEventArgs args)
         {
             ResolveRowItem(args);
-            if (SelectedItem == null)
+            if (SelectedItem == null && !SelectedVrdEntryIds.Any())
             {
                 NotificationService.Notify(new Radzen.NotificationMessage
                 {
                     Severity = Radzen.NotificationSeverity.Warning,
                     Summary = "Selection Required",
-                    Detail = "Please select a receiving record to print.",
+                    Detail = "Please select or check receiving record(s) to print.",
                     Duration = 4000
                 });
                 return;
@@ -1827,10 +1893,20 @@ namespace Impulse.Pages.Production.ReceivingList
             string filtersStr = BuildFiltersString();
             string dateRangeStr = $"{Filter.DtFrom:dd-MMM-yyyy} to {Filter.DtTo:dd-MMM-yyyy}";
 
+            string selectionFormula;
+            if (SelectedVrdEntryIds.Any())
+            {
+                selectionFormula = $"{{VVendReceivingList.VRD_EntryID}} in [{string.Join(",", SelectedVrdEntryIds)}]";
+            }
+            else
+            {
+                selectionFormula = $"{{VVendReceivingList.VRD_EntryID}} = {SelectedItem!.VRD_EntryID}";
+            }
+
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "ReceivingList_Selection.rpt",
-                SelectionFormula = $"{{VVendReceivingList.VRD_EntryID}} = {SelectedItem.VRD_EntryID}",
+                SelectionFormula = selectionFormula,
                 FormulaValues = new Dictionary<string, object>
                 {
                     { "Filters", $"'{filtersStr}'" },
