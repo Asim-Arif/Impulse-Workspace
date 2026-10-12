@@ -14,6 +14,7 @@ namespace Impulse.Services.Setup
         private readonly IUserPermissionDataAccess _permissionData;
         private readonly AuthenticationStateProvider _authStateProvider;
         private readonly ILogger<UserPermissionService> _logger;
+        private readonly Impulse.Services.Licensing.ILicenseService _licenseService;
 
         private bool _isInitialized = false;
         private string _currentUserName = string.Empty;
@@ -28,11 +29,13 @@ namespace Impulse.Services.Setup
         public UserPermissionService(
             IUserPermissionDataAccess permissionData,
             AuthenticationStateProvider authStateProvider,
-            ILogger<UserPermissionService> logger)
+            ILogger<UserPermissionService> logger,
+            Impulse.Services.Licensing.ILicenseService licenseService)
         {
             _permissionData = permissionData;
             _authStateProvider = authStateProvider;
             _logger = logger;
+            _licenseService = licenseService;
         }
 
         public async Task InitializeAsync(string? userName = null)
@@ -97,6 +100,14 @@ namespace Impulse.Services.Setup
 
         public bool HasModuleAccess(string moduleName)
         {
+            if (string.IsNullOrWhiteSpace(moduleName)) return true;
+
+            // License check first: unlicensed modules are blocked for all users, including Administrators
+            if (!_licenseService.IsModuleAllowed(moduleName))
+            {
+                return false;
+            }
+
             if (IsAdministrator) return true;
             if (_currentUserModel == null) return false;
 
@@ -827,7 +838,6 @@ namespace Impulse.Services.Setup
 
         public bool IsRouteAuthorized(string relativePath)
         {
-            if (IsAdministrator) return true;
             if (string.IsNullOrWhiteSpace(relativePath)) return true;
 
             // Strip query string and leading/trailing slashes
@@ -837,44 +847,80 @@ namespace Impulse.Services.Setup
             // Favourites hub is accessible to all authenticated users
             if (string.Equals(cleanPath, "favourites", StringComparison.OrdinalIgnoreCase)) return true;
 
-                        // 1. Check exact match in configured dictionary
+            // Identify which module this route belongs to
+            string? routeModule = null;
             if (RoutePermissions.TryGetValue(cleanPath, out var perm))
             {
-                if (!HasModuleAccess(perm.Module)) return false;
-                if (!string.IsNullOrEmpty(perm.OptionId) && !HasOptionAccess(perm.OptionId)) return false;
+                routeModule = perm.Module;
+            }
+            else
+            {
+                var matchingKvp = RoutePermissions
+                    .Where(kvp => cleanPath.StartsWith(kvp.Key + "/", StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(kvp => kvp.Key.Length)
+                    .FirstOrDefault();
+
+                if (!string.IsNullOrEmpty(matchingKvp.Key))
+                {
+                    routeModule = matchingKvp.Value.Module;
+                }
+                else
+                {
+                    var segments = cleanPath.Split('/');
+                    var root = segments[0].ToLowerInvariant();
+                    routeModule = root switch
+                    {
+                        "financial" or "accounts" => "Accounts",
+                        "payroll" => "Payroll",
+                        "stock" or "inventory" => "Stock",
+                        "production" => "Production",
+                        "export" => "Export",
+                        "company" => "Company",
+                        "dashboards" => "DashBoard",
+                        "setup" => "Setup",
+                        "office" or "intraoffice" => "IntraOffice",
+                        _ => null
+                    };
+                }
+            }
+
+            // CRITICAL LICENSE GUARD: If module is not licensed, block unconditionally,
+            // even for System Administrators!
+            if (!string.IsNullOrEmpty(routeModule) && !_licenseService.IsModuleAllowed(routeModule))
+            {
+                return false;
+            }
+
+            if (IsAdministrator) return true;
+
+            // 1. Check exact match in configured dictionary
+            if (RoutePermissions.TryGetValue(cleanPath, out var userPerm))
+            {
+                if (!HasModuleAccess(userPerm.Module)) return false;
+                if (!string.IsNullOrEmpty(userPerm.OptionId) && !HasOptionAccess(userPerm.OptionId)) return false;
                 return true;
             }
 
             // 1.2 Check parameterized subroutes or trailing path segments (longest matching prefix first)
-            var matchingKvp = RoutePermissions
+            var matchingUserKvp = RoutePermissions
                 .Where(kvp => cleanPath.StartsWith(kvp.Key + "/", StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(kvp => kvp.Key.Length)
                 .FirstOrDefault();
 
-            if (!string.IsNullOrEmpty(matchingKvp.Key))
+            if (!string.IsNullOrEmpty(matchingUserKvp.Key))
             {
-                if (!HasModuleAccess(matchingKvp.Value.Module)) return false;
-                if (!string.IsNullOrEmpty(matchingKvp.Value.OptionId) && !HasOptionAccess(matchingKvp.Value.OptionId)) return false;
+                if (!HasModuleAccess(matchingUserKvp.Value.Module)) return false;
+                if (!string.IsNullOrEmpty(matchingUserKvp.Value.OptionId) && !HasOptionAccess(matchingUserKvp.Value.OptionId)) return false;
                 return true;
             }
 
             // 2. Prefix matching for top-level module areas
-            var segments = cleanPath.Split('/');
-            var root = segments[0].ToLowerInvariant();
-
-            return root switch
+            if (!string.IsNullOrEmpty(routeModule))
             {
-                "financial" or "accounts" => HasModuleAccess("Accounts"),
-                "payroll" => HasModuleAccess("Payroll"),
-                "stock" or "inventory" => HasModuleAccess("Stock"),
-                "production" => HasModuleAccess("Production"),
-                "export" => HasModuleAccess("Export"),
-                "company" => HasModuleAccess("Company"),
-                "dashboards" => HasModuleAccess("DashBoard"),
-                "setup" => HasModuleAccess("Setup"),
-                "office" or "intraoffice" => HasModuleAccess("IntraOffice"),
-                _ => true
-            };
+                return HasModuleAccess(routeModule);
+            }
+
+            return true;
         }
 
         public Task<List<MenuOptionModel>> GetMenuOptionsByModuleAsync(string moduleName)

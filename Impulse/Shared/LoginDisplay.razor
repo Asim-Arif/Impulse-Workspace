@@ -1,6 +1,11 @@
 @using Microsoft.Extensions.Configuration
 @using Microsoft.Data.SqlClient
+@using Impulse.Services.Licensing
+@using Impulse.Models.License
 @inject IConfiguration Configuration
+@inject ILicenseService LicenseService
+@inject IJSRuntime JSRuntime
+@inject Radzen.NotificationService NotificationService
 
 <AuthorizeView>
     <Authorized>
@@ -23,6 +28,17 @@
 
             <!-- Right: System Telemetry, Status Pills & Sign Out -->
             <div class="d-none d-md-flex align-items-center gap-2">
+                <!-- License Status Badge (Click to View / Activate) -->
+                <div class="header-telemetry-pill" style="cursor: pointer;" @onclick="OpenLicenseModal" title="Click to view License Details & Server Hardware ID">
+                    <i class="fas @(LicenseService.IsLicensed ? "fa-shield-alt text-success" : "fa-shield-virus text-danger")"></i>
+                    <div class="telemetry-text">
+                        <span class="telemetry-title" style="font-weight: 700;">@(LicenseService.IsLicensed ? (string.IsNullOrEmpty(LicenseService.CurrentLicense.ClientName) ? "Licensed" : LicenseService.CurrentLicense.ClientName) : "Unlicensed")</span>
+                        <span class="telemetry-subtitle @(LicenseService.IsLicensed ? "text-success" : "text-danger")" style="text-transform: none; font-size: 0.68rem; letter-spacing: normal;">
+                            @(LicenseService.IsLicensed ? (LicenseService.CurrentLicense.AllowedModules.Contains("All") ? "Enterprise Full" : string.Join(", ", LicenseService.CurrentLicense.AllowedModules)) : "License Inactive")
+                        </span>
+                    </div>
+                </div>
+
                 <!-- System & Version Badge -->
                 <div class="header-telemetry-pill">
                     <i class="fas fa-server text-primary"></i>
@@ -73,12 +89,130 @@
 
             <!-- Mobile Action Group (Visible on mobile screens < 768px) -->
             <div class="d-flex d-md-none align-items-center gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary p-1 px-2" @onclick="OpenLicenseModal" title="License Info">
+                    <i class="fas @(LicenseService.IsLicensed ? "fa-shield-alt text-success" : "fa-shield-virus text-danger")"></i>
+                </button>
                 <NotificationBell />
                 <a href="/Identity/Account/Logout" class="btn btn-outline-danger btn-sm p-1 px-2" title="Sign Out">
                     <i class="fas fa-arrow-right-from-bracket"></i>
                 </a>
             </div>
         </div>
+
+        @if (isLicenseModalOpen)
+        {
+            <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 10050;">
+                <div class="modal-dialog modal-dialog-centered" style="max-width: 580px;">
+                    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden; background: #ffffff;">
+                        <div class="modal-header border-0 pb-0 pt-3 px-4 d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="d-inline-flex p-2 rounded-circle @(LicenseService.IsLicensed ? "bg-success-subtle text-success" : "bg-danger-subtle text-danger")">
+                                    <i class="fas @(LicenseService.IsLicensed ? "fa-shield-alt" : "fa-shield-virus") fa-lg"></i>
+                                </span>
+                                <div>
+                                    <h5 class="modal-title fw-bold text-dark mb-0">Impulse System License</h5>
+                                    <span class="text-secondary small">Cryptographic Hardware-Locked Protection</span>
+                                </div>
+                            </div>
+                            <button type="button" class="btn-close shadow-none" @onclick="CloseLicenseModal"></button>
+                        </div>
+                        <div class="modal-body px-4 py-3">
+                            <!-- License Status Banner -->
+                            <div class="alert @(LicenseService.IsLicensed ? "alert-success border-success-subtle" : "alert-danger border-danger-subtle") d-flex align-items-center justify-content-between py-2 px-3 rounded-3 mb-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="fas @(LicenseService.IsLicensed ? "fa-check-circle" : "fa-exclamation-triangle")"></i>
+                                    <div>
+                                        <strong>@(LicenseService.IsLicensed ? "Active License" : "Inactive / Unlicensed")</strong>
+                                        <div class="small text-muted">@LicenseService.CurrentLicense.StatusMessage</div>
+                                    </div>
+                                </div>
+                                <span class="badge @(LicenseService.IsLicensed ? "bg-success" : "bg-danger") px-2 py-1">@LicenseService.CurrentLicense.Status</span>
+                            </div>
+
+                            <!-- License Metadata Grid -->
+                            <div class="card border-0 bg-light p-3 mb-3 rounded-3">
+                                <div class="row g-2 small">
+                                    <div class="col-sm-4 text-secondary">Licensed Client:</div>
+                                    <div class="col-sm-8 fw-bold text-dark">@(string.IsNullOrEmpty(LicenseService.CurrentLicense.ClientName) ? "Unspecified" : LicenseService.CurrentLicense.ClientName)</div>
+
+                                    <div class="col-sm-4 text-secondary">Server Hardware ID:</div>
+                                    <div class="col-sm-8">
+                                        <div class="d-flex align-items-center gap-1">
+                                            <code class="text-primary fw-bold" style="font-size: 0.82rem;">@LicenseService.GetCurrentHardwareId()</code>
+                                            <button type="button" class="btn btn-sm btn-link p-0 text-secondary" @onclick="CopyHardwareId" title="Copy Hardware ID to Clipboard">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-sm-4 text-secondary">License Validity:</div>
+                                    <div class="col-sm-8 text-dark">
+                                        @(LicenseService.CurrentLicense.ExpiresAt.HasValue
+                                            ? LicenseService.CurrentLicense.ExpiresAt.Value.ToString("dd-MMM-yyyy")
+                                            : "Perpetual / Lifetime (No Expiry)")
+                                    </div>
+
+                                    <div class="col-sm-4 text-secondary">Issued On:</div>
+                                    <div class="col-sm-8 text-dark">
+                                        @(LicenseService.CurrentLicense.IssuedAt.HasValue
+                                            ? LicenseService.CurrentLicense.IssuedAt.Value.ToString("dd-MMM-yyyy HH:mm UTC")
+                                            : "N/A")
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Modules Status -->
+                            <div class="mb-3">
+                                <div class="small fw-bold text-secondary mb-2 text-uppercase" style="letter-spacing: 0.5px; font-size: 0.72rem;">Authorized ERP Modules</div>
+                                <div class="d-flex flex-wrap gap-2">
+                                    @foreach (var mod in new[] { "Accounts", "Payroll", "Stock", "Production", "Export", "IntraOffice" })
+                                    {
+                                        var allowed = LicenseService.IsModuleAllowed(mod);
+                                        <span class="badge @(allowed ? "bg-success text-white" : "bg-secondary text-white opacity-50") px-2 py-1 d-inline-flex align-items-center gap-1" style="font-size: 0.76rem; font-weight: 500;">
+                                            <i class="fas @(allowed ? "fa-check" : "fa-lock")" style="font-size: 0.68rem;"></i>
+                                            @mod
+                                        </span>
+                                    }
+                                </div>
+                            </div>
+
+                            <!-- Activate New Key Section -->
+                            <div class="border-top pt-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="small fw-bold text-secondary text-uppercase" style="letter-spacing: 0.5px; font-size: 0.72rem;">Update / Activate License Key</span>
+                                    <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none small" @onclick="() => showActivateInput = !showActivateInput">
+                                        @(showActivateInput ? "Cancel" : "Enter New Key")
+                                    </button>
+                                </div>
+
+                                @if (showActivateInput)
+                                {
+                                    <div class="mb-2">
+                                        <textarea class="form-control form-control-sm font-monospace" rows="3" placeholder="Paste IMPULSE-LIC-... license token here" @bind="newLicenseKeyInput" style="font-size: 0.72rem; resize: none;"></textarea>
+                                    </div>
+                                    <div class="d-flex justify-content-end gap-2">
+                                        <button type="button" class="btn btn-sm btn-primary px-3 shadow-sm" @onclick="HandleActivateLicense" disabled="@isActivating">
+                                            @if (isActivating)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                            }
+                                            else
+                                            {
+                                                <i class="fas fa-key me-1"></i>
+                                            }
+                                            Activate License
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0 pt-0 px-4 pb-3">
+                            <button type="button" class="btn btn-sm btn-outline-secondary px-3" @onclick="CloseLicenseModal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
     </Authorized>
     <NotAuthorized>
         <div class="d-flex align-items-center login-display-content px-3">
@@ -129,6 +263,101 @@
         else
         {
             return "Good evening";
+        }
+    }
+
+    private bool isLicenseModalOpen = false;
+    private bool showActivateInput = false;
+    private bool isActivating = false;
+    private string newLicenseKeyInput = string.Empty;
+
+    private void OpenLicenseModal()
+    {
+        isLicenseModalOpen = true;
+    }
+
+    private void CloseLicenseModal()
+    {
+        isLicenseModalOpen = false;
+        showActivateInput = false;
+        newLicenseKeyInput = string.Empty;
+    }
+
+    private async Task CopyHardwareId()
+    {
+        try
+        {
+            var hwid = LicenseService.GetCurrentHardwareId();
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", hwid);
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Success,
+                Summary = "Copied",
+                Detail = "Hardware ID copied to clipboard.",
+                Duration = 3000
+            });
+        }
+        catch
+        {
+            // Ignore clipboard errors
+        }
+    }
+
+    private async Task HandleActivateLicense()
+    {
+        if (string.IsNullOrWhiteSpace(newLicenseKeyInput))
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Warning,
+                Summary = "Empty Key",
+                Detail = "Please paste a valid license key string.",
+                Duration = 4000
+            });
+            return;
+        }
+
+        isActivating = true;
+        try
+        {
+            var (success, message) = await LicenseService.ActivateLicenseAsync(newLicenseKeyInput.Trim());
+            if (success)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Success,
+                    Summary = "License Activated",
+                    Detail = "New license key applied successfully!",
+                    Duration = 4000
+                });
+                showActivateInput = false;
+                newLicenseKeyInput = string.Empty;
+            }
+            else
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Activation Failed",
+                    Detail = message,
+                    Duration = 6000
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Error,
+                Summary = "Activation Error",
+                Detail = ex.Message,
+                Duration = 6000
+            });
+        }
+        finally
+        {
+            isActivating = false;
+            StateHasChanged();
         }
     }
 }

@@ -1,5 +1,7 @@
 @using Impulse.Services.Setup
+@using Impulse.Services.Licensing
 @inject IUserPermissionService PermissionService
+@inject ILicenseService LicenseService
 @inject NavigationManager NavigationManager
 @implements IDisposable
 
@@ -12,14 +14,36 @@ else
     <div class="container-fluid py-5 text-center" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
         <div class="card border-0 shadow-sm mx-auto p-5" style="max-width: 540px; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border-radius: 16px;">
             <div class="mb-3">
-                <span class="d-inline-flex p-3 rounded-circle bg-danger-subtle text-danger">
-                    <i class="fas fa-user-lock fa-3x"></i>
-                </span>
+                @if (IsUnlicensedModule)
+                {
+                    <span class="d-inline-flex p-3 rounded-circle bg-warning-subtle text-warning">
+                        <i class="fas fa-key fa-3x"></i>
+                    </span>
+                }
+                else
+                {
+                    <span class="d-inline-flex p-3 rounded-circle bg-danger-subtle text-danger">
+                        <i class="fas fa-user-lock fa-3x"></i>
+                    </span>
+                }
             </div>
-            <h4 class="fw-bold text-dark mb-1">Access Restricted</h4>
-            <p class="text-secondary small mb-4">
-                Your user account is not authorized to access this module or screen. Please contact your system administrator to request access permissions.
-            </p>
+            @if (IsUnlicensedModule)
+            {
+                <h4 class="fw-bold text-dark mb-1">Module Not Licensed</h4>
+                <p class="text-secondary small mb-3">
+                    This module is not included in your organization's license. To unlock access, please contact your Impulse software provider.
+                </p>
+                <div class="p-2 mb-4 bg-light rounded text-muted small font-monospace">
+                    Server HWID: <strong>@LicenseService.GetCurrentHardwareId()</strong>
+                </div>
+            }
+            else
+            {
+                <h4 class="fw-bold text-dark mb-1">Access Restricted</h4>
+                <p class="text-secondary small mb-4">
+                    Your user account is not authorized to access this module or screen. Please contact your system administrator to request access permissions.
+                </p>
+            }
             <div class="d-flex justify-content-center gap-2">
                 <a href="/" class="btn btn-sm btn-primary px-3 shadow-sm">
                     <i class="fas fa-home me-1"></i> Return to Home
@@ -37,6 +61,7 @@ else
     public RenderFragment? ChildContent { get; set; }
 
     private bool IsAuthorized { get; set; } = true;
+    private bool IsUnlicensedModule { get; set; } = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -56,11 +81,25 @@ else
         try
         {
             var relative = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+            var cleanPath = relative.Split('?')[0].Trim('/');
+            var root = cleanPath.Split('/')[0].ToLowerInvariant();
+            var module = root switch
+            {
+                "financial" or "accounts" => "Accounts",
+                "payroll" => "Payroll",
+                "stock" or "inventory" => "Stock",
+                "production" => "Production",
+                "export" => "Export",
+                _ => null
+            };
+
+            IsUnlicensedModule = !string.IsNullOrEmpty(module) && !LicenseService.IsModuleAllowed(module);
             IsAuthorized = PermissionService.IsRouteAuthorized(relative);
         }
         catch
         {
             IsAuthorized = true;
+            IsUnlicensedModule = false;
         }
     }
 

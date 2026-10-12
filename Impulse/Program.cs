@@ -535,6 +535,10 @@ builder.Services.AddScoped<Impulse.Services.WorkflowTasks.IWorkflowTaskEngine, I
 // WhatsApp Gateway Microservice Process Supervisor
 builder.Services.AddHostedService<Impulse.Services.IntraOffice.WhatsAppGatewayHostService>();
 
+// Hardware-Locked Cryptographic Licensing Engine
+builder.Services.AddSingleton<Impulse.Services.Licensing.IHardwareFingerprintService, Impulse.Services.Licensing.HardwareFingerprintService>();
+builder.Services.AddSingleton<Impulse.Services.Licensing.ILicenseService, Impulse.Services.Licensing.LicenseService>();
+
 var app = builder.Build();
 
 // Enable PathBase only if explicitly configured in appsettings (e.g. for IIS sub-application hosting)
