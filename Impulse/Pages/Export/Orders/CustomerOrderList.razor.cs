@@ -239,7 +239,7 @@ namespace Impulse.Pages.Export.Orders
 
                 if (!isDirector)
                 {
-                    allOrders = allOrders.Where(o => o.AuthorizationStatus == "Authorized").ToList();
+                    allOrders = allOrders.Where(o => o.AuthorizationStatus == "Authorized" || o.AuthorizationStatus == "Partially Authorized").ToList();
                 }
 
                 // Recalculate totals

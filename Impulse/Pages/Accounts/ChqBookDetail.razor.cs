@@ -1,230 +1,250 @@
-using BlazorBootstrap;
 using BlazorContextMenu;
-using DataAccessLibrary;
-using DataAccessLibrary.DAC.Accounts;
 using DataAccessLibrary.Interface.Accounts;
-using DataAccessLibrary.Models;
 using DataAccessLibrary.Models.ViewModels.Accounts;
-using DocumentFormat.OpenXml.Drawing;
 using Impulse.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.JSInterop;
-using Microsoft.VisualBasic;
-using Radzen;
-using System.Collections.ObjectModel;
+using System;
+using System.Collections.Generic;
 using System.Linq;
-using System.Security.AccessControl;
 using System.Threading.Tasks;
-using OpenXmlMenu = DocumentFormat.OpenXml.Office2010.CustomUI;
 
 namespace Impulse.Pages.Accounts
 {
     public partial class ChqBookDetail : ComponentBase, IDisposable
     {
+        [SupplyParameterFromQuery]
+        public string? ReturnUrl { get; set; }
 
         private List<BankAccountInfo> Accounts = new List<BankAccountInfo>();
         private BankAccountInfo? SelectedAccount = null;
         private BankAccountInfo? SelectedBankAccount = null;
         private ChqBookDetailViewModel? SelectedChqBook = null;
         private ChqBookDetailViewModel ChqBookModel = new ChqBookDetailViewModel();
-        private ChqBookDetailViewModel SelectedChqNo = new ChqBookDetailViewModel();
+        private ChqListModel? SelectedCheque = null;
 
         [Inject]
-        private IAuditService _auditService { get; set; }
-        [Inject]
-        private INotificationService NotificationServiceManager { get; set; }
-        [Inject]
-        private IReportNavigationService ReportNavigationService { get; set; }
-        [Inject]
-        private IChqBookDetail _chqbookService { get; set; }
-        [Inject]
-        private IDBHelperService _idbHelperService { get; set; }
+        private IAuditService _auditService { get; set; } = default!;
 
-        private string validationMessage = string.Empty;
-        private string successMessage = string.Empty;
+        [Inject]
+        private INotificationService NotificationServiceManager { get; set; } = default!;
 
-        private Timer _timer;
-        private bool isSaving = false;
+        [Inject]
+        private IReportNavigationService ReportNavigationService { get; set; } = default!;
+
+        [Inject]
+        private IChqBookDetail _chqbookService { get; set; } = default!;
+
+        [Inject]
+        private IDBHelperService _idbHelperService { get; set; } = default!;
+
+        [Inject]
+        private NavigationManager Navigation { get; set; } = default!;
 
         private string strComputerName = string.Empty;
         private string strUserName = string.Empty;
         private bool IsLoading = false;
-        private List<ChqBookDetailViewModel> getDatafromdb_BankAccounts { get; set; } = new List<ChqBookDetailViewModel>();
+        private bool isSaving = false;
+
+        // Modals visibility
+        private bool ShowModal = false;
+        private bool ShowODModel = false;
+        private bool bShowCancelChqModel = false;
+        private bool bPrintCheque = false;
+        private ItemClickEventArgs? _cachedMenuEvent;
+
+        // Cheque Books & Cheques data
+        private List<ChqBookDetailViewModel> getDatafromdb { get; set; } = new List<ChqBookDetailViewModel>();
+        private List<ChqListModel> getDatafromdb_chqsdata { get; set; } = new List<ChqListModel>();
+
+        // Tree Search and Expansion state
+        private string BankSearchText = string.Empty;
+        private HashSet<string> ExpandedBanks = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private HashSet<string> ExpandedBranches = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        public class BankTreeGroup
+        {
+            public string BankName { get; set; } = string.Empty;
+            public List<BranchTreeGroup> Branches { get; set; } = new List<BranchTreeGroup>();
+        }
+
+        public class BranchTreeGroup
+        {
+            public string BranchName { get; set; } = string.Empty;
+            public string BranchKey { get; set; } = string.Empty;
+            public List<BankAccountInfo> Accounts { get; set; } = new List<BankAccountInfo>();
+        }
 
         protected override async Task OnInitializedAsync()
-        {
-            await InitializeData();
-            strComputerName = _auditService.GetClientIpAddress();
-            strUserName = _auditService.GetCurrentUserName();
-            //Accounts = await _chqbookService.GetTransactionalAccounts("WHERE Active=1 AND Parent=0");
-            Accounts = await _chqbookService.GetBankAccounts();
-
-            //getDatafromdb.Clear();
-            //var getdatafromDb = await _chqbookService.GetBankChqBooks(BankAccNo);
-            //getDatafromdb = getdatafromDb.ToList();
-        }
-
-        private async Task InitializeData()
-        {
-            isSaving = false;
-            RefreshChqBooks("");
-        }
-
-        public void Dispose()
-        {
-            _timer?.Dispose();
-        }
-
-        private void HideSuccessMessage(object state)
-        {
-            InvokeAsync(() =>
-            {
-                successMessage = string.Empty;
-                StateHasChanged();
-            });
-            _timer?.Dispose();
-        }
-
-        private async Task<IEnumerable<BankAccountInfo>> GetTransactionAccounts(string searchText)
-        {
-            return await Task.FromResult(Accounts.Where(x => x.AccTitle.ToLower().Contains(searchText.ToLower())).ToList());
-        }
-
-        private async Task SelectedResultChanged_Account(BankAccountInfo? selectedAccount)
-        {
-            SelectedAccount = selectedAccount;
-            if (selectedAccount != null && selectedAccount.AccTitle != null)
-            {
-                IsLoading = true;
-                RefreshChqBooks(SelectedAccount.AccNo);
-            }
-        }
-
-        private List<ChqBookDetailViewModel> getDatafromdb { get; set; } = new List<ChqBookDetailViewModel>();
-        private async Task RefreshChqBooks(string? BankAccNo)
-        {
-            IsLoading= true;
-            try
-            {
-                StateHasChanged();
-
-                    getDatafromdb.Clear();
-                    var getdatafromDb = await _chqbookService.GetBankChqBooks(BankAccNo);
-                    getDatafromdb = getdatafromDb.ToList();
-                    
-                IsLoading = false;
-                StateHasChanged();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error fetching Data: {ex.Message}");
-                NotificationServiceManager.ShowError("Error Message",ex.Message);
-            }
-            finally
-            {
-                StateHasChanged();
-                IsLoading = false;
-            }
-        }
-
-        private List<BankAccountInfo> getDatafromdb_bankaccounts { get; set; } = new List<BankAccountInfo>();
-        private async Task RefreshBankAccounts()
         {
             IsLoading = true;
             try
             {
-                StateHasChanged();
+                strComputerName = _auditService.GetClientIpAddress();
+                strUserName = _auditService.GetCurrentUserName();
 
-                getDatafromdb_bankaccounts.Clear();
-                var getdatafromDb = await _chqbookService.GetBankAccountsList();
-                getDatafromdb_bankaccounts = getdatafromDb.ToList();
+                await RefreshBankAccounts();
 
-                IsLoading = false;
-                StateHasChanged();
+                // Auto-select Default Bank Account (or first account if none marked default)
+                var defaultAccount = Accounts.FirstOrDefault(a => a.DefaultBank) ?? Accounts.FirstOrDefault();
+                if (defaultAccount != null)
+                {
+                    await SelectBankAccount(defaultAccount);
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error fetching Data: {ex.Message}");
+                Console.WriteLine($"Error Initializing ChqBookDetail: {ex.Message}");
+                NotificationServiceManager.ShowError("Error Initializing", ex.Message);
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+
+        public void Dispose()
+        {
+        }
+
+        private async Task RefreshBankAccounts()
+        {
+            Accounts = await _chqbookService.GetBankAccountsList();
+
+            // Expand all banks and branches by default so user immediately sees accounts
+            foreach (var acc in Accounts)
+            {
+                if (!string.IsNullOrEmpty(acc.Bank))
+                {
+                    ExpandedBanks.Add(acc.Bank);
+                    ExpandedBranches.Add($"{acc.Bank}_{acc.Branch ?? "Main Branch"}");
+                }
+            }
+        }
+
+        private List<BankTreeGroup> GetTreeGroups()
+        {
+            var query = Accounts.AsEnumerable();
+            if (!string.IsNullOrWhiteSpace(BankSearchText))
+            {
+                string search = BankSearchText.Trim();
+                query = query.Where(a =>
+                    (a.Bank != null && a.Bank.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
+                    (a.Branch != null && a.Branch.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
+                    (a.AccTitle != null && a.AccTitle.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
+                    (a.AccNo != null && a.AccNo.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
+                    (a.BankAccNo != null && a.BankAccNo.Contains(search, StringComparison.OrdinalIgnoreCase))
+                );
+            }
+
+            var list = new List<BankTreeGroup>();
+            foreach (var bankGroup in query.GroupBy(a => a.Bank ?? "Other Banks").OrderBy(g => g.Key))
+            {
+                var bg = new BankTreeGroup { BankName = bankGroup.Key };
+                foreach (var branchGroup in bankGroup.GroupBy(a => a.Branch ?? "Main Branch").OrderBy(g => g.Key))
+                {
+                    var br = new BranchTreeGroup
+                    {
+                        BranchName = branchGroup.Key,
+                        BranchKey = $"{bankGroup.Key}_{branchGroup.Key}",
+                        Accounts = branchGroup.OrderByDescending(a => a.DefaultBank).ThenBy(a => a.AccTitle).ToList()
+                    };
+                    bg.Branches.Add(br);
+                }
+                list.Add(bg);
+            }
+            return list;
+        }
+
+        private void ToggleBankExpand(string bank)
+        {
+            if (ExpandedBanks.Contains(bank))
+                ExpandedBanks.Remove(bank);
+            else
+                ExpandedBanks.Add(bank);
+        }
+
+        private void ToggleBranchExpand(string branchKey)
+        {
+            if (ExpandedBranches.Contains(branchKey))
+                ExpandedBranches.Remove(branchKey);
+            else
+                ExpandedBranches.Add(branchKey);
+        }
+
+        private async Task OnBankHeaderClick(BankTreeGroup bankGroup)
+        {
+            ToggleBankExpand(bankGroup.BankName);
+
+            // If the currently selected account does not belong to this bank, auto-select this bank's first account
+            if (SelectedAccount == null || SelectedAccount.Bank != bankGroup.BankName)
+            {
+                var firstAcc = bankGroup.Branches.SelectMany(b => b.Accounts).FirstOrDefault();
+                if (firstAcc != null)
+                {
+                    await SelectBankAccount(firstAcc);
+                }
+            }
+        }
+
+        private async Task OnBranchHeaderClick(BranchTreeGroup branchGroup)
+        {
+            ToggleBranchExpand(branchGroup.BranchKey);
+
+            if (SelectedAccount == null || SelectedAccount.Branch != branchGroup.BranchName)
+            {
+                var firstAcc = branchGroup.Accounts.FirstOrDefault();
+                if (firstAcc != null)
+                {
+                    await SelectBankAccount(firstAcc);
+                }
+            }
+        }
+
+        private async Task SelectBankAccount(BankAccountInfo acc)
+        {
+            SelectedAccount = acc;
+
+            // Ensure parent bank and branch remain expanded
+            if (!string.IsNullOrEmpty(acc.Bank))
+            {
+                ExpandedBanks.Add(acc.Bank);
+                ExpandedBranches.Add($"{acc.Bank}_{acc.Branch ?? "Main Branch"}");
+            }
+
+            await RefreshChqBooks(acc.AccNo);
+
+            SelectedChqBook = getDatafromdb.FirstOrDefault();
+            if (SelectedChqBook != null)
+            {
+                await RefreshChqsData(SelectedChqBook.ChqBookNo);
+            }
+            else
+            {
+                getDatafromdb_chqsdata.Clear();
+            }
+            StateHasChanged();
+        }
+
+        private async Task RefreshChqBooks(string? BankAccNo)
+        {
+            try
+            {
+                getDatafromdb.Clear();
+                var getdatafromDb = await _chqbookService.GetBankChqBooks(BankAccNo ?? "");
+                getDatafromdb = getdatafromDb.ToList();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching Cheque Books: {ex.Message}");
                 NotificationServiceManager.ShowError("Error Message", ex.Message);
             }
             finally
             {
                 StateHasChanged();
-                IsLoading = false;
             }
         }
 
-        private void GoToIndexPage()
-        {
-            Navigation.NavigateTo("/", true);
-        }
-
-        private bool IsAdding = false;
-        private bool ShowModal = false;
-        private bool IsEdit = false;
-        private bool isError= false;
-
-        private void ShowAddModal(int OnlineChqBook=0)
-        {
-
-            if (string.IsNullOrEmpty(SelectedAccount?.AccNo))
-            {
-                NotificationServiceManager.ShowWarning("Warning", "Please Select Bank Account For Cheque Book");
-                return;
-            }
-
-            IsAdding = true;
-            ShowModal = true;
-            IsEdit = false;
-        }
-        private void HideModal()
-        {
-            IsAdding = false;
-            ShowModal = false;
-            IsEdit = false;
-
-            ChqBookModel.ManualNo = string.Empty;
-            ChqBookModel.StartingFrom = string.Empty;
-            ChqBookModel.Chqs = 0;
-            ChqBookModel.ChqBookDetail = string.Empty;
-
-        }
-
-        private bool ShowBankModal = false;
-        private bool IsEdit_BankAccount = false;
-
-        private void ShowBankAccountModal()
-        {
-            ShowBankModal = true;
-            IsEdit_BankAccount = false;
-            RefreshBankAccounts();
-        }
-
-        private void HideBankAccountModal()
-        {
-            ShowBankModal = false;
-            IsEdit_BankAccount = false;
-        }
-
-        private bool ShowODModel = false;
-
-        private void ShowOverDraftModel(ItemClickEventArgs e)   
-        {
-            var chqbook = e.Data as BankAccountInfo;
-            SelectedBankAccount = chqbook;
-            if (SelectedBankAccount != null)
-            {
-                ShowODModel = true;
-            }
-        }
-        private void HideODModel()
-        {
-            ShowODModel = false;
-        }
         private async Task OnChequeBookSelected(ChqBookDetailViewModel chqbook)
         {
             SelectedChqBook = chqbook;
@@ -232,13 +252,55 @@ namespace Impulse.Pages.Accounts
             {
                 await RefreshChqsData(SelectedChqBook.ChqBookNo);
             }
+            else
+            {
+                getDatafromdb_chqsdata.Clear();
+            }
+        }
+
+        private async Task RefreshChqsData(long chqbookno)
+        {
+            try
+            {
+                getDatafromdb_chqsdata.Clear();
+                var data = await _chqbookService.GetChqBookChequesList(chqbookno);
+                getDatafromdb_chqsdata = data.ToList();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching Cheques: {ex.Message}");
+                NotificationServiceManager.ShowError("Error Message", ex.Message);
+            }
+            finally
+            {
+                StateHasChanged();
+            }
+        }
+
+        private string GetDateInputValue(string? dtStr)
+        {
+            if (!string.IsNullOrEmpty(dtStr) && DateTime.TryParse(dtStr, out var d))
+            {
+                return d.ToString("yyyy-MM-dd");
+            }
+            return "";
         }
 
         private async Task OnClearanceDateChanged(ChqListModel cheque, ChangeEventArgs e)
         {
-            if (DateTime.TryParse(e.Value?.ToString(), out DateTime newDate))
+            string val = e.Value?.ToString()?.Trim() ?? "";
+            if (string.IsNullOrEmpty(val))
             {
-                cheque.ClearanceDT = newDate.ToString("dd-MMM-yy");
+                cheque.ClearanceDT = "";
+                bool success = await _chqbookService.UpdateChequeClearanceDate((long)cheque.CSNo, null);
+                if (success)
+                {
+                    NotificationServiceManager.ShowSuccess("Success", "Clearance Date cleared.");
+                }
+            }
+            else if (DateTime.TryParse(val, out DateTime newDate))
+            {
+                cheque.ClearanceDT = newDate.ToString("dd-MMM-yyyy");
                 bool success = await _chqbookService.UpdateChequeClearanceDate((long)cheque.CSNo, newDate);
                 if (success)
                 {
@@ -251,54 +313,32 @@ namespace Impulse.Pages.Accounts
             }
         }
 
-        private void PrintChqBookDetail(ItemClickEventArgs e)
+        private void ShowAddModal()
         {
-            var chqbook = e.Data as ChqBookDetailViewModel;
-            if (chqbook != null)
+            if (string.IsNullOrEmpty(SelectedAccount?.AccNo))
             {
-                string rptName = "ChqBook.rpt";
-                string strcond = $"{{VChqBookLedger.ChqbookNo}}={chqbook.ChqBookNo}";
-                ReportNavigationService.PrintReportAsync_Old(rptName, strcond);
+                NotificationServiceManager.ShowWarning("Warning", "Please Select a Bank Account for the Cheque Book.");
+                return;
             }
+
+            ChqBookModel = new ChqBookDetailViewModel
+            {
+                AccNo = SelectedAccount.AccNo,
+                Chqs = 25,
+                ManualNo = string.Empty,
+                StartingFrom = string.Empty,
+                ChqBookDetail = string.Empty
+            };
+            ShowModal = true;
         }
 
-        private List<ChqListModel> getDatafromdb_chqsdata { get; set; } = new List<ChqListModel>();
-        private async Task RefreshChqsData(long chqbookno)
+        private void HideModal()
         {
-            try
-            {
-                StateHasChanged();
-                getDatafromdb_chqsdata.Clear();
-
-                var data = await _chqbookService.GetChqBookChequesList(chqbookno);
-                getDatafromdb_chqsdata = data.ToList();
-
-                StateHasChanged();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error fetching Data: {ex.Message}");
-                NotificationServiceManager.ShowError("Error Message", ex.Message);
-            }
-            finally
-            {
-                StateHasChanged();
-            }
+            ShowModal = false;
+            ChqBookModel = new ChqBookDetailViewModel();
         }
 
-        private void MakeBankAccountDefault(ItemClickEventArgs e)
-        {
-            var bankaccount = e.Data as BankAccountInfo;
-            SelectedBankAccount = bankaccount;
-            if (SelectedBankAccount != null) 
-            { 
-                SelectedBankAccount.DefaultBank = true;
-                SaveOverDraftData();
-                RefreshBankAccounts();
-            }
-        }
-
-        private void SaveOverDraftData()
+        private async Task SaveChqBook()
         {
             if (isSaving)
                 return;
@@ -306,129 +346,202 @@ namespace Impulse.Pages.Accounts
             {
                 isSaving = true;
 
-                _chqbookService.SaveOverDraftData(SelectedBankAccount, SelectedBankAccount.AccNo, SelectedBankAccount.DefaultBank);
-
-                isError = false;
-                NotificationServiceManager.ShowSuccess("Saved", "Updated Successfully.");
-                isSaving = false;
-                HideODModel();
-            }
-            catch (Exception ex)
-            {
-                isError = true;
-                NotificationServiceManager.ShowError("Error", $"{ex.Message}");
-                isSaving = false;
-            }
-            finally
-            {
-                isSaving = false;
-            }
-        }
-        private async Task SaveChqBook()
-        {
-        if (isSaving)
-            return;
-            try
-            {
-                isSaving = true;
-
-                if (ChqBookModel == null)
+                if (SelectedAccount == null || string.IsNullOrEmpty(SelectedAccount.AccNo))
                 {
-                    NotificationServiceManager.ShowWarning("Error", "Please select Bank Account.");
+                    NotificationServiceManager.ShowWarning("Validation", "Please select a Bank Account.");
                     return;
                 }
-                if (string.IsNullOrEmpty(ChqBookModel.StartingFrom))
+                if (string.IsNullOrWhiteSpace(ChqBookModel.StartingFrom))
                 {
-                    NotificationServiceManager.ShowWarning("Error", "Please Starting From.");
+                    NotificationServiceManager.ShowWarning("Validation", "Please enter Starting From.");
                     return;
                 }
-                if ((ChqBookModel.Chqs==0))
-                {   
-                    NotificationServiceManager.ShowWarning("Error", "Please Enter No Of Cheques");
+                if (ChqBookModel.Chqs <= 0)
+                {
+                    NotificationServiceManager.ShowWarning("Validation", "Please enter valid number of cheques.");
                     return;
                 }
-                if (string.IsNullOrEmpty(ChqBookModel.ManualNo))
+                if (string.IsNullOrWhiteSpace(ChqBookModel.ManualNo))
                 {
-                    NotificationServiceManager.ShowWarning("Error", "Please Enter Manual Book No.");
+                    NotificationServiceManager.ShowWarning("Validation", "Please enter Manual Book No.");
                     return;
                 }
 
                 ChqBookModel.AccNo = SelectedAccount.AccNo;
-                Console.WriteLine($"Error fetching Data: {ChqBookModel.Chqs}");
 
                 await _chqbookService.SaveChqBook(ChqBookModel);
 
-                isError = false;
-                NotificationServiceManager.ShowSuccess("Saved", "Transaction saved successfully.");
-                isSaving = false;
-                RefreshChqBooks(ChqBookModel.AccNo);
+                NotificationServiceManager.ShowSuccess("Saved", "Cheque Book saved successfully.");
                 HideModal();
+
+                await RefreshChqBooks(SelectedAccount.AccNo);
+                SelectedChqBook = getDatafromdb.FirstOrDefault(b => b.ManualNo == ChqBookModel.ManualNo) ?? getDatafromdb.FirstOrDefault();
+                if (SelectedChqBook != null)
+                {
+                    await RefreshChqsData(SelectedChqBook.ChqBookNo);
+                }
             }
             catch (Exception ex)
             {
-                isError = true;
-                NotificationServiceManager.ShowError("Error", $"{ex.Message}");
-                isSaving = false;
+                NotificationServiceManager.ShowError("Error", ex.Message);
             }
             finally
             {
                 isSaving = false;
+                StateHasChanged();
             }
         }
+
         private async Task DeleteChqBook(ItemClickEventArgs e)
         {
             try
             {
-
-                var chqbook = e.Data  as ChqBookDetailViewModel;
-                SelectedChqBook = chqbook;
-                if (SelectedChqBook != null)
+                var chqbook = e.Data as ChqBookDetailViewModel ?? SelectedChqBook;
+                if (chqbook != null)
                 {
-
-                    int iChqUsed = await _idbHelperService.GetSingleValueAsync<int>("ISNULL(Chqs,0)-ISNULL(ChqsLeft,0)", "VChqBooks", " WHERE ChqBookNo='" + SelectedChqBook.ChqBookNo + "'");
-
-                    if (iChqUsed > 0) {
-                        NotificationServiceManager.ShowWarning("Warning", $"Can't Delete. Cheque(s) issued.");
+                    int iChqUsed = await _idbHelperService.GetSingleValueAsync<int>("ISNULL(Chqs,0)-ISNULL(ChqsLeft,0)", "VChqBooks", " WHERE ChqBookNo='" + chqbook.ChqBookNo + "'");
+                    if (iChqUsed > 0)
+                    {
+                        NotificationServiceManager.ShowWarning("Warning", "Can't Delete. Cheque(s) already issued.");
                         return;
-                    }   
+                    }
 
-                    bool deleted = await _chqbookService.DeleteChqBook(SelectedChqBook.ChqBookNo);
+                    bool deleted = await _chqbookService.DeleteChqBook(chqbook.ChqBookNo);
                     if (deleted)
                     {
-                        NotificationServiceManager.ShowSuccess("Cheque Book Deleted.", $"Cheque Book Deleted Successfully.");
-                        if (SelectedAccount != null)
+                        NotificationServiceManager.ShowSuccess("Deleted", "Cheque Book deleted successfully.");
+                        await RefreshChqBooks(SelectedAccount?.AccNo ?? "");
+                        SelectedChqBook = getDatafromdb.FirstOrDefault();
+                        if (SelectedChqBook != null)
                         {
-                            RefreshChqBooks(SelectedAccount.AccNo);
+                            await RefreshChqsData(SelectedChqBook.ChqBookNo);
                         }
                         else
                         {
-                            RefreshChqBooks("");
+                            getDatafromdb_chqsdata.Clear();
                         }
                     }
                     else
                     {
-                        NotificationServiceManager.ShowError("Error", $"Can't Delete Cheque Book Is Using");
+                        NotificationServiceManager.ShowError("Error", "Could not delete Cheque Book.");
                     }
                 }
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
-                NotificationServiceManager.ShowError("Error", $"{ex.Message}");
+                NotificationServiceManager.ShowError("Error", ex.Message);
             }
         }
-        private void OpenLedger(ItemClickEventArgs e)
+
+        private async Task MakeBankAccountDefault(ItemClickEventArgs e)
         {
-            var bankaccno = e.Data as BankAccountInfo;
-            SelectedBankAccount = bankaccno;
-
-            var dtTo = DateTime.Today;
-            var dtFrom = dtTo.AddDays(-30);
-
-            Navigation.NavigateTo($"/accounts/accountsledger?para_AccNo={SelectedBankAccount.AccNo}&para_DTFrom={dtFrom:yyyy-MM-dd}&para_DTTo={dtTo:yyyy-MM-dd}");
+            var bankaccount = e.Data as BankAccountInfo ?? SelectedAccount;
+            if (bankaccount != null)
+            {
+                bankaccount.DefaultBank = true;
+                bool saved = await _chqbookService.SaveOverDraftData(bankaccount, bankaccount.AccNo, true);
+                if (saved)
+                {
+                    NotificationServiceManager.ShowSuccess("Success", $"[{bankaccount.AccNo}] set as default bank account.");
+                    await RefreshBankAccounts();
+                    StateHasChanged();
+                }
+            }
         }
 
-        private bool bPrintCheque = false;
-        private ChqListModel? SelectedCheque;
+        private void ShowOverDraftModel(ItemClickEventArgs e)
+        {
+            var bankaccount = e.Data as BankAccountInfo ?? SelectedAccount;
+            SelectedBankAccount = bankaccount;
+            if (SelectedBankAccount != null)
+            {
+                ShowODModel = true;
+            }
+        }
+
+        private void HideODModel()
+        {
+            ShowODModel = false;
+        }
+
+        private async Task SaveOverDraftData()
+        {
+            if (isSaving || SelectedBankAccount == null)
+                return;
+            try
+            {
+                isSaving = true;
+                bool saved = await _chqbookService.SaveOverDraftData(SelectedBankAccount, SelectedBankAccount.AccNo, false);
+                if (saved)
+                {
+                    NotificationServiceManager.ShowSuccess("Saved", "Overdraft settings updated successfully.");
+                    HideODModel();
+                    await RefreshBankAccounts();
+                }
+                else
+                {
+                    NotificationServiceManager.ShowError("Error", "Could not save overdraft settings.");
+                }
+            }
+            catch (Exception ex)
+            {
+                NotificationServiceManager.ShowError("Error", ex.Message);
+            }
+            finally
+            {
+                isSaving = false;
+                StateHasChanged();
+            }
+        }
+
+        private void OpenLedger(ItemClickEventArgs e)
+        {
+            var bankacc = e.Data as BankAccountInfo ?? SelectedAccount;
+            if (bankacc != null)
+            {
+                var dtTo = DateTime.Today;
+                var dtFrom = dtTo.AddDays(-30);
+                Navigation.NavigateTo($"/accounts/accountsledger?para_AccNo={bankacc.AccNo}&para_DTFrom={dtFrom:yyyy-MM-dd}&para_DTTo={dtTo:yyyy-MM-dd}");
+            }
+        }
+
+        private async Task PrintChqBooks(ItemClickEventArgs? e = null)
+        {
+            var request = new ReportRequest
+            {
+                ReportName = "ChqBooksSummary.rpt",
+                SelectionFormula = ""
+            };
+            await ReportNavigationService.PrintReportAsync(request);
+        }
+
+        private async Task PrintChqBookDetail(ItemClickEventArgs e)
+        {
+            var chqbook = e.Data as ChqBookDetailViewModel ?? SelectedChqBook;
+            if (chqbook != null)
+            {
+                var request = new ReportRequest
+                {
+                    ReportName = "ChqBook.rpt",
+                    SelectionFormula = $"{{VChqBookLedger.ChqbookNo}}={chqbook.ChqBookNo}"
+                };
+                await ReportNavigationService.PrintReportAsync(request);
+            }
+        }
+
+        private async Task PrintSelectedChqBookDetail()
+        {
+            if (SelectedChqBook != null)
+            {
+                var request = new ReportRequest
+                {
+                    ReportName = "ChqBook.rpt",
+                    SelectionFormula = $"{{VChqBookLedger.ChqbookNo}}={SelectedChqBook.ChqBookNo}"
+                };
+                await ReportNavigationService.PrintReportAsync(request);
+            }
+        }
+
         private async Task ShowPrintCheque(ItemClickEventArgs e)
         {
             SelectedCheque = e.Data as ChqListModel;
@@ -438,7 +551,7 @@ namespace Impulse.Pages.Accounts
 
             SelectedCheque.chqprintdate = DateTime.Now;
 
-            int iprinted = _idbHelperService.getSingleIntValue ("ChqPrintingDone", "Cheque", " WHERE SNo=" + SelectedCheque.CSNo + "");
+            int iprinted = _idbHelperService.getSingleIntValue("ChqPrintingDone", "Cheque", " WHERE SNo=" + SelectedCheque.CSNo + "");
             if (iprinted == 1)
             {
                 bool printAgain = await NotificationServiceManager.ShowQuestionNotification("Confirmation", "Cheque Already Printed. Do you want to print again?");
@@ -447,15 +560,8 @@ namespace Impulse.Pages.Accounts
                     bPrintCheque = false;
                     return;
                 }
-                else 
-                {
-                    bPrintCheque = true;
-                }
             }
-            else
-            {
-                bPrintCheque = true;
-            }
+            bPrintCheque = true;
         }
 
         private void HidePrintCheque()
@@ -463,12 +569,40 @@ namespace Impulse.Pages.Accounts
             bPrintCheque = false;
         }
 
-        private bool bShowCancelChqModel = false;
-        private ItemClickEventArgs _cachedMenuEvent;
+        private async Task PrintCheque()
+        {
+            if (SelectedCheque == null)
+                return;
+
+            string rptName = await _idbHelperService.getSingleStringValue("ChqFormat", "VChqLedger", " WHERE SNo=" + SelectedCheque.CSNo + "");
+            if (string.IsNullOrWhiteSpace(rptName))
+            {
+                rptName = "rptChq.rpt";
+            }
+            else
+            {
+                rptName = rptName.Replace(".rpt", "", StringComparison.OrdinalIgnoreCase) + ".rpt";
+            }
+
+            var request = new ReportRequest
+            {
+                ReportName = rptName,
+                SelectionFormula = "{VChqLedger.SNo}=" + SelectedCheque.CSNo
+            };
+            await ReportNavigationService.PrintReportAsync(request);
+
+            if (_cachedMenuEvent != null)
+            {
+                await ChangeChequeStatus(2, _cachedMenuEvent);
+            }
+
+            bPrintCheque = false;
+            StateHasChanged();
+        }
+
         private void ShowCancelChqModel(ItemClickEventArgs e)
         {
-            var chqno = e.Data as ChqListModel;
-            SelectedCheque = chqno;
+            SelectedCheque = e.Data as ChqListModel;
             _cachedMenuEvent = e;
             if (SelectedCheque != null)
             {
@@ -479,95 +613,69 @@ namespace Impulse.Pages.Accounts
 
         private void HideCancelChqModel()
         {
-            bShowCancelChqModel =false;
+            bShowCancelChqModel = false;
             StateHasChanged();
         }
 
         private async Task MakeChequeCancel()
         {
-            await ChangeChequeStatus(1, _cachedMenuEvent);
-            bShowCancelChqModel = false;
-            StateHasChanged();
-        }
-
-        private async Task PrintCheque()
-        {
-            string rptName = await _idbHelperService.getSingleStringValue("ChqFormat", "VChqLedger", " WHERE SNo=" + SelectedCheque.CSNo + "");
-            if (rptName == "") 
+            if (_cachedMenuEvent != null)
             {
-                rptName = "rptChq.rpt";
+                await ChangeChequeStatus(1, _cachedMenuEvent);
             }
-            else
-            {
-                rptName = rptName.Replace(".rpt", "", StringComparison.OrdinalIgnoreCase) + ".rpt";
-            }
-            string strcond= "{VChqLedger.SNo}="+ SelectedCheque.CSNo +"";
-
-            //ReportNavigationService.PrintChequeReportAsync(rptName, strcond);
-            ReportNavigationService.PrintReportAsync_Old(rptName, strcond);
-
-            await ChangeChequeStatus(2, _cachedMenuEvent);
-            
-            StateHasChanged();
-            
             bShowCancelChqModel = false;
-            bPrintCheque = false;
-
             StateHasChanged();
         }
 
         private async Task ChangeChequeStatus(int itype, ItemClickEventArgs e)
         {
+            try
             {
-                try
+                var chqno = e.Data as ChqListModel ?? SelectedCheque;
+                if (chqno != null)
                 {
-                    var chqno = e.Data as ChqListModel;
-                    SelectedCheque = chqno;
-                    if (SelectedCheque != null)
+                    chqno.UserName = strUserName;
+                    chqno.MachineName = strComputerName;
+
+                    bool bChanged = await _chqbookService.ChangeChqStatus(chqno, chqno.ChqNo, chqno.CSNo, itype, 0);
+                    if (bChanged)
                     {
-
-                        SelectedCheque.UserName = strUserName;
-                        SelectedCheque.MachineName = strComputerName;
-
-                        bool bChanged = await _chqbookService.ChangeChqStatus(SelectedCheque, SelectedCheque.ChqNo, SelectedCheque.CSNo, itype, 0);
-                        if (bChanged)
+                        if (itype == 0)
                         {
-                            if (itype == 0)
-                            {
-                                NotificationServiceManager.ShowSuccess("Cheque Status.", $"Cheque marked uncancel.");
-                            }
-                            else if (itype == 0)
-                            {
-                                NotificationServiceManager.ShowSuccess("Cheque Status.", $"Cheque marked as cancel.");
-                            }
-
-                            RefreshChqsData(SelectedCheque.ChqBookNo);
+                            NotificationServiceManager.ShowSuccess("Cheque Status", "Cheque marked as uncanceled.");
                         }
-                        else
+                        else if (itype == 1)
                         {
-                            NotificationServiceManager.ShowError("Error", $"Can't Delete Cheque Book Is Using");
+                            NotificationServiceManager.ShowSuccess("Cheque Status", "Cheque marked as canceled.");
+                        }
+
+                        if (SelectedChqBook != null)
+                        {
+                            await RefreshChqsData(SelectedChqBook.ChqBookNo);
                         }
                     }
+                    else
+                    {
+                        NotificationServiceManager.ShowError("Error", "Could not change cheque status.");
+                    }
                 }
-                catch (System.Exception ex)
-                {
-                    NotificationServiceManager.ShowError("Error", $"{ex.Message}");
-                }
-
+            }
+            catch (Exception ex)
+            {
+                NotificationServiceManager.ShowError("Error", ex.Message);
             }
         }
 
-        private async Task PrintChqBooks()
+        private void GoBack()
         {
-
-            string rptName = "ChqBooksSummary.rpt";
-            string strcond = "";
-
-            //ReportNavigationService.PrintChequeReportAsync(rptName, strcond);
-            ReportNavigationService.PrintReportAsync_Old (rptName, strcond);
-
-            StateHasChanged();
+            if (!string.IsNullOrEmpty(ReturnUrl))
+            {
+                Navigation.NavigateTo(ReturnUrl);
+            }
+            else
+            {
+                Navigation.NavigateTo("/");
+            }
         }
-
     }
 }

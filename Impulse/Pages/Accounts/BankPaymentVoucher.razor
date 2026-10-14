@@ -25,7 +25,7 @@
         
         @* <p>Bank ID: @p_bankId</p> *@
 
-        <form class="card-body">
+        <form class="card-body enter-as-tab" data-enter-1step="true" onsubmit="return false;">
 
             @if (!string.IsNullOrEmpty(successMessage))
             {
@@ -248,12 +248,12 @@
                     <input type="text" id="Payee" name="Payee" class="form-control" @bind:event="oninput" @bind="voucherViewModel.ChequeDetails.Payee">
                 </div>
                 <div class="col-sm-4">
-                    <label for="HandedOverTo" class="form-label mb-0">Handed over to</label>
-                    <input type="text" id="HandedOverTo" name="HandedOverTo" class="form-control" @bind:event="oninput" @bind="voucherViewModel.Handed_Over_To">
+                    <label for="HandedOverTo" class="form-label mb-0">Handed over to <span class="text-danger fw-bold">*</span></label>
+                    <input type="text" id="HandedOverTo" name="HandedOverTo" class="form-control" @bind:event="oninput" @bind="voucherViewModel.Handed_Over_To" required>
                 </div>
                 <div class="col-sm-4">
                     <label for="BankNarration" class="form-label mb-0">Bank Narration</label>
-                    <input type="text" id="BankNarration" name="BankNarration" class="form-control" @bind:event="oninput" @bind="voucherViewModel.ChequeDetails.Description">
+                    <input type="text" id="BankNarration" name="BankNarration" class="form-control" @bind:event="oninput" @bind="voucherViewModel.ChequeDetails.Description" @onchange="OnBankNarrationUserChanged">
                 </div>
             </div>
 

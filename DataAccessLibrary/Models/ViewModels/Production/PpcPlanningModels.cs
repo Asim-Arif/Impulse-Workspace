@@ -16,7 +16,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public int PlannedItems { get; set; }
         public int TotalOrderQty { get; set; }
         public bool IsPlanned { get; set; }
-        public bool IsPartiallyPlanned => PlannedItems > 0 && PlannedItems < TotalItems;
+        public bool IsPartiallyPlanned => !IsPlanned && PlannedItems > 0;
         public string? PlannedBy { get; set; }
         public DateTime? PlannedAt { get; set; }
     }
@@ -32,8 +32,8 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string Currency { get; set; } = string.Empty;
         public bool Authorized { get; set; }
         public bool IsPlanned { get; set; }
-        public bool IsPartiallyPlanned => Items.Any(i => i.IsPlanned) && Items.Any(i => !i.IsPlanned && i.Authorized);
-        public bool HasUnplannedItems => Items.Any(i => !i.IsPlanned && i.Authorized);
+        public bool IsPartiallyPlanned => !IsPlanned && Items.Any(i => i.IsPlanned);
+        public bool HasUnplannedItems => Items.Any(i => !i.IsPlanned || !i.Authorized);
         public int PlannedItemsCount => Items.Count(i => i.IsPlanned);
         public string? PlannedBy { get; set; }
         public DateTime? PlannedAt { get; set; }
@@ -49,7 +49,12 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public int OrderQty { get; set; }
         public bool Authorized { get; set; } = true;
         public int AuthorizedQty { get; set; }
-        public bool IsPlanned { get; set; }
+        private bool _isPlanned;
+        public bool IsPlanned
+        {
+            get => _isPlanned || StockQty > 0 || Purchases.Any(p => p.PurchaseQty > 0 && p.ProcessID > 0);
+            set => _isPlanned = value;
+        }
         public int AvailableInHandStock { get; set; }
 
         // 1. Stock Allocation
@@ -75,12 +80,19 @@ namespace DataAccessLibrary.Models.ViewModels.Production
 
     public class PpcItemPurchaseAllocationDto
     {
+        public int EntryID { get; set; }
         public int ProcessID { get; set; }
         public string ProcessName { get; set; } = string.Empty;
         public int? VendID { get; set; }
         public string? MakerName { get; set; }
         public int PurchaseQty { get; set; }
         public double PurchaseRate { get; set; }
+        public double ExcessQtyPercentage { get; set; } = 50;
+        public long? VendIssued_RefID { get; set; }
+        public string? MasterPONo { get; set; }
+        public DateTime? IssuedAt { get; set; }
+        public string? IssuedBy { get; set; }
+        public bool IsIssued => VendIssued_RefID.HasValue && VendIssued_RefID.Value > 0;
         public List<MakerLookupDto> AvailableMakers { get; set; } = new();
     }
 

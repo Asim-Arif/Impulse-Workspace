@@ -18,6 +18,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public bool Closed { get; set; }
         public string IssEmpID { get; set; } = string.Empty;
         public bool IsFactoryMaker { get; set; }
+        public float ExcessQtyPercentage { get; set; } = 50f;
     }
 
     public class MasterPOLineItemModel
@@ -31,6 +32,12 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public decimal IssQty { get; set; }
         public decimal PrevRcvdQty { get; set; }
         public decimal PendingQty => IssQty - PrevRcvdQty;
+        public decimal GetMaxAllowedQty(float excessQtyPercentage)
+        {
+            decimal excessTolerance = 1m + ((decimal)excessQtyPercentage / 100m);
+            decimal maxAllowed = (IssQty * excessTolerance) - PrevRcvdQty;
+            return maxAllowed > 0 ? maxAllowed : 0;
+        }
         public decimal Rate { get; set; }
         public string LotNo { get; set; } = string.Empty;
         public decimal ReceivingQty { get; set; }

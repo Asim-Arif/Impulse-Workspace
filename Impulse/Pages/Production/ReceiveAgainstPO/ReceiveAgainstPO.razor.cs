@@ -41,6 +41,7 @@ namespace Impulse.Pages.Production.ReceiveAgainstPO
         public MasterPOSearchResultModel? MasterPO { get; set; }
         public List<MasterPOLineItemModel> Lines { get; set; } = new List<MasterPOLineItemModel>();
 
+        public List<EmployeeLookupModel> AllEmployees { get; set; } = new List<EmployeeLookupModel>();
         public List<EmployeeLookupModel> AvailableEmployees { get; set; } = new List<EmployeeLookupModel>();
         public EmployeeLookupModel? SelectedWorker { get; set; }
         public List<EmployeeLookupModel> SelectedWorkers { get; set; } = new List<EmployeeLookupModel>();
@@ -72,6 +73,12 @@ namespace Impulse.Pages.Production.ReceiveAgainstPO
         public decimal TotalPendingQty => Lines.Sum(l => l.PendingQty);
         public decimal TotalReceivingQty => Lines.Sum(l => l.ReceivingQty);
         public decimal TotalReceivingValue => Lines.Sum(l => l.ReceivingQty * l.Rate);
+
+        protected override async Task OnInitializedAsync()
+        {
+            AllEmployees = await MakerPOService.GetEmployeesAsync();
+            AvailableEmployees = new List<EmployeeLookupModel>(AllEmployees);
+        }
 
         public async Task HandleSearchKeyUp(KeyboardEventArgs e)
         {
@@ -152,7 +159,7 @@ namespace Impulse.Pages.Production.ReceiveAgainstPO
 
                 if (MasterPO.IsFactoryMaker)
                 {
-                    AvailableEmployees = await MakerPOService.GetEmployeesAsync();
+                    AvailableEmployees = new List<EmployeeLookupModel>(AllEmployees);
                 }
 
                 NotificationService.Notify(new Radzen.NotificationMessage
@@ -191,6 +198,20 @@ namespace Impulse.Pages.Production.ReceiveAgainstPO
                 AvailableEmployees.Where(e => (e.Name != null && e.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase))
                                            || (e.EmpID != null && e.EmpID.Contains(searchText, StringComparison.OrdinalIgnoreCase))
                                            || (e.Designation != null && e.Designation.Contains(searchText, StringComparison.OrdinalIgnoreCase))));
+        }
+
+        public Task<IEnumerable<EmployeeLookupModel>> SearchCountedByEmployees(string searchText)
+        {
+            if (AllEmployees == null || !AllEmployees.Any())
+                return Task.FromResult(Enumerable.Empty<EmployeeLookupModel>());
+
+            if (string.IsNullOrWhiteSpace(searchText))
+                return Task.FromResult<IEnumerable<EmployeeLookupModel>>(AllEmployees);
+
+            return Task.FromResult<IEnumerable<EmployeeLookupModel>>(
+                AllEmployees.Where(e => (e.Name != null && e.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                                     || (e.EmpID != null && e.EmpID.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                                     || (e.Designation != null && e.Designation.Contains(searchText, StringComparison.OrdinalIgnoreCase))));
         }
 
         public void AddWorker()
@@ -257,13 +278,30 @@ namespace Impulse.Pages.Production.ReceiveAgainstPO
 
             foreach (var line in activeReceivingLines)
             {
-                if (line.ReceivingQty > line.PendingQty)
+                if (line.SelectedCountedBy == null && string.IsNullOrWhiteSpace(line.CountedBy))
                 {
                     NotificationService.Notify(new Radzen.NotificationMessage
                     {
                         Severity = Radzen.NotificationSeverity.Warning,
-                        Summary = "Quantity Exceeds Pending Limit",
-                        Detail = $"Item [{line.ItemCode}] receiving quantity ({line.ReceivingQty:N0}) exceeds pending quantity ({line.PendingQty:N0}).",
+                        Summary = "Counted By Required",
+                        Detail = $"Please select 'Counted By' employee for item [{line.ItemCode}].",
+                        Duration = 4000
+                    });
+                    return;
+                }
+            }
+
+            float excessPct = MasterPO?.ExcessQtyPercentage ?? 50f;
+            foreach (var line in activeReceivingLines)
+            {
+                decimal maxAllowed = line.GetMaxAllowedQty(excessPct);
+                if (line.ReceivingQty > maxAllowed)
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Warning,
+                        Summary = "Quantity Exceeds Allowed Limit",
+                        Detail = $"Item [{line.ItemCode}] receiving quantity ({line.ReceivingQty:N0}) exceeds maximum allowed ({maxAllowed:N0}) including {excessPct}% excess allowance.",
                         Duration = 5000
                     });
                     return;
@@ -313,7 +351,8 @@ namespace Impulse.Pages.Production.ReceiveAgainstPO
                     OrderNo = l.OrderNo,
                     Rate = l.Rate,
                     RcvdQty = l.ReceivingQty,
-                    CountedBy = l.CountedBy,
+                    CountedBy = l.SelectedCountedBy?.Name ?? (!string.IsNullOrWhiteSpace(l.CountedBy) ? l.CountedBy : ""),
+                    Insp_EmpID = l.SelectedCountedBy?.EmpID ?? (!string.IsNullOrWhiteSpace(l.Insp_EmpID) ? l.Insp_EmpID : ""),
                     LotNo = l.LotNo,
                     ReWorkLot = l.ReWorkLot,
                     RepairType = l.RepairType,

@@ -183,26 +183,6 @@ namespace Impulse.Services.IntraOffice
         public async Task MarkAllAsReadAsync(string userId, int? channelId = null, string? senderId = null)
         {
             await _intra.MarkMessagesAsReadAsync(userId, senderId, channelId);
-
-            if (!string.IsNullOrEmpty(senderId) && !string.Equals(senderId, userId, StringComparison.OrdinalIgnoreCase))
-            {
-                try
-                {
-                    var reader = await _intra.GetUserProfileAsync(userId);
-                    var readerName = reader?.FullName ?? "Someone";
-                    _ = _notifications.SendNotificationAsync(new AppNotification
-                    {
-                        Category = NotificationCategory.Message,
-                        Title = $"✓✓ {readerName} read your messages",
-                        Message = $"{readerName} has seen your direct messages.",
-                        SenderName = readerName,
-                        TargetUserId = senderId,
-                        ActionUrl = $"/office/messages/{userId}",
-                        IsReadReceipt = true
-                    });
-                }
-                catch { }
-            }
         }
 
         public async Task<int> GetUnreadCountAsync(string userId)

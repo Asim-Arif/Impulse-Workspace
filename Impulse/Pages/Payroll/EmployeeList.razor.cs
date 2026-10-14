@@ -52,15 +52,24 @@ namespace Impulse.Pages.Payroll
 
         // Search fields dropdown options removed — search now covers all fields
 
+        private bool? _lastContractorsOnly;
+        private bool _isDataLoaded = false;
+
         protected override async Task OnInitializedAsync()
         {
-            await LoadData();
+            // Initial load handled in OnParametersSetAsync to avoid duplicate concurrent executions
+            await Task.CompletedTask;
         }
 
         protected override async Task OnParametersSetAsync()
         {
-            // Re-load data if contractorsOnly parameter changes
-            await LoadData();
+            // Load on first render or when contractorsOnly parameter changes
+            if (!_isDataLoaded || _lastContractorsOnly != ContractorsOnly)
+            {
+                _isDataLoaded = true;
+                _lastContractorsOnly = ContractorsOnly;
+                await LoadData();
+            }
         }
 
         private async Task LoadData()
@@ -79,13 +88,9 @@ namespace Impulse.Pages.Payroll
                     selectedDepartment = null;
                 }
 
-                // Load all employees for departments
-                allEmployees.Clear();
-                foreach (var dept in departments)
-                {
-                    var deptEmps = await EmployeeService.GetEmployeesAsync(dept.DeptID, showInactive, ContractorsOnly);
-                    allEmployees.AddRange(deptEmps);
-                }
+                // Load all employees in a single query instead of querying per department
+                var emps = await EmployeeService.GetEmployeesAsync("0", showInactive, ContractorsOnly);
+                allEmployees = emps.Where(e => !string.IsNullOrEmpty(e.EmpID)).ToList();
 
                 // Populate employee filter dropdown
                 await UpdateEmployeeFilterDropdown();

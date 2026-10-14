@@ -19,65 +19,126 @@ namespace Impulse.Components.Production.RepairTypes
         [Parameter] public EventCallback OnSaved { get; set; }
         [Parameter] public EventCallback OnClosed { get; set; }
 
-        public string ProcessSearchFilter { get; set; } = string.Empty;
+        public List<RepairTypeProcessItemDto> AvailableProcesses { get; set; } = new();
+        public RepairTypeProcessItemDto? SelectedProcess { get; set; }
+        public bool NewStepScanning { get; set; } = false;
         public bool IsSaving { get; set; } = false;
 
-        public List<RepairTypeProcessItemDto> FilteredProcesses
+        protected override async Task OnParametersSetAsync()
         {
-            get
+            if (IsOpen)
             {
-                if (Model == null || Model.Processes == null)
-                    return new List<RepairTypeProcessItemDto>();
-
-                if (string.IsNullOrWhiteSpace(ProcessSearchFilter))
-                    return Model.Processes;
-
-                string q = ProcessSearchFilter.Trim();
-                return Model.Processes.Where(p =>
-                    (!string.IsNullOrEmpty(p.Code) && p.Code.Contains(q, StringComparison.OrdinalIgnoreCase)) ||
-                    (!string.IsNullOrEmpty(p.Description) && p.Description.Contains(q, StringComparison.OrdinalIgnoreCase))
-                ).ToList();
+                await LoadProcessesLookupAsync();
             }
         }
 
-        public void ToggleProcess(RepairTypeProcessItemDto proc, bool isChecked)
+        public async Task LoadProcessesLookupAsync()
         {
-            proc.IsSelected = isChecked;
-            if (isChecked)
+            try
             {
-                if (proc.SeqNo <= 0)
+                AvailableProcesses = await RepairTypeService.GetAvailableProcessesForRepairAsync(null);
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new NotificationMessage
                 {
-                    int maxSeq = Model?.Processes.Where(p => p.IsSelected && p.SeqNo > 0).Select(p => p.SeqNo).DefaultIfEmpty(0).Max() ?? 0;
-                    proc.SeqNo = maxSeq + 1;
-                }
-            }
-            else
-            {
-                proc.SeqNo = 0;
-                proc.Scanning = false;
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Failed to Load Processes",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
             }
         }
 
-        public void SelectAllProcesses()
+        public async Task<IEnumerable<RepairTypeProcessItemDto>> SearchProcesses(string searchText)
         {
-            if (Model == null) return;
-            int seq = 1;
-            foreach (var proc in Model.Processes)
-            {
-                proc.IsSelected = true;
-                if (proc.SeqNo <= 0)
-                    proc.SeqNo = seq++;
-            }
+            if (string.IsNullOrWhiteSpace(searchText))
+                return AvailableProcesses;
+
+            string q = searchText.Trim();
+            return AvailableProcesses.Where(p =>
+                (!string.IsNullOrEmpty(p.Code) && p.Code.Contains(q, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrEmpty(p.Description) && p.Description.Contains(q, StringComparison.OrdinalIgnoreCase))
+            );
         }
 
-        public void ClearAllProcesses()
+        public void OnProcessSelected(RepairTypeProcessItemDto proc)
+        {
+            SelectedProcess = proc;
+        }
+
+        public void AddStep()
+        {
+            if (Model == null || SelectedProcess == null)
+                return;
+
+            if (Model.Processes.Any(p => p.ProcessID == SelectedProcess.ProcessID))
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Warning,
+                    Summary = "Duplicate Process",
+                    Detail = $"Process '{SelectedProcess.Description}' is already in this repair sequence.",
+                    Duration = 3500
+                });
+                return;
+            }
+
+            var step = new RepairTypeProcessItemDto
+            {
+                ProcessID = SelectedProcess.ProcessID,
+                Code = SelectedProcess.Code,
+                Description = SelectedProcess.Description,
+                IsSelected = true,
+                Scanning = NewStepScanning,
+                SeqNo = Model.Processes.Count + 1
+            };
+
+            Model.Processes.Add(step);
+            SelectedProcess = null;
+            NewStepScanning = false;
+        }
+
+        public void MoveStepUp(int index)
+        {
+            if (Model == null || index <= 0 || index >= Model.Processes.Count)
+                return;
+
+            var temp = Model.Processes[index];
+            Model.Processes[index] = Model.Processes[index - 1];
+            Model.Processes[index - 1] = temp;
+
+            Resequence();
+        }
+
+        public void MoveStepDown(int index)
+        {
+            if (Model == null || index < 0 || index >= Model.Processes.Count - 1)
+                return;
+
+            var temp = Model.Processes[index];
+            Model.Processes[index] = Model.Processes[index + 1];
+            Model.Processes[index + 1] = temp;
+
+            Resequence();
+        }
+
+        public void RemoveStep(int index)
+        {
+            if (Model == null || index < 0 || index >= Model.Processes.Count)
+                return;
+
+            Model.Processes.RemoveAt(index);
+            Resequence();
+        }
+
+        private void Resequence()
         {
             if (Model == null) return;
-            foreach (var proc in Model.Processes)
+            for (int i = 0; i < Model.Processes.Count; i++)
             {
-                proc.IsSelected = false;
-                proc.SeqNo = 0;
-                proc.Scanning = false;
+                Model.Processes[i].SeqNo = i + 1;
+                Model.Processes[i].IsSelected = true;
             }
         }
 
@@ -121,13 +182,13 @@ namespace Impulse.Components.Production.RepairTypes
                 return;
             }
 
-            if (!Model.Processes.Any(p => p.IsSelected))
+            if (!Model.Processes.Any())
             {
                 NotificationService.Notify(new NotificationMessage
                 {
                     Severity = NotificationSeverity.Warning,
-                    Summary = "No Processes Selected",
-                    Detail = "Please select at least one manufacturing process for this repair type.",
+                    Summary = "No Processes Added",
+                    Detail = "Please add at least one manufacturing process into the sequence.",
                     Duration = 3000
                 });
                 return;
@@ -136,6 +197,8 @@ namespace Impulse.Components.Production.RepairTypes
             IsSaving = true;
             try
             {
+                Resequence();
+
                 if (Model.EntryID == 0)
                 {
                     int newId = await RepairTypeService.SaveRepairTypeAsync(Model);
@@ -145,7 +208,7 @@ namespace Impulse.Components.Production.RepairTypes
                         {
                             Severity = NotificationSeverity.Success,
                             Summary = "Repair Type Created",
-                            Detail = $"Repair Type '{Model.RepairType}' created successfully.",
+                            Detail = $"Repair Type '{Model.RepairType}' created successfully with {Model.Processes.Count} steps.",
                             Duration = 4000
                         });
 

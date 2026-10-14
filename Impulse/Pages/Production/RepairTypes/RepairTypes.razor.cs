@@ -84,25 +84,12 @@ namespace Impulse.Pages.Production.RepairTypes
 
         public async Task OpenCreateModal()
         {
-            try
+            ModelForEdit = new RepairTypeDto
             {
-                var processes = await RepairTypeService.GetAvailableProcessesForRepairAsync(null);
-                ModelForEdit = new RepairTypeDto
-                {
-                    Processes = processes
-                };
-                ShowModal = true;
-            }
-            catch (Exception ex)
-            {
-                NotificationService.Notify(new NotificationMessage
-                {
-                    Severity = NotificationSeverity.Error,
-                    Summary = "Error Initializing Modal",
-                    Detail = ex.Message,
-                    Duration = 4000
-                });
-            }
+                Processes = new List<RepairTypeProcessItemDto>()
+            };
+            ShowModal = true;
+            await Task.CompletedTask;
         }
 
         public async Task OpenEditModal(RepairTypeListItem item)

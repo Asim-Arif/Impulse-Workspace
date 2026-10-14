@@ -45,7 +45,7 @@ builder.Services.AddRazorComponents()
 builder.Services.AddServerSideBlazor(options =>
 {
     options.DetailedErrors = true;
-    options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(3);
+    options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(30);
 }).AddHubOptions(options =>
 {
     options.MaximumReceiveMessageSize = 32 * 1024 * 1024; // 32MB
@@ -101,10 +101,10 @@ builder.Services.AddScoped<UserSessionService>();
 builder.Services.AddScoped<IBankListDataAccess, BankListDataAccess>();
 builder.Services.AddScoped<IAccountReportingAccess, AccountsReportingDataAccess>();
 
-//builder.Services.AddServerSideBlazor();
 builder.Services.AddServerSideBlazor(options =>
 {
     options.DetailedErrors = true;
+    options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(30);
 }).AddHubOptions(options =>
 {
     options.MaximumReceiveMessageSize = 500 * 1024 * 1024; // 500 MB to prevent voice note disconnects

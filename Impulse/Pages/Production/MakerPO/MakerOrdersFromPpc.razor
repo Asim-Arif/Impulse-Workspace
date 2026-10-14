@@ -297,7 +297,7 @@
                             <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem; overflow: visible !important;">
                                 <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
                                     <tr>
-                                        <th style="width: 40px;" class="text-center">
+                                        <th style="width: 35px; min-width: 35px; max-width: 35px; white-space: nowrap;" class="text-center">
                                             <input type="checkbox" class="form-check-input"
                                                    checked="@(groupLines.All(l => l.IsSelected))"
                                                    @onchange="@((ChangeEventArgs e) => {
@@ -305,24 +305,25 @@
                                                         foreach (var l in groupLines.Where(x => !x.IsPosted)) l.IsSelected = isChecked;
                                                    })" />
                                         </th>
-                                        <th>Item Code / Description</th>
-                                        <th>Process</th>
+                                        <th style="width: 100%; min-width: 250px;">Item Code / Description</th>
+                                        <th style="width: 105px; min-width: 105px; max-width: 105px; white-space: nowrap;">Process</th>
                                         @if (isUnassigned)
                                         {
-                                            <th style="width: 260px;">Assign Maker</th>
+                                            <th style="width: 220px; min-width: 220px; max-width: 220px; white-space: nowrap;">Assign Maker</th>
                                         }
-                                        <th class="text-center" style="width: 100px;">PO Qty</th>
-                                        <th style="width: 120px;">Rate (PKR)</th>
-                                        <th style="width: 140px;">Return Date</th>
-                                        <th style="width: 110px;">Batch #</th>
-                                        <th style="width: 150px;">Status / Master PO</th>
+                                        <th class="text-center" style="width: 75px; min-width: 75px; max-width: 75px; white-space: nowrap;">PO Qty</th>
+                                        <th class="text-center" style="width: 75px; min-width: 75px; max-width: 75px; white-space: nowrap;">Excess %</th>
+                                        <th style="width: 95px; min-width: 95px; max-width: 95px; white-space: nowrap;">Rate (PKR)</th>
+                                        <th style="width: 130px; min-width: 130px; max-width: 130px; white-space: nowrap;">Return Date</th>
+                                        <th style="width: 95px; min-width: 95px; max-width: 95px; white-space: nowrap;">Batch #</th>
+                                        <th style="width: 140px; min-width: 140px; max-width: 140px; white-space: nowrap;">Status / Master PO</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @foreach (var line in groupLines)
                                     {
                                         <tr class="@(line.IsPosted ? "table-light text-muted" : "")" style="position: relative;">
-                                            <td class="text-center">
+                                            <td class="text-center" style="width: 35px; min-width: 35px; max-width: 35px; white-space: nowrap;">
                                                 @if (!line.IsPosted)
                                                 {
                                                     <input type="checkbox" class="form-check-input" @bind="line.IsSelected" />
@@ -332,17 +333,17 @@
                                                     <i class="fas fa-check-circle text-success" title="Issued"></i>
                                                 }
                                             </td>
-                                            <td>
+                                            <td style="width: 100%; min-width: 250px;">
                                                 <div class="fw-bold text-dark">@line.CompItemID</div>
                                                 <small class="text-muted">@line.ItemName</small>
                                             </td>
-                                            <td>
+                                            <td style="width: 105px; min-width: 105px; max-width: 105px; white-space: nowrap;">
                                                 <span class="badge bg-secondary-subtle text-secondary border">@line.ProcessName</span>
                                             </td>
 
                                             @if (isUnassigned)
                                             {
-                                                <td style="position: relative; overflow: visible;">
+                                                <td style="width: 220px; min-width: 220px; max-width: 220px; white-space: nowrap; position: relative; overflow: visible;">
                                                     <div style="position: relative; z-index: 50;">
                                                         <BlazoredTypeahead SearchMethod="SearchMakersAsync"
                                                                            EnableDropDown="true"
@@ -367,16 +368,33 @@
                                             }
 
                                             <!-- PO Quantity: STRICTLY LOCKED / READONLY as required -->
-                                            <td class="text-center">
+                                            <td class="text-center" style="width: 75px; min-width: 75px; max-width: 75px; white-space: nowrap;">
                                                 <span class="badge bg-light text-dark border px-2 py-1 fw-bold fs-6 font-monospace" title="Quantity locked from PPC allocation">
                                                     @line.PurchaseQty
                                                 </span>
                                             </td>
 
-                                            <td>
+                                            <td class="text-center" style="width: 75px; min-width: 75px; max-width: 75px; white-space: nowrap;">
+                                                @if (!line.IsPosted)
+                                                {
+                                                    <div class="input-group input-group-sm d-inline-flex flex-nowrap align-items-center" style="width: 68px !important; max-width: 68px !important;">
+                                                        <input type="number" class="form-control form-control-sm text-center font-monospace px-1"
+                                                               style="width: 44px !important; min-width: 36px !important; max-width: 44px !important;"
+                                                               @bind="line.ExcessQtyPercentage" min="0" max="1000" step="1" title="Excess Quantity Allowance %" />
+                                                        <span class="input-group-text px-1 text-muted" style="font-size: 0.72rem;">%</span>
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-light text-secondary border font-monospace">@line.ExcessQtyPercentage%</span>
+                                                }
+                                            </td>
+
+                                            <td style="width: 95px; min-width: 95px; max-width: 95px; white-space: nowrap;">
                                                 @if (!line.IsPosted)
                                                 {
                                                     <input type="number" class="form-control form-control-sm text-end font-monospace"
+                                                           style="width: 90px !important; max-width: 90px !important;"
                                                            @bind="line.PurchaseRate" step="0.5" min="0" />
                                                 }
                                                 else
@@ -385,10 +403,11 @@
                                                 }
                                             </td>
 
-                                            <td>
+                                            <td style="width: 130px; min-width: 130px; max-width: 130px; white-space: nowrap;">
                                                 @if (!line.IsPosted)
                                                 {
                                                     <input type="date" class="form-control form-control-sm"
+                                                           style="width: 125px !important;"
                                                            @bind="line.ReturnDT" />
                                                 }
                                                 else
@@ -397,10 +416,11 @@
                                                 }
                                             </td>
 
-                                            <td>
+                                            <td style="width: 95px; min-width: 95px; max-width: 95px; white-space: nowrap;">
                                                 @if (!line.IsPosted)
                                                 {
                                                     <input type="text" class="form-control form-control-sm text-uppercase"
+                                                           style="width: 90px !important;"
                                                            @bind="line.BatchNo" maxlength="20" />
                                                 }
                                                 else
@@ -409,7 +429,7 @@
                                                 }
                                             </td>
 
-                                            <td>
+                                            <td style="width: 140px; min-width: 140px; max-width: 140px; white-space: nowrap;">
                                                 @if (line.IsPosted)
                                                 {
                                                     <div class="d-flex align-items-center gap-1">

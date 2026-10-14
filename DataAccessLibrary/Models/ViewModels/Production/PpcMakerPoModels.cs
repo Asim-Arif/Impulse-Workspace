@@ -21,6 +21,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
     {
         public long EntryID { get; set; }
         public string OrderNo { get; set; } = string.Empty;
+        public string CustCode { get; set; } = string.Empty;
         public string CompItemID { get; set; } = string.Empty;
         public string ItemName { get; set; } = string.Empty;
         public int ProcessID { get; set; }
@@ -42,6 +43,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public bool DrawingProvided { get; set; }
         public bool ForgingProvided { get; set; }
         public bool SteelProvided { get; set; }
+        public double ExcessQtyPercentage { get; set; } = 50;
 
         // Fulfilled / Issued State
         public long? VendIssued_RefID { get; set; }
@@ -56,6 +58,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
     public class GenerateMakerPoRequest
     {
         public string OrderNo { get; set; } = string.Empty;
+        public string CustCode { get; set; } = string.Empty;
         public string? IssEmpID { get; set; }
         public string? CountedBy { get; set; }
         public int? SteelType_RefID { get; set; }

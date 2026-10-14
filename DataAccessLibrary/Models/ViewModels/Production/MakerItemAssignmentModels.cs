@@ -50,11 +50,19 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string AssignedUnit { get; set; } = string.Empty;
         public string Remarks { get; set; } = string.Empty;
         public string MakerDescription { get; set; } = string.Empty;
+        public string? CustCode { get; set; }
 
         // Editing state helper for inline edit modal/drawer
         public bool IsEditing { get; set; }
         public decimal EditRate { get; set; }
         public string EditRemarks { get; set; } = string.Empty;
+    }
+
+    public class CustomerLookupModel
+    {
+        public string CustCode { get; set; } = string.Empty;
+        public string? Name { get; set; }
+        public string DisplayText => string.IsNullOrWhiteSpace(Name) || Name == CustCode ? CustCode : $"[{CustCode}] {Name}";
     }
 
     public class ItemRevisionHistoryModel

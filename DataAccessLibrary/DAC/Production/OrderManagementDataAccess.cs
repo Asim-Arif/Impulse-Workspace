@@ -116,39 +116,94 @@ namespace DataAccessLibrary.DAC.Production
             if (!orders.Any())
                 return orders;
 
-            // Fetch high-level stage info for these orders
-            var orderNos = orders.Select(x => x.OrderNo).Take(200).ToList();
+            if (db is SqlConnection sqlConn && sqlConn.State != ConnectionState.Open)
+            {
+                await sqlConn.OpenAsync();
+            }
+
+            await db.ExecuteAsync(@"
+                IF OBJECT_ID('tempdb..#TargetOrders') IS NOT NULL DROP TABLE #TargetOrders;
+                CREATE TABLE #TargetOrders (
+                    OrderNo VARCHAR(50) COLLATE DATABASE_DEFAULT PRIMARY KEY, 
+                    MasterOrderNo VARCHAR(50) COLLATE DATABASE_DEFAULT
+                );");
+
+            var targetTable = new DataTable();
+            targetTable.Columns.Add("OrderNo", typeof(string));
+            targetTable.Columns.Add("MasterOrderNo", typeof(string));
+
+            var addedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var ord in orders)
+            {
+                if (string.IsNullOrWhiteSpace(ord.OrderNo)) continue;
+
+                string rawOrderNo = ord.OrderNo.Trim();
+                if (addedKeys.Add(rawOrderNo))
+                {
+                    targetTable.Rows.Add(rawOrderNo, rawOrderNo);
+                }
+
+                string altPrefix = rawOrderNo.StartsWith("SO-", StringComparison.OrdinalIgnoreCase)
+                    ? rawOrderNo.Substring(3).Trim()
+                    : "SO-" + rawOrderNo;
+
+                if (!string.IsNullOrWhiteSpace(altPrefix) && addedKeys.Add(altPrefix))
+                {
+                    targetTable.Rows.Add(altPrefix, rawOrderNo);
+                }
+
+                if (!string.IsNullOrWhiteSpace(ord.InternalRefNo))
+                {
+                    string refNo = ord.InternalRefNo.Trim();
+                    if (addedKeys.Add(refNo))
+                    {
+                        targetTable.Rows.Add(refNo, rawOrderNo);
+                    }
+                }
+            }
+
+            if (db is SqlConnection openSqlConn)
+            {
+                using var bulkCopy = new SqlBulkCopy(openSqlConn);
+                bulkCopy.DestinationTableName = "#TargetOrders";
+                await bulkCopy.WriteToServerAsync(targetTable);
+            }
 
             // 1. Shipped / Invoiced quantities (direct base tables seek)
             var shippedMap = (await db.QueryAsync<(string OrderNo, int ShippedQty)>(@"
                 SELECT 
-                    foi.OrderNo, 
+                    t.MasterOrderNo AS OrderNo, 
                     ISNULL(SUM(cii.Qty), 0) AS ShippedQty
                 FROM FOrderItems foi WITH (NOLOCK)
+                INNER JOIN #TargetOrders t ON foi.OrderNo = t.OrderNo
                 INNER JOIN FProformaOrders fpo WITH (NOLOCK) ON foi.ID = fpo.OrderEntryID
                 INNER JOIN CustomInvoiceItems cii WITH (NOLOCK) ON fpo.EntryID = cii.RefID
                 INNER JOIN CustomInvoice ci WITH (NOLOCK) ON cii.CustomInvoice = ci.CustomInvoice
                 WHERE ci.GatePassDT IS NOT NULL
-                  AND foi.OrderNo IN @OrderNos
-                GROUP BY foi.OrderNo", new { OrderNos = orderNos }))
+                GROUP BY t.MasterOrderNo"))
                 .ToDictionary(x => x.OrderNo, x => x.ShippedQty, StringComparer.OrdinalIgnoreCase);
 
             // 2. Dispatched quantities
             var dispatchedMap = (await db.QueryAsync<(string OrderNo, int DispatchedQty)>(@"
-                SELECT vrd.OrderNo, ISNULL(SUM(dvrd.Qty), 0) AS DispatchedQty
-                FROM DispatchListDetail_VRD dvrd
-                INNER JOIN VendRcvdDetail vrd ON dvrd.VRD_RefID = vrd.EntryID
-                WHERE vrd.OrderNo IN @OrderNos
-                GROUP BY vrd.OrderNo", new { OrderNos = orderNos }))
+                SELECT 
+                    t.MasterOrderNo AS OrderNo, 
+                    ISNULL(SUM(dvrd.Qty), 0) AS DispatchedQty
+                FROM DispatchListDetail_VRD dvrd WITH (NOLOCK)
+                INNER JOIN VendRcvdDetail vrd WITH (NOLOCK) ON dvrd.VRD_RefID = vrd.EntryID
+                INNER JOIN #TargetOrders t ON vrd.OrderNo = t.OrderNo
+                GROUP BY t.MasterOrderNo"))
                 .ToDictionary(x => x.OrderNo, x => x.DispatchedQty, StringComparer.OrdinalIgnoreCase);
 
             // 3. Produced / Final Finished quantities (NextProcessID IS NULL means lot production is complete)
             var producedMap = (await db.QueryAsync<(string OrderNo, int ProducedQty)>(@"
-                SELECT vrd.OrderNo, ISNULL(SUM(vrd.RcvdQty), 0) AS ProducedQty
-                FROM VendRcvdDetail vrd
-                WHERE vrd.OrderNo IN @OrderNos 
-                  AND (vrd.NextProcessID IS NULL OR vrd.NextProcessID = 0)
-                GROUP BY vrd.OrderNo", new { OrderNos = orderNos }))
+                SELECT 
+                    t.MasterOrderNo AS OrderNo, 
+                    ISNULL(SUM(vrd.RcvdQty), 0) AS ProducedQty
+                FROM VendRcvdDetail vrd WITH (NOLOCK)
+                INNER JOIN #TargetOrders t ON vrd.OrderNo = t.OrderNo
+                WHERE (vrd.NextProcessID IS NULL OR vrd.NextProcessID = 0)
+                GROUP BY t.MasterOrderNo"))
                 .ToDictionary(x => x.OrderNo, x => x.ProducedQty, StringComparer.OrdinalIgnoreCase);
 
             // 4. Running lots details for orders (optimized direct query with index seek)
@@ -161,16 +216,16 @@ namespace DataAccessLibrary.DAC.Production
                 OrderLots AS (
                     -- 1. Lots issued to maker and currently in process
                     SELECT 
-                        vid.OrderNo,
+                        t.MasterOrderNo AS OrderNo,
                         vid.ItemCode,
                         vid.LotNo,
                         vid.RcvProcessID AS ProcessID,
                         (vid.IssQty - vid.RcvdQty) AS Qty,
                         ip.SNO
                     FROM VendIssdDetail vid WITH (NOLOCK)
+                    INNER JOIN #TargetOrders t ON vid.OrderNo = t.OrderNo
                     LEFT JOIN ItemProcesses ip WITH (NOLOCK) ON vid.ItemCode = ip.ItemID AND vid.RcvProcessID = ip.ProcessID
-                    WHERE vid.OrderNo IN @OrderNos
-                      AND vid.LotNo <> '0'
+                    WHERE vid.LotNo <> '0'
                       AND vid.IssQty > vid.RcvdQty
                       AND NOT EXISTS (
                           SELECT 1 FROM VendRcvdDetail vrd WITH (NOLOCK) 
@@ -185,16 +240,16 @@ namespace DataAccessLibrary.DAC.Production
 
                     -- 2. Lots received from maker but waiting for next process
                     SELECT 
-                        vrd.OrderNo,
+                        t.MasterOrderNo AS OrderNo,
                         vrd.ItemCode,
                         vrd.LotNo,
                         vrd.ProcessID,
                         (vrd.RcvdQty - vrd.IssQty - ISNULL(vrd.Wastage, 0) - ISNULL(vrd.ReWorkQty, 0)) AS Qty,
                         ip.SNO
                     FROM VendRcvdDetail vrd WITH (NOLOCK)
+                    INNER JOIN #TargetOrders t ON vrd.OrderNo = t.OrderNo
                     LEFT JOIN ItemProcesses ip WITH (NOLOCK) ON vrd.ItemCode = ip.ItemID AND vrd.ProcessID = ip.ProcessID
-                    WHERE vrd.OrderNo IN @OrderNos
-                      AND vrd.LotNo <> '0'
+                    WHERE vrd.LotNo <> '0'
                       AND (vrd.RcvdQty - vrd.IssQty - ISNULL(vrd.Wastage, 0) - ISNULL(vrd.ReWorkQty, 0)) > 0
                       AND (vrd.NextProcessID IS NOT NULL AND vrd.NextProcessID <> 0)
                       AND ISNULL(vrd.Opening_RefID, 0) = 0
@@ -226,35 +281,41 @@ namespace DataAccessLibrary.DAC.Production
                 FROM LotSteps ls
                 LEFT JOIN ItemProcessGroups ipg WITH (NOLOCK) ON ls.ItemCode = ipg.ItemID
                 LEFT JOIN ProcessGroupsProcesses currPgp WITH (NOLOCK) ON ipg.PG_RefID = currPgp.Group_RefID AND ls.ProcessID = currPgp.Process_RefID
-                LEFT JOIN ProcessStepCounts psc ON ipg.PG_RefID = psc.Group_RefID", new { OrderNos = orderNos }))
+                LEFT JOIN ProcessStepCounts psc ON ipg.PG_RefID = psc.Group_RefID"))
                 .GroupBy(x => (string)x.OrderNo, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
 
             // 5. PO Issuance & Receiving summary
             var poMap = (await db.QueryAsync<(string OrderNo, int TotalIssQty, int TotalRcvdQty)>(@"
                 SELECT 
-                    vid.OrderNo,
+                    t.MasterOrderNo AS OrderNo,
                     ISNULL(SUM(vid.IssQty), 0) AS TotalIssQty,
                     ISNULL(SUM(ISNULL(rcv.TotalRcvd, ISNULL(vid.RcvdQty, 0))), 0) AS TotalRcvdQty
-                FROM VendIssdDetail vid
-                INNER JOIN VendIssued vi ON vid.RefID = vi.EntryID
+                FROM VendIssdDetail vid WITH (NOLOCK)
+                INNER JOIN #TargetOrders t ON vid.OrderNo = t.OrderNo
+                INNER JOIN VendIssued vi WITH (NOLOCK) ON vid.RefID = vi.EntryID
                 LEFT JOIN (
                     SELECT vr.Issuance_RefID, vrd.ItemCode, SUM(vrd.RcvdQty) AS TotalRcvd
-                    FROM VendReceived vr
-                    INNER JOIN VendRcvdDetail vrd ON vr.EntryID = vrd.RefID
+                    FROM VendReceived vr WITH (NOLOCK)
+                    INNER JOIN VendRcvdDetail vrd WITH (NOLOCK) ON vr.EntryID = vrd.RefID
                     GROUP BY vr.Issuance_RefID, vrd.ItemCode
                 ) rcv ON vi.EntryID = rcv.Issuance_RefID AND vid.ItemCode = rcv.ItemCode
-                WHERE vid.OrderNo IN @OrderNos
-                  AND ISNULL(vi.MasterPONo, '') <> ''
-                GROUP BY vid.OrderNo", new { OrderNos = orderNos }))
+                WHERE ISNULL(vi.MasterPONo, '') <> ''
+                GROUP BY t.MasterOrderNo"))
                 .ToDictionary(x => x.OrderNo, x => (x.TotalIssQty, x.TotalRcvdQty), StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                await db.ExecuteAsync("IF OBJECT_ID('tempdb..#TargetOrders') IS NOT NULL DROP TABLE #TargetOrders;");
+            }
+            catch { }
 
             foreach (var ord in orders)
             {
                 int orderQty = Math.Max(1, ord.TotalOrderQty);
                 shippedMap.TryGetValue(ord.OrderNo, out int shippedQty);
-                ord.TotalShippedQty = shippedQty;
                 dispatchedMap.TryGetValue(ord.OrderNo, out int dispQty);
+                ord.TotalShippedQty = Math.Max(shippedQty, dispQty);
                 producedMap.TryGetValue(ord.OrderNo, out int prodQty);
                 runningLots.TryGetValue(ord.OrderNo, out var ordLots);
                 ordLots ??= new List<dynamic>();
@@ -271,7 +332,7 @@ namespace DataAccessLibrary.DAC.Production
                 }
                 else if (dispQty >= orderQty && orderQty > 0)
                 {
-                    ord.CurrentStageNumber = 9;
+                    ord.CurrentStageNumber = 10;
                     ord.CurrentStageName = "Dispatch Finalized";
                 }
                 else if (dispQty > 0)

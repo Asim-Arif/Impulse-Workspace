@@ -44,6 +44,23 @@ namespace Impulse.Pages.Production.MakerItemAssignment
         public bool IsDirectorOrAdmin { get; set; } = false;
         public string CurrentUserName { get; set; } = "System";
 
+        public bool IsCustomerWiseRatesEnabled { get; set; } = false;
+        public List<CustomerLookupModel> Customers { get; set; } = new List<CustomerLookupModel>();
+
+        private CustomerLookupModel? _selectedCustomer;
+        public CustomerLookupModel? SelectedCustomer
+        {
+            get => _selectedCustomer;
+            set
+            {
+                if (_selectedCustomer != value)
+                {
+                    _selectedCustomer = value;
+                    _ = OnCustomerSelectedAsync(value);
+                }
+            }
+        }
+
         public List<MakerLookupModel> Makers { get; set; } = new List<MakerLookupModel>();
         
         private MakerLookupModel? _selectedMaker;
@@ -90,6 +107,7 @@ namespace Impulse.Pages.Production.MakerItemAssignment
         public decimal EditRateValue { get; set; }
         public string EditRemarksValue { get; set; } = string.Empty;
         public string RateChangeReason { get; set; } = string.Empty;
+        public bool ApplyToAllCustomers { get; set; } = false;
         public bool IsSavingEdit { get; set; } = false;
 
         public IEnumerable<AssignedMakerItemModel> FilteredAssignedItems =>
@@ -98,6 +116,7 @@ namespace Impulse.Pages.Production.MakerItemAssignment
                 : AssignedItems.Where(i => (i.ItemID != null && i.ItemID.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
                                         || (i.ItemName != null && i.ItemName.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
                                         || (i.Description != null && i.Description.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
+                                        || (i.CustCode != null && i.CustCode.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
                                         || (i.Remarks != null && i.Remarks.Contains(SearchText, StringComparison.OrdinalIgnoreCase)));
 
         protected override async Task OnInitializedAsync()
@@ -117,6 +136,19 @@ namespace Impulse.Pages.Production.MakerItemAssignment
             catch (Exception ex)
             {
                 Console.WriteLine($"Error checking user roles in MakerItemAssignment: {ex.Message}");
+            }
+
+            try
+            {
+                IsCustomerWiseRatesEnabled = await MakerItemAssignmentService.HasCustomerWiseRatesSupportAsync();
+                if (IsCustomerWiseRatesEnabled)
+                {
+                    Customers = await MakerItemAssignmentService.GetCustomersAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error checking customer-wise rates support: {ex.Message}");
             }
 
             await LoadActiveMakersAsync();
@@ -173,6 +205,7 @@ namespace Impulse.Pages.Production.MakerItemAssignment
         {
             try
             {
+                _selectedCustomer = null;
                 _selectedProcess = null;
                 SelectedUnassignedItem = null;
                 Processes.Clear();
@@ -233,6 +266,36 @@ namespace Impulse.Pages.Production.MakerItemAssignment
             }
         }
 
+        private async Task OnCustomerSelectedAsync(CustomerLookupModel? customer)
+        {
+            try
+            {
+                SelectedUnassignedItem = null;
+                UnassignedItems.Clear();
+                await InvokeAsync(StateHasChanged);
+
+                if (SelectedMaker != null && SelectedProcess != null)
+                {
+                    await LoadAssignedItemsAsync();
+                    await LoadUnassignedItemsAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Error Filtering Customer Items",
+                    Detail = ex.Message,
+                    Duration = 5000
+                });
+            }
+            finally
+            {
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+
         private async Task LoadAssignedItemsAsync()
         {
             if (SelectedMaker == null || SelectedProcess == null) return;
@@ -240,7 +303,8 @@ namespace Impulse.Pages.Production.MakerItemAssignment
             await InvokeAsync(StateHasChanged);
             try
             {
-                AssignedItems = await MakerItemAssignmentService.GetAssignedItemsAsync(SelectedMaker.VendID, SelectedProcess.ProcessID);
+                string? custCode = IsCustomerWiseRatesEnabled ? SelectedCustomer?.CustCode : null;
+                AssignedItems = await MakerItemAssignmentService.GetAssignedItemsAsync(SelectedMaker.VendID, SelectedProcess.ProcessID, custCode);
             }
             catch (Exception ex)
             {
@@ -265,7 +329,8 @@ namespace Impulse.Pages.Production.MakerItemAssignment
             if (SelectedMaker == null || SelectedProcess == null) return;
             try
             {
-                UnassignedItems = await MakerItemAssignmentService.GetUnassignedItemsAsync(SelectedMaker.VendID, SelectedProcess.ProcessID);
+                string? custCode = IsCustomerWiseRatesEnabled ? SelectedCustomer?.CustCode : null;
+                UnassignedItems = await MakerItemAssignmentService.GetUnassignedItemsAsync(SelectedMaker.VendID, SelectedProcess.ProcessID, custCode);
             }
             catch (Exception ex)
             {
@@ -282,6 +347,16 @@ namespace Impulse.Pages.Production.MakerItemAssignment
             {
                 await InvokeAsync(StateHasChanged);
             }
+        }
+
+        public Task<IEnumerable<CustomerLookupModel>> SearchCustomers(string searchText)
+        {
+            if (string.IsNullOrWhiteSpace(searchText))
+                return Task.FromResult<IEnumerable<CustomerLookupModel>>(Customers);
+
+            return Task.FromResult<IEnumerable<CustomerLookupModel>>(
+                Customers.Where(c => (!string.IsNullOrEmpty(c.CustCode) && c.CustCode.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                                  || (!string.IsNullOrEmpty(c.Name) && c.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase))));
         }
 
         public Task<IEnumerable<MakerLookupModel>> SearchMakers(string searchText)
@@ -322,10 +397,23 @@ namespace Impulse.Pages.Production.MakerItemAssignment
         {
             if (SelectedMaker == null || SelectedProcess == null || SelectedUnassignedItem == null) return;
 
+            if (IsCustomerWiseRatesEnabled && SelectedCustomer == null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Customer Required",
+                    Detail = "Please select a Customer before assigning an item.",
+                    Duration = 4000
+                });
+                return;
+            }
+
             IsAssigning = true;
             try
             {
-                await MakerItemAssignmentService.AssignItemAsync(SelectedMaker.VendID, SelectedProcess.ProcessID, SelectedUnassignedItem.ItemID, 0m);
+                string? custCode = IsCustomerWiseRatesEnabled ? SelectedCustomer?.CustCode : null;
+                await MakerItemAssignmentService.AssignItemAsync(SelectedMaker.VendID, SelectedProcess.ProcessID, SelectedUnassignedItem.ItemID, 0m, custCode);
 
                 NotificationService.Notify(new Radzen.NotificationMessage
                 {
@@ -361,12 +449,14 @@ namespace Impulse.Pages.Production.MakerItemAssignment
             EditRateValue = item.Rate;
             EditRemarksValue = item.Remarks;
             RateChangeReason = string.Empty;
+            ApplyToAllCustomers = false;
         }
 
         public void CloseEditModal()
         {
             EditingItem = null;
             RateChangeReason = string.Empty;
+            ApplyToAllCustomers = false;
         }
 
         public async Task SaveEditModal()
@@ -396,6 +486,12 @@ namespace Impulse.Pages.Production.MakerItemAssignment
                         return;
                     }
 
+                    string reason = RateChangeReason.Trim();
+                    if (IsCustomerWiseRatesEnabled && ApplyToAllCustomers)
+                    {
+                        reason += " (Apply to All Customers)";
+                    }
+
                     var rateRequest = new MakerItemRateWorkflowRequestDto
                     {
                         EntryID = EditingItem.EntryID,
@@ -409,7 +505,7 @@ namespace Impulse.Pages.Production.MakerItemAssignment
                         NewRate = EditRateValue,
                         AssignedUnit = string.IsNullOrEmpty(EditingItem.AssignedUnit) ? "Pcs" : EditingItem.AssignedUnit,
                         Remarks = EditRemarksValue,
-                        Reason = RateChangeReason.Trim(),
+                        Reason = reason,
                         OriginatorUserName = userName,
                         CreatedAt = DateTime.UtcNow
                     };
@@ -442,23 +538,47 @@ namespace Impulse.Pages.Production.MakerItemAssignment
                 }
 
                 // Director/Admin direct update OR only remarks changed
-                await MakerItemAssignmentService.UpdateAssignedItemRateAndRemarksAsync(
-                    EditingItem.EntryID,
-                    EditRateValue,
-                    EditingItem.Rate,
-                    EditRemarksValue,
-                    userName);
-
-                EditingItem.Rate = EditRateValue;
-                EditingItem.Remarks = EditRemarksValue;
-
-                NotificationService.Notify(new Radzen.NotificationMessage
+                if (IsCustomerWiseRatesEnabled && ApplyToAllCustomers)
                 {
-                    Severity = Radzen.NotificationSeverity.Success,
-                    Summary = "Updated",
-                    Detail = $"Item [{EditingItem.ItemID}] updated successfully.",
-                    Duration = 3500
-                });
+                    await MakerItemAssignmentService.UpdateRateForAllCustomersAsync(
+                        SelectedMaker?.VendID ?? EditingItem.VendID,
+                        SelectedProcess?.ProcessID ?? EditingItem.ProcessID,
+                        EditingItem.ItemID,
+                        EditRateValue,
+                        EditingItem.Rate,
+                        EditRemarksValue,
+                        userName);
+
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Success,
+                        Summary = "Updated All Customers",
+                        Detail = $"Item [{EditingItem.ItemID}] updated across all customers.",
+                        Duration = 3500
+                    });
+
+                    await LoadAssignedItemsAsync();
+                }
+                else
+                {
+                    await MakerItemAssignmentService.UpdateAssignedItemRateAndRemarksAsync(
+                        EditingItem.EntryID,
+                        EditRateValue,
+                        EditingItem.Rate,
+                        EditRemarksValue,
+                        userName);
+
+                    EditingItem.Rate = EditRateValue;
+                    EditingItem.Remarks = EditRemarksValue;
+
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Success,
+                        Summary = "Updated",
+                        Detail = $"Item [{EditingItem.ItemID}] updated successfully.",
+                        Duration = 3500
+                    });
+                }
 
                 CloseEditModal();
             }
@@ -591,6 +711,47 @@ namespace Impulse.Pages.Production.MakerItemAssignment
             if (e.Data is AssignedMakerItemModel item)
             {
                 await ConfirmUnassign(item);
+            }
+        }
+
+        public async Task OnUpdateAllCustomersContextClick(ItemClickEventArgs e)
+        {
+            if (e.Data is AssignedMakerItemModel item && SelectedMaker != null && SelectedProcess != null)
+            {
+                try
+                {
+                    var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                    string userName = authState?.User?.Identity?.Name ?? CurrentUserName;
+
+                    await MakerItemAssignmentService.UpdateRateForAllCustomersAsync(
+                        SelectedMaker.VendID,
+                        SelectedProcess.ProcessID,
+                        item.ItemID,
+                        item.Rate,
+                        item.Rate,
+                        item.Remarks ?? string.Empty,
+                        userName);
+
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Success,
+                        Summary = "Updated All Customers",
+                        Detail = $"Rate {item.Rate:N2} applied to item [{item.ItemID}] across all customers for this maker.",
+                        Duration = 4000
+                    });
+
+                    await LoadAssignedItemsAsync();
+                }
+                catch (Exception ex)
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Error,
+                        Summary = "Update Failed",
+                        Detail = ex.Message,
+                        Duration = 5000
+                    });
+                }
             }
         }
     }

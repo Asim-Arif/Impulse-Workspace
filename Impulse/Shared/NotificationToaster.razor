@@ -229,6 +229,7 @@
 
     private readonly List<ActiveToast> activeToasts = new();
     private readonly HashSet<string> seenNotificationIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, DateTime> recentNotificationFingerprints = new(StringComparer.OrdinalIgnoreCase);
     private string? currentUserId;
     private string? currentUserName;
     private readonly HashSet<string> currentUserRoles = new(StringComparer.OrdinalIgnoreCase);
@@ -372,7 +373,7 @@
             {
                 foreach (var notif in recents)
                 {
-                    if (notif == null || notif.IsRead) continue;
+                    if (notif == null || notif.IsRead || notif.IsReadReceipt) continue;
                     if (seenNotificationIds.Contains(notif.Id)) continue;
 
                     // Show notifications created recently (within last 5 minutes or since session started)
@@ -381,7 +382,10 @@
                         if (MatchesCurrentUser(notif.TargetUserId) && !IsSentByMe(notif))
                         {
                             seenNotificationIds.Add(notif.Id);
-                            newUnreadNotifications.Add(notif);
+                            if (!IsDuplicateBurst(notif))
+                            {
+                                newUnreadNotifications.Add(notif);
+                            }
                         }
                     }
                     else
@@ -447,12 +451,37 @@
         return false;
     }
 
+    private bool IsDuplicateBurst(AppNotification notif)
+    {
+        var fingerprint = $"{notif.Category}|{notif.Title?.Trim()}|{notif.Message?.Trim()}|{notif.TargetUserId?.Trim()}";
+        var now = DateTime.UtcNow;
+
+        lock (recentNotificationFingerprints)
+        {
+            // Prune entries older than 2 minutes
+            var staleKeys = recentNotificationFingerprints.Where(kvp => (now - kvp.Value).TotalMinutes > 2).Select(kvp => kvp.Key).ToList();
+            foreach (var key in staleKeys)
+            {
+                recentNotificationFingerprints.Remove(key);
+            }
+
+            // If an identical notification was received in the last 30 seconds, consider it a duplicate burst
+            if (recentNotificationFingerprints.TryGetValue(fingerprint, out var lastSeen) && (now - lastSeen).TotalSeconds < 30)
+            {
+                return true;
+            }
+
+            recentNotificationFingerprints[fingerprint] = now;
+            return false;
+        }
+    }
+
     private async Task HandleNotificationReceived(AppNotification notification)
     {
         if (notification == null || isDisposed) return;
 
-        // Skip internal READ_SYNC signals
-        if (notification.Message == "READ_SYNC") return;
+        // Skip internal READ_SYNC signals and read receipts completely
+        if (notification.Message == "READ_SYNC" || notification.IsReadReceipt) return;
 
         // Check if notification is meant for this user
         if (!string.IsNullOrWhiteSpace(notification.TargetUserId))
@@ -477,6 +506,9 @@
             seenNotificationIds.Add(notification.Id);
         }
 
+        // Anti-spam debounce: suppress duplicate burst notifications with identical content within 30 seconds
+        if (IsDuplicateBurst(notification)) return;
+
         await ShowToastAsync(notification);
     }
 
@@ -489,7 +521,13 @@
 
         await InvokeAsync(() =>
         {
-            if (activeToasts.Any(t => t.Notification.Id == notification.Id)) return;
+            // Do not show duplicate if a toast with the exact same ID, or same Title and Message is already actively visible
+            if (activeToasts.Any(t => t.Notification.Id == notification.Id ||
+                (string.Equals(t.Notification.Title, notification.Title, StringComparison.OrdinalIgnoreCase) &&
+                 string.Equals(t.Notification.Message, notification.Message, StringComparison.OrdinalIgnoreCase))))
+            {
+                return;
+            }
 
             activeToasts.Insert(0, toast);
             if (activeToasts.Count > 5)
@@ -498,17 +536,6 @@
             }
             StateHasChanged();
         });
-
-        // Read-receipt toasts: no sound, dismiss after 3 seconds
-        if (notification.IsReadReceipt)
-        {
-            _ = Task.Run(async () =>
-            {
-                await Task.Delay(3000);
-                await InvokeAsync(() => DismissToast(toast.Id));
-            });
-            return;
-        }
 
         // Play audio chime and browser notification safely in background
         _ = Task.Run(async () =>

@@ -15,6 +15,6 @@ namespace Impulse.Services.Production
         Task<bool> SkipProcessAsync(string itemCode, int currentProcessId, int newProcessId, string lotNo);
         Task<List<EmployeeLookupModel>> GetEmployeesWithCapacityAsync(int processId);
         Task<long> GetFactoryMakerVendIdAsync();
-        Task<decimal> GetItemRateAsync(long vendId, int processId, string itemId);
+        Task<decimal> GetItemRateAsync(long vendId, int processId, string itemId, string? custCode = null);
     }
 }

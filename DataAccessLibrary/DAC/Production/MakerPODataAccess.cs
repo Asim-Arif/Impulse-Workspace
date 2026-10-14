@@ -48,10 +48,11 @@ namespace DataAccessLibrary.DAC.Production
         public async Task<List<AssignedItemLookupModel>> GetAssignedItemsForMakerAndProcessAsync(long vendId, int processId)
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
-            string sql = @"SELECT I.ItemID, I.ItemName, ISNULL(VAI.Rate, 0) AS Rate, ISNULL(VAI.Unit, 'Pcs') AS Unit 
+            string sql = @"SELECT I.ItemID, I.ItemName, MAX(ISNULL(VAI.Rate, 0)) AS Rate, ISNULL(MAX(VAI.Unit), 'Pcs') AS Unit 
                            FROM Items I 
                            INNER JOIN VendAssItems VAI ON I.ItemID = VAI.ItemID 
                            WHERE VAI.VendID = @VendId AND VAI.ProcessID = @ProcessId 
+                           GROUP BY I.ItemID, I.ItemName
                            ORDER BY I.ItemName";
 
             return (await db.QueryAsync<AssignedItemLookupModel>(sql, new { VendId = vendId, ProcessId = processId })).ToList();

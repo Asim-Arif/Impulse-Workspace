@@ -25,6 +25,7 @@ namespace Impulse.Pages.Accounts
         private string strCashBalance { get; set; } = string.Empty;
         private string strAccountBalance { get; set; } = string.Empty;
         private decimal dDebitCreditDifference { get; set; } = 0;
+        private string _lastGeneratedDescription = string.Empty;
         
         private List<ChartOfAccountsModel> cashAccounts = new List<ChartOfAccountsModel>();
         private List<ChartOfAccountsModel> Accounts = new List<ChartOfAccountsModel>();
@@ -125,6 +126,7 @@ namespace Impulse.Pages.Accounts
             voucherViewModel.ChequeDetails.Payee=string.Empty;*/
             voucherViewModel.Notes = string.Empty;
             voucherViewModel.Handed_Over_To = string.Empty;
+            _lastGeneratedDescription = string.Empty;
             
             // Later i'll change amount & get from GD            
             await GetNextVoucherNo(voucherViewModel.DT);            
@@ -181,6 +183,7 @@ namespace Impulse.Pages.Accounts
             //Update Cheque Amount
             //voucherViewModel.ChequeDetails.Amount = voucherViewModel.TotalDebit - voucherViewModel.TotalCredit;
             dDebitCreditDifference = voucherViewModel.TotalDebit - voucherViewModel.TotalCredit;
+            UpdateNotesAndCashDescription();
             // Clear form inputs
             newVoucherLine.Description = string.Empty;
             newVoucherLine.Debit = 0;
@@ -203,8 +206,40 @@ namespace Impulse.Pages.Accounts
         private void RemoveVoucherLine(VoucherLineItemViewModel VLIVM)
         {
             voucherViewModel.LineItems.Remove(VLIVM);
+            dDebitCreditDifference = voucherViewModel.TotalDebit - voucherViewModel.TotalCredit;
+            UpdateNotesAndCashDescription();
             //voucherViewModel.ChequeDetails.Amount = voucherViewModel.TotalDebit - voucherViewModel.TotalCredit;
             //VoucherLineList.Remove(VLIVM);
+        }
+
+        private string GenerateCashHeadDescription()
+        {
+            var validDescriptions = voucherViewModel.LineItems
+                .Where(x => !x.IsSystemLine && !string.IsNullOrWhiteSpace(x.Description))
+                .Select(x => x.Description.Trim())
+                .ToList();
+
+            if (!validDescriptions.Any())
+                return string.Empty;
+
+            if (validDescriptions.Count == 1)
+                return validDescriptions[0];
+
+            if (validDescriptions.Count == 2)
+                return $"{validDescriptions[0]} And {validDescriptions[1]}";
+
+            var allExceptLast = string.Join(", ", validDescriptions.Take(validDescriptions.Count - 1));
+            return $"{allExceptLast}, And {validDescriptions.Last()}";
+        }
+
+        private void UpdateNotesAndCashDescription()
+        {
+            var newDesc = GenerateCashHeadDescription();
+            if (string.IsNullOrWhiteSpace(voucherViewModel.Notes) || voucherViewModel.Notes == _lastGeneratedDescription)
+            {
+                voucherViewModel.Notes = newDesc;
+                _lastGeneratedDescription = newDesc;
+            }
         }
 
         
@@ -232,37 +267,43 @@ namespace Impulse.Pages.Accounts
                     return;                    
                 }
                                 
-                if (string.IsNullOrEmpty(voucherViewModel.Handed_Over_To))
-                {
-                    NotificationServiceManager.ShowWarning("Error", "Please enter Handed over to.");
-                    return;
-                }                
-                if (string.IsNullOrEmpty(voucherViewModel.Notes))
-                {
-                    NotificationServiceManager.ShowWarning("Error", "Please enter Notes.");
-                    return;
-                }
                 decimal dTotalDebit = 0;
                 decimal dTotalCredit = 0;
 
-                dTotalDebit=voucherViewModel.TotalDebit;
-                dTotalCredit=voucherViewModel.TotalCredit+dDebitCreditDifference;
+                dTotalDebit = voucherViewModel.TotalDebit;
+                dTotalCredit = voucherViewModel.TotalCredit + dDebitCreditDifference;
                 if (dTotalDebit != dTotalCredit) 
                 {
                     NotificationServiceManager.ShowWarning("Error", "Can't post transaction when Debit and Credit are not equal.");
                     return;
                 }
-                //We need to add Bank Account Transaction details as Credit to our voucher line.
+
+                // Auto-generate cash head description based on legacy frmExpenses.frm
+                string cashDescription = !string.IsNullOrWhiteSpace(voucherViewModel.Notes)
+                    ? voucherViewModel.Notes.Trim()
+                    : GenerateCashHeadDescription();
+
+                if (string.IsNullOrWhiteSpace(cashDescription))
+                {
+                    cashDescription = "Cash Payment";
+                }
+
+                if (string.IsNullOrWhiteSpace(voucherViewModel.Notes))
+                {
+                    voucherViewModel.Notes = cashDescription;
+                }
+
+                //We need to add Cash Account Transaction details as Credit to our voucher line.
                 systemLine = new VoucherLineItemViewModel
                 {
                     AccNo = SelectedCashAccount.AccNo,
                     AccTitle = SelectedCashAccount.AccTitle,
-                    Description = "Payment For "+voucherViewModel.Notes,  //voucherViewModel.ChequeDetails.Description,
+                    Description = cashDescription,
                     CS_RefID = 0,//int.Parse(SelectedCostCenter?.DropDownValue_ID ?? "0"),
                     CS_Description = "",//SelectedCostCenter?.DropDownValue_Description ?? "",
                     Debit = 0,
                     Credit = dDebitCreditDifference,
-                    IsSystemLine=true
+                    IsSystemLine = true
                 };
                 voucherViewModel.LineItems.Add(systemLine);
 
@@ -414,11 +455,19 @@ namespace Impulse.Pages.Accounts
             {
                 newVoucherLine.AccTitle = selectedAccount.AccTitle;
                 newVoucherLine.AccNo = selectedAccount.AccNo;
+                newVoucherLine.Description = "Payment for " + selectedAccount.AccTitle.Trim();
                 
                 decimal balance = await VoucherService.GetBalance(selectedAccount.AccNo, voucherViewModel.DT);
                 strAccountBalance = balance.ToString("N2");
                 StateHasChanged();
-                
+            }
+            else
+            {
+                newVoucherLine.AccTitle = string.Empty;
+                newVoucherLine.AccNo = string.Empty;
+                newVoucherLine.Description = string.Empty;
+                strAccountBalance = string.Empty;
+                StateHasChanged();
             }
         }
 

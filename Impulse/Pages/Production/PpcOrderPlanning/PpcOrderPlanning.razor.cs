@@ -30,10 +30,10 @@ namespace Impulse.Pages.Production.PpcOrderPlanning
 
         public bool CanSavePlan =>
             OrderHeader != null &&
-            OrderHeader.Items.Any() &&
-            !OrderHeader.Items.Any(i => i.StockQty > i.AvailableInHandStock || i.StockQty < 0) &&
-            !OrderHeader.Items.Any(i => i.Purchases.Any(p => p.PurchaseQty <= 0 || p.ProcessID <= 0)) &&
-            !OrderHeader.Items.Any(i => i.HubSchedules.Any(h => h.StartDate > h.EndDate));
+            OrderHeader.Items.Any(i => i.Authorized) &&
+            !OrderHeader.Items.Where(i => i.Authorized).Any(i => i.StockQty > i.AvailableInHandStock || i.StockQty < 0) &&
+            !OrderHeader.Items.Where(i => i.Authorized).Any(i => i.Purchases.Any(p => p.PurchaseQty <= 0 || p.ProcessID <= 0)) &&
+            !OrderHeader.Items.Where(i => i.Authorized).Any(i => i.HubSchedules.Any(h => h.StartDate > h.EndDate));
 
         protected override async Task OnInitializedAsync()
         {
@@ -130,6 +130,8 @@ namespace Impulse.Pages.Production.PpcOrderPlanning
 
         public async Task AddPurchaseSplit(PpcOrderItemDto item)
         {
+            if (!item.Authorized) return;
+
             var split = new PpcItemPurchaseAllocationDto
             {
                 ProcessID = 0,
@@ -218,10 +220,36 @@ namespace Impulse.Pages.Production.PpcOrderPlanning
 
         public async Task SavePlanAsync()
         {
-            if (IsSaving || OrderHeader == null || !OrderHeader.Items.Any()) return;
+            if (IsSaving || OrderHeader == null) return;
 
-            // 1. Validation checks
-            foreach (var item in OrderHeader.Items)
+            var authorizedItems = OrderHeader.Items.Where(i => i.Authorized).ToList();
+            if (!authorizedItems.Any())
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Warning,
+                    Summary = "No Authorized Items",
+                    Detail = "This order has no authorized items to plan. Material planning is restricted until authorized by a Director.",
+                    Duration = 5000
+                });
+                return;
+            }
+
+            var plannedItems = authorizedItems.Where(i => i.IsPlanned).ToList();
+            if (!plannedItems.Any())
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Warning,
+                    Summary = "No Items Planned",
+                    Detail = "Please plan at least one item (add a maker purchase split, issue stock, or mark as in-house planned) before saving.",
+                    Duration = 5000
+                });
+                return;
+            }
+
+            // 1. Validation checks on planned items
+            foreach (var item in plannedItems)
             {
                 if (item.StockQty > item.AvailableInHandStock)
                 {
@@ -281,7 +309,7 @@ namespace Impulse.Pages.Production.PpcOrderPlanning
                     OrderNo = OrderHeader.OrderNo,
                     PlannedBy = currentUserName,
                     Notes = PlanningNotes,
-                    Items = OrderHeader.Items
+                    Items = authorizedItems
                 };
 
                 bool ok = await PpcPlanningService.SavePpcPlanAndDispatchTasksAsync(request);

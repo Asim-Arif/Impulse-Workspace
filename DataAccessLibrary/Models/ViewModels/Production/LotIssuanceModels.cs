@@ -26,6 +26,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public int RepairType { get; set; }
         public int ReqAuth { get; set; }
         public string CountedBy { get; set; } = string.Empty;
+        public string CustCode { get; set; } = string.Empty;
     }
 
     public class LotIssuanceLookupResultModel
@@ -67,5 +68,6 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public int ReWorkLot { get; set; }
         public int RepairType { get; set; }
         public string CountedBy { get; set; } = string.Empty;
+        public string CustCode { get; set; } = string.Empty;
     }
 }

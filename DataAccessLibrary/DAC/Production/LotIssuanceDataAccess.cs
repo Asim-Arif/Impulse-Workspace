@@ -25,6 +25,23 @@ namespace DataAccessLibrary.DAC.Production
         private string ConnectionString => _config.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("DefaultConnection string is not configured.");
 
+        private static bool? _hasCustCodeColumn;
+        private static async Task<bool> HasCustCodeColumnAsync(IDbConnection conn)
+        {
+            if (_hasCustCodeColumn.HasValue) return _hasCustCodeColumn.Value;
+            try
+            {
+                int count = await conn.ExecuteScalarAsync<int>(
+                    "SELECT COUNT(1) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'VendAssItems' AND COLUMN_NAME = 'CustCode'");
+                _hasCustCodeColumn = count > 0;
+            }
+            catch
+            {
+                _hasCustCodeColumn = false;
+            }
+            return _hasCustCodeColumn.Value;
+        }
+
         public async Task<List<ProcessPOLookupModel>> GetProcessesAsync()
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
@@ -98,12 +115,14 @@ namespace DataAccessLibrary.DAC.Production
                                       ISNULL(VRD.NextProcessID, 0) AS ReturnProcessID, ISNULL(P.Description, '') AS ReturnProcessName,
                                       0 AS Priority,
                                       ISNULL(VRD.ReWorkLot, 0) AS ReWorkLot, ISNULL(VRD.Repair_RefID, 0) AS RepairType,
-                                      ISNULL(VRD.ReqAuth, 0) AS ReqAuth
+                                      ISNULL(VRD.ReqAuth, 0) AS ReqAuth,
+                                      ISNULL(FCO.CustCode, 'Stock') AS CustCode
                                FROM VendRcvdDetail VRD
                                INNER JOIN VendReceived VR ON VRD.RefID = VR.EntryID
                                LEFT JOIN Items I ON VRD.ItemCode = I.ItemID
                                LEFT JOIN Processes P ON VRD.NextProcessID = P.ProcessID
                                LEFT JOIN Lots_List L ON VRD.LotNo = L.LotNo
+                               LEFT JOIN FCustomerOrders FCO ON VRD.OrderNo = FCO.OrderNo
                                WHERE VRD.LotNo = @LotNo
                                ORDER BY VRD.EntryID DESC";
 
@@ -188,11 +207,13 @@ namespace DataAccessLibrary.DAC.Production
                                   VID.Rate, ISNULL(I.Unit, 'Pcs') AS Unit, ISNULL(VID.RcvProcessID, 0) AS TargetProcessID,
                                   ISNULL(P.Description, '') AS TargetProcessName, ISNULL(VID.RcvProcessID, 0) AS ReturnProcessID,
                                   ISNULL(P.Description, '') AS ReturnProcessName, ISNULL(VID.Priority, 0) AS Priority,
-                                  ISNULL(VID.ReWorkLot, 0) AS ReWorkLot, ISNULL(VID.Repair_RefID, 0) AS RepairType
+                                  ISNULL(VID.ReWorkLot, 0) AS ReWorkLot, ISNULL(VID.Repair_RefID, 0) AS RepairType,
+                                  ISNULL(FCO.CustCode, 'Stock') AS CustCode
                            FROM VendIssdDetail VID
                            INNER JOIN VendIssued VI ON VID.RefID = VI.EntryID
                            LEFT JOIN Items I ON VID.ItemCode = I.ItemID
                            LEFT JOIN Processes P ON VID.RcvProcessID = P.ProcessID
+                           LEFT JOIN FCustomerOrders FCO ON VID.OrderNo = FCO.OrderNo
                            WHERE (VID.IssQty - ISNULL(VID.RcvdQty, 0)) > 0
                              AND (@ProcessID = 0 OR VID.RcvProcessID = @ProcessID)
                              AND (@VendID = 0 OR VI.VendID = @VendID)
@@ -298,12 +319,40 @@ namespace DataAccessLibrary.DAC.Production
                     }
 
                     // Insert or update VendAssItems
-                    string checkAssSql = @"SELECT COUNT(*) FROM VendAssItems WHERE VendID = @VendID AND ProcessID = @ProcessID AND ItemID = @ItemID";
-                    int assCount = await db.ExecuteScalarAsync<int>(checkAssSql, new { VendID = header.VendID, ProcessID = header.ProcessID, ItemID = line.ItemCode }, trans);
+                    bool hasCustCodeCol = await HasCustCodeColumnAsync(db);
+                    string effCustCode = !string.IsNullOrWhiteSpace(line.CustCode) ? line.CustCode : "Stock";
+
+                    string checkAssSql = hasCustCodeCol
+                        ? @"SELECT COUNT(*) FROM VendAssItems 
+                            WHERE VendID = @VendID AND ProcessID = @ProcessID AND ItemID = @ItemID 
+                              AND (CustCode = @CustCode OR CustCode = 'Stock' OR CustCode IS NULL OR CustCode = '')"
+                        : @"SELECT COUNT(*) FROM VendAssItems 
+                            WHERE VendID = @VendID AND ProcessID = @ProcessID AND ItemID = @ItemID";
+
+                    int assCount = await db.ExecuteScalarAsync<int>(checkAssSql, new
+                    {
+                        header.VendID,
+                        header.ProcessID,
+                        ItemID = line.ItemCode,
+                        CustCode = effCustCode
+                    }, trans);
+
                     if (assCount == 0)
                     {
-                        string insertAssSql = @"INSERT INTO VendAssItems (VendID, ProcessID, ItemID, Rate, Unit, Remarks) VALUES (@VendID, @ProcessID, @ItemID, @Rate, 'Pcs', 'Auto-LotIssuance')";
-                        await db.ExecuteAsync(insertAssSql, new { VendID = header.VendID, ProcessID = header.ProcessID, ItemID = line.ItemCode, Rate = line.Rate }, trans);
+                        string insertAssSql = hasCustCodeCol
+                            ? @"INSERT INTO VendAssItems (VendID, ProcessID, ItemID, Rate, Unit, Remarks, CustCode) 
+                                VALUES (@VendID, @ProcessID, @ItemID, @Rate, 'Pcs', 'Auto-LotIssuance', @CustCode)"
+                            : @"INSERT INTO VendAssItems (VendID, ProcessID, ItemID, Rate, Unit, Remarks) 
+                                VALUES (@VendID, @ProcessID, @ItemID, @Rate, 'Pcs', 'Auto-LotIssuance')";
+
+                        await db.ExecuteAsync(insertAssSql, new
+                        {
+                            header.VendID,
+                            header.ProcessID,
+                            ItemID = line.ItemCode,
+                            Rate = line.Rate,
+                            CustCode = effCustCode
+                        }, trans);
                     }
 
                     // Insert into PrintSession
@@ -412,7 +461,7 @@ namespace DataAccessLibrary.DAC.Production
             return 0;
         }
 
-        public async Task<decimal> GetItemRateAsync(long vendId, int processId, string itemId)
+        public async Task<decimal> GetItemRateAsync(long vendId, int processId, string itemId, string? custCode = null)
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
 
@@ -425,18 +474,40 @@ namespace DataAccessLibrary.DAC.Production
             }
 
             // 2. Fetch rate from VendAssItems for selected maker, process & item
-            const string rateSql = @"
-                SELECT TOP 1 ISNULL(Rate, 0)
-                FROM VendAssItems
-                WHERE VendID = @VendId
-                  AND ProcessID = @ProcessId
-                  AND ItemID = @ItemId";
+            bool hasCustCol = await HasCustCodeColumnAsync(db);
+            string rateSql;
+            if (hasCustCol && !string.IsNullOrWhiteSpace(custCode))
+            {
+                rateSql = @"
+                    SELECT TOP 1 ISNULL(Rate, 0)
+                    FROM VendAssItems
+                    WHERE VendID = @VendId
+                      AND ProcessID = @ProcessId
+                      AND ItemID = @ItemId
+                      AND (CustCode = @CustCode OR CustCode = 'Stock' OR CustCode IS NULL OR CustCode = '')
+                    ORDER BY 
+                      CASE 
+                        WHEN CustCode = @CustCode THEN 1 
+                        WHEN CustCode = 'Stock' THEN 2 
+                        ELSE 3 
+                      END";
+            }
+            else
+            {
+                rateSql = @"
+                    SELECT TOP 1 ISNULL(Rate, 0)
+                    FROM VendAssItems
+                    WHERE VendID = @VendId
+                      AND ProcessID = @ProcessId
+                      AND ItemID = @ItemId";
+            }
 
             decimal? rate = await db.ExecuteScalarAsync<decimal?>(rateSql, new
             {
                 VendId = vendId,
                 ProcessId = processId,
-                ItemId = itemId
+                ItemId = itemId,
+                CustCode = custCode
             });
 
             return rate ?? 0m;

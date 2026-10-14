@@ -104,6 +104,23 @@ namespace DataAccessLibrary.DAC.Production
             return rows.ToList();
         }
 
+        private static bool? _hasCustCodeColumn;
+        private static async Task<bool> HasCustCodeColumnAsync(IDbConnection conn)
+        {
+            if (_hasCustCodeColumn.HasValue) return _hasCustCodeColumn.Value;
+            try
+            {
+                int count = await conn.ExecuteScalarAsync<int>(
+                    "SELECT COUNT(1) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'VendAssItems' AND COLUMN_NAME = 'CustCode'");
+                _hasCustCodeColumn = count > 0;
+            }
+            catch
+            {
+                _hasCustCodeColumn = false;
+            }
+            return _hasCustCodeColumn.Value;
+        }
+
         public async Task<List<PpcMakerPoItemRowDto>> GetPpcPurchasesForOrderAsync(string orderNo)
         {
             using var conn = CreateConnection();
@@ -111,6 +128,7 @@ namespace DataAccessLibrary.DAC.Production
                 SELECT 
                     pip.EntryID,
                     pip.OrderNo,
+                    ISNULL(co.CustCode, '') AS CustCode,
                     pip.ItemID AS CompItemID,
                     ISNULL(i.ItemName, ISNULL(i.Description, pip.ItemID)) AS ItemName,
                     pip.ProcessID,
@@ -119,31 +137,80 @@ namespace DataAccessLibrary.DAC.Production
                     ISNULL(m.VenderName, 'Unassigned') AS MakerName,
                     pip.PurchaseQty,
                     ISNULL(pip.PurchaseRate, 0) AS PurchaseRate,
-                    pip.VendIssued_RefID,
-                    pip.MasterPONo,
-                    pip.IssuedAt,
-                    pip.IssuedBy
+                    ISNULL(pip.ExcessQtyPercentage, 50) AS ExcessQtyPercentage,
+                    COALESCE(pip.VendIssued_RefID, vid.RefID) AS VendIssued_RefID,
+                    COALESCE(pip.MasterPONo, vi.MasterPONo, vi.RecieptID) AS MasterPONo,
+                    COALESCE(pip.IssuedAt, vi.DT) AS IssuedAt,
+                    COALESCE(pip.IssuedBy, vi.UserName) AS IssuedBy
                 FROM PPC_Order_Item_Purchases pip
+                LEFT JOIN FCustomerOrders co ON pip.OrderNo = co.OrderNo
                 LEFT JOIN Items i ON pip.ItemID = i.ItemID
                 LEFT JOIN Processes p ON pip.ProcessID = p.ProcessID
                 LEFT JOIN Makers m ON pip.VendID = m.VendID
+                OUTER APPLY (
+                    SELECT TOP 1 vid_inner.RefID, vid_inner.EntryID AS DetailEntryID
+                    FROM VendIssdDetail vid_inner
+                    WHERE vid_inner.OrderNo = pip.OrderNo 
+                      AND vid_inner.ItemCode = pip.ItemID 
+                      AND vid_inner.RcvProcessID = pip.ProcessID
+                    ORDER BY vid_inner.EntryID DESC
+                ) vid
+                LEFT JOIN VendIssued vi ON vid.RefID = vi.EntryID
                 WHERE pip.OrderNo = @OrderNo
                 ORDER BY pip.EntryID";
 
             var list = (await conn.QueryAsync<PpcMakerPoItemRowDto>(sql, new { OrderNo = orderNo })).ToList();
 
+            // Auto-heal synchronization: if any row was found issued via VendIssdDetail but missing on pip, persist it back
+            foreach (var row in list.Where(r => r.VendIssued_RefID.HasValue && r.VendIssued_RefID.Value > 0))
+            {
+                const string healSql = @"
+                    UPDATE PPC_Order_Item_Purchases
+                    SET VendIssued_RefID = @RefID,
+                        MasterPONo = @MasterPONo,
+                        IssuedAt = ISNULL(IssuedAt, GETUTCDATE())
+                    WHERE EntryID = @EntryID AND VendIssued_RefID IS NULL";
+                await conn.ExecuteAsync(healSql, new
+                {
+                    RefID = row.VendIssued_RefID.Value,
+                    MasterPONo = row.MasterPONo,
+                    EntryID = row.EntryID
+                });
+            }
+
             // Populate fallback rates from VendAssItems if Rate is 0 and Maker is assigned
+            bool hasCustCodeCol = await HasCustCodeColumnAsync(conn);
             foreach (var row in list.Where(r => r.PurchaseRate == 0 && r.VendID > 0))
             {
-                const string rateSql = @"
-                    SELECT TOP 1 Rate 
-                    FROM VendAssItems 
-                    WHERE VendID = @VendID AND ProcessID = @ProcessID AND ItemID = @ItemID";
+                string rateSql;
+                if (hasCustCodeCol && !string.IsNullOrWhiteSpace(row.CustCode))
+                {
+                    rateSql = @"
+                        SELECT TOP 1 Rate 
+                        FROM VendAssItems 
+                        WHERE VendID = @VendID AND ProcessID = @ProcessID AND ItemID = @ItemID
+                          AND (CustCode = @CustCode OR CustCode IS NULL OR CustCode = '' OR CustCode = 'Stock')
+                        ORDER BY 
+                          CASE 
+                            WHEN CustCode = @CustCode THEN 1 
+                            WHEN CustCode = 'Stock' THEN 2 
+                            ELSE 3 
+                          END";
+                }
+                else
+                {
+                    rateSql = @"
+                        SELECT TOP 1 Rate 
+                        FROM VendAssItems 
+                        WHERE VendID = @VendID AND ProcessID = @ProcessID AND ItemID = @ItemID";
+                }
+
                 var defaultRate = await conn.ExecuteScalarAsync<decimal?>(rateSql, new
                 {
                     row.VendID,
                     row.ProcessID,
-                    ItemID = row.CompItemID
+                    ItemID = row.CompItemID,
+                    row.CustCode
                 });
 
                 if (defaultRate.HasValue && defaultRate.Value > 0)
@@ -270,7 +337,7 @@ namespace DataAccessLibrary.DAC.Production
                             UserName = request.UserName,
                             MachineName = request.MachineName,
                             SpecialInstructions = line.SpecialInstructions ?? string.Empty,
-                            ExcessQtyPercentage = 0,
+                            ExcessQtyPercentage = line.ExcessQtyPercentage > 0 ? (float)line.ExcessQtyPercentage : 50f,
                             MaximumRcvingsAgainstPO = 1,
                             MasterPONo = currentMasterPoNo,
                             SampleProvided = line.SampleProvided,
@@ -345,26 +412,37 @@ namespace DataAccessLibrary.DAC.Production
                         await conn.ExecuteAsync(insertAuthSql, new { UserID = request.UserId, IssID = lineEntryId }, trans);
 
                         // 4f. Auto assign item to maker if not already assigned
-                        string checkAssignedSql = @"SELECT COUNT(1) FROM VendAssItems 
-                                                    WHERE VendID = @VendID AND ProcessID = @ProcessID AND ItemID = @ItemID";
+                        bool hasCustColForPo = await HasCustCodeColumnAsync(conn);
+                        string checkAssignedSql = hasCustColForPo && !string.IsNullOrWhiteSpace(line.CustCode)
+                            ? @"SELECT COUNT(1) FROM VendAssItems 
+                                WHERE VendID = @VendID AND ProcessID = @ProcessID AND ItemID = @ItemID 
+                                  AND (CustCode = @CustCode OR CustCode IS NULL OR CustCode = '')"
+                            : @"SELECT COUNT(1) FROM VendAssItems 
+                                WHERE VendID = @VendID AND ProcessID = @ProcessID AND ItemID = @ItemID";
+
                         int countAssigned = await conn.ExecuteScalarAsync<int>(checkAssignedSql, new
                         {
                             line.VendID,
                             line.ProcessID,
-                            ItemID = line.CompItemID
+                            ItemID = line.CompItemID,
+                            line.CustCode
                         }, trans);
 
                         if (countAssigned == 0)
                         {
-                            string autoAssignSql = @"
-                                INSERT INTO VendAssItems (VendID, ProcessID, ItemID, Rate, Unit, Remarks)
-                                VALUES (@VendID, @ProcessID, @ItemID, @Rate, 'Pcs', 'Auto')";
+                            string autoAssignSql = hasCustColForPo && !string.IsNullOrWhiteSpace(line.CustCode)
+                                ? @"INSERT INTO VendAssItems (VendID, ProcessID, ItemID, Rate, Unit, Remarks, CustCode)
+                                    VALUES (@VendID, @ProcessID, @ItemID, @Rate, 'Pcs', 'Auto', @CustCode)"
+                                : @"INSERT INTO VendAssItems (VendID, ProcessID, ItemID, Rate, Unit, Remarks)
+                                    VALUES (@VendID, @ProcessID, @ItemID, @Rate, 'Pcs', 'Auto')";
+
                             await conn.ExecuteAsync(autoAssignSql, new
                             {
                                 line.VendID,
                                 line.ProcessID,
                                 ItemID = line.CompItemID,
-                                Rate = line.PurchaseRate > 0 ? line.PurchaseRate : 1m
+                                Rate = line.PurchaseRate > 0 ? line.PurchaseRate : 1m,
+                                line.CustCode
                             }, trans);
                         }
 

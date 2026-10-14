@@ -3035,6 +3035,12 @@ BEGIN
     PRINT 'Added column [VendIssued_RefID] to [dbo].[PPC_Order_Item_Purchases]';
 END
 GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.[PPC_Order_Item_Purchases]') AND name = 'ExcessQtyPercentage')
+BEGIN
+    ALTER TABLE [dbo].[PPC_Order_Item_Purchases] ADD [ExcessQtyPercentage] [real] NOT NULL DEFAULT ((50));
+    PRINT 'Added column [ExcessQtyPercentage] to [dbo].[PPC_Order_Item_Purchases]';
+END
+GO
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.[Users]') AND name = 'MIL_Print_Maker_Issuance_Report_Valuewise')
 BEGIN
     ALTER TABLE [dbo].[Users] ADD [MIL_Print_Maker_Issuance_Report_Valuewise] [bit] NOT NULL CONSTRAINT [DF_Users_MIL_Print_Maker_Issuance_Report_Valuewise] DEFAULT ((0));
@@ -5358,6 +5364,83 @@ FROM        dbo.Employees RIGHT OUTER JOIN
                                                           AND dbo.VendReceived.ProcessID = dbo.ProcessGroupsProcesses.Process_RefID 
                 LEFT OUTER JOIN dbo.VHubSupervisors ON dbo.ProcessGroupsProcesses.Group_RefID = dbo.VHubSupervisors.GroupID 
                                                   AND dbo.ProcessGroupsProcesses.Hub_Name = dbo.VHubSupervisors.Hub_Name
+GO
+
+-- ==============================================================================
+-- VENDASSITEMS: HARMONIZE CUSTCODE & SP_VENDASSITEM FOR ALL CLIENTS
+-- ==============================================================================
+
+-- 1. Ensure CustCode column exists on VendAssItems (Nullable for backward compatibility)
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('VendAssItems') AND name = 'CustCode')
+BEGIN
+    ALTER TABLE [dbo].[VendAssItems] ADD [CustCode] VARCHAR(50) NULL;
+END
+GO
+
+-- 1b. Ensure default constraint exists for CustCode so omitted inserts never fail
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('VendAssItems') AND name = 'CustCode')
+   AND NOT EXISTS (SELECT 1 FROM sys.default_constraints WHERE parent_object_id = OBJECT_ID('VendAssItems') AND col_name(parent_object_id, parent_column_id) = 'CustCode')
+BEGIN
+    ALTER TABLE [dbo].[VendAssItems] ADD CONSTRAINT [DF_VendAssItems_CustCode] DEFAULT ('Stock') FOR [CustCode];
+END
+GO
+
+-- 2. Update SP_VendAssItem to make @CustCode optional (default NULL -> 'Stock') and inline bulk assignment
+CREATE OR ALTER PROCEDURE [dbo].[SP_VendAssItem] 
+    @VendID AS INT,
+    @ItemID AS VARCHAR(50) = '0',
+    @ProcessID AS INT,
+    @Rate AS REAL = 0,
+    @CustCode AS VARCHAR(50) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @PlantRate AS FLOAT;
+    DECLARE @StampRate AS FLOAT;
+    DECLARE @SnaffRate AS FLOAT;
+    DECLARE @Unit AS VARCHAR(50);
+    DECLARE @EffectiveCustCode AS VARCHAR(50) = ISNULL(NULLIF(@CustCode, ''), 'Stock');
+
+    IF @ItemID <> '0' 
+    BEGIN
+        SELECT @PlantRate = PlantRate, @StampRate = StampRate, @SnaffRate = SnaffRate, @Unit = Unit 
+        FROM Items 
+        WHERE ItemID = @ItemID;
+
+        INSERT INTO VendAssItems(VendID, ProcessID, ItemID, Rate, PlantRate, StampRate, SnaffRate, Unit, CustCode)
+        VALUES(@VendID, @ProcessID, @ItemID, @Rate, @PlantRate, @StampRate, @SnaffRate, @Unit, @EffectiveCustCode);
+    END
+    ELSE
+    BEGIN
+        -- Bulk assign unassigned items for this maker, process & customer
+        INSERT INTO VendAssItems(VendID, ProcessID, ItemID, PlantRate, StampRate, SnaffRate, CustCode)
+        SELECT @VendID, @ProcessID, ItemID, PlantRate, StampRate, SnaffRate, @EffectiveCustCode
+        FROM Items 
+        WHERE ItemID IN (SELECT ItemID FROM ItemProcesses WHERE ProcessID = @ProcessID) 
+          AND ItemID NOT IN (
+              SELECT ItemID 
+              FROM VendAssItems 
+              WHERE VendID = @VendID 
+                AND ProcessID = @ProcessID
+                AND (CustCode = @EffectiveCustCode OR (@EffectiveCustCode = 'Stock' AND (CustCode IS NULL OR CustCode = '' OR CustCode = 'Stock')))
+          );
+    END
+END
+GO
+
+-- 3. Harmonize VMakerAssItems view so CustCode is always exposed
+CREATE OR ALTER VIEW [dbo].[VMakerAssItems]
+AS
+SELECT  dbo.ItemGroups.Description, dbo.Makers.VenderName, dbo.Makers.PhaseID, dbo.Makers.VendType, dbo.Makers.RepairDedRate, 
+        dbo.VItems1.ItemName, dbo.VItems1.Unit, dbo.VItems1.Type, dbo.Makers.Active, 
+        dbo.Makers.VendID1, dbo.VendAssItems.EntryID, dbo.VendAssItems.VendID, dbo.VendAssItems.ProcessID, dbo.VendAssItems.ItemID, 
+        dbo.VendAssItems.Rate, dbo.VendAssItems.PlantRate, dbo.VendAssItems.StampRate, 
+        dbo.VendAssItems.SnaffRate, dbo.VendAssItems.Unit AS AssignedUnit, dbo.VendAssItems.Remarks, 
+        dbo.VItems1.ItemSize, dbo.VItems1.SizeUnit, dbo.VendAssItems.CustCode
+FROM    dbo.VendAssItems INNER JOIN
+        dbo.Makers ON dbo.VendAssItems.VendID = dbo.Makers.VendID INNER JOIN
+        dbo.VItems1 ON dbo.VendAssItems.ItemID = dbo.VItems1.ItemID LEFT OUTER JOIN
+        dbo.ItemGroups ON dbo.VItems1.GroupID = dbo.ItemGroups.ID;
 GO
 
 

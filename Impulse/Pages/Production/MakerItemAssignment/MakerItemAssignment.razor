@@ -98,7 +98,7 @@
                     <div class="row g-3 align-items-end">
 
                         <!-- Select Maker -->
-                        <div class="col-md-4">
+                        <div class="@(IsCustomerWiseRatesEnabled ? "col-md-3" : "col-md-4")">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
                                 Select Maker / Contractor <span class="text-danger">*</span>
                             </label>
@@ -117,7 +117,7 @@
                         </div>
 
                         <!-- Select Process -->
-                        <div class="col-md-3">
+                        <div class="@(IsCustomerWiseRatesEnabled ? "col-md-2" : "col-md-3")">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
                                 Select Process <span class="text-danger">*</span>
                             </label>
@@ -137,6 +137,31 @@
                                 </BlazoredTypeahead>
                             </div>
                         </div>
+
+                        @if (IsCustomerWiseRatesEnabled)
+                        {
+                            <!-- Select Customer -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
+                                    Customer <span class="text-muted fw-normal">(Optional Filter)</span>
+                                </label>
+                                <div class="@(SelectedMaker == null ? "disabled-typeahead-wrapper" : "")">
+                                    <BlazoredTypeahead SearchMethod="SearchCustomers"
+                                                       @bind-Value="SelectedCustomer"
+                                                       Placeholder="All / Select Customer..."
+                                                       EnableDropDown="true"
+                                                       Disabled="SelectedMaker == null"
+                                                       MaximumSuggestions="1000">
+                                        <SelectedTemplate Context="c">
+                                            @c.DisplayText
+                                        </SelectedTemplate>
+                                        <ResultTemplate Context="c">
+                                            @c.DisplayText
+                                        </ResultTemplate>
+                                    </BlazoredTypeahead>
+                                </div>
+                            </div>
+                        }
 
                         <!-- Unassigned Items Dropdown -->
                         <div class="col-md-3">
@@ -209,6 +234,10 @@
                                         <tr>
                                             <th style="width: 100px;">Item ID</th>
                                             <th>Item Name</th>
+                                            @if (IsCustomerWiseRatesEnabled)
+                                            {
+                                                <th style="width: 120px;">Customer</th>
+                                            }
                                             <th>Group</th>
                                             <th class="text-end" style="width: 110px;">Rate (Pcs)</th>
                                             <th class="text-end" style="width: 110px;">Rate (Dzn)</th>
@@ -224,6 +253,19 @@
                                             <ContextMenuTrigger WrapperTag="tr" MenuId="itemRowContextMenu" Data="item">
                                                 <td class="fw-bold text-primary">@item.ItemID</td>
                                                 <td class="fw-semibold">@item.ItemName</td>
+                                                @if (IsCustomerWiseRatesEnabled)
+                                                {
+                                                    <td>
+                                                        @if (!string.IsNullOrWhiteSpace(item.CustCode))
+                                                        {
+                                                            <span class="badge bg-secondary-subtle text-secondary border">@item.CustCode</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-light text-muted border">General</span>
+                                                        }
+                                                    </td>
+                                                }
                                                 <td>@(string.IsNullOrEmpty(item.Description) ? "-" : item.Description)</td>
                                                 <td class="text-end fw-bold text-success">@item.Rate.ToString("N2")</td>
                                                 <td class="text-end text-secondary">@item.RateDozen.ToString("N2")</td>
@@ -244,7 +286,7 @@
                                         @if (!FilteredAssignedItems.Any())
                                         {
                                             <tr>
-                                                <td colspan="9" class="text-center text-muted py-4">
+                                                <td colspan="@(IsCustomerWiseRatesEnabled ? 10 : 9)" class="text-center text-muted py-4">
                                                     <i class="fas fa-info-circle me-1"></i> No assigned items found for this maker and process.
                                                 </td>
                                             </tr>
@@ -279,6 +321,12 @@
     <Item OnClick="OnEditContextClick">
         <i class="fas fa-pencil-alt win11-icon text-secondary me-2"></i> Edit Rate &amp; Remarks
     </Item>
+    @if (IsCustomerWiseRatesEnabled)
+    {
+        <Item OnClick="OnUpdateAllCustomersContextClick">
+            <i class="fas fa-users-cog win11-icon text-info me-2"></i> Update Rate for All Customers
+        </Item>
+    }
     <Seperator />
     <Item OnClick="OnUnassignContextClick">
         <i class="fas fa-trash win11-icon text-danger me-2"></i> Unassign Item
@@ -332,6 +380,16 @@
                         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Remarks</label>
                         <textarea class="form-control form-control-sm" rows="3" @bind="EditRemarksValue" placeholder="Enter remarks..."></textarea>
                     </div>
+
+                    @if (IsCustomerWiseRatesEnabled)
+                    {
+                        <div class="mb-2 form-check">
+                            <input type="checkbox" class="form-check-input" id="applyAllCust" @bind="ApplyToAllCustomers" />
+                            <label class="form-check-label fw-semibold text-secondary" for="applyAllCust" style="font-size:0.82rem;">
+                                <i class="fas fa-users-cog me-1 text-info"></i> Apply this rate to all customers for this item &amp; maker
+                            </label>
+                        </div>
+                    }
                 </div>
                 <div class="modal-footer py-2" style="background:#f8f9fb; border-radius: 0 0 12px 12px;">
                     <button type="button" class="btn btn-sm btn-outline-secondary px-3" @onclick="CloseEditModal">Cancel</button>

@@ -194,7 +194,7 @@ namespace Impulse.Pages.Production.LotIssuance
             foreach (var item in StagedItems)
             {
                 int procId = item.TargetProcessID > 0 ? item.TargetProcessID : SelectedProcessID;
-                item.Rate = await LotIssuanceService.GetItemRateAsync(SelectedMaker.VendID, procId, item.ItemCode);
+                item.Rate = await LotIssuanceService.GetItemRateAsync(SelectedMaker.VendID, procId, item.ItemCode, item.CustCode);
             }
         }
 
@@ -537,6 +537,7 @@ namespace Impulse.Pages.Production.LotIssuance
                     IssueRefID = i.VendIssdDetailEntryID,
                     ItemCode = i.ItemCode,
                     OrderNo = i.OrderNo,
+                    CustCode = i.CustCode,
                     Rate = i.Rate,
                     IssQty = i.IssuanceQty,
                     LotNo = i.LotNo,

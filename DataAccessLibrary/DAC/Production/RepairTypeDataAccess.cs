@@ -85,7 +85,20 @@ namespace DataAccessLibrary.DAC.Production
             var dto = await db.QueryFirstOrDefaultAsync<RepairTypeDto>(masterSql, new { EntryID = entryId });
             if (dto == null) return null;
 
-            dto.Processes = await GetAvailableProcessesForRepairAsync(entryId);
+            const string assignedProcessesSql = @"
+                SELECT 
+                    rtp.ProcessID,
+                    ISNULL(p.Code, '') AS Code,
+                    ISNULL(p.Description, '') AS Description,
+                    CAST(1 AS BIT) AS IsSelected,
+                    ISNULL(rtp.SeqNo, 0) AS SeqNo,
+                    ISNULL(rtp.Scanning, 0) AS Scanning
+                FROM RepairTypeProcesses rtp
+                INNER JOIN Processes p ON rtp.ProcessID = p.ProcessID
+                WHERE rtp.Repair_RefID = @EntryID
+                ORDER BY rtp.SeqNo, rtp.EntryID";
+
+            dto.Processes = (await db.QueryAsync<RepairTypeProcessItemDto>(assignedProcessesSql, new { EntryID = entryId })).ToList();
             return dto;
         }
 

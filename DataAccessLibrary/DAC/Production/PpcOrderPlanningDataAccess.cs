@@ -40,21 +40,24 @@ namespace DataAccessLibrary.DAC.Production
                         ISNULL(fc.Name, '') AS CustomerName,
                         ISNULL(o.Country, '') AS Country,
                         COUNT(DISTINCT oi.CompItemCode) AS TotalItems,
-                        COUNT(DISTINCT pip.ItemID) AS PlannedItems,
+                        COUNT(DISTINCT CASE WHEN ISNULL(oi.Authorized, 0) = 1 AND pip.ItemID IS NOT NULL THEN pip.ItemID END) AS PlannedItems,
                         ISNULL(SUM(oi.Qty), 0) AS TotalOrderQty,
                         CASE 
-                            WHEN COUNT(DISTINCT oi.CompItemCode) > 0 AND COUNT(DISTINCT pip.ItemID) >= COUNT(DISTINCT oi.CompItemCode) THEN 1 
+                            WHEN COUNT(DISTINCT oi.CompItemCode) > 0 
+                                 AND COUNT(DISTINCT CASE WHEN ISNULL(oi.Authorized, 0) = 1 AND pip.ItemID IS NOT NULL THEN pip.ItemID END) >= COUNT(DISTINCT oi.CompItemCode) 
+                                 AND ISNULL(o.Authorized, 0) = 1
+                            THEN 1 
                             ELSE 0 
                         END AS IsPlanned,
                         pm.PlannedBy,
                         pm.PlannedAt
                     FROM FCustomerOrders o
                     LEFT JOIN ForeignCustomers fc ON o.CustCode = fc.CustCode AND o.Country = fc.Country
-                    LEFT JOIN FOrderItems oi ON o.OrderNo = oi.OrderNo AND ISNULL(oi.Authorized, 0) = 1
+                    LEFT JOIN FOrderItems oi ON o.OrderNo = oi.OrderNo
                     LEFT JOIN PPC_Order_Planning_Master pm ON o.OrderNo = pm.OrderNo
                     LEFT JOIN PPC_Order_Item_Planning pip ON o.OrderNo = pip.OrderNo AND oi.CompItemCode = pip.ItemID
                     WHERE o.Authorized = 1 OR EXISTS (SELECT 1 FROM FOrderItems foi WHERE foi.OrderNo = o.OrderNo AND ISNULL(foi.Authorized, 0) = 1)
-                    GROUP BY o.OrderNo, o.DT, o.DeliveryDT, o.CustCode, fc.Name, o.Country, pm.OrderNo, pm.PlannedBy, pm.PlannedAt
+                    GROUP BY o.OrderNo, o.DT, o.DeliveryDT, o.CustCode, fc.Name, o.Country, o.Authorized, pm.OrderNo, pm.PlannedBy, pm.PlannedAt
                     ORDER BY o.DT DESC, o.OrderNo DESC";
 
                 var list = await db.QueryAsync<PpcOrderSummaryListItem>(sql);
@@ -85,7 +88,7 @@ namespace DataAccessLibrary.DAC.Production
                         ISNULL(o.Country, '') AS Country,
                         ISNULL(fc.Curr, '') AS Currency,
                         o.Authorized,
-                        CASE WHEN pm.OrderNo IS NOT NULL THEN 1 ELSE 0 END AS IsPlanned,
+                        CASE WHEN pm.Status = 'Planned' THEN 1 ELSE 0 END AS IsPlanned,
                         pm.PlannedBy,
                         pm.PlannedAt,
                         pm.Notes
@@ -141,13 +144,19 @@ namespace DataAccessLibrary.DAC.Production
                 // 2. Fetch saved purchases
                 const string savedPurchasesSql = @"
                     SELECT 
+                        pip.EntryID,
                         pip.ItemID,
                         pip.ProcessID,
                         p.Description AS ProcessName,
                         pip.VendID,
                         m.VenderName AS MakerName,
                         pip.PurchaseQty,
-                        pip.PurchaseRate
+                        pip.PurchaseRate,
+                        ISNULL(pip.ExcessQtyPercentage, 50) AS ExcessQtyPercentage,
+                        pip.VendIssued_RefID,
+                        pip.MasterPONo,
+                        pip.IssuedAt,
+                        pip.IssuedBy
                     FROM PPC_Order_Item_Purchases pip
                     INNER JOIN Processes p ON pip.ProcessID = p.ProcessID
                     LEFT JOIN Makers m ON pip.VendID = m.VendID
@@ -211,29 +220,38 @@ namespace DataAccessLibrary.DAC.Production
                             ProcessName = (string)r.ProcessName
                         }).ToList();
 
-                    // Restore saved planning values if available
-                    if (savedPlanMap.TryGetValue(item.CompItemID, out var plan))
+                    // Restore saved planning values if available (only for authorized items)
+                    if (item.Authorized && savedPlanMap.TryGetValue(item.CompItemID, out var plan))
                     {
                         item.StockQty = (int)plan.StockQty;
                         item.IsPlanned = true;
                     }
                     else
                     {
+                        item.StockQty = 0;
                         item.IsPlanned = false;
                     }
 
-                    // Restore saved purchases
-                    var itemPurchases = savedPurchases.Where(p => (string)p.ItemID == item.CompItemID).ToList();
+                    // Restore saved purchases (only for authorized items)
+                    var itemPurchases = item.Authorized
+                        ? savedPurchases.Where(p => (string)p.ItemID == item.CompItemID).ToList()
+                        : new List<dynamic>();
                     foreach (var p in itemPurchases)
                     {
                         var alloc = new PpcItemPurchaseAllocationDto
                         {
+                            EntryID = (int)p.EntryID,
                             ProcessID = (int)p.ProcessID,
                             ProcessName = (string)p.ProcessName,
                             VendID = (int?)p.VendID,
                             MakerName = (string?)p.MakerName,
                             PurchaseQty = (int)p.PurchaseQty,
-                            PurchaseRate = (double)p.PurchaseRate
+                            PurchaseRate = (double)p.PurchaseRate,
+                            ExcessQtyPercentage = p.ExcessQtyPercentage != null ? Convert.ToDouble(p.ExcessQtyPercentage) : 50,
+                            VendIssued_RefID = (long?)p.VendIssued_RefID,
+                            MasterPONo = (string?)p.MasterPONo,
+                            IssuedAt = (DateTime?)p.IssuedAt,
+                            IssuedBy = (string?)p.IssuedBy
                         };
 
                         // Pre-populate available makers for this process
@@ -256,18 +274,21 @@ namespace DataAccessLibrary.DAC.Production
                             var sched = new PpcItemHubScheduleDto
                             {
                                 Hub_Name = hubName,
-                                PlannedQty = item.ProductionQty,
+                                PlannedQty = item.Authorized ? item.ProductionQty : 0,
                                 StartDate = DateTime.Today,
                                 EndDate = header.DeliveryDate ?? DateTime.Today.AddDays(14)
                             };
 
                             // Check if previously saved
-                            var savedSched = savedSchedules.FirstOrDefault(s => (string)s.ItemID == item.CompItemID && (string)s.Hub_Name == hubName);
-                            if (savedSched != null)
+                            if (item.Authorized)
                             {
-                                sched.PlannedQty = (int)savedSched.PlannedQty;
-                                sched.StartDate = (DateTime)savedSched.StartDate;
-                                sched.EndDate = (DateTime)savedSched.EndDate;
+                                var savedSched = savedSchedules.FirstOrDefault(s => (string)s.ItemID == item.CompItemID && (string)s.Hub_Name == hubName);
+                                if (savedSched != null)
+                                {
+                                    sched.PlannedQty = (int)savedSched.PlannedQty;
+                                    sched.StartDate = (DateTime)savedSched.StartDate;
+                                    sched.EndDate = (DateTime)savedSched.EndDate;
+                                }
                             }
 
                             // Attach supervisors for this group and hub
@@ -280,9 +301,8 @@ namespace DataAccessLibrary.DAC.Production
                     }
                 }
 
-                // Header is fully planned only if all authorized items have saved planning
-                var authItems = items.Where(i => i.Authorized).ToList();
-                header.IsPlanned = authItems.Any() && authItems.All(i => i.IsPlanned);
+                // Header is fully planned only if the order is authorized and all items are authorized & planned
+                header.IsPlanned = header.Authorized && items.Any() && items.All(i => i.Authorized && i.IsPlanned);
 
                 return header;
             }
@@ -356,36 +376,64 @@ namespace DataAccessLibrary.DAC.Production
                 var orderNo = request.OrderNo.Trim();
                 var user = request.PlannedBy ?? "System";
 
-                // 1. Delete previous records for this order
+                // Filter to only items that were actually planned
+                var plannedItems = request.Items
+                    .Where(i => i.Authorized && i.IsPlanned)
+                    .ToList();
+
+                int totalAuthorizedCount = request.Items.Count(i => i.Authorized);
+                string status = (plannedItems.Count >= totalAuthorizedCount && totalAuthorizedCount > 0)
+                    ? "Planned"
+                    : (plannedItems.Count > 0 ? "Partially Planned" : "Draft");
+
+                // 1. Delete previous hub schedules, item planning, and master records (Purchases are upserted to preserve issued POs)
                 await conn.ExecuteAsync("DELETE FROM PPC_Order_Item_Hub_Schedules WHERE OrderNo = @OrderNo", new { OrderNo = orderNo }, trans);
-                await conn.ExecuteAsync("DELETE FROM PPC_Order_Item_Purchases WHERE OrderNo = @OrderNo", new { OrderNo = orderNo }, trans);
                 await conn.ExecuteAsync("DELETE FROM PPC_Order_Item_Planning WHERE OrderNo = @OrderNo", new { OrderNo = orderNo }, trans);
                 await conn.ExecuteAsync("DELETE FROM PPC_Order_Planning_Master WHERE OrderNo = @OrderNo", new { OrderNo = orderNo }, trans);
+
+                // Fetch existing purchase allocations to protect already-issued Master POs
+                const string existingPurchasesSql = @"
+                    SELECT EntryID, ItemID, ProcessID, VendID, PurchaseQty, PurchaseRate, ExcessQtyPercentage, VendIssued_RefID, MasterPONo
+                    FROM PPC_Order_Item_Purchases
+                    WHERE OrderNo = @OrderNo";
+                var existingPurchases = (await conn.QueryAsync<dynamic>(existingPurchasesSql, new { OrderNo = orderNo }, trans)).ToList();
+                var retainedEntryIds = new List<int>();
 
                 // 2. Insert Master record
                 const string masterSql = @"
                     INSERT INTO PPC_Order_Planning_Master (OrderNo, PlannedBy, PlannedAt, Status, Notes)
-                    VALUES (@OrderNo, @PlannedBy, GETUTCDATE(), 'Planned', @Notes)";
+                    VALUES (@OrderNo, @PlannedBy, GETUTCDATE(), @Status, @Notes)";
 
                 await conn.ExecuteAsync(masterSql, new
                 {
                     OrderNo = orderNo,
                     PlannedBy = user,
+                    Status = status,
                     Notes = request.Notes
                 }, trans);
 
-                // 3. Insert Item Planning & Purchases & Hub Schedules
+                // 3. Insert Item Planning & Upsert Purchases & Hub Schedules (only for planned items)
                 const string itemPlanSql = @"
                     INSERT INTO PPC_Order_Item_Planning 
                         (OrderNo, ItemID, OrderQty, StockQty, TotalPurchaseQty, ProductionQty, Remarks, CreatedAt, CreatedBy)
                     VALUES 
                         (@OrderNo, @ItemID, @OrderQty, @StockQty, @TotalPurchaseQty, @ProductionQty, @Remarks, GETUTCDATE(), @CreatedBy)";
 
-                const string purchaseSql = @"
+                const string insertPurchaseSql = @"
                     INSERT INTO PPC_Order_Item_Purchases 
-                        (OrderNo, ItemID, ProcessID, VendID, PurchaseQty, PurchaseRate, CreatedAt, CreatedBy)
+                        (OrderNo, ItemID, ProcessID, VendID, PurchaseQty, PurchaseRate, ExcessQtyPercentage, CreatedAt, CreatedBy)
                     VALUES 
-                        (@OrderNo, @ItemID, @ProcessID, @VendID, @PurchaseQty, @PurchaseRate, GETUTCDATE(), @CreatedBy)";
+                        (@OrderNo, @ItemID, @ProcessID, @VendID, @PurchaseQty, @PurchaseRate, @ExcessQtyPercentage, GETUTCDATE(), @CreatedBy);
+                    SELECT SCOPE_IDENTITY();";
+
+                const string updatePurchaseSql = @"
+                    UPDATE PPC_Order_Item_Purchases 
+                    SET ProcessID = @ProcessID,
+                        VendID = @VendID,
+                        PurchaseQty = @PurchaseQty,
+                        PurchaseRate = @PurchaseRate,
+                        ExcessQtyPercentage = @ExcessQtyPercentage
+                    WHERE EntryID = @EntryID AND (VendIssued_RefID IS NULL OR VendIssued_RefID = 0)";
 
                 const string schedSql = @"
                     INSERT INTO PPC_Order_Item_Hub_Schedules 
@@ -393,7 +441,7 @@ namespace DataAccessLibrary.DAC.Production
                     VALUES 
                         (@OrderNo, @ItemID, @Hub_Name, @PlannedQty, @StartDate, @EndDate, GETUTCDATE(), @CreatedBy)";
 
-                foreach (var item in request.Items)
+                foreach (var item in plannedItems)
                 {
                     // Item summary row
                     await conn.ExecuteAsync(itemPlanSql, new
@@ -408,19 +456,45 @@ namespace DataAccessLibrary.DAC.Production
                         CreatedBy = user
                     }, trans);
 
-                    // Multi-purchase split rows
+                    // Multi-purchase split rows: upsert without breaking already-issued POs
                     foreach (var p in item.Purchases.Where(x => x.PurchaseQty > 0 && x.ProcessID > 0))
                     {
-                        await conn.ExecuteAsync(purchaseSql, new
+                        var existing = existingPurchases.FirstOrDefault(e => (int)e.EntryID == p.EntryID);
+                        if (existing != null)
                         {
-                            OrderNo = orderNo,
-                            ItemID = item.CompItemID,
-                            ProcessID = p.ProcessID,
-                            VendID = p.VendID,
-                            PurchaseQty = p.PurchaseQty,
-                            PurchaseRate = p.PurchaseRate,
-                            CreatedBy = user
-                        }, trans);
+                            retainedEntryIds.Add(p.EntryID);
+                            bool isIssued = existing.VendIssued_RefID != null && (long)existing.VendIssued_RefID > 0;
+                            if (!isIssued)
+                            {
+                                await conn.ExecuteAsync(updatePurchaseSql, new
+                                {
+                                    ProcessID = p.ProcessID,
+                                    VendID = p.VendID,
+                                    PurchaseQty = p.PurchaseQty,
+                                    PurchaseRate = p.PurchaseRate,
+                                    ExcessQtyPercentage = p.ExcessQtyPercentage > 0 ? p.ExcessQtyPercentage : 50,
+                                    EntryID = p.EntryID
+                                }, trans);
+                            }
+                            // If already issued, leave strictly untouched to preserve PO linkage and integrity
+                        }
+                        else
+                        {
+                            int newEntryId = await conn.ExecuteScalarAsync<int>(insertPurchaseSql, new
+                            {
+                                OrderNo = orderNo,
+                                ItemID = item.CompItemID,
+                                ProcessID = p.ProcessID,
+                                VendID = p.VendID,
+                                PurchaseQty = p.PurchaseQty,
+                                PurchaseRate = p.PurchaseRate,
+                                ExcessQtyPercentage = p.ExcessQtyPercentage > 0 ? p.ExcessQtyPercentage : 50,
+                                CreatedBy = user
+                            }, trans);
+
+                            p.EntryID = newEntryId;
+                            retainedEntryIds.Add(newEntryId);
+                        }
                     }
 
                     // Hub schedule rows
@@ -439,8 +513,23 @@ namespace DataAccessLibrary.DAC.Production
                     }
                 }
 
+                // Delete only UNISSUED purchase allocations that were removed from the plan
+                if (retainedEntryIds.Any())
+                {
+                    const string deleteUnretainedSql = @"
+                        DELETE FROM PPC_Order_Item_Purchases 
+                        WHERE OrderNo = @OrderNo 
+                          AND (VendIssued_RefID IS NULL OR VendIssued_RefID = 0)
+                          AND EntryID NOT IN @RetainedEntryIds";
+                    await conn.ExecuteAsync(deleteUnretainedSql, new { OrderNo = orderNo, RetainedEntryIds = retainedEntryIds }, trans);
+                }
+                else
+                {
+                    await conn.ExecuteAsync("DELETE FROM PPC_Order_Item_Purchases WHERE OrderNo = @OrderNo AND (VendIssued_RefID IS NULL OR VendIssued_RefID = 0)", new { OrderNo = orderNo }, trans);
+                }
+
                 trans.Commit();
-                _logger.LogInformation("PPC Plan successfully saved for Order #{OrderNo} with {ItemCount} items.", orderNo, request.Items.Count);
+                _logger.LogInformation("PPC Plan successfully saved for Order #{OrderNo} with {ItemCount} planned items (Status: {Status}).", orderNo, plannedItems.Count, status);
                 return true;
             }
             catch (Exception ex)

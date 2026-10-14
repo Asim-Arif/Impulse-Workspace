@@ -181,6 +181,11 @@ namespace Impulse.Pages.Accounts
             // Clear the validation message
             validationMessage = string.Empty;
 
+            try
+            {
+                _ = JS.InvokeVoidAsync("eval", "setTimeout(() => { document.querySelector('.enter-as-tab .blazored-typeahead__input')?.focus(); }, 60);");
+            }
+            catch { }
         }
 
         private void RemoveVoucherLine(VoucherLineItemViewModel VLIVM)
