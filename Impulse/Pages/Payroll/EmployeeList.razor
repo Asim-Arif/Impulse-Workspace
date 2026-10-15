@@ -178,6 +178,9 @@
                                                     <td class="text-end fw-bold">@emp.StartingSalary.ToString("N0")</td>
                                                     <td>@emp.JoinDate?.ToString("dd-MMM-yyyy")</td>
                                                     <td class="text-center" @onclick:stopPropagation="true">
+                                                        <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2 me-1" style="font-size: 0.8rem;" @onclick="() => OpenAttachments(emp)" title="View & Manage Attachments">
+                                                            <i class="fas fa-paperclip text-primary"></i>
+                                                        </button>
                                                         <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2" style="font-size: 0.8rem;" @onclick="(e) => OpenManageMenu(e, emp)">Manage</button>
                                                     </td>
                                                 </ContextMenuTrigger>
@@ -246,6 +249,9 @@
                                                             <td class="text-end fw-bold">@emp.StartingSalary.ToString("N0")</td>
                                                             <td>@emp.JoinDate?.ToString("dd-MMM-yyyy")</td>
                                                             <td class="text-center" @onclick:stopPropagation="true">
+                                                                <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2 me-1" style="font-size: 0.8rem;" @onclick="() => OpenAttachments(emp)" title="View & Manage Attachments">
+                                                                    <i class="fas fa-paperclip text-primary"></i>
+                                                                </button>
                                                                 <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2" style="font-size: 0.8rem;" @onclick="(e) => OpenManageMenu(e, emp)">Manage</button>
                                                             </td>
                                                         </ContextMenuTrigger>
@@ -391,6 +397,9 @@
     @if (context.Data is EmployeeListItemModel emp)
     {
         <div class="win11-section-header">Employee: @emp.Name (@emp.EmpID)</div>
+        <Item class="win11-menu-item" OnClick="@(() => OpenAttachments(emp))">
+            <i class="fas fa-paperclip fa-fw win11-icon text-primary"></i> Attachments
+        </Item>
         <Item class="win11-menu-item" OnClick="@(() => EditEmployee(emp.EmpID))">
             <i class="fas fa-edit fa-fw win11-icon text-primary"></i> Edit Employee
         </Item>
@@ -431,6 +440,9 @@
         }
     }
 </ContextMenu>
+
+<!-- ── Attachment Quick-Access Modal ── -->
+<AttachmentModal @ref="attachmentModalRef" />
 
 <style>
     .win11-menu-item {

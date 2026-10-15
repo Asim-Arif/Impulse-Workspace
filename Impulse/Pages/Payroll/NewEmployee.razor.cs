@@ -25,6 +25,9 @@ namespace Impulse.Pages.Payroll
         [Inject]
         public Radzen.NotificationService NotificationService { get; set; } = default!;
 
+        [Inject]
+        public Impulse.Services.Common.IEntityAttachmentService AttachmentService { get; set; } = default!;
+
         public EmployeeDto Employee { get; set; } = new EmployeeDto();
         public List<DepartmentModel> Departments { get; set; } = new List<DepartmentModel>();
         public List<string> Designations { get; set; } = new List<string>();
@@ -33,6 +36,7 @@ namespace Impulse.Pages.Payroll
 
         public string ActiveTab { get; set; } = "PersonalInfo";
         public bool IsSaving { get; set; } = false;
+        public int AttachmentCount { get; set; } = 0;
 
         public DepartmentModel? SelectedDepartment { get; set; }
 
@@ -60,6 +64,10 @@ namespace Impulse.Pages.Payroll
                 {
                     Employee = emp;
                     SelectedDepartment = Departments.FirstOrDefault(d => d.DeptID == Employee.DeptID);
+                    if (!string.IsNullOrEmpty(Employee.EmpID))
+                    {
+                        AttachmentCount = await AttachmentService.GetCountAsync("Employee", Employee.EmpID, Employee.DeptID);
+                    }
                 }
                 else
                 {
@@ -177,6 +185,12 @@ namespace Impulse.Pages.Payroll
             ActiveTab = tabName;
         }
 
+        private void OnAttachmentCountChanged(int count)
+        {
+            AttachmentCount = count;
+            StateHasChanged();
+        }
+
         private async Task HandleValidSubmit()
         {
             if (string.IsNullOrWhiteSpace(Employee.EmpID))
@@ -233,6 +247,42 @@ namespace Impulse.Pages.Payroll
             {
                 IsSaving = false;
             }
+        }
+
+        public bool _showCopyTargetsModal = false;
+
+        public void HandleTargetsCopied((List<EmpDailyTargetDto> Targets, bool ReplaceExisting) args)
+        {
+            if (args.Targets == null || args.Targets.Count == 0) return;
+
+            if (args.ReplaceExisting)
+            {
+                Employee.DailyTargets.Clear();
+                Employee.DailyTargets.AddRange(args.Targets);
+            }
+            else
+            {
+                foreach (var t in args.Targets)
+                {
+                    bool exists = Employee.DailyTargets.Any(x => x.ProcessID == t.ProcessID && x.GroupID == t.GroupID && x.OverTime == t.OverTime);
+                    if (!exists)
+                    {
+                        Employee.DailyTargets.Add(t);
+                    }
+                }
+            }
+
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Success,
+                Summary = "Targets Copied",
+                Detail = args.ReplaceExisting
+                    ? $"Replaced current targets with {args.Targets.Count} copied target(s)."
+                    : $"Appended targets to list successfully.",
+                Duration = 4000
+            });
+
+            StateHasChanged();
         }
 
         private void Cancel()

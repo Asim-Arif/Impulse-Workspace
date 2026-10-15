@@ -276,6 +276,9 @@
                                                     </td>
                                                     <td class="text-center pe-3" @onclick:stopPropagation="true">
                                                         <div class="d-flex align-items-center justify-content-center gap-1">
+                                                            <button type="button" class="btn btn-outline-secondary btn-sm py-1 px-2" @onclick="() => OpenAttachments(c)" title="View & Manage Attachments">
+                                                                <i class="fas fa-paperclip text-primary"></i>
+                                                            </button>
                                                             <button type="button" class="btn btn-outline-primary btn-sm py-1 px-2.5" @onclick="() => EditCustomer(c)" title="Edit Customer Details">
                                                                 <i class="fas fa-pencil-alt me-1"></i>Edit
                                                             </button>
@@ -308,6 +311,9 @@
     @if (context.Data is ForeignCustomerListViewModel cust)
     {
         <div class="win11-section-header">@cust.CustCode - @cust.Name</div>
+        <Item class="win11-menu-item" OnClick="@(() => OpenAttachments(cust))">
+            <i class="fas fa-paperclip fa-fw win11-icon text-primary"></i> Attachments
+        </Item>
         <Item class="win11-menu-item" OnClick="@(() => EditCustomer(cust))">
             <i class="fas fa-pencil-alt fa-fw win11-icon text-primary"></i> Edit Customer Info
         </Item>
@@ -370,6 +376,9 @@
         </div>
     </div>
 }
+
+<!-- ── Attachment Quick-Access Modal ── -->
+<AttachmentModal @ref="attachmentModalRef" />
 
 <style>
     /* Win11 Context Menu styles per AGENTS.md */

@@ -100,6 +100,22 @@
                     <button type="button" class="nav-link @(activeTab=="invoiceto"?"active":"")"
                             @onclick='() => SetTab("invoiceto")'>Invoice To</button>
                 </li>
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(activeTab=="notes"?"active":"")"
+                            @onclick='() => SetTab("notes")'>
+                        <i class="fas fa-sticky-note me-1 text-warning"></i> Notes
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(activeTab=="attachments"?"active":"")"
+                            @onclick='() => SetTab("attachments")'>
+                        <i class="fas fa-paperclip me-1 text-primary"></i> Attachments
+                        @if (AttachmentCount > 0)
+                        {
+                            <span class="badge rounded-pill bg-primary ms-1" style="font-size: 0.72rem;">@AttachmentCount</span>
+                        }
+                    </button>
+                </li>
             </ul>
 
             @* ============================================================ *@
@@ -893,6 +909,54 @@
                         </tbody>
                     </table>
                 </div>
+            }
+
+            @* ============================================================ *@
+            @* TAB: NOTES                                                    *@
+            @* ============================================================ *@
+            @if (activeTab == "notes")
+            {
+                @if (string.IsNullOrWhiteSpace(model.CustCode))
+                {
+                    <div class="alert alert-info d-flex align-items-center py-3 px-4 mb-0 rounded-3">
+                        <i class="fas fa-info-circle fa-2x me-3 text-info"></i>
+                        <div>
+                            <div class="fw-bold">New Customer</div>
+                            <div style="font-size: 0.88rem;">Please save basic customer details first before recording customer notes.</div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <EntityNotesManager EntityType="Customer"
+                                        EntityId="@model.CustCode"
+                                        EntitySecondaryId="@model.Country" />
+                }
+            }
+
+            @* ============================================================ *@
+            @* TAB: ATTACHMENTS                                              *@
+            @* ============================================================ *@
+            @if (activeTab == "attachments")
+            {
+                @if (string.IsNullOrWhiteSpace(model.CustCode))
+                {
+                    <div class="alert alert-info d-flex align-items-center py-3 px-4 mb-0 rounded-3">
+                        <i class="fas fa-info-circle fa-2x me-3 text-info"></i>
+                        <div>
+                            <div class="fw-bold">New Customer</div>
+                            <div style="font-size: 0.88rem;">Please save basic customer details first before uploading attachments.</div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <EntityAttachmentManager EntityType="Customer"
+                                             EntityId="@model.CustCode"
+                                             EntitySecondaryId="@model.Country"
+                                             EntityDisplayName="@model.Name"
+                                             OnCountChanged="OnAttachmentCountChanged" />
+                }
             }
 
             @* ============================================================ *@

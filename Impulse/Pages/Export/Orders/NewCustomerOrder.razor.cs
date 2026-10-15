@@ -33,6 +33,9 @@ namespace Impulse.Pages.Export.Orders
         [Inject]
         public Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthStateProvider { get; set; } = default!;
 
+        [Inject]
+        public Impulse.Services.Common.IEntityAttachmentService AttachmentService { get; set; } = default!;
+
         // bound model
         public CustomerOrderViewModel Order { get; set; } = new();
 
@@ -42,6 +45,7 @@ namespace Impulse.Pages.Export.Orders
         // layout state
         public string ActiveTab { get; set; } = "ArticleDetail";
         public bool IsSaving { get; set; } = false;
+        public int AttachmentCount { get; set; } = 0;
 
         // lookup lists
         public List<CompanyLookupModel> Companies { get; set; } = new();
@@ -86,6 +90,11 @@ namespace Impulse.Pages.Export.Orders
                     {
                         Countries = await CustomerOrderService.GetCountriesForCustomerAsync(SelectedCustomer.CustCode);
                         await HandleCustomerCountryChanged(isEdit: true);
+                    }
+
+                    if (!string.IsNullOrEmpty(Order.OrderNo))
+                    {
+                        AttachmentCount = await AttachmentService.GetCountAsync("Order", Order.OrderNo, Order.CustCode);
                     }
                 }
                 else
@@ -688,6 +697,12 @@ namespace Impulse.Pages.Export.Orders
         public void ChangeTab(string tabName)
         {
             ActiveTab = tabName;
+        }
+
+        private void OnAttachmentCountChanged(int count)
+        {
+            AttachmentCount = count;
+            StateHasChanged();
         }
 
         public void AddRevision()

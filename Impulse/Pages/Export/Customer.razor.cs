@@ -2,6 +2,7 @@ using DataAccessLibrary.Models.ViewModels;
 using DataAccessLibrary.Models.ViewModels.Export;
 using Microsoft.AspNetCore.Components;
 using Impulse.Services;
+using Impulse.Services.Common;
 
 namespace Impulse.Pages.Export
 {
@@ -17,6 +18,7 @@ namespace Impulse.Pages.Export
         [Inject] private INotificationService NotificationServiceManager { get; set; } = null!;
         [Inject] private NavigationManager Navigation { get; set; } = null!;
         [Inject] private IVoucherService _voucherService { get; set; } = null!;
+        [Inject] private Impulse.Services.Common.IEntityAttachmentService _attachmentService { get; set; } = null!;
 
         // ------------------------------------------------------------------ //
         //  Parameters
@@ -32,6 +34,7 @@ namespace Impulse.Pages.Export
         private string strUserName = string.Empty;
         private bool isSaving = false;
         private string activeTab = "company";
+        private int AttachmentCount = 0;
 
         // Model
         private ForeignCustomerViewModel model = new();
@@ -174,6 +177,11 @@ namespace Impulse.Pages.Export
                 s.DropDownValue_Description == model.CustomerSource);
             SelectedShippingMethod = ShippingMethods.FirstOrDefault(sh =>
                 sh.DropDownValue_Description == model.DefaultShipMethod);
+
+            if (!string.IsNullOrEmpty(model.CustCode))
+            {
+                AttachmentCount = await _attachmentService.GetCountAsync("Customer", model.CustCode, model.Country);
+            }
         }
 
         // ------------------------------------------------------------------ //
@@ -181,6 +189,12 @@ namespace Impulse.Pages.Export
         // ------------------------------------------------------------------ //
 
         private void SetTab(string tab) => activeTab = tab;
+
+        private void OnAttachmentCountChanged(int count)
+        {
+            AttachmentCount = count;
+            StateHasChanged();
+        }
 
         // ------------------------------------------------------------------ //
         //  Typeahead search helpers

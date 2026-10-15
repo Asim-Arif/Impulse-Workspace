@@ -157,6 +157,7 @@
                                     <th>Maturity</th>
                                     <th>Orders</th>
                                     <th>D.P Nos</th>
+                                    <th class="text-center" style="width: 70px;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -178,6 +179,11 @@
                                             <td>@rowItem.DTMaturity?.ToString("dd-MMM-yyyy")</td>
                                             <td class="text-truncate" style="max-width: 150px;" title="@rowItem.InvoiceOrders">@rowItem.InvoiceOrders</td>
                                             <td class="text-truncate" style="max-width: 100px;" title="@rowItem.DispatchListNos">@rowItem.DispatchListNos</td>
+                                            <td class="text-center" @onclick:stopPropagation="true">
+                                                <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2" @onclick="() => OpenAttachments(rowItem)" title="View & Manage Attachments">
+                                                    <i class="fas fa-paperclip text-primary"></i>
+                                                </button>
+                                            </td>
                                         </tr>
                                     }
                                 }
@@ -203,6 +209,8 @@
 </div>
 
 <ContextMenu Id="rowContextMenu" Template="Win11Style" UseDefaultEventHandlers="true">
+    <Item class="win11-menu-item" OnClick="OpenAttachments"><i class="fas fa-paperclip win11-icon text-primary"></i> Attachments</Item>
+    <Seperator />
     @if (invoiceType == 0 || invoiceType == 1)
     {
         <Item class="win11-menu-item" OnClick="AddInvoice"><i class="fas fa-plus win11-icon"></i> Add New Custom Invoice</Item>
@@ -325,3 +333,6 @@
         </div>
     </div>
 }
+
+<!-- ── Attachment Quick-Access Modal ── -->
+<AttachmentModal @ref="attachmentModalRef" />

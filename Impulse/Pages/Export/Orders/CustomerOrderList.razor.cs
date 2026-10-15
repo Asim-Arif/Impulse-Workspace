@@ -12,6 +12,7 @@ using Impulse.Services;
 using Impulse.Services.Export;
 using Impulse.Services.WorkflowTasks;
 using DataAccessLibrary.Interface.Setup;
+using Impulse.Components.Common;
 
 namespace Impulse.Pages.Export.Orders
 {
@@ -938,6 +939,19 @@ namespace Impulse.Pages.Export.Orders
                 }
             };
             await ReportNavigation.PrintReportAsync(request);
+        }
+
+        private AttachmentModal? attachmentModalRef;
+
+        private void OpenAttachments(CustomerOrderListItemModel order)
+        {
+            highlightedOrder = order;
+            attachmentModalRef?.Open(
+                entityType: "Order",
+                entityId: order.OrderNo,
+                secondaryId: order.CustCode,
+                displayName: $"Order #{order.OrderNo} ({order.CustCode} - {order.CompanyName})"
+            );
         }
     }
 }

@@ -6,6 +6,7 @@ using Impulse.Services.Export;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
+using Impulse.Components.Common;
 
 namespace Impulse.Pages.Export.Invoices
 {
@@ -467,6 +468,25 @@ namespace Impulse.Pages.Export.Invoices
         {
             if (contextMenuRowItem == null) return;
             NotificationServiceManager.ShowWarning("Pending", "Generate Batches functionality will be implemented soon.");
+        }
+
+        private AttachmentModal? attachmentModalRef;
+
+        private void OpenAttachments(InvoiceListModel item)
+        {
+            contextMenuRowItem = item;
+            attachmentModalRef?.Open(
+                entityType: "Invoice",
+                entityId: item.CustomInvoice,
+                secondaryId: item.CustCode,
+                displayName: $"Invoice #{item.CustomInvoice} ({item.CustCode} - {item.Country})"
+            );
+        }
+
+        private void OpenAttachments(ItemClickEventArgs e)
+        {
+            if (contextMenuRowItem == null) return;
+            OpenAttachments(contextMenuRowItem);
         }
     }
 }

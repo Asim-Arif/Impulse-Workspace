@@ -147,6 +147,20 @@
                         <i class="fas fa-map-marker-alt me-1"></i> Addresses
                     </button>
                 </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link @(ActiveTab == 7 ? "active" : "")" id="notes-tab" type="button" @onclick="() => ActiveTab = 7">
+                        <i class="fas fa-sticky-note me-1 text-warning"></i> Notes
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link @(ActiveTab == 8 ? "active" : "")" id="attachments-tab" type="button" @onclick="() => ActiveTab = 8">
+                        <i class="fas fa-paperclip me-1 text-primary"></i> Attachments
+                        @if (AttachmentCount > 0)
+                        {
+                            <span class="badge rounded-pill bg-primary ms-1" style="font-size: 0.72rem;">@AttachmentCount</span>
+                        }
+                    </button>
+                </li>
             </ul>
 
             <!-- Tab Content -->
@@ -186,6 +200,38 @@
                     <AddressesTab Invoice="Invoice"
                                   ShippingAddressPresets="ShippingAddressPresets"
                                   InvoiceToPresets="InvoiceToPresets" />
+                </div>
+                <div style="display: @(ActiveTab == 7 ? "block" : "none")">
+                    @if (string.IsNullOrWhiteSpace(Invoice.CustomInvoiceNo))
+                    {
+                        <div class="alert alert-info py-3 px-4 rounded-3 m-3">
+                            <i class="fas fa-info-circle fa-lg me-2 text-info"></i>
+                            Please save the invoice header first before recording notes.
+                        </div>
+                    }
+                    else
+                    {
+                        <EntityNotesManager EntityType="Invoice"
+                                            EntityId="@Invoice.CustomInvoiceNo"
+                                            EntitySecondaryId="@Invoice.CustCode" />
+                    }
+                </div>
+                <div style="display: @(ActiveTab == 8 ? "block" : "none")">
+                    @if (string.IsNullOrWhiteSpace(Invoice.CustomInvoiceNo))
+                    {
+                        <div class="alert alert-info py-3 px-4 rounded-3 m-3">
+                            <i class="fas fa-info-circle fa-lg me-2 text-info"></i>
+                            Please save the invoice header first before uploading attachments.
+                        </div>
+                    }
+                    else
+                    {
+                        <EntityAttachmentManager EntityType="Invoice"
+                                                 EntityId="@Invoice.CustomInvoiceNo"
+                                                 EntitySecondaryId="@Invoice.CustCode"
+                                                 EntityDisplayName="@($"Invoice #{Invoice.CustomInvoiceNo} - {Invoice.CustCode}")"
+                                                 OnCountChanged="OnAttachmentCountChanged" />
+                    }
                 </div>
             </div>
             

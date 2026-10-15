@@ -168,6 +168,24 @@
                                         @onclick='() => ChangeTab("Targets")'
                                         type="button" role="tab">Targets</button>
                             </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "Notes" ? "active" : "")"
+                                        @onclick='() => ChangeTab("Notes")'
+                                        type="button" role="tab">
+                                    <i class="fas fa-sticky-note me-1 text-warning"></i> Notes
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(ActiveTab == "Attachments" ? "active" : "")"
+                                        @onclick='() => ChangeTab("Attachments")'
+                                        type="button" role="tab">
+                                    <i class="fas fa-paperclip me-1 text-primary"></i> Attachments
+                                    @if (AttachmentCount > 0)
+                                    {
+                                        <span class="badge rounded-pill bg-primary ms-1" style="font-size: 0.72rem;">@AttachmentCount</span>
+                                    }
+                                </button>
+                            </li>
                         </ul>
 
                         <!-- Tab Content -->
@@ -224,7 +242,42 @@
                                 <SalaryHistoryTab Employee="Employee" />
                             </div>
                             <div class="tab-pane fade @(ActiveTab == "Targets" ? "show active" : "")" role="tabpanel">
-                                <TargetsTab Employee="Employee" Processes="Processes" Groups="Groups" />
+                                <TargetsTab Employee="Employee"
+                                            Processes="Processes"
+                                            Groups="Groups"
+                                            OnOpenCopyModal="() => _showCopyTargetsModal = true" />
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "Notes" ? "show active" : "")" role="tabpanel">
+                                @if (string.IsNullOrWhiteSpace(Employee.EmpID))
+                                {
+                                    <div class="alert alert-info py-3 px-4 rounded-3 mb-0">
+                                        <i class="fas fa-info-circle fa-lg me-2 text-info"></i>
+                                        Please assign an Employee ID or save basic employee info first before recording notes.
+                                    </div>
+                                }
+                                else
+                                {
+                                    <EntityNotesManager EntityType="Employee"
+                                                        EntityId="@Employee.EmpID"
+                                                        EntitySecondaryId="@Employee.DeptID" />
+                                }
+                            </div>
+                            <div class="tab-pane fade @(ActiveTab == "Attachments" ? "show active" : "")" role="tabpanel">
+                                @if (string.IsNullOrWhiteSpace(Employee.EmpID))
+                                {
+                                    <div class="alert alert-info py-3 px-4 rounded-3 mb-0">
+                                        <i class="fas fa-info-circle fa-lg me-2 text-info"></i>
+                                        Please assign an Employee ID or save basic employee info first before uploading attachments.
+                                    </div>
+                                }
+                                else
+                                {
+                                    <EntityAttachmentManager EntityType="Employee"
+                                                             EntityId="@Employee.EmpID"
+                                                             EntitySecondaryId="@Employee.DeptID"
+                                                             EntityDisplayName="@Employee.Name"
+                                                             OnCountChanged="OnAttachmentCountChanged" />
+                                }
                             </div>
                         </div>
                 </div>
@@ -247,6 +300,12 @@
         </div>
     </div>
 </div>
+
+<CopyTargetsModal @bind-IsOpen="_showCopyTargetsModal"
+                  CurrentEmpId="@Employee.EmpID"
+                  Processes="Processes"
+                  Groups="Groups"
+                  OnTargetsCopied="HandleTargetsCopied" />
 
 <style>
     /* Material Design 3 style tabs */
@@ -286,6 +345,6 @@
     }
     .employee-tabs-container {
         position: relative !important;
-        z-index: 1 !important;
+        z-index: auto !important;
     }
 </style>

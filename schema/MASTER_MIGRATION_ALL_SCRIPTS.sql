@@ -2317,7 +2317,10 @@ SELECT     dbo.VendReceived.EntryID, dbo.VendReceived.VendID, dbo.VendReceived.D
                   dbo.ItemGroups.Description AS ItemGroup, dbo.VendReceived.EmpID, T1.VRD_From_RefID, dbo.VendIssued.DT AS IssDT, dbo.VendIssdDetail.IssQty AS Issuance_IssQty, dbo.VendIssdDetail.RcvdQty AS Issuance_RcvdQty, 
                   dbo.VendReceived_Employees_F(dbo.VendReceived.EntryID) AS Empoloyees, TDL.VRD_RefID, dbo.VendIssdDetail.ReturnDT, dbo.MakerPostedBillsDetail_Receivings.EntryID AS MPB_D_EntryID, dbo.MakerPostedBills.BillNo, dbo.FCustomerOrders.InternalRefNo, 
                   FOrderItems.OrderQty, dbo.VendIssued.Closed, dbo.VItems_Complaints.ItemID AS ComplaintItemID, dbo.Lots_List.Batch_No, dbo.Lots_List.Mill_Certificate_No, dbo.Items.TipSize, dbo.VendReceived.EntryDT, dbo.Employees.Phone1, 
-                VHubSupervisors.Hub_Name,VHubSupervisors.Supervisors
+                VHubSupervisors.Hub_Name,VHubSupervisors.Supervisors,
+                ISNULL(TDL.DispatchQty, 0) AS DispatchQty,
+                ISNULL(TTRF.StoreTransferQty, 0) AS StoreTransferQty,
+                CASE WHEN TLC.ClosedLotNo IS NOT NULL THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END AS IsLotClosed
 FROM        dbo.Employees RIGHT OUTER JOIN
                   dbo.VendReceived INNER JOIN
                   dbo.vendRcvdDetail ON dbo.VendReceived.EntryID = dbo.vendRcvdDetail.RefID INNER JOIN
@@ -2338,9 +2341,15 @@ FROM        dbo.Employees RIGHT OUTER JOIN
                        FROM        dbo.LotTransferDetails
                        WHERE     (Type = 1)
                        GROUP BY VRD_From_RefID) AS T1 ON dbo.vendRcvdDetail.EntryID = T1.VRD_From_RefID LEFT OUTER JOIN
-                      (SELECT     VRD_RefID
+                      (SELECT     VRD_RefID, SUM(Qty) AS DispatchQty
                        FROM        dbo.DispatchListDetail_VRD
-                       GROUP BY VRD_RefID) AS TDL ON dbo.vendRcvdDetail.EntryID = TDL.VRD_RefID
+                       GROUP BY VRD_RefID) AS TDL ON dbo.vendRcvdDetail.EntryID = TDL.VRD_RefID LEFT OUTER JOIN
+                      (SELECT     VRD_RefID, SUM(Qty) AS StoreTransferQty
+                       FROM        dbo.TransferredToReadyFinishLotsDetail
+                       GROUP BY VRD_RefID) AS TTRF ON dbo.vendRcvdDetail.EntryID = TTRF.VRD_RefID LEFT OUTER JOIN
+                      (SELECT     LotNo AS ClosedLotNo
+                       FROM        dbo.Lots_Closed
+                       GROUP BY LotNo) AS TLC ON dbo.vendRcvdDetail.LotNo = TLC.ClosedLotNo
                 LEFT OUTER JOIN dbo.ItemProcessGroups ON dbo.vendRcvdDetail.ItemCode = dbo.ItemProcessGroups.ItemID 
                 LEFT OUTER JOIN dbo.ProcessGroupsProcesses ON dbo.ItemProcessGroups.PG_RefID = dbo.ProcessGroupsProcesses.Group_RefID 
                                                           AND dbo.VendReceived.ProcessID = dbo.ProcessGroupsProcesses.Process_RefID 
@@ -4486,6 +4495,7 @@ INNER JOIN dbo.Makers ON dbo.VendAssItems.VendID = dbo.Makers.VendID
 INNER JOIN dbo.VItems1 ON dbo.VendAssItems.ItemID = dbo.VItems1.ItemID 
 LEFT OUTER JOIN dbo.ItemGroups ON dbo.VItems1.GroupID = dbo.ItemGroups.ID
 GO
+-- Completed
 END
 GO
 
@@ -5442,6 +5452,61 @@ FROM    dbo.VendAssItems INNER JOIN
         dbo.VItems1 ON dbo.VendAssItems.ItemID = dbo.VItems1.ItemID LEFT OUTER JOIN
         dbo.ItemGroups ON dbo.VItems1.GroupID = dbo.ItemGroups.ID;
 GO
+
+-- ====================================================================================================
+-- Universal Entity Attachments & Notes System (Customers, Orders, Invoices, Employees)
+-- ====================================================================================================
+
+-- 1. EntityAttachments Table
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'EntityAttachments')
+BEGIN
+    CREATE TABLE [dbo].[EntityAttachments] (
+        [Id]                BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [EntityType]        VARCHAR(50) NOT NULL,          -- 'Customer', 'Order', 'Invoice', 'Employee'
+        [EntityId]          VARCHAR(100) NOT NULL,         -- e.g. CustCode, OrderNo, InvoiceNo, EmpID
+        [EntitySecondaryId] VARCHAR(100) NULL,             -- e.g. Country (for ForeignCustomers composite key)
+        [OriginalFileName]  NVARCHAR(500) NOT NULL,        -- e.g. "Tax_Exemption_Certificate_2026.pdf"
+        [StoredFileName]    NVARCHAR(500) NOT NULL,        -- e.g. "guid_Tax_Exemption_Certificate_2026.pdf"
+        [FilePath]          NVARCHAR(1000) NOT NULL,       -- e.g. "/uploads/attachments/customer/..."
+        [FileSize]          BIGINT NOT NULL DEFAULT 0,     -- Size in bytes
+        [FileExtension]     VARCHAR(20) NOT NULL,          -- e.g. ".pdf", ".xlsx", ".dwg"
+        [ContentType]       VARCHAR(150) NULL,             -- MIME type
+        [Remarks]           NVARCHAR(500) NULL,            -- Optional user description / tag
+        [UploadedBy]        NVARCHAR(100) NOT NULL,        -- Current user name
+        [UploadedAt]        DATETIME2 NOT NULL DEFAULT GETDATE(),
+        [IsDeleted]         BIT NOT NULL DEFAULT 0,
+        [DeletedBy]         NVARCHAR(100) NULL,
+        [DeletedAt]         DATETIME2 NULL
+    );
+
+    CREATE NONCLUSTERED INDEX [IX_EntityAttachments_Lookup] 
+        ON [dbo].[EntityAttachments]([EntityType], [EntityId], [EntitySecondaryId], [IsDeleted])
+        INCLUDE ([OriginalFileName], [FileSize], [FileExtension], [UploadedAt], [UploadedBy]);
+        
+    PRINT 'Created table: EntityAttachments';
+END
+GO
+
+-- 2. EntityNotes Table
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'EntityNotes')
+BEGIN
+    CREATE TABLE [dbo].[EntityNotes] (
+        [Id]                BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [EntityType]        VARCHAR(50) NOT NULL,          -- 'Customer', 'Order', 'Invoice', 'Employee'
+        [EntityId]          VARCHAR(100) NOT NULL,         -- e.g. CustCode, OrderNo, InvoiceNo, EmpID
+        [EntitySecondaryId] VARCHAR(100) NULL,             -- e.g. Country (for ForeignCustomers composite key)
+        [NoteText]          NVARCHAR(MAX) NOT NULL DEFAULT '',
+        [LastModifiedBy]    NVARCHAR(100) NOT NULL,
+        [LastModifiedAt]    DATETIME2 NOT NULL DEFAULT GETDATE()
+    );
+
+    CREATE NONCLUSTERED INDEX [IX_EntityNotes_Lookup] 
+        ON [dbo].[EntityNotes]([EntityType], [EntityId], [EntitySecondaryId]);
+        
+    PRINT 'Created table: EntityNotes';
+END
+GO
+
 
 
 

@@ -8,6 +8,7 @@ using Impulse.Constants;
 using Impulse.Services;
 using Impulse.Services.Payroll;
 using BlazorContextMenu;
+using Impulse.Components.Common;
 
 namespace Impulse.Pages.Payroll
 {
@@ -609,6 +610,19 @@ namespace Impulse.Pages.Payroll
             };
 
             await ReportNavigation.PrintReportAsync(request);
+        }
+
+        private AttachmentModal? attachmentModalRef;
+
+        private void OpenAttachments(EmployeeListItemModel emp)
+        {
+            highlightedEmployee = emp;
+            attachmentModalRef?.Open(
+                entityType: "Employee",
+                entityId: emp.EmpID,
+                secondaryId: emp.DeptID,
+                displayName: $"[{emp.EmpID}] {emp.Name} - {emp.Designation}"
+            );
         }
     }
 }

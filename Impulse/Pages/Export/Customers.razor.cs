@@ -1,6 +1,7 @@
 using DataAccessLibrary.Models.ViewModels.Export;
 using Microsoft.AspNetCore.Components;
 using Impulse.Services;
+using Impulse.Components.Common;
 
 namespace Impulse.Pages.Export
 {
@@ -189,6 +190,19 @@ namespace Impulse.Pages.Export
                 NotificationServiceManager.ShowError("Error", ex.Message);
                 customerToDelete = null;
             }
+        }
+
+        private AttachmentModal? attachmentModalRef;
+
+        private void OpenAttachments(ForeignCustomerListViewModel customer)
+        {
+            highlightedCustomer = customer;
+            attachmentModalRef?.Open(
+                entityType: "Customer",
+                entityId: customer.CustCode,
+                secondaryId: customer.Country,
+                displayName: $"{customer.CustCode} - {customer.Name} ({customer.Country})"
+            );
         }
     }
 }

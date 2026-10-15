@@ -539,6 +539,12 @@ builder.Services.AddHostedService<Impulse.Services.IntraOffice.WhatsAppGatewayHo
 builder.Services.AddSingleton<Impulse.Services.Licensing.IHardwareFingerprintService, Impulse.Services.Licensing.HardwareFingerprintService>();
 builder.Services.AddSingleton<Impulse.Services.Licensing.ILicenseService, Impulse.Services.Licensing.LicenseService>();
 
+// Common Entity Attachments & Notes Services
+builder.Services.AddScoped<DataAccessLibrary.Interface.Common.IEntityAttachmentDataAccess, DataAccessLibrary.DAC.Common.EntityAttachmentDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Common.IEntityAttachmentService, Impulse.Services.Common.EntityAttachmentService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Common.IEntityNoteDataAccess, DataAccessLibrary.DAC.Common.EntityNoteDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Common.IEntityNoteService, Impulse.Services.Common.EntityNoteService>();
+
 var app = builder.Build();
 
 // Enable PathBase only if explicitly configured in appsettings (e.g. for IIS sub-application hosting)
@@ -582,7 +588,7 @@ app.MapFallbackToPage("/_Host");
 // Ensure upload directories exist
 var env = app.Services.GetRequiredService<IWebHostEnvironment>();
 var webRoot = env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-foreach (var sub in new[] { "tasks", "announcements", "chat", "meetings", "leads", "minutes", "maker_po_signed" })
+foreach (var sub in new[] { "tasks", "announcements", "chat", "meetings", "leads", "minutes", "maker_po_signed", "attachments" })
 {
     var dir = Path.Combine(webRoot, "uploads", sub);
     if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);

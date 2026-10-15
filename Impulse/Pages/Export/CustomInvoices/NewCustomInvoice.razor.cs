@@ -18,6 +18,7 @@ namespace Impulse.Pages.Export.CustomInvoices
 
         [Inject] private ICustomInvoiceService InvoiceService { get; set; } = default!;
         [Inject] private NotificationService NotificationService { get; set; } = default!;
+        [Inject] private Impulse.Services.Common.IEntityAttachmentService AttachmentService { get; set; } = default!;
 
         // ── Main Model ─────────────────────────────────────────────────────
         public CustomInvoiceViewModel Invoice { get; set; } = new();
@@ -26,6 +27,7 @@ namespace Impulse.Pages.Export.CustomInvoices
         private bool IsEditMode => !string.IsNullOrEmpty(CustomInvoiceNo);
         private bool IsLoading = false;
         private int ActiveTab = 0; // Starts at 0: Invoice Items
+        private int AttachmentCount = 0;
 
         // ── Tab refs ──────────────────────────────────────────────────────
         private OtherInfoTab? OtherInfoTabRef;
@@ -121,6 +123,17 @@ namespace Impulse.Pages.Export.CustomInvoices
                 OtherInfoTabRef.SetDisChargeCountryList(Countries);
                 await OtherInfoTabRef.RestorePortSelectionsAsync();
             }
+
+            if (!string.IsNullOrEmpty(Invoice.CustomInvoiceNo))
+            {
+                AttachmentCount = await AttachmentService.GetCountAsync("Invoice", Invoice.CustomInvoiceNo, Invoice.CustCode);
+            }
+        }
+
+        private void OnAttachmentCountChanged(int count)
+        {
+            AttachmentCount = count;
+            StateHasChanged();
         }
 
         private async Task OnCompanyChanged()

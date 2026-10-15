@@ -213,6 +213,24 @@
                                 @onclick='() => ChangeTab("ImportExcel")'
                                 type="button" role="tab">Import From Excel</button>
                     </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "Notes" ? "active" : "")"
+                                @onclick='() => ChangeTab("Notes")'
+                                type="button" role="tab">
+                            <i class="fas fa-sticky-note me-1 text-warning"></i> Notes
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(ActiveTab == "Attachments" ? "active" : "")"
+                                @onclick='() => ChangeTab("Attachments")'
+                                type="button" role="tab">
+                            <i class="fas fa-paperclip me-1 text-primary"></i> Attachments
+                            @if (AttachmentCount > 0)
+                            {
+                                <span class="badge rounded-pill bg-primary ms-1" style="font-size: 0.72rem;">@AttachmentCount</span>
+                            }
+                        </button>
+                    </li>
                 </ul>
 
                 <!-- Tab Content panes -->
@@ -244,6 +262,38 @@
                                         ExcelOK="ExcelOK"
                                         OnImportTrigger="ImportExcelMock"
                                         OnAddToOrder="AppendExcelOkItems" />
+                    </div>
+                    <div class="tab-pane fade @(ActiveTab == "Notes" ? "show active" : "")" role="tabpanel">
+                        @if (string.IsNullOrWhiteSpace(Order.OrderNo))
+                        {
+                            <div class="alert alert-info py-3 px-4 rounded-3 mb-0">
+                                <i class="fas fa-info-circle fa-lg me-2 text-info"></i>
+                                Please enter an Order Number or save the order header first before recording notes.
+                            </div>
+                        }
+                        else
+                        {
+                            <EntityNotesManager EntityType="Order"
+                                                EntityId="@Order.OrderNo"
+                                                EntitySecondaryId="@Order.CustCode" />
+                        }
+                    </div>
+                    <div class="tab-pane fade @(ActiveTab == "Attachments" ? "show active" : "")" role="tabpanel">
+                        @if (string.IsNullOrWhiteSpace(Order.OrderNo))
+                        {
+                            <div class="alert alert-info py-3 px-4 rounded-3 mb-0">
+                                <i class="fas fa-info-circle fa-lg me-2 text-info"></i>
+                                Please enter an Order Number or save the order header first before uploading attachments.
+                            </div>
+                        }
+                        else
+                        {
+                            <EntityAttachmentManager EntityType="Order"
+                                                     EntityId="@Order.OrderNo"
+                                                     EntitySecondaryId="@Order.CustCode"
+                                                     EntityDisplayName="@($"Order #{Order.OrderNo} - {Order.CustCode}")"
+                                                     OnCountChanged="OnAttachmentCountChanged" />
+                        }
                     </div>
                 </div>
 
