@@ -224,5 +224,156 @@ namespace DataAccessLibrary.DAC.Production
             var rows = await db.ExecuteAsync(sql, new { Id = requestId, TaskId = taskId });
             return rows > 0;
         }
+
+        public async Task<List<WorkflowApprovalHistoryModel>> GetApprovalHistoryAsync(
+            string? workflowCode = null, 
+            DateTime? fromDate = null, 
+            DateTime? toDate = null, 
+            string? status = null)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+
+            if (string.IsNullOrWhiteSpace(workflowCode) || string.Equals(workflowCode, "all", StringComparison.OrdinalIgnoreCase))
+            {
+                workflowCode = null;
+            }
+            if (string.IsNullOrWhiteSpace(status) || string.Equals(status, "all", StringComparison.OrdinalIgnoreCase))
+            {
+                status = null;
+            }
+
+            DateTime? fromDateParam = fromDate?.Date;
+            DateTime? toDateParam = toDate?.Date.AddDays(1);
+
+            const string sql = @"
+                SELECT 
+                    'ProductionDeletionRequests' AS SourceTable,
+                    p.[Id] AS RecordId,
+                    p.[TaskId],
+                    CASE 
+                        WHEN p.[RequestType] = 'LotReceiving' THEN 'DeleteLotAuthorization'
+                        WHEN p.[RequestType] IN ('LotIssuance', 'MasterPOIssuance') THEN 'DeleteProductionIssuance'
+                        WHEN p.[RequestType] = 'SkipProcess' THEN 'SkipProcess'
+                        ELSE p.[RequestType]
+                    END AS WorkflowCode,
+                    ISNULL(wc.[WorkflowName], p.[RequestType]) AS WorkflowName,
+                    ISNULL(wc.[Module], 'Production') AS Module,
+                    p.[LotNo],
+                    p.[OrderNo],
+                    p.[ItemCode],
+                    p.[ItemName],
+                    p.[ProcessName],
+                    CASE 
+                        WHEN p.[RequestType] = 'SkipProcess' THEN NULL 
+                        ELSE p.[MakerName] 
+                    END AS MakerName,
+                    CASE 
+                        WHEN p.[RequestType] = 'SkipProcess' THEN p.[MakerName] 
+                        ELSE NULL 
+                    END AS TargetProcessName,
+                    p.[Qty],
+                    p.[Reason] AS RequestReason,
+                    p.[RequestedBy],
+                    p.[RequestedDT],
+                    p.[MachineName],
+                    p.[Status],
+                    p.[ReviewedBy] AS ActionBy,
+                    p.[ReviewedDT] AS ActionDT,
+                    p.[DirectorRemarks] AS ActionRemarks
+                FROM dbo.ProductionDeletionRequests p WITH (NOLOCK)
+                LEFT JOIN dbo.WorkflowConfigurations wc WITH (NOLOCK) ON wc.[WorkflowCode] = (
+                    CASE 
+                        WHEN p.[RequestType] = 'LotReceiving' THEN 'DeleteLotAuthorization'
+                        WHEN p.[RequestType] IN ('LotIssuance', 'MasterPOIssuance') THEN 'DeleteProductionIssuance'
+                        WHEN p.[RequestType] = 'SkipProcess' THEN 'SkipProcess'
+                        ELSE p.[RequestType]
+                    END
+                )
+                WHERE (@WorkflowCode IS NULL OR (
+                    CASE 
+                        WHEN p.[RequestType] = 'LotReceiving' THEN 'DeleteLotAuthorization'
+                        WHEN p.[RequestType] IN ('LotIssuance', 'MasterPOIssuance') THEN 'DeleteProductionIssuance'
+                        WHEN p.[RequestType] = 'SkipProcess' THEN 'SkipProcess'
+                        ELSE p.[RequestType]
+                    END = @WorkflowCode
+                ))
+                  AND (@FromDate IS NULL OR p.[RequestedDT] >= @FromDate)
+                  AND (@ToDate IS NULL OR p.[RequestedDT] < @ToDate)
+                  AND (@Status IS NULL OR p.[Status] = @Status)
+
+                UNION ALL
+
+                SELECT 
+                    'TaskItems' AS SourceTable,
+                    t.[Id] AS RecordId,
+                    t.[Id] AS TaskId,
+                    CASE 
+                        WHEN t.[SourceEntityType] IN ('AttendanceWorkflow', 'AttendanceApproval') THEN 'AttendanceApproval'
+                        WHEN t.[SourceEntityType] IN ('MakerItemRateWorkflow', 'MakerRateChange') THEN 'MakerRateChange'
+                        ELSE t.[SourceEntityType]
+                    END AS WorkflowCode,
+                    ISNULL(wc.[WorkflowName], t.[SourceEntityType]) AS WorkflowName,
+                    ISNULL(wc.[Module], 'General') AS Module,
+                    NULL AS LotNo,
+                    NULL AS OrderNo,
+                    NULL AS ItemCode,
+                    t.[Title] AS ItemName,
+                    NULL AS ProcessName,
+                    NULL AS MakerName,
+                    NULL AS TargetProcessName,
+                    NULL AS Qty,
+                    t.[Description] AS RequestReason,
+                    t.[AssignedBy] AS RequestedBy,
+                    t.[CreatedAt] AS RequestedDT,
+                    NULL AS MachineName,
+                    CASE t.[Status]
+                        WHEN 2 THEN 'Approved'
+                        WHEN 3 THEN 'Rejected'
+                        WHEN 0 THEN 'Pending'
+                        WHEN 1 THEN 'Pending'
+                        ELSE 'Pending'
+                    END AS Status,
+                    t.[CompletedBy] AS ActionBy,
+                    t.[CompletedAt] AS ActionDT,
+                    (SELECT TOP 1 tc.[Content] FROM dbo.TaskComments tc WITH (NOLOCK) WHERE tc.[TaskId] = t.[Id] ORDER BY tc.[Id] DESC) AS ActionRemarks
+                FROM dbo.TaskItems t WITH (NOLOCK)
+                INNER JOIN dbo.WorkflowConfigurations wc WITH (NOLOCK) ON wc.[WorkflowCode] = (
+                    CASE 
+                        WHEN t.[SourceEntityType] IN ('AttendanceWorkflow', 'AttendanceApproval') THEN 'AttendanceApproval'
+                        WHEN t.[SourceEntityType] IN ('MakerItemRateWorkflow', 'MakerRateChange') THEN 'MakerRateChange'
+                        ELSE t.[SourceEntityType]
+                    END
+                )
+                WHERE t.[SourceEntityType] NOT IN ('DeleteLotAuthorization', 'DeleteProductionIssuance', 'SkipProcess')
+                  AND (@WorkflowCode IS NULL OR (
+                      CASE 
+                          WHEN t.[SourceEntityType] IN ('AttendanceWorkflow', 'AttendanceApproval') THEN 'AttendanceApproval'
+                          WHEN t.[SourceEntityType] IN ('MakerItemRateWorkflow', 'MakerRateChange') THEN 'MakerRateChange'
+                          ELSE t.[SourceEntityType]
+                      END = @WorkflowCode
+                  ))
+                  AND (@FromDate IS NULL OR t.[CreatedAt] >= @FromDate)
+                  AND (@ToDate IS NULL OR t.[CreatedAt] < @ToDate)
+                  AND (@Status IS NULL OR (
+                      CASE t.[Status]
+                          WHEN 2 THEN 'Approved'
+                          WHEN 3 THEN 'Rejected'
+                          WHEN 0 THEN 'Pending'
+                          WHEN 1 THEN 'Pending'
+                          ELSE 'Pending'
+                      END = @Status
+                  ))
+                ORDER BY RequestedDT DESC";
+
+            var results = await db.QueryAsync<WorkflowApprovalHistoryModel>(sql, new
+            {
+                WorkflowCode = workflowCode,
+                FromDate = fromDateParam,
+                ToDate = toDateParam,
+                Status = status
+            });
+
+            return results.ToList();
+        }
     }
 }

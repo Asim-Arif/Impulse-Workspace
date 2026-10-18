@@ -397,7 +397,9 @@ namespace DataAccessLibrary.DAC.Production
                 string assignedToUserNames = string.Join(",", dispatchUsers.Select(u => (string)u.UserName));
                 string assignedToDisplayNames = "[Role: Dispatch]";
 
-                // 2. Create TaskItem for Dispatch (ActionUrl = "" per request #10)
+                string dispatchActionUrl = "/production/create-dispatch-list";
+
+                // 2. Create TaskItem for Dispatch
                 const string insertTaskSql = @"
                     INSERT INTO TaskItems (
                         Title, Description, AssignedTo, AssignedToNames, AssignedBy, Priority, Status, DueDate,
@@ -406,7 +408,7 @@ namespace DataAccessLibrary.DAC.Production
                     ) VALUES (
                         @Title, @Description, @AssignedTo, @AssignedToNames, @AssignedBy, 2, 0, DATEADD(day, 2, GETDATE()),
                         0, 0, 0,
-                        'LotDispatch', @EntityRefId, 'Dispatch', '', GETUTCDATE(), GETUTCDATE()
+                        'LotDispatch', @EntityRefId, 'Dispatch', @ActionUrl, GETUTCDATE(), GETUTCDATE()
                     );
                     SELECT CAST(SCOPE_IDENTITY() AS INT);";
 
@@ -417,7 +419,8 @@ namespace DataAccessLibrary.DAC.Production
                     AssignedTo = assignedToUserNames,
                     AssignedToNames = assignedToDisplayNames,
                     AssignedBy = string.IsNullOrWhiteSpace(createdBy) ? "System" : createdBy,
-                    EntityRefId = entityRefId
+                    EntityRefId = entityRefId,
+                    ActionUrl = dispatchActionUrl
                 }, trans);
 
                 // 3. Register in Task_Assignees & AppNotifications
@@ -425,7 +428,7 @@ namespace DataAccessLibrary.DAC.Production
                     INSERT INTO AppNotifications (
                         Id, Category, Title, Message, SenderName, TargetUserId, ActionUrl, CreatedAt, IsRead, IsReadReceipt
                     ) VALUES (
-                        @Id, 4, @Title, @Message, @SenderName, @TargetUserId, '', GETUTCDATE(), 0, 0
+                        @Id, 4, @Title, @Message, @SenderName, @TargetUserId, @ActionUrl, GETUTCDATE(), 0, 0
                     );";
 
                 const string insertAssigneeSql = @"

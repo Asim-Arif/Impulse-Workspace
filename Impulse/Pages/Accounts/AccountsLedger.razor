@@ -137,15 +137,15 @@
                         <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
                             <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
                                 <tr>
-                                    <th>Dated</th>
-                                    <th>Voucher #</th>
+                                    <th style="width: 110px; min-width: 110px; white-space: nowrap;">Dated</th>
+                                    <th style="width: 140px; min-width: 140px; white-space: nowrap;">Voucher #</th>
                                     <th>Description</th>
-                                    <th class="text-end">Debit</th>
-                                    <th class="text-end">Credit</th>
-                                    <th class="text-end">Balance</th>
-                                    <th class="text-center">Chq #</th>
-                                    <th class="text-center">Chq Date</th>
-                                    <th>Handed Over To</th>
+                                    <th class="text-end" style="width: 110px; min-width: 110px; white-space: nowrap;">Debit</th>
+                                    <th class="text-end" style="width: 110px; min-width: 110px; white-space: nowrap;">Credit</th>
+                                    <th class="text-end" style="width: 140px; min-width: 140px; white-space: nowrap;">Balance</th>
+                                    <th class="text-center" style="width: 95px; min-width: 95px; white-space: nowrap;">Chq #</th>
+                                    <th class="text-center" style="width: 110px; min-width: 110px; white-space: nowrap;">Chq Date</th>
+                                    <th style="width: 160px; min-width: 160px; white-space: nowrap;">Handed Over To</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -156,19 +156,19 @@
                                         <td colspan="5" class="text-center text-primary" style="font-size: 0.8rem;">
                                             @StrOpeningMsg
                                         </td>
-                                        <td class="text-end text-primary">@CurrentAccount.OpeningBalance.ToString("N2")</td>
+                                        <td class="text-end text-primary text-nowrap">@CurrentAccount.OpeningBalance.ToString("N2")</td>
                                         <td colspan="3"></td>
                                     </tr>
 
                                     @foreach (var row in LedgerDatafromDB)
                                     {
                                         <ContextMenuTrigger MenuId="rowContextMenu" Data="row" WrapperTag="tr" CssClass="clickable-row">
-                                            <td>@row.VDate.ToString("dd-MMM-yyyy")</td>
-                                            <td>@row.VchrNo</td>
+                                            <td class="text-nowrap">@row.VDate.ToString("dd-MMM-yyyy")</td>
+                                            <td class="text-nowrap">@row.VchrNo</td>
                                             <td>@row.Description</td>
-                                            <td class="text-end">@row.Debit.ToString("N2")</td>
-                                            <td class="text-end">@row.Credit.ToString("N2")</td>
-                                            <td class="text-end">@row.Balance.ToString("N2")</td>
+                                            <td class="text-end text-nowrap">@row.Debit.ToString("N2")</td>
+                                            <td class="text-end text-nowrap">@row.Credit.ToString("N2")</td>
+                                            <td class="text-end text-nowrap">@row.Balance.ToString("N2")</td>
                                             <td class="text-center">
                                                 @if (!string.IsNullOrEmpty(row.ChqNo))
                                                 {
@@ -177,8 +177,8 @@
                                                     </span>
                                                 }
                                             </td>
-                                            <td class="text-center">@(row.ChqDate == DateTime.MinValue ? "" : row.ChqDate.ToString("dd-MMM-yyyy"))</td>
-                                            <td>@row.Handed_Over_To</td>
+                                            <td class="text-center text-nowrap">@(row.ChqDate == DateTime.MinValue ? "" : row.ChqDate.ToString("dd-MMM-yyyy"))</td>
+                                            <td class="text-nowrap">@row.Handed_Over_To</td>
                                         </ContextMenuTrigger>
                                         
                                         @if (!string.IsNullOrEmpty(row.BalanceTag_UserName))
@@ -195,16 +195,16 @@
                                     <!-- Closing Balance Row -->
                                     <tr class="table-primary fw-bold">
                                         <td colspan="3" class="text-end">TOTAL:</td>
-                                        <td class="text-end text-danger">@TotalDebit?.ToString("N2")</td>
-                                        <td class="text-end text-success">@TotalCredit?.ToString("N2")</td>
-                                        <td class="text-end text-primary">@CurrentAccount.Balance.ToString("N2")</td>
+                                        <td class="text-end text-danger text-nowrap">@TotalDebit?.ToString("N2")</td>
+                                        <td class="text-end text-success text-nowrap">@TotalCredit?.ToString("N2")</td>
+                                        <td class="text-end text-primary text-nowrap">@FormatBalanceWithDrCr(CurrentAccount.Balance)</td>
                                         <td colspan="3"></td>
                                     </tr>
                                     <tr class="table-warning fw-bold">
                                         <td colspan="5" class="text-center text-primary" style="font-size: 0.8rem;">
                                             @StrClosingMsg
                                         </td>
-                                        <td class="text-end text-primary">@CurrentAccount.Balance.ToString("N2")</td>
+                                        <td class="text-end text-primary text-nowrap">@FormatBalanceWithDrCr(CurrentAccount.Balance)</td>
                                         <td colspan="3"></td>
                                     </tr>
                                 }

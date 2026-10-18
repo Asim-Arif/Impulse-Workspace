@@ -41,8 +41,8 @@
                     </th>
                     <th style="width: 45px;">S. #</th>
                     <th style="width: 95px;">Date</th>
-                    <th style="width: 100px;">Order #</th>
-                    <th style="width: 100px;">Item ID</th>
+                    <th style="width: 105px;">Internal Ref #</th>
+                    <th style="width: 110px;">Item ID</th>
                     <th style="width: 250px; min-width: 180px; max-width: 260px;">Description</th>
                     <th class="text-center" style="width: 85px;">Issd Qty</th>
                     <th class="text-end" style="width: 90px;">Price</th>
@@ -50,7 +50,7 @@
                     <th class="text-end" style="width: 90px;">Repair</th>
                     <th class="text-end" style="width: 105px;">Rcvd. Value</th>
                     <th class="text-center" style="width: 85px;">Rcvd Qty</th>
-                    <th class="text-center" style="width: 90px;">Lot #</th>
+                    <th class="text-center" style="width: 100px;">Lot #</th>
                     <th style="width: 110px;">Process</th>
                     <th style="width: 90px;">Customer</th>
                 </tr>
@@ -83,8 +83,8 @@
                             </td>
                             <td>@(idx++)</td>
                             <td>@lot.DT.ToString("dd-MMM-yy")</td>
-                            <td class="fw-semibold">@lot.OrderNo</td>
-                            <td><span class="badge bg-secondary">@lot.ItemCode</span></td>
+                            <td class="fw-semibold">@lot.InternalRefNo</td>
+                            <td><span class="badge bg-secondary" style="font-size: 0.92rem; font-weight: 600; padding: 4px 8px;">@lot.ItemCode</span></td>
                             <td class="fw-semibold @(lot.Audited ? "text-primary" : "text-dark")" style="max-width: 260px;" @onmouseenter="() => ShowImagePreview(lot.ItemCode)" title="@lot.ItemName">
                                 <div class="text-truncate" style="max-width: 260px;" title="@lot.ItemName">
                                     @lot.ItemName
@@ -112,7 +112,7 @@
                             <td class="text-end fw-bold text-success">@lot.RcvdValue.ToString("N2")</td>
                             <td class="text-center fw-bold">@lot.RcvdQty.ToString("N0")</td>
                             <td class="text-center">
-                                <span class="badge px-2 py-1" style="background-color: #2196F3; color: #ffffff; font-weight: 700; border-radius: 4px;">
+                                <span class="badge px-2 py-1" style="background-color: #2196F3; color: #ffffff; font-weight: 700; border-radius: 4px; font-size: 0.95rem; letter-spacing: 0.5px;">
                                     @lot.LotNo
                                 </span>
                             </td>
@@ -197,26 +197,3 @@
         </div>
     </div>
 </div>
-
-<!-- Context Menu for Billing Grid with Standard Win11Style Classes -->
-<ContextMenu Id="lotContextMenu" Template="Win11Style">
-    <div class="win11-section-header">Lot Actions</div>
-    <Item class="win11-menu-item" OnClick="@ContextEditRate">
-        <i class="fas fa-pencil-alt fa-fw win11-icon text-primary"></i> Edit Rate
-    </Item>
-    <Item class="win11-menu-item" OnClick="@ContextHideLot">
-        <i class="fas fa-eye-slash fa-fw win11-icon text-warning"></i> Hide from Billing
-    </Item>
-    <div class="win11-divider"></div>
-    <Item class="win11-menu-item" OnClick="@ContextPrintPTC">
-        <i class="fas fa-file-alt fa-fw win11-icon text-dark"></i> Print PTC (Receiving Slip)
-    </Item>
-</ContextMenu>
-
-<style>
-    .blazor-context-menu {
-        z-index: 100000 !important;
-        max-height: 40vh !important;
-        overflow-y: auto !important;
-    }
-</style>

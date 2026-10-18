@@ -18,6 +18,7 @@ namespace Impulse.Pages.Production.SkipProcessApproval
         [Inject] private NotificationService NotificationService { get; set; } = default!;
         [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = default!;
         [Inject] private NavigationManager NavigationManager { get; set; } = default!;
+        [Inject] private Impulse.Services.Setup.IUserPermissionService UserPermissionService { get; set; } = default!;
 
         [Parameter] public int? pTaskId { get; set; }
 
@@ -32,6 +33,13 @@ namespace Impulse.Pages.Production.SkipProcessApproval
 
         protected override async Task OnInitializedAsync()
         {
+            await UserPermissionService.InitializeAsync();
+            if (!UserPermissionService.HasOptionAccess("PrdSkipProcessApproval"))
+            {
+                NavigationManager.NavigateTo("/", true);
+                return;
+            }
+
             try
             {
                 var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();

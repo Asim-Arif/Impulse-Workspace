@@ -274,58 +274,57 @@
 <!-- Copy User Modal -->
 @if (IsCopyUserOpen && CopyingSourceUser != null)
 {
-    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.55); z-index: 1060;" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
-            <div class="modal-content border-0 shadow-lg" style="border-radius: 14px; overflow: hidden;">
-                <div class="modal-header bg-light border-bottom py-2 px-3 d-flex align-items-center justify-content-between">
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="p-2 bg-info-subtle text-info rounded-2">
-                            <i class="fas fa-copy"></i>
-                        </div>
-                        <div>
-                            <h6 class="modal-title fw-bold text-dark mb-0">Copy User Profile</h6>
-                            <small class="text-secondary">Clone rights &amp; permissions from @CopyingSourceUser.UserName</small>
-                        </div>
-                    </div>
-                    <button type="button" class="btn-close" @onclick="CloseCopyUserModal"></button>
+    <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(4px); z-index: 100050; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; font-family: 'Calibri', 'Segoe UI', sans-serif;">
+        <div class="shadow-lg border-0" style="width: 1000px; max-width: 96vw; max-height: 92vh; background: #ffffff; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden;">
+            <div class="bg-primary text-white py-2 px-3 d-flex align-items-center justify-content-between" style="flex-shrink: 0;">
+                <h6 class="modal-title fw-bold mb-0" style="font-size: 1.05rem;">
+                    <i class="fas fa-copy me-2"></i>
+                    <span>Copy User Profile</span>
+                    @if (CopyingSourceUser != null)
+                    {
+                        <span class="fw-normal opacity-90 ms-2" style="font-size: 0.95rem;">— Clone rights &amp; permissions from @CopyingSourceUser.UserName</span>
+                    }
+                </h6>
+                <button type="button" class="btn-close btn-close-white" @onclick="CloseCopyUserModal"></button>
+            </div>
+            <div class="p-3" style="overflow-y: auto; flex-grow: 1;">
+                <div class="alert alert-info py-2 px-3 small mb-3" style="display: block; line-height: 1.5; white-space: normal;">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Copies all module navigation links, operational authorizations, and screen permissions from <strong>@CopyingSourceUser?.UserName</strong> to a new user account.
                 </div>
-                <div class="modal-body p-3">
-                    <div class="alert alert-info py-2 px-3 small mb-3">
-                        <i class="fas fa-info-circle me-1"></i>
-                        Copies all module navigation links, operational authorizations, and screen permissions from <strong>@CopyingSourceUser.UserName</strong> to a new user account.
-                    </div>
-                    <div class="mb-3">
+                <div class="row g-3">
+                    <div class="col-md-6 mb-2">
                         <label class="form-label small fw-bold text-secondary mb-1">
                             New Username <span class="text-danger">*</span>
                         </label>
                         <input type="text" class="form-control form-control-sm" @bind="NewCopyUserName" placeholder="e.g. adeel.export" />
                     </div>
-                    <div class="mb-3">
+                    <div class="col-md-6 mb-2">
                         <label class="form-label small fw-bold text-secondary mb-1">Initial Password (Optional)</label>
                         <input type="password" class="form-control form-control-sm" @bind="NewCopyPassword" placeholder="Leave blank or enter initial password" />
                     </div>
-                    <div class="mb-2">
+                    <div class="col-12 mb-2">
                         <label class="form-label small fw-bold text-secondary mb-1">Full Display Name (Optional)</label>
                         <input type="text" class="form-control form-control-sm" @bind="NewCopyFullName" placeholder="e.g. Adeel Ahmad" />
                     </div>
                 </div>
-                <div class="modal-footer bg-light py-2 px-3 d-flex justify-content-between">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CloseCopyUserModal">
-                        <i class="fas fa-times me-1"></i> Cancel
-                    </button>
-                    <button type="button" class="btn btn-sm btn-info text-white shadow-sm" @onclick="ExecuteCopyUserAsync" disabled="@IsCopyingUser">
-                        @if (IsCopyingUser)
-                        {
-                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                            <span>Copying...</span>
-                        }
-                        else
-                        {
-                            <i class="fas fa-copy me-1"></i>
-                            <span>Create Copy</span>
-                        }
-                    </button>
-                </div>
+            </div>
+            <div class="modal-footer border-top py-2 px-3 bg-light d-flex justify-content-between" style="flex-shrink: 0;">
+                <button type="button" class="btn btn-sm btn-outline-secondary px-3" @onclick="CloseCopyUserModal">
+                    <i class="fas fa-times me-1"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-sm btn-primary px-3 shadow-sm" @onclick="ExecuteCopyUserAsync" disabled="@IsCopyingUser">
+                    @if (IsCopyingUser)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        <span>Copying...</span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-copy me-1"></i>
+                        <span>Create Copy</span>
+                    }
+                </button>
             </div>
         </div>
     </div>

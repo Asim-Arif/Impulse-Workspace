@@ -1,4 +1,6 @@
+using BlazorContextMenu;
 using DataAccessLibrary.Models.ViewModels.Production;
+using Impulse.Components.Production.MakerBilling;
 using Impulse.Services;
 using Impulse.Services.Production;
 using Microsoft.AspNetCore.Components;
@@ -22,7 +24,12 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
         public LookupItemString? SelectedDebitHead { get; set; } = null;
         public MakerBillingFilter Filter { get; set; } = new MakerBillingFilter();
 
+        // Customer & Internal Ref Filters
+        public string SelectedCustCode { get; set; } = string.Empty;
+        public string SelectedInternalRefNo { get; set; } = string.Empty;
+
         // 6 Tab Datasets
+        public List<MakerBillingLotItem> AllLots { get; set; } = new List<MakerBillingLotItem>();
         public List<MakerBillingLotItem> Lots { get; set; } = new List<MakerBillingLotItem>();
         public List<MakerRepairItem> RepairItems { get; set; } = new List<MakerRepairItem>();
         public List<MakerMaterialDedItem> MaterialDedItems { get; set; } = new List<MakerMaterialDedItem>();
@@ -35,6 +42,7 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
         public decimal LongTermDeduction { get; set; } = 0;
 
         // UI State
+        public MakerBillingTab? billingTab;
         public int ActiveTab { get; set; } = 0;
         public bool IsLoading { get; set; } = false;
         public bool IsPosting { get; set; } = false;
@@ -96,6 +104,8 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
         {
             SelectedMaker = maker;
             Filter.VendID = maker?.Id ?? 0;
+            SelectedCustCode = string.Empty;
+            SelectedInternalRefNo = string.Empty;
             await LoadAllDataAsync();
         }
 
@@ -149,10 +159,48 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
             await LoadAllDataAsync();
         }
 
+        public IEnumerable<string> AvailableCustomerCodes =>
+            AllLots.Select(x => x.CustCode)
+                   .Where(c => !string.IsNullOrWhiteSpace(c))
+                   .Distinct(StringComparer.OrdinalIgnoreCase)
+                   .OrderBy(c => c);
+
+        public IEnumerable<string> AvailableInternalRefNos =>
+            AllLots.Where(x => string.IsNullOrWhiteSpace(SelectedCustCode) || x.CustCode.Equals(SelectedCustCode, StringComparison.OrdinalIgnoreCase))
+                   .Select(x => x.InternalRefNo)
+                   .Where(r => !string.IsNullOrWhiteSpace(r))
+                   .Distinct(StringComparer.OrdinalIgnoreCase)
+                   .OrderBy(r => r);
+
+        public void OnCustomerFilterChanged()
+        {
+            if (!string.IsNullOrWhiteSpace(SelectedInternalRefNo) &&
+                !AvailableInternalRefNos.Contains(SelectedInternalRefNo, StringComparer.OrdinalIgnoreCase))
+            {
+                SelectedInternalRefNo = string.Empty;
+            }
+            ApplyLocalLotFilter();
+        }
+
+        public void OnInternalRefFilterChanged()
+        {
+            ApplyLocalLotFilter();
+        }
+
+        public void ApplyLocalLotFilter()
+        {
+            Lots = AllLots.Where(x =>
+                (string.IsNullOrWhiteSpace(SelectedCustCode) || x.CustCode.Equals(SelectedCustCode, StringComparison.OrdinalIgnoreCase)) &&
+                (string.IsNullOrWhiteSpace(SelectedInternalRefNo) || x.InternalRefNo.Equals(SelectedInternalRefNo, StringComparison.OrdinalIgnoreCase))
+            ).ToList();
+            StateHasChanged();
+        }
+
         public async Task LoadAllDataAsync()
         {
             if (Filter.VendID <= 0)
             {
+                AllLots.Clear();
                 Lots.Clear();
                 RepairItems.Clear();
                 MaterialDedItems.Clear();
@@ -166,7 +214,8 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
             IsLoading = true;
             try
             {
-                Lots = await BillingService.GetMakerBillingLotsAsync(Filter);
+                AllLots = await BillingService.GetMakerBillingLotsAsync(Filter);
+                ApplyLocalLotFilter();
                 RepairItems = await BillingService.GetRepairWastageItemsAsync(Filter);
                 MaterialDedItems = await BillingService.GetMaterialDeductionsAsync(Filter.VendID, Filter.MasterPONo);
                 HiddenLots = await BillingService.GetHiddenLotsAsync(Filter.VendID);
@@ -201,7 +250,8 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
             try
             {
                 await BillingService.HideLotFromBillingAsync(lot.EntryID);
-                Lots.Remove(lot);
+                AllLots.Remove(lot);
+                ApplyLocalLotFilter();
 
                 NotificationService.Notify(new Radzen.NotificationMessage
                 {
@@ -256,20 +306,115 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
 
         public async Task HandlePrintPTC(MakerBillingLotItem lot)
         {
+            if (lot == null || string.IsNullOrWhiteSpace(lot.LotNo) || lot.LotNo == "0")
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Print PTC",
+                    Detail = "Please select a record with a valid Lot No.",
+                    Duration = 4000
+                });
+                return;
+            }
+
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
-                ReportName = "VendReceivings.rpt",
-                SelectionFormula = $"{{VendRcvd.EntryID}} = {lot.EntryID}"
+                ReportName = "PTCQel.rpt",
+                Parameters = new Dictionary<string, object>
+                {
+                    { "@LotNo", lot.LotNo }
+                }
             });
         }
 
         public async Task HandlePrintPTCFromHidden(MakerHiddenLotItem hidden)
         {
+            if (hidden == null || string.IsNullOrWhiteSpace(hidden.LotNo) || hidden.LotNo == "0")
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Print PTC",
+                    Detail = "Please select a record with a valid Lot No.",
+                    Duration = 4000
+                });
+                return;
+            }
+
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
-                ReportName = "VendReceivings.rpt",
-                SelectionFormula = $"{{VendRcvd.EntryID}} = {hidden.VRD_RefID}"
+                ReportName = "PTCQel.rpt",
+                Parameters = new Dictionary<string, object>
+                {
+                    { "@LotNo", hidden.LotNo }
+                }
             });
+        }
+
+        // ── Context Menu Actions ──────────────────────────────────────────
+        public void ContextEditRate(ItemClickEventArgs args)
+        {
+            if (args.Data is MakerBillingLotItem lot)
+            {
+                billingTab?.StartRateEdit(lot);
+            }
+        }
+
+        public async Task ContextHideLot(ItemClickEventArgs args)
+        {
+            if (args.Data is MakerBillingLotItem lot)
+            {
+                await HandleHideLot(lot);
+            }
+        }
+
+        public async Task ContextPrintPTC(ItemClickEventArgs args)
+        {
+            if (args.Data is MakerBillingLotItem lot)
+            {
+                await HandlePrintPTC(lot);
+            }
+        }
+
+        public async Task ContextRestoreHiddenLot(ItemClickEventArgs args)
+        {
+            if (args.Data is MakerHiddenLotItem item)
+            {
+                try
+                {
+                    await BillingService.RestoreHiddenLotAsync(item.EntryID);
+                    HiddenLots.Remove(item);
+
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Success,
+                        Summary = "Lot Restored",
+                        Detail = $"Lot #{item.LotNo} restored to Maker Billing.",
+                        Duration = 3000
+                    });
+
+                    await LoadAllDataAsync();
+                }
+                catch (Exception ex)
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Error,
+                        Summary = "Restore Failed",
+                        Detail = ex.Message,
+                        Duration = 4000
+                    });
+                }
+            }
+        }
+
+        public async Task ContextPrintPTCFromHidden(ItemClickEventArgs args)
+        {
+            if (args.Data is MakerHiddenLotItem hidden)
+            {
+                await HandlePrintPTCFromHidden(hidden);
+            }
         }
 
         public async Task PrintMaterialDeductionsReport()

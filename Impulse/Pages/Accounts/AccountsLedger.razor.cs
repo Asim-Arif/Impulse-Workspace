@@ -297,5 +297,10 @@ namespace Impulse.Pages.Accounts
             }
         }
 
+        private string FormatBalanceWithDrCr(decimal balance)
+        {
+            return $"{Math.Abs(balance):N2} {(balance >= 0 ? "Dr" : "Cr")}";
+        }
+
     }
 }

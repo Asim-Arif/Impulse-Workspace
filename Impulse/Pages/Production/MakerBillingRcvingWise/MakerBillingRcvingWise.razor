@@ -3,6 +3,7 @@
 @using DataAccessLibrary.Models.ViewModels.Production
 @using Impulse.Components.Production.MakerBilling
 @using Blazored.Typeahead
+@using BlazorContextMenu
 
 <PageTitle>Maker Billing | Impulse ERP</PageTitle>
 <meta name="description" content="Calculate maker piece rates, deductions, and generate payment bills." />
@@ -123,10 +124,10 @@
                     </div>
                 </div>
 
-                <!-- Row 2: Date & Posting Settings -->
+                <!-- Row 2: Date & Posting Settings, Customer & Internal Ref Filters -->
                 <div class="row g-2 align-items-end">
                     <!-- Date Range Preset -->
-                    <div class="col-md-2">
+                    <div class="col-xl-2 col-md-2">
                         <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
                             <i class="fas fa-calendar-alt text-primary me-1"></i> Range
                         </label>
@@ -144,33 +145,61 @@
                     </div>
 
                     <!-- From Date -->
-                    <div class="col-md-2">
+                    <div class="col-xl-1 col-md-2">
                         <label class="form-label form-label-sm mb-1 fw-bold text-secondary">From Date</label>
-                        <input type="date" class="form-control form-control-sm" @bind="Filter.DtFrom" @bind:after="LoadAllDataAsync" disabled="@(Filter.DateRangeIndex != 8)" />
+                        <input type="date" class="form-control form-control-sm px-1" @bind="Filter.DtFrom" @bind:after="LoadAllDataAsync" disabled="@(Filter.DateRangeIndex != 8)" />
                     </div>
 
                     <!-- To Date -->
-                    <div class="col-md-2">
+                    <div class="col-xl-1 col-md-2">
                         <label class="form-label form-label-sm mb-1 fw-bold text-secondary">To Date</label>
-                        <input type="date" class="form-control form-control-sm" @bind="Filter.DtTo" @bind:after="LoadAllDataAsync" disabled="@(Filter.DateRangeIndex != 8)" />
+                        <input type="date" class="form-control form-control-sm px-1" @bind="Filter.DtTo" @bind:after="LoadAllDataAsync" disabled="@(Filter.DateRangeIndex != 8)" />
+                    </div>
+
+                    <!-- Customer Code Filter -->
+                    <div class="col-xl-2 col-md-2">
+                        <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
+                            <i class="fas fa-user-tag text-primary me-1"></i> Customer Code
+                        </label>
+                        <select class="form-select form-select-sm" @bind="SelectedCustCode" @bind:after="OnCustomerFilterChanged">
+                            <option value="">&lt;All Customers&gt;</option>
+                            @foreach (var custCode in AvailableCustomerCodes)
+                            {
+                                <option value="@custCode">@custCode</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Internal Ref # Filter -->
+                    <div class="col-xl-2 col-md-2">
+                        <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
+                            <i class="fas fa-hashtag text-primary me-1"></i> Internal Ref #
+                        </label>
+                        <select class="form-select form-select-sm" @bind="SelectedInternalRefNo" @bind:after="OnInternalRefFilterChanged">
+                            <option value="">&lt;All Ref #&gt;</option>
+                            @foreach (var r in AvailableInternalRefNos)
+                            {
+                                <option value="@r">@r</option>
+                            }
+                        </select>
                     </div>
 
                     <!-- Posting Date -->
-                    <div class="col-md-2">
+                    <div class="col-xl-2 col-md-2">
                         <label class="form-label form-label-sm mb-1 fw-bold text-primary">Posting Date</label>
                         <input type="date" class="form-control form-control-sm border-primary fw-bold" @bind="Filter.PostingDate" />
                     </div>
 
                     <!-- Show Picture & Refresh -->
-                    <div class="col-md-4 d-flex align-items-center gap-3">
-                        <div class="form-check form-switch mb-0">
+                    <div class="col-xl-2 col-md-4 d-flex align-items-center gap-2">
+                        <div class="form-check form-switch mb-0" title="Show item picture preview on hover">
                             <input class="form-check-input" type="checkbox" id="chkPic" @bind="Filter.ShowPicture" />
-                            <label class="form-check-label fw-bold text-secondary small" for="chkPic">
-                                Show Pictures
+                            <label class="form-check-label fw-bold text-secondary small text-nowrap" for="chkPic">
+                                Pictures
                             </label>
                         </div>
 
-                        <button type="button" class="btn btn-sm btn-primary flex-grow-1 fw-bold" @onclick="LoadAllDataAsync" disabled="@IsLoading">
+                        <button type="button" class="btn btn-sm btn-primary flex-grow-1 fw-bold text-nowrap" @onclick="LoadAllDataAsync" disabled="@IsLoading">
                             @if (IsLoading)
                             {
                                 <span class="spinner-border spinner-border-sm me-1" role="status"></span>
@@ -230,7 +259,8 @@
             <div class="tab-content">
                 @if (ActiveTab == 0)
                 {
-                    <MakerBillingTab Lots="@Lots"
+                    <MakerBillingTab @ref="billingTab"
+                                     Lots="@Lots"
                                      IsLoading="@IsLoading"
                                      ShowPicture="@Filter.ShowPicture"
                                      RejectionRelaxation="@Filter.RejectionRelaxation"
@@ -283,7 +313,38 @@
     </div>
 </div>
 
+<!-- ── Context Menus (outside card to prevent backdrop-filter coordinate displacement) ── -->
+<ContextMenu Id="lotContextMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <div class="win11-section-header">Lot Actions</div>
+    <Item class="win11-menu-item" OnClick="@ContextEditRate">
+        <i class="fas fa-pencil-alt fa-fw win11-icon text-primary"></i> Edit Rate
+    </Item>
+    <Item class="win11-menu-item" OnClick="@ContextHideLot">
+        <i class="fas fa-eye-slash fa-fw win11-icon text-warning"></i> Hide from Billing
+    </Item>
+    <div class="win11-divider"></div>
+    <Item class="win11-menu-item" OnClick="@ContextPrintPTC">
+        <i class="fas fa-file-alt fa-fw win11-icon text-dark"></i> Print PTC
+    </Item>
+</ContextMenu>
+
+<ContextMenu Id="hiddenLotMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <div class="win11-section-header">Hidden Lot Actions</div>
+    <Item class="win11-menu-item" OnClick="@ContextRestoreHiddenLot">
+        <i class="fas fa-eye fa-fw win11-icon text-success"></i> Show in Billing
+    </Item>
+    <div class="win11-divider"></div>
+    <Item class="win11-menu-item" OnClick="@ContextPrintPTCFromHidden">
+        <i class="fas fa-file-alt fa-fw win11-icon text-dark"></i> Print PTC
+    </Item>
+</ContextMenu>
+
 <style>
+    .win11-context-menu-container, .blazor-context-menu {
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+        z-index: 100000 !important;
+    }
     .blazored-typeahead {
         height: 35px !important;
         font-size: 0.875rem !important;
@@ -309,3 +370,4 @@
         z-index: 10000 !important;
     }
 </style>
+

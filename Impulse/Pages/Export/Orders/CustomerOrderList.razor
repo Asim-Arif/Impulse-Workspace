@@ -296,9 +296,12 @@
                                                     <td class="text-center">@order.TotalArticles</td>
                                                     <td class="text-center fw-bold">@order.PurchasePlanStatus</td>
                                                     <td class="text-center" @onclick:stopPropagation="true">
-                                                        <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2 me-1" style="font-size: 0.75rem;" @onclick="() => OpenAttachments(currentOrder)" title="View & Manage Attachments">
-                                                            <i class="fas fa-paperclip text-primary"></i>
-                                                        </button>
+                                                        @if (!IsProductionMode)
+                                                        {
+                                                            <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2 me-1" style="font-size: 0.75rem;" @onclick="() => OpenAttachments(currentOrder)" title="View & Manage Attachments">
+                                                                <i class="fas fa-paperclip text-primary"></i>
+                                                            </button>
+                                                        }
                                                         <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2" style="font-size: 0.75rem;" @onclick="(e) => OpenRowMenu(e, currentOrder)">Manage</button>
                                                     </td>
                                                 </tr>
@@ -381,11 +384,11 @@
     @if (context.Data is CustomerOrderListItemModel order)
     {
         <div class="win11-section-header">Order No: @order.OrderNo</div>
-        <Item class="win11-menu-item" OnClick="@(() => OpenAttachments(order))">
-            <i class="fas fa-paperclip fa-fw win11-icon text-primary"></i> Attachments
-        </Item>
         @if (!IsProductionMode)
         {
+            <Item class="win11-menu-item" OnClick="@(() => OpenAttachments(order))">
+                <i class="fas fa-paperclip fa-fw win11-icon text-primary"></i> Attachments
+            </Item>
             <Item class="win11-menu-item" OnClick="@(() => EditOrder(order.OrderNo))">
                 <i class="fas fa-edit fa-fw win11-icon text-primary"></i> Edit Order
             </Item>

@@ -945,6 +945,11 @@ namespace Impulse.Pages.Export.Orders
 
         private void OpenAttachments(CustomerOrderListItemModel order)
         {
+            if (IsProductionMode)
+            {
+                return;
+            }
+
             highlightedOrder = order;
             attachmentModalRef?.Open(
                 entityType: "Order",

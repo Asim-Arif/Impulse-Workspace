@@ -18,6 +18,7 @@ namespace Impulse.Pages.Production.IssuanceDeletionApproval
         [Inject] private NotificationService NotificationService { get; set; } = default!;
         [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = default!;
         [Inject] private NavigationManager NavigationManager { get; set; } = default!;
+        [Inject] private Impulse.Services.Setup.IUserPermissionService UserPermissionService { get; set; } = default!;
 
         [Parameter] public int? pTaskId { get; set; }
 
@@ -32,6 +33,13 @@ namespace Impulse.Pages.Production.IssuanceDeletionApproval
 
         protected override async Task OnInitializedAsync()
         {
+            await UserPermissionService.InitializeAsync();
+            if (!UserPermissionService.HasOptionAccess("PrdIssuanceDeletionApproval"))
+            {
+                NavigationManager.NavigateTo("/", true);
+                return;
+            }
+
             try
             {
                 var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();

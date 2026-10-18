@@ -148,6 +148,8 @@ namespace DataAccessLibrary.DAC.Production
                 string custCode = dict.ContainsKey("CustCode") && dict["CustCode"] != null ? dict["CustCode"].ToString()! : string.Empty;
                 bool audited = dict.ContainsKey("Audited") && dict["Audited"] != null && Convert.ToBoolean(dict["Audited"]);
 
+                string internalRefNo = dict.ContainsKey("InternalRefNo") && dict["InternalRefNo"] != null ? dict["InternalRefNo"].ToString()! : string.Empty;
+
                 decimal balValue = Math.Round(rcvdValue - unAuthValue - repairAmt, 2);
 
                 items.Add(new MakerBillingLotItem
@@ -158,6 +160,7 @@ namespace DataAccessLibrary.DAC.Production
                     RcvReceiptID = rcvReceiptId,
                     DT = dt,
                     OrderNo = orderNo,
+                    InternalRefNo = internalRefNo,
                     ItemCode = itemCode,
                     ItemName = itemName,
                     IssQty = issQty,

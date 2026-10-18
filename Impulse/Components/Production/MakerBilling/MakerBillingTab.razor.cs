@@ -48,7 +48,9 @@ namespace Impulse.Components.Production.MakerBilling
             ? Lots
             : Lots.Where(x => x.LotNo.Contains(SearchLotText, StringComparison.OrdinalIgnoreCase) ||
                               x.ItemCode.Contains(SearchLotText, StringComparison.OrdinalIgnoreCase) ||
-                              x.ItemName.Contains(SearchLotText, StringComparison.OrdinalIgnoreCase));
+                              x.ItemName.Contains(SearchLotText, StringComparison.OrdinalIgnoreCase) ||
+                              x.InternalRefNo.Contains(SearchLotText, StringComparison.OrdinalIgnoreCase) ||
+                              x.CustCode.Contains(SearchLotText, StringComparison.OrdinalIgnoreCase));
 
         public List<MakerBillingLotItem> SelectedLots => Lots.Where(x => x.IsSelected).ToList();
         public int AuditedLotsCount => Lots.Count(x => x.Audited);
@@ -163,6 +165,7 @@ namespace Impulse.Components.Production.MakerBilling
         {
             EditingLotId = lot.EntryID;
             EditingRate = lot.Rate;
+            StateHasChanged();
         }
 
         public void CancelRateEdit()

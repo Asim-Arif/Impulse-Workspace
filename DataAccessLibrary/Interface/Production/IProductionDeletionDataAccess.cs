@@ -20,5 +20,6 @@ namespace DataAccessLibrary.Interface.Production
         Task<bool> ApproveRequestAsync(int id, string directorUserName, string? remarks = null);
         Task<bool> RejectRequestAsync(int id, string directorUserName, string remarks);
         Task<bool> UpdateTaskIdAsync(int requestId, int taskId);
+        Task<List<WorkflowApprovalHistoryModel>> GetApprovalHistoryAsync(string? workflowCode = null, System.DateTime? fromDate = null, System.DateTime? toDate = null, string? status = null);
     }
 }

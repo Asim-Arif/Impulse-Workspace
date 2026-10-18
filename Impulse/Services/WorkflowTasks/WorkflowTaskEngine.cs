@@ -116,6 +116,87 @@ namespace Impulse.Services.WorkflowTasks
 
                     if (existingId.HasValue && existingId.Value > 0)
                     {
+                        if (request.UpdateExistingIfExists)
+                        {
+                            const string updateTaskSql = @"
+                                UPDATE TaskItems 
+                                SET Title = @Title, 
+                                    Description = @Description, 
+                                    ActionUrl = @ActionUrl, 
+                                    Priority = @Priority, 
+                                    DueDate = @DueDate, 
+                                    UpdatedAt = GETUTCDATE()
+                                WHERE Id = @TaskId;";
+
+                            await checkDb.ExecuteAsync(updateTaskSql, new
+                            {
+                                TaskId = existingId.Value,
+                                request.Title,
+                                request.Description,
+                                request.ActionUrl,
+                                request.Priority,
+                                request.DueDate
+                            });
+
+                            const string insertCommentSql = @"
+                                INSERT INTO TaskComments (TaskId, UserId, Content, CreatedAt)
+                                VALUES (@TaskId, @UserId, @Content, GETUTCDATE());";
+
+                            await checkDb.ExecuteAsync(insertCommentSql, new
+                            {
+                                TaskId = existingId.Value,
+                                UserId = string.IsNullOrWhiteSpace(request.CreatedBy) ? "System" : request.CreatedBy,
+                                Content = $"Task updated with new authorized items: {request.Title}"
+                            });
+
+                            _logger.LogInformation("Active workflow task #{TaskId} for {EntityType} #{EntityRef} ({Role}) updated with new details. Dispatching updated notification.",
+                                existingId.Value, request.SourceEntityType, request.SourceEntityRefId, primaryRole);
+
+                            // Resolve target users and send updated notification
+                            var updateTargetUserNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                            foreach (var role in rolesList)
+                            {
+                                var usersInRole = await _userRoleData.GetUsersByRoleAsync(role);
+                                foreach (var u in usersInRole)
+                                {
+                                    if (!u.InActive && !string.IsNullOrWhiteSpace(u.UserName))
+                                    {
+                                        updateTargetUserNames.Add(u.UserName);
+                                    }
+                                }
+                            }
+
+                            if (request.TargetUserNames != null)
+                            {
+                                foreach (var u in request.TargetUserNames)
+                                {
+                                    if (!string.IsNullOrWhiteSpace(u)) updateTargetUserNames.Add(u.Trim());
+                                }
+                            }
+
+                            foreach (var userName in updateTargetUserNames)
+                            {
+                                try
+                                {
+                                    await _notificationService.SendNotificationAsync(new AppNotification
+                                    {
+                                        Category = NotificationCategory.Task,
+                                        Title = request.Title,
+                                        Message = request.Description,
+                                        SenderName = request.CreatedBy,
+                                        TargetUserId = userName,
+                                        ActionUrl = request.ActionUrl
+                                    });
+                                }
+                                catch (Exception notifEx)
+                                {
+                                    _logger.LogError(notifEx, "Failed to send update notification to '{User}' on Task #{TaskId}", userName, existingId.Value);
+                                }
+                            }
+
+                            return existingId.Value;
+                        }
+
                         _logger.LogInformation("Active workflow task #{TaskId} already exists for {EntityType} #{EntityRef} ({Role}). Skipping duplicate creation and notifications.",
                             existingId.Value, request.SourceEntityType, request.SourceEntityRefId, primaryRole);
                         return existingId.Value;
@@ -457,10 +538,11 @@ namespace Impulse.Services.WorkflowTasks
                             TargetRole = "PPC",
                             Title = taskTitle,
                             Description = taskDesc,
-                            ActionUrl = $"/production/order-planning?orderNo={orderNo}",
+                            ActionUrl = $"/production/order-planning?orderNo={Uri.EscapeDataString(orderNo)}",
                             Priority = 1,
                             DueDate = DateTime.Today.AddDays(2),
-                            CreatedBy = authorizedByUserName
+                            CreatedBy = authorizedByUserName,
+                            UpdateExistingIfExists = true
                         });
                     }
                     catch (Exception ex)
@@ -1955,6 +2037,20 @@ namespace Impulse.Services.WorkflowTasks
         public Task<DataAccessLibrary.Models.Setup.WorkflowConfigurationModel?> GetWorkflowConfigAsync(string workflowCode)
         {
             return _workflowConfigData.GetWorkflowConfigByCodeAsync(workflowCode);
+        }
+
+        public Task<List<DataAccessLibrary.Models.Setup.WorkflowConfigurationModel>> GetAllWorkflowConfigsAsync()
+        {
+            return _workflowConfigData.GetAllWorkflowConfigsAsync();
+        }
+
+        public Task<List<WorkflowApprovalHistoryModel>> GetApprovalHistoryAsync(
+            string? workflowCode = null, 
+            DateTime? fromDate = null, 
+            DateTime? toDate = null, 
+            string? status = null)
+        {
+            return _prodDeletionData.GetApprovalHistoryAsync(workflowCode, fromDate, toDate, status);
         }
 
         #endregion

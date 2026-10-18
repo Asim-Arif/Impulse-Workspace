@@ -20,6 +20,7 @@ namespace Impulse.Services.WorkflowTasks
         public int Priority { get; set; } = 2;
         public DateTime? DueDate { get; set; }
         public string CreatedBy { get; set; } = "System";
+        public bool UpdateExistingIfExists { get; set; } = false;
     }
 
     public interface IWorkflowTaskEngine
@@ -72,5 +73,9 @@ namespace Impulse.Services.WorkflowTasks
         // Governance Workflow Config Checks
         Task<bool> IsApprovalRequiredAsync(string workflowCode, string userName, System.Security.Claims.ClaimsPrincipal? claimsPrincipal = null);
         Task<DataAccessLibrary.Models.Setup.WorkflowConfigurationModel?> GetWorkflowConfigAsync(string workflowCode);
+        Task<List<DataAccessLibrary.Models.Setup.WorkflowConfigurationModel>> GetAllWorkflowConfigsAsync();
+
+        // Historical Approvals
+        Task<List<DataAccessLibrary.Models.ViewModels.Production.WorkflowApprovalHistoryModel>> GetApprovalHistoryAsync(string? workflowCode = null, DateTime? fromDate = null, DateTime? toDate = null, string? status = null);
     }
 }
