@@ -225,8 +225,9 @@ namespace DataAccessLibrary.DAC.Export
                             VALUES (@OrderNo, @ItemCode, @CompItemCode, @Price, @Qty, @Qty, 
                                     @CustomPrice, @SortNo, @DeliveryDT, @Quality, @Stamps, 
                                     @DeliveryStatus, @Remarks, @Weight, @Item_Finishing_Type, 
-                                    @IW_OrderNo, @IW_BatchNo, 0, 0)";
-                        await db.ExecuteAsync(insertItemSql, item, trans);
+                                    @IW_OrderNo, @IW_BatchNo, 0, 0);
+                            SELECT CAST(SCOPE_IDENTITY() as int);";
+                        item.ID = await db.QuerySingleAsync<int>(insertItemSql, item, trans);
                     }
                     else
                     {

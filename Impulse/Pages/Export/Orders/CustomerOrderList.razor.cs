@@ -238,7 +238,9 @@ namespace Impulse.Pages.Export.Orders
                     ViewType
                 );
 
-                if (!isDirector)
+                // In Production View, restrict non-director users to Authorized/Partially Authorized orders only.
+                // In Export View, allow users to view all customer orders including Pending Authorization.
+                if (IsProductionMode && !isDirector)
                 {
                     allOrders = allOrders.Where(o => o.AuthorizationStatus == "Authorized" || o.AuthorizationStatus == "Partially Authorized").ToList();
                 }
@@ -742,6 +744,29 @@ namespace Impulse.Pages.Export.Orders
                 {
                     { "@OrderNo", orderNo }
                 }
+            };
+            await ReportNavigation.PrintReportAsync(request);
+        }
+
+        private async Task PrintTrackRemainingQty(string orderNo)
+        {
+            var request = new ReportRequest
+            {
+                ReportName = ReportNames.Export.TrackRemainingQty,
+                Parameters = new Dictionary<string, object>
+                {
+                    { "@OrderNo", orderNo }
+                }
+            };
+            await ReportNavigation.PrintReportAsync(request);
+        }
+
+        private async Task PrintPurchaseOrderStatusForm(string orderNo)
+        {
+            var request = new ReportRequest
+            {
+                ReportName = ReportNames.Export.CustomerOrderMakerPOStatus,
+                SelectionFormula = $"{{VrptOrders.OrderNo}}='{orderNo}' AND ISNULL({{VendIssued.MasterPONo}})=FALSE"
             };
             await ReportNavigation.PrintReportAsync(request);
         }

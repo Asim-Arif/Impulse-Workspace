@@ -376,6 +376,27 @@ namespace Impulse.Pages.Export.Orders
             }
             else
             {
+                // Validate duplicate line item against composite key (OrderNo, CompItemCode, DeliveryDT, Stamps, Quality, Remarks, Item_Finishing_Type)
+                var duplicate = Order.OrderItems.FirstOrDefault(i =>
+                    string.Equals(i.CompItemCode, NewItemInput.CompItemCode, StringComparison.OrdinalIgnoreCase) &&
+                    i.DeliveryDT.Date == NewItemInput.DeliveryDT.Date &&
+                    string.Equals(i.Stamps ?? "", NewItemInput.Stamps ?? "", StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(i.Quality ?? "", NewItemInput.Quality ?? "", StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(i.Remarks ?? "", NewItemInput.Remarks ?? "", StringComparison.OrdinalIgnoreCase) &&
+                    i.Item_Finishing_Type == NewItemInput.Item_Finishing_Type);
+
+                if (duplicate != null)
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Warning,
+                        Summary = "Duplicate Item Line",
+                        Detail = $"Item '{NewItemInput.CompItemCode}' with matching delivery date, stamps, quality, and remarks already exists on row #{duplicate.SortNo}. Please update row #{duplicate.SortNo} or specify different delivery dates/remarks.",
+                        Duration = 6000
+                    });
+                    return;
+                }
+
                 // Create and add new item
                 var line = new CustomerOrderItemViewModel
                 {

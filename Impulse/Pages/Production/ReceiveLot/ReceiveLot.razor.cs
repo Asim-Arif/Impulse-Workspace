@@ -105,6 +105,8 @@ namespace Impulse.Pages.Production.ReceiveLot
             }
 
             IsSearching = true;
+            SelectedWorkers.Clear();
+            SelectedWorker = null;
             try
             {
                 var searchResult = await ReceiveLotService.SearchLotAsync(SearchLotNo.Trim());
@@ -173,9 +175,36 @@ namespace Impulse.Pages.Production.ReceiveLot
                     line.ReceivingQty = Math.Max(0, line.PendingQty);
                 }
 
-                if (LotHeader.IsFactoryMaker)
+                AvailableEmployees = new List<EmployeeLookupModel>(AllEmployees);
+
+                // Auto-fetch factory worker from lot issuance if selected
+                SelectedWorkers.Clear();
+                SelectedWorker = null;
+
+                if (!string.IsNullOrWhiteSpace(LotHeader.IssEmpID))
                 {
-                    AvailableEmployees = new List<EmployeeLookupModel>(AllEmployees);
+                    var issuedWorker = AllEmployees.FirstOrDefault(e =>
+                        string.Equals(e.EmpID?.Trim(), LotHeader.IssEmpID.Trim(), StringComparison.OrdinalIgnoreCase));
+
+                    if (issuedWorker != null)
+                    {
+                        SelectedWorkers.Add(issuedWorker);
+                    }
+                    else
+                    {
+                        var fallbackWorker = new EmployeeLookupModel
+                        {
+                            EmpID = LotHeader.IssEmpID.Trim(),
+                            Name = !string.IsNullOrWhiteSpace(LotHeader.IssEmpName) ? LotHeader.IssEmpName : LotHeader.IssEmpID.Trim(),
+                            Designation = LotHeader.IssEmpDesignation ?? ""
+                        };
+                        SelectedWorkers.Add(fallbackWorker);
+                        if (!AllEmployees.Any(e => string.Equals(e.EmpID?.Trim(), fallbackWorker.EmpID, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            AllEmployees.Add(fallbackWorker);
+                            AvailableEmployees.Add(fallbackWorker);
+                        }
+                    }
                 }
 
                 NotificationService.Notify(new Radzen.NotificationMessage

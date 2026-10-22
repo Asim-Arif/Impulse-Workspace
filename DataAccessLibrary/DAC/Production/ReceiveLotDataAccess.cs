@@ -32,6 +32,7 @@ namespace DataAccessLibrary.DAC.Production
                                   ISNULL(M.VenderName, 'N/A') AS VendorName, ISNULL(M.VendID1, '') AS VendID1,
                                   VI.ProcessID, ISNULL(P.Description, 'N/A') AS ProcessName, ISNULL(VI.ItemID, '') AS ItemID, VI.DT,
                                   VI.Authorized, ISNULL(VI.Closed, 0) AS Closed, ISNULL(VI.IssEmpID, '') AS IssEmpID,
+                                  ISNULL(E.Name, '') AS IssEmpName, ISNULL(E.Designation, '') AS IssEmpDesignation,
                                    CASE WHEN M.VenderName LIKE '%FACTORY%' OR M.VendID1 LIKE '%FAC%' OR M.VendID = 79 OR M.VendID = 129 OR M.VendID = (SELECT TOP 1 CAST(DataValue AS BIGINT) FROM GeneralData WHERE DataName = 'FactoryMaker') THEN 1 ELSE 0 END AS IsFactoryMaker,
                                    CASE WHEN (SELECT COUNT(VRD.EntryID) FROM VendRcvdDetail VRD WHERE VRD.Issue_RefID = VID.EntryID AND VRD.LotNo = VID.LotNo) > 0 THEN 1 ELSE 0 END AS AlreadyReceived,
                                    ISNULL(P.AuthRequired, 0) AS AuthRequired,
@@ -45,6 +46,7 @@ namespace DataAccessLibrary.DAC.Production
                            INNER JOIN VendIssued VI ON VI.EntryID = VID.RefID
                            LEFT JOIN VMakers M ON VI.VendID = M.VendID
                            LEFT JOIN Processes P ON VI.ProcessID = P.ProcessID
+                           LEFT JOIN Employees E ON VI.IssEmpID = E.EmpID
                            WHERE VID.EntryID = (SELECT MAX(EntryID) FROM VendIssdDetail WHERE LotNo = @LotNo)";
 
             return await db.QueryFirstOrDefaultAsync<LotSearchResultModel>(sql, new { LotNo = lotNo.Trim() });

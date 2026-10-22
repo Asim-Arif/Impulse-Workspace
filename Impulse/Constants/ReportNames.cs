@@ -151,7 +151,7 @@ namespace Impulse.Constants
             public const string ProductionOrder = Folder + "rptProductionOrder.rpt";
             public const string ProdOrderBalanceQty = Folder + "rptProductionOrderBalanceQty.rpt";
             public const string ProdOrderMarkingPlan = Folder + "rptProductionOrderWranglerMarkingPlan.rpt";
-            public const string ProdOrderWValue = Folder + "rptProductionOrderWValueWrangler.rpt";
+            public const string ProdOrderWValue = Folder + "rptProductionOrderWValue.rpt";
             public const string ProdOrderRM = Folder + "ProductionOrder_RM.rpt";
             public const string ProdOrderPacking = Folder + "ProductionOrder_Packing.rpt";
             public const string ProdOrderStatus = Folder + "rptProductionOrder_Status.rpt";
@@ -173,6 +173,8 @@ namespace Impulse.Constants
             public const string OrderPurchasePlanningLog = Folder + "OrderPurchasePlanningLog.rpt";
             public const string UrgentRequest = Folder + "UrgentRequest.rpt";
             public const string OrderCheckSheet = Folder + "OrderCheckSheet.rpt";
+            public const string TrackRemainingQty = Folder + "Track_Remaining_Qty.rpt";
+            public const string CustomerOrderMakerPOStatus = Folder + "CustomerOrder_MakerPO_Status.rpt";
         }
 
         // Stock Subfolder

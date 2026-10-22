@@ -19,6 +19,7 @@ namespace Impulse.Pages.Dashboards.ProductionPlanning
         [Inject] public DialogService DialogService { get; set; } = default!;
         [Inject] public NavigationManager NavigationManager { get; set; } = default!;
         [Inject] public SecurityService SecurityService { get; set; } = default!;
+        [Inject] public Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthenticationStateProvider { get; set; } = default!;
 
         public List<LookupItemString> Customers { get; set; } = new();
         public string SelectedCustCode { get; set; } = "0";
@@ -272,15 +273,38 @@ namespace Impulse.Pages.Dashboards.ProductionPlanning
             }
         }
 
+        private async Task<string> GetCurrentUserNameAsync()
+        {
+            try
+            {
+                if (AuthenticationStateProvider != null)
+                {
+                    var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                    return authState?.User?.Identity?.Name ?? Environment.UserName;
+                }
+            }
+            catch { }
+            return Environment.UserName;
+        }
+
         public async Task PrintOrderBalance(string? orderNo)
         {
             if (string.IsNullOrWhiteSpace(orderNo)) return;
             try
             {
+                string userName = await GetCurrentUserNameAsync();
                 await ReportNavigationService.PrintReportAsync(new ReportRequest
                 {
-                    ReportName = "rptProductionOrder_Balance.rpt",
-                    SelectionFormula = $"{{CustOrders.OrderNo}}='{orderNo}'"
+                    ReportName = "rptProductionOrderWrangler.rpt",
+                    SelectionFormula = $"{{CustOrders.OrderNo}}='{orderNo}' AND {{CustOrders.Qty}}>{{CustOrders.ShippedQty}}",
+                    Parameters = new Dictionary<string, object>
+                    {
+                        { "@OrderNo", orderNo }
+                    },
+                    FormulaValues = new Dictionary<string, object>
+                    {
+                        { "UserName", $"'{userName}'" }
+                    }
                 });
             }
             catch (Exception ex)
@@ -297,7 +321,22 @@ namespace Impulse.Pages.Dashboards.ProductionPlanning
                 await ReportNavigationService.PrintReportAsync(new ReportRequest
                 {
                     ReportName = "OrderPlanningReport.rpt",
-                    SelectionFormula = $"{{CustOrders.OrderNo}}='{orderNo}'"
+                    Parameters = new Dictionary<string, object>
+                    {
+                        { "@OrderNo", orderNo },
+                        { "@FromItems", false },
+                        { "@DTFrom", DateTime.Today.ToString("yyyy-MM-dd") },
+                        { "@DTTo", DateTime.Today.ToString("yyyy-MM-dd") },
+                        { "@CustCode", "" },
+                        { "@Country", "" },
+                        { "@NoDelivery", false },
+                        { "@Both", false },
+                        { "@ItemCode", "0" },
+                        { "@Urgent", false },
+                        { "@GroupID", 0 },
+                        { "@templist_refid", 0 },
+                        { "@TempList_RefID", 0 }
+                    }
                 });
             }
             catch (Exception ex)

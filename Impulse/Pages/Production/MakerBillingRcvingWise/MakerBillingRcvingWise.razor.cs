@@ -440,10 +440,25 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
                 return;
             }
 
+            var selectedIds = Lots.Where(x => x.IsSelected).Select(x => x.EntryID).ToList();
+            if (!selectedIds.Any())
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Please Select Entries",
+                    Detail = "Please select entries to print.",
+                    Duration = 3000
+                });
+                return;
+            }
+
+            string selectionFormula = $"{{MakerPostedBillsDetail.RcvDetailEntryID}} in [{string.Join(",", selectedIds)}]";
+
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "MakerUnPostedBills.rpt",
-                SelectionFormula = string.Empty,
+                SelectionFormula = selectionFormula,
                 Parameters = new Dictionary<string, object>
                 {
                     { "@MakerID", Filter.VendID },

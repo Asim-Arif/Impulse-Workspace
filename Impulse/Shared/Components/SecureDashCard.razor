@@ -3,9 +3,18 @@
 
 @if (IsAllowed)
 {
-    <a href="@Href" class="@Class" @attributes="AdditionalAttributes">
-        @ChildContent
-    </a>
+    @if (!string.IsNullOrWhiteSpace(Href))
+    {
+        <a href="@Href" class="@Class" @attributes="AdditionalAttributes">
+            @ChildContent
+        </a>
+    }
+    else
+    {
+        <div class="@Class" role="button" tabindex="0" @attributes="AdditionalAttributes">
+            @ChildContent
+        </div>
+    }
 }
 else
 {

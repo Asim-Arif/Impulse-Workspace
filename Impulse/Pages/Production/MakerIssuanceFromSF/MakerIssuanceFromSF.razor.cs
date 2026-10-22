@@ -45,6 +45,17 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
         public bool IsDirectorOrAdmin { get; set; } = false;
         public string CurrentUserName { get; set; } = "System";
 
+        [SupplyParameterFromQuery(Name = "returnUrl")]
+        public string? ReturnUrl { get; set; }
+
+        public void NavigateBack()
+        {
+            if (!string.IsNullOrEmpty(ReturnUrl))
+            {
+                NavigationManager.NavigateTo(ReturnUrl);
+            }
+        }
+
         public CreateSFIssuanceHeaderModel Header { get; set; } = new CreateSFIssuanceHeaderModel();
 
         public List<ProcessPOLookupModel> Processes { get; set; } = new List<ProcessPOLookupModel>();

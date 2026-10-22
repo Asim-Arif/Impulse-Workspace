@@ -440,6 +440,12 @@
         <Item class="win11-menu-item" OnClick="@(() => PrintOrderWrangler(order.OrderNo))">
             <i class="fas fa-print fa-fw win11-icon"></i> Print Order
         </Item>
+        @if (!IsProductionMode)
+        {
+            <Item class="win11-menu-item" OnClick="@(() => PrintOrderWrangler(order.OrderNo, withValue: true))">
+                <i class="fas fa-file-invoice-dollar fa-fw win11-icon text-success"></i> Print Order (With Value)
+            </Item>
+        }
         <Item class="win11-menu-item" OnClick="@(() => PrintOrderWrangler(order.OrderNo, reportType: 99))">
             <i class="fas fa-sticky-note fa-fw win11-icon"></i> Print Order Slip
         </Item>
@@ -481,6 +487,12 @@
         }
         <Item class="win11-menu-item" OnClick="@(() => PrintScoreBoard(order.OrderNo))">
             <i class="fas fa-tachometer-alt fa-fw win11-icon"></i> Score Board Report
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintTrackRemainingQty(order.OrderNo))">
+            <i class="fas fa-tasks fa-fw win11-icon text-info"></i> Track Remaining Qty
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintPurchaseOrderStatusForm(order.OrderNo))">
+            <i class="fas fa-clipboard-list fa-fw win11-icon text-primary"></i> Purchase Order Status Form
         </Item>
     }
 </ContextMenu>

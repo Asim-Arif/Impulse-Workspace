@@ -162,13 +162,13 @@ namespace Impulse.Pages.Production.AuthorizeReceived
                 EmpName = w.EmpName
             }).ToList();
 
-            if (!TempWastageList.Any() && item.Wastage > 0)
+            if (!TempWastageList.Any())
             {
                 TempWastageList.Add(new WastageBreakdownItemModel
                 {
                     VRD_RefID = item.EntryID,
                     Wastage_RefID = AvailableWastageTypes.FirstOrDefault()?.EntryID ?? 0,
-                    Qty = item.Wastage,
+                    Qty = item.Wastage > 0 ? item.Wastage : 1,
                     WastageType = 1,
                     VendID = item.VendID
                 });
@@ -199,6 +199,7 @@ namespace Impulse.Pages.Production.AuthorizeReceived
         {
             if (CurrentModalItem != null)
             {
+                TempWastageList = TempWastageList.Where(w => w.Qty > 0 && w.Wastage_RefID > 0).ToList();
                 CurrentModalItem.WastageBreakdowns = TempWastageList.ToList();
                 CurrentModalItem.Wastage = TempWastageList.Sum(w => w.Qty);
             }
@@ -226,13 +227,13 @@ namespace Impulse.Pages.Production.AuthorizeReceived
                 ReturnProcessName = r.ReturnProcessName
             }).ToList();
 
-            if (!TempReWorkList.Any() && item.ReWorkQty > 0)
+            if (!TempReWorkList.Any())
             {
                 TempReWorkList.Add(new ReWorkBreakdownItemModel
                 {
                     VRD_RefID = item.EntryID,
                     Repair_RefID = AvailableRepairTypes.FirstOrDefault()?.EntryID ?? 0,
-                    Qty = item.ReWorkQty,
+                    Qty = item.ReWorkQty > 0 ? item.ReWorkQty : 1,
                     ReturnProcessID = item.ProcessID
                 });
             }
@@ -261,6 +262,7 @@ namespace Impulse.Pages.Production.AuthorizeReceived
         {
             if (CurrentModalItem != null)
             {
+                TempReWorkList = TempReWorkList.Where(r => r.Qty > 0 && r.Repair_RefID > 0).ToList();
                 CurrentModalItem.ReWorkBreakdowns = TempReWorkList.ToList();
                 CurrentModalItem.ReWorkQty = TempReWorkList.Sum(r => r.Qty);
             }
@@ -271,6 +273,63 @@ namespace Impulse.Pages.Production.AuthorizeReceived
         {
             ShowReWorkModal = false;
             CurrentModalItem = null;
+        }
+
+        public void OnReWorkQtyChanged(PendingAuthorizeReceivedItemModel item, ChangeEventArgs e)
+        {
+            if (decimal.TryParse(e.Value?.ToString(), out decimal val))
+            {
+                item.ReWorkQty = val >= 0 ? val : 0;
+                if (item.ReWorkBreakdowns.Count == 1)
+                {
+                    item.ReWorkBreakdowns[0].Qty = item.ReWorkQty;
+                }
+                else if (!item.ReWorkBreakdowns.Any() && item.ReWorkQty > 0)
+                {
+                    var defaultRepair = AvailableRepairTypes.FirstOrDefault();
+                    item.ReWorkBreakdowns.Add(new ReWorkBreakdownItemModel
+                    {
+                        VRD_RefID = item.EntryID,
+                        Repair_RefID = defaultRepair?.EntryID ?? 0,
+                        RepairTypeName = defaultRepair?.Description ?? "Rework",
+                        Qty = item.ReWorkQty,
+                        ReturnProcessID = item.ProcessID
+                    });
+                }
+                else if (item.ReWorkQty == 0)
+                {
+                    item.ReWorkBreakdowns.Clear();
+                }
+            }
+        }
+
+        public void OnWastageChanged(PendingAuthorizeReceivedItemModel item, ChangeEventArgs e)
+        {
+            if (decimal.TryParse(e.Value?.ToString(), out decimal val))
+            {
+                item.Wastage = val >= 0 ? val : 0;
+                if (item.WastageBreakdowns.Count == 1)
+                {
+                    item.WastageBreakdowns[0].Qty = item.Wastage;
+                }
+                else if (!item.WastageBreakdowns.Any() && item.Wastage > 0)
+                {
+                    var defaultWastage = AvailableWastageTypes.FirstOrDefault();
+                    item.WastageBreakdowns.Add(new WastageBreakdownItemModel
+                    {
+                        VRD_RefID = item.EntryID,
+                        Wastage_RefID = defaultWastage?.EntryID ?? 0,
+                        WastageTypeName = defaultWastage?.Description ?? "Wastage",
+                        Qty = item.Wastage,
+                        WastageType = defaultWastage?.WastageType ?? 1,
+                        VendID = item.VendID
+                    });
+                }
+                else if (item.Wastage == 0)
+                {
+                    item.WastageBreakdowns.Clear();
+                }
+            }
         }
 
         // POST AUTHORIZATION
@@ -286,6 +345,64 @@ namespace Impulse.Pages.Production.AuthorizeReceived
                     Detail = "Please select at least 1 entry to authorize.",
                     Duration = 4000
                 });
+                return;
+            }
+
+            // 1. Validate Rework Breakdowns
+            var itemNeedingRework = selectedItems.FirstOrDefault(i => i.ReWorkQty > 0 && (!i.ReWorkBreakdowns.Any()));
+            if (itemNeedingRework != null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Rework Breakdown Required",
+                    Detail = $"Lot [{itemNeedingRework.LotNo}] has {itemNeedingRework.ReWorkQty} Rework Qty. Please specify the repair type breakdown.",
+                    Duration = 5000
+                });
+                OpenReWorkModal(itemNeedingRework);
+                return;
+            }
+
+            var itemReworkMismatch = selectedItems.FirstOrDefault(i => i.ReWorkBreakdowns.Any() && i.ReWorkBreakdowns.Sum(r => r.Qty) != i.ReWorkQty);
+            if (itemReworkMismatch != null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Rework Qty Mismatch",
+                    Detail = $"Lot [{itemReworkMismatch.LotNo}] breakdown total ({itemReworkMismatch.ReWorkBreakdowns.Sum(r => r.Qty)}) does not match Rework Qty ({itemReworkMismatch.ReWorkQty}).",
+                    Duration = 5000
+                });
+                OpenReWorkModal(itemReworkMismatch);
+                return;
+            }
+
+            // 2. Validate Wastage Breakdowns
+            var itemNeedingWastage = selectedItems.FirstOrDefault(i => i.Wastage > 0 && (!i.WastageBreakdowns.Any()));
+            if (itemNeedingWastage != null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Wastage Breakdown Required",
+                    Detail = $"Lot [{itemNeedingWastage.LotNo}] has {itemNeedingWastage.Wastage} Wastage Qty. Please specify the wastage breakdown.",
+                    Duration = 5000
+                });
+                OpenWastageModal(itemNeedingWastage);
+                return;
+            }
+
+            var itemWastageMismatch = selectedItems.FirstOrDefault(i => i.WastageBreakdowns.Any() && i.WastageBreakdowns.Sum(w => w.Qty) != i.Wastage);
+            if (itemWastageMismatch != null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Wastage Qty Mismatch",
+                    Detail = $"Lot [{itemWastageMismatch.LotNo}] breakdown total ({itemWastageMismatch.WastageBreakdowns.Sum(w => w.Qty)}) does not match Wastage Qty ({itemWastageMismatch.Wastage}).",
+                    Duration = 5000
+                });
+                OpenWastageModal(itemWastageMismatch);
                 return;
             }
 

@@ -374,20 +374,11 @@
                                                 </span>
                                             </td>
 
+                                            <!-- Excess %: STRICTLY LOCKED / READONLY from PPC Planning -->
                                             <td class="text-center" style="width: 75px; min-width: 75px; max-width: 75px; white-space: nowrap;">
-                                                @if (!line.IsPosted)
-                                                {
-                                                    <div class="input-group input-group-sm d-inline-flex flex-nowrap align-items-center" style="width: 68px !important; max-width: 68px !important;">
-                                                        <input type="number" class="form-control form-control-sm text-center font-monospace px-1"
-                                                               style="width: 44px !important; min-width: 36px !important; max-width: 44px !important;"
-                                                               @bind="line.ExcessQtyPercentage" min="0" max="1000" step="1" title="Excess Quantity Allowance %" />
-                                                        <span class="input-group-text px-1 text-muted" style="font-size: 0.72rem;">%</span>
-                                                    </div>
-                                                }
-                                                else
-                                                {
-                                                    <span class="badge bg-light text-secondary border font-monospace">@line.ExcessQtyPercentage%</span>
-                                                }
+                                                <span class="badge bg-light text-dark border px-2 py-1 font-monospace" title="Excess % locked from PPC allocation">
+                                                    @line.ExcessQtyPercentage%
+                                                </span>
                                             </td>
 
                                             <td style="width: 95px; min-width: 95px; max-width: 95px; white-space: nowrap;">

@@ -211,8 +211,8 @@
                     </div>
                 </div>
 
-                <!-- SECTION 2: FACTORY EMPLOYEES PANEL (IF IN-HOUSE FACTORY MAKER) -->
-                @if (LotHeader.IsFactoryMaker)
+                <!-- SECTION 2: FACTORY EMPLOYEES PANEL (IF IN-HOUSE FACTORY MAKER OR FACTORY WORKER ATTACHED) -->
+                @if (LotHeader.IsFactoryMaker || !string.IsNullOrWhiteSpace(LotHeader.IssEmpID) || SelectedWorkers.Any())
                 {
                     <div class="card mb-3 border" style="background:#ffffff; border-radius:8px; position: relative !important; z-index: 900 !important; overflow: visible !important;">
                         <div class="card-header py-2 bg-light fw-bold text-secondary" style="font-size:0.85rem; border-radius:8px 8px 0 0;">

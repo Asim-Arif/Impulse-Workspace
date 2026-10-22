@@ -18,6 +18,8 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public bool Authorized { get; set; }
         public bool Closed { get; set; }
         public string IssEmpID { get; set; } = string.Empty;
+        public string IssEmpName { get; set; } = string.Empty;
+        public string IssEmpDesignation { get; set; } = string.Empty;
         public bool IsFactoryMaker { get; set; }
         public bool AlreadyReceived { get; set; }
         public bool AuthRequired { get; set; }

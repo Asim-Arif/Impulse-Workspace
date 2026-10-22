@@ -21,7 +21,7 @@
                 </div>
             </div>
 
-            <EditForm Model="Order" OnValidSubmit="SaveOrderAndClose">
+            <EditForm Model="Order">
                 <DataAnnotationsValidator />
                 <ValidationSummary class="text-danger mb-3" />
 
@@ -333,7 +333,7 @@
                         <button type="button" class="btn btn-outline-primary" @onclick="SaveOrderAndNew" disabled="@IsSaving">
                             <i class="fas fa-plus me-1"></i> Save &amp; New
                         </button>
-                        <button type="submit" class="btn btn-primary" disabled="@IsSaving">
+                        <button type="button" class="btn btn-primary" @onclick="SaveOrderAndClose" disabled="@IsSaving">
                             @if (IsSaving)
                             {
                                 <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>

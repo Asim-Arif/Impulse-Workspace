@@ -136,9 +136,25 @@ namespace DataAccessLibrary.DAC.Production
                     }, trans);
 
                     // 2. Insert Rework Details
-                    if (item.ReWorkBreakdowns != null && item.ReWorkBreakdowns.Any())
+                    var reworkList = item.ReWorkBreakdowns?.ToList() ?? new List<ReWorkBreakdownItemModel>();
+                    if (!reworkList.Any() && totalReWork > 0)
                     {
-                        foreach (var rw in item.ReWorkBreakdowns)
+                        int defaultRepairId = await db.ExecuteScalarAsync<int>(
+                            "SELECT TOP 1 EntryID FROM RepairTypes ORDER BY EntryID", transaction: trans);
+                        if (defaultRepairId > 0)
+                        {
+                            reworkList.Add(new ReWorkBreakdownItemModel
+                            {
+                                VRD_RefID = item.EntryID,
+                                Repair_RefID = defaultRepairId,
+                                Qty = totalReWork
+                            });
+                        }
+                    }
+
+                    if (reworkList.Any())
+                    {
+                        foreach (var rw in reworkList)
                         {
                             string insertRwSql = @"INSERT INTO VendRcvdDetailReWorkDetail (VRD_RefID, Repair_RefID, Qty) 
                                                    VALUES (@VRD_RefID, @Repair_RefID, @Qty);
@@ -165,9 +181,27 @@ namespace DataAccessLibrary.DAC.Production
                     decimal wastageCh2Originator = 0;
                     decimal wastageCh2Selection = 0;
 
-                    if (item.WastageBreakdowns != null && item.WastageBreakdowns.Any())
+                    var wastageList = item.WastageBreakdowns?.ToList() ?? new List<WastageBreakdownItemModel>();
+                    if (!wastageList.Any() && totalWastage > 0)
                     {
-                        foreach (var w in item.WastageBreakdowns)
+                        long defaultWastageId = await db.ExecuteScalarAsync<long>(
+                            "SELECT TOP 1 EntryID FROM WastageTypes WHERE ISNULL(Closed, 0) = 0 ORDER BY EntryID", transaction: trans);
+                        if (defaultWastageId > 0)
+                        {
+                            wastageList.Add(new WastageBreakdownItemModel
+                            {
+                                VRD_RefID = item.EntryID,
+                                Wastage_RefID = defaultWastageId,
+                                Qty = totalWastage,
+                                WastageType = 1,
+                                VendID = item.VendID
+                            });
+                        }
+                    }
+
+                    if (wastageList.Any())
+                    {
+                        foreach (var w in wastageList)
                         {
                             long targetVendId = item.VendID;
                             if (w.WastageType == 2)
