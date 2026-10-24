@@ -173,6 +173,7 @@ builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IBiometricLedgerD
 builder.Services.AddScoped<Impulse.Services.Payroll.IBiometricLedgerService, Impulse.Services.Payroll.BiometricLedgerService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IAttendanceLedgerDataAccess, DataAccessLibrary.DAC.Payroll.AttendanceLedgerDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Payroll.IAttendanceLedgerService, Impulse.Services.Payroll.AttendanceLedgerService>();
+builder.Services.AddSingleton<Impulse.Services.Payroll.IBiometricAgentCoordinator, Impulse.Services.Payroll.BiometricAgentCoordinator>();
 builder.Services.AddScoped<Impulse.Services.Payroll.IIFaceMachineService, Impulse.Services.Payroll.IFaceMachineService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Payroll.IEmployeeLeaveDataAccess, DataAccessLibrary.DAC.Payroll.EmployeeLeaveDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Payroll.IEmployeeLeaveService, Impulse.Services.Payroll.EmployeeLeaveService>();
@@ -583,6 +584,7 @@ app.MapRazorPages();
 app.MapControllers();
 app.MapBlazorHub();
 app.MapHub<Impulse.Hubs.ChatHub>("/chathub");
+app.MapHub<Impulse.Hubs.BiometricAgentHub>("/hubs/biometric-agent");
 app.MapFallbackToPage("/_Host");
 
 // Ensure upload directories exist

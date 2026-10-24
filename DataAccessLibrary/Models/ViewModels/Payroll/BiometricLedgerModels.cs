@@ -123,4 +123,29 @@ namespace DataAccessLibrary.Models.ViewModels.Payroll
         public DateTime AttDate  { get; set; }
         public string   AttTime  { get; set; } = string.Empty;  // "HH:mm"
     }
+
+    /// <summary>
+    /// Command dispatched from cloud VPS to an office sync agent.
+    /// </summary>
+    public class BiometricAgentReadCommand
+    {
+        public string RequestId { get; set; } = string.Empty;
+        public string IPAddress { get; set; } = string.Empty;
+        public int    MachineNo { get; set; } = 1;
+        public int    PortNo    { get; set; } = 4370;
+        public string Prefix    { get; set; } = "EMP";
+        public bool   ClearLogs { get; set; } = false;
+    }
+
+    /// <summary>
+    /// Result returned by the sync agent to the cloud VPS after reading the machine.
+    /// </summary>
+    public class BiometricAgentReadResult
+    {
+        public string RequestId    { get; set; } = string.Empty;
+        public bool   Success      { get; set; }
+        public string ErrorMessage { get; set; } = string.Empty;
+        public List<IFacePunchRecord> Punches { get; set; } = new();
+    }
 }
+

@@ -3,13 +3,16 @@ using DataAccessLibrary.Models.ViewModels.Payroll;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
 namespace Impulse.Services.Payroll
 {
     /// <summary>
-    /// Communicates with ZKTeco IFace machines via COM interop (late-binding dynamic).
-    /// Requires zkemkeeper.dll (or the ZKTeco SDK) to be registered on the server.
+    /// Communicates with ZKTeco IFace machines via COM interop using reflection with ParameterModifier
+    /// for proper [out]/by-ref argument marshaling from SSR_GetGeneralLogData.
+    /// Requires 64-bit zkemkeeper.dll (and supporting ZKTeco SDK DLLs) registered in System32.
     /// 
     /// Employee ID mapping: dynamic Company prefix + "-" + enrollNumber.PadLeft(5,'0').
     /// Punch time rule: if time <= 05:00, subtract 1 day (night-shift rollover).
@@ -18,23 +21,36 @@ namespace Impulse.Services.Payroll
     {
         private readonly ITakeAttendanceDataAccess _takeAttendance;
         private readonly IEmployeeDataAccess _employeeDataAccess;
+        private readonly IBiometricAgentCoordinator _agentCoordinator;
+        private readonly IConfiguration _config;
         private readonly ILogger<IFaceMachineService> _logger;
 
         public IFaceMachineService(
             ITakeAttendanceDataAccess takeAttendance,
             IEmployeeDataAccess employeeDataAccess,
+            IBiometricAgentCoordinator agentCoordinator,
+            IConfiguration config,
             ILogger<IFaceMachineService> logger)
         {
             _takeAttendance = takeAttendance;
             _employeeDataAccess = employeeDataAccess;
+            _agentCoordinator = agentCoordinator;
+            _config = config;
             _logger = logger;
         }
 
+        public bool IsAgentConnected(string clientKey = "Default")
+        {
+            return _agentCoordinator.HasConnectedAgent(clientKey);
+        }
+
         public async Task<(int recordsRead, int recordsProcessed, string message)> ReadAndProcessAsync(
-            string ipAddress, int machineNo, int portNo = 4370)
+            string ipAddress, int machineNo, int portNo = 4370, string userName = "System", string computerName = "Unknown", bool? clearLogs = null)
         {
             int recordsRead = 0;
             int recordsProcessed = 0;
+
+            bool shouldClear = clearLogs ?? _config.GetValue<bool>("Biometric:ClearLogsAfterRead", false);
 
             string prefix = "EMP";
             try
@@ -46,16 +62,57 @@ namespace Impulse.Services.Payroll
                 _logger.LogWarning(ex, "Failed to resolve employee prefix from company; defaulting to EMP");
             }
 
-            // Collect punch records first (COM work must be synchronous)
             List<IFacePunchRecord> punches;
-            try
+
+            // ── Auto-Routing: Cloud VPS (Agent) vs Local Server (Direct COM) ──
+            if (_agentCoordinator.HasConnectedAgent())
             {
-                punches = ReadFromMachine(ipAddress, machineNo, portNo, out recordsRead, prefix);
+                _logger.LogInformation("Routing IFace machine read via connected Biometric Sync Agent for IP {IP} (ClearLogs={Clear})", ipAddress, shouldClear);
+                var remoteResult = await _agentCoordinator.RequestPunchesAsync(ipAddress, machineNo, portNo, prefix, "Default", shouldClear);
+                if (!remoteResult.success)
+                {
+                    return (0, 0, remoteResult.error);
+                }
+                punches = remoteResult.records;
+                recordsRead = punches.Count;
             }
-            catch (Exception ex)
+            else
             {
-                _logger.LogError(ex, "IFace machine read failed: {IP}", ipAddress);
-                return (0, 0, $"Failed to connect or read from machine ({ipAddress}): {ex.Message}");
+                // Local COM driver mode (Server is on-premises with ZKTeco SDK registered)
+                Type? czKemType = Type.GetTypeFromProgID("zkemkeeper.ZKEM")
+                               ?? Type.GetTypeFromProgID("zkemkeeper.CZKEM")
+                               ?? Type.GetTypeFromCLSID(new Guid("00853A19-BD51-419B-9269-2DABE57EB61F"));
+                if (czKemType == null)
+                {
+                    return (0, 0, "No office Biometric Sync Agent is connected, and ZKTeco COM component is not registered on this server. " +
+                                  "Please start the office Sync Agent or register zkemkeeper.dll in C:\\Windows\\System32.");
+                }
+
+                try
+                {
+                    var result = await Task.Run(() =>
+                    {
+                        return ReadFromMachine(czKemType, ipAddress, machineNo, portNo, prefix, shouldClear);
+                    });
+
+                    if (!result.success)
+                    {
+                        return (0, 0, result.errorMessage);
+                    }
+
+                    punches = result.list;
+                    recordsRead = result.totalRead;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "IFace machine read failed: {IP}", ipAddress);
+                    return (0, 0, $"Failed to connect or read from machine ({ipAddress}): {ex.Message}");
+                }
+            }
+
+            if (recordsRead == 0)
+            {
+                return (0, 0, $"No new punch records found on machine ({ipAddress}).");
             }
 
             // Process each punch through the central attendance engine
@@ -63,7 +120,7 @@ namespace Impulse.Services.Payroll
             {
                 try
                 {
-                    await _takeAttendance.ProcessPunchAsync(punch.EmpID, punch.AttDate, punch.AttTime);
+                    await _takeAttendance.ProcessPunchAsync(punch.EmpID, punch.AttDate, punch.AttTime, userName, computerName);
                     recordsProcessed++;
                 }
                 catch (Exception ex)
@@ -73,88 +130,219 @@ namespace Impulse.Services.Payroll
                 }
             }
 
-            string message = $"Read {recordsRead} punch records, processed {recordsProcessed} successfully.";
+            string message = $"Read {recordsRead} punch records, processed {recordsProcessed} successfully. (Logs preserved on machine for trial)";
             return (recordsRead, recordsProcessed, message);
         }
 
         /// <summary>
-        /// Synchronously connects to the ZKTeco IFace machine via COM (late-binding),
-        /// reads all pending general log data, clears the log, disconnects, and returns punch records.
+        /// Synchronously connects to the ZKTeco IFace machine via COM reflection,
+        /// reads all pending general log data, disconnects, and returns punch records.
+        /// NOTE: ClearGLog is deliberately omitted during client trial runs to preserve machine logs.
         /// </summary>
-        private List<IFacePunchRecord> ReadFromMachine(string ipAddress, int machineNo, int portNo, out int totalRead, string prefix = "EMP")
+        private (bool success, string errorMessage, List<IFacePunchRecord> list, int totalRead) ReadFromMachine(
+            Type czKemType, string ipAddress, int machineNo, int portNo, string prefix = "EMP", bool clearLogs = false)
         {
-            totalRead = 0;
             var records = new List<IFacePunchRecord>();
+            int totalRead = 0;
 
-            // Late-bind to zkemkeeper.CZKEM COM object
-            Type? czKemType = Type.GetTypeFromProgID("zkemkeeper.CZKEM");
-            if (czKemType == null)
-                throw new InvalidOperationException("ZKTeco zkemkeeper COM component is not registered on this server. Please install the ZKTeco SDK.");
+            object? czkemInstance = null;
+            try
+            {
+                czkemInstance = Activator.CreateInstance(czKemType);
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Failed to initialize ZKTeco COM driver: {ex.Message}", records, 0);
+            }
 
-            dynamic czkem = Activator.CreateInstance(czKemType)!;
-
-            // Connect
-            bool connected = czkem.Connect_Net(ipAddress, portNo) == 1;
-            if (!connected)
-                throw new InvalidOperationException($"Could not connect to IFace machine at {ipAddress}:{portNo}. Check IP and network.");
+            if (czkemInstance == null)
+            {
+                return (false, "Failed to instantiate zkemkeeper.CZKEM COM object.", records, 0);
+            }
 
             try
             {
-                // Read general log data into machine's internal buffer
-                bool dataRead = czkem.ReadGeneralLogData(machineNo) == 1;
-                if (!dataRead)
+                // Connect to machine
+                object? connRet = czKemType.InvokeMember(
+                    "Connect_Net",
+                    BindingFlags.InvokeMethod,
+                    null,
+                    czkemInstance,
+                    new object[] { ipAddress, portNo });
+
+                bool connected = ToBool(connRet);
+                if (!connected)
                 {
-                    _logger.LogWarning("ReadGeneralLogData returned false for machine {No} at {IP}", machineNo, ipAddress);
-                    return records;
+                    int errCode = GetLastErrorCode(czKemType, czkemInstance);
+                    string codeSuffix = errCode != 0 ? $" (Error Code: {errCode})" : "";
+                    return (false, $"Could not connect to IFace machine at {ipAddress}:{portNo}{codeSuffix}. Please verify the machine IP and network connection.", records, 0);
                 }
 
-                // Iterate all buffered records
-                string  enrollCode  = string.Empty;
-                int     verifyMode  = 0;
-                int     inOutMode   = 0;
-                int     year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0, workerCode = 0;
-
-                while (czkem.SSR_GetGeneralLogData(
-                           machineNo,
-                           out enrollCode,
-                           out verifyMode,
-                           out inOutMode,
-                           out year, out month, out day,
-                           out hour, out minute, out second,
-                           out workerCode) != 0)
+                try
                 {
-                    totalRead++;
+                    // Read general log data into machine's internal memory buffer
+                    object? dataReadRet = czKemType.InvokeMember(
+                        "ReadGeneralLogData",
+                        BindingFlags.InvokeMethod,
+                        null,
+                        czkemInstance,
+                        new object[] { machineNo });
 
-                    if (!int.TryParse(enrollCode, out int enrollNumber)) continue;
-
-                    var attDate = new DateTime(year, month, day);
-                    string attTime = $"{hour:D2}:{minute:D2}";
-
-                    // Night-shift rollover: if punch is at or before 05:00, it belongs to previous day
-                    bool isNextDay = (hour < 5) || (hour == 5 && minute == 0);
-                    if (isNextDay) attDate = attDate.AddDays(-1);
-
-                    // Dynamic EmpID format: $"{prefix}-00001"
-                    string empId = $"{prefix}-{enrollNumber:D5}";
-
-                    records.Add(new IFacePunchRecord
+                    bool dataRead = ToBool(dataReadRet);
+                    if (!dataRead)
                     {
-                        EmpID   = empId,
-                        AttDate = attDate,
-                        AttTime = attTime
-                    });
-                }
+                        _logger.LogWarning("ReadGeneralLogData returned false for machine {No} at {IP}", machineNo, ipAddress);
+                        return (true, string.Empty, records, 0);
+                    }
 
-                // Clear log from machine after successful read
-                czkem.ClearGLog(machineNo);
-                czkem.EnableDevice(machineNo, true);
+                    // Prepare ParameterModifier for SSR_GetGeneralLogData:
+                    // Param 0: dwMachineNumber (in)
+                    // Param 1-10: dwEnrollNumber, dwVerifyMode, dwInOutMode, dwYear, dwMonth, dwDay, dwHour, dwMinute, dwSecond, dwWorkCode (all [out] / by-ref)
+                    var paramMods = new ParameterModifier(11);
+                    paramMods[0] = false;
+                    for (int i = 1; i <= 10; i++) paramMods[i] = true;
+                    var modifiers = new ParameterModifier[] { paramMods };
+
+                    object[] logArgs = new object[11];
+                    logArgs[0] = machineNo;
+                    logArgs[1] = string.Empty;
+                    for (int i = 2; i <= 10; i++) logArgs[i] = 0;
+
+                    while (true)
+                    {
+                        object? getRet = czKemType.InvokeMember(
+                            "SSR_GetGeneralLogData",
+                            BindingFlags.InvokeMethod,
+                            null,
+                            czkemInstance,
+                            logArgs,
+                            modifiers,
+                            null,
+                            null);
+
+                        if (!ToBool(getRet)) break;
+
+                        totalRead++;
+
+                        string enrollCode = logArgs[1]?.ToString() ?? string.Empty;
+                        if (!int.TryParse(enrollCode, out int enrollNumber)) continue;
+
+                        int year   = Convert.ToInt32(logArgs[4]);
+                        int month  = Convert.ToInt32(logArgs[5]);
+                        int day    = Convert.ToInt32(logArgs[6]);
+                        int hour   = Convert.ToInt32(logArgs[7]);
+                        int minute = Convert.ToInt32(logArgs[8]);
+
+                        var attDate = new DateTime(year, month, day);
+                        string attTime = $"{hour:D2}:{minute:D2}";
+
+                        // Night-shift rollover: if punch is at or before 05:00, it belongs to previous day
+                        bool isNextDay = (hour < 5) || (hour == 5 && minute == 0);
+                        if (isNextDay) attDate = attDate.AddDays(-1);
+
+                        // Dynamic EmpID format: $"{prefix}-00001"
+                        string empId = $"{prefix}-{enrollNumber:D5}";
+
+                        records.Add(new IFacePunchRecord
+                        {
+                            EmpID   = empId,
+                            AttDate = attDate,
+                            AttTime = attTime
+                        });
+                    }
+
+                    // Clear logs from machine if requested
+                    if (clearLogs)
+                    {
+                        try
+                        {
+                            czKemType.InvokeMember(
+                                "ClearGLog",
+                                BindingFlags.InvokeMethod,
+                                null,
+                                czkemInstance,
+                                new object[] { machineNo });
+                            _logger.LogInformation("Successfully cleared machine logs for machine {No} at {IP}", machineNo, ipAddress);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to clear log for machine {No}", machineNo);
+                        }
+                    }
+
+                    try
+                    {
+                        czKemType.InvokeMember(
+                            "EnableDevice",
+                            BindingFlags.InvokeMethod,
+                            null,
+                            czkemInstance,
+                            new object[] { machineNo, true });
+                    }
+                    catch { }
+                }
+                finally
+                {
+                    // Disconnect from machine
+                    try
+                    {
+                        czKemType.InvokeMember(
+                            "Disconnect",
+                            BindingFlags.InvokeMethod,
+                            null,
+                            czkemInstance,
+                            null);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed disconnecting from machine {IP}", ipAddress);
+                    }
+                }
             }
             finally
             {
-                czkem.Disconnect();
+                // Release COM Runtime Callable Wrapper (RCW) immediately
+                if (czkemInstance != null && Marshal.IsComObject(czkemInstance))
+                {
+                    Marshal.FinalReleaseComObject(czkemInstance);
+                }
             }
 
-            return records;
+            return (true, string.Empty, records, totalRead);
+        }
+
+        private static bool ToBool(object? val)
+        {
+            if (val == null) return false;
+            if (val is bool b) return b;
+            if (int.TryParse(val.ToString(), out int i)) return i != 0;
+            return false;
+        }
+
+        private static int GetLastErrorCode(Type czKemType, object czkemInstance)
+        {
+            try
+            {
+                var errMods = new ParameterModifier(1);
+                errMods[0] = true;
+                object[] args = new object[] { 0 };
+
+                czKemType.InvokeMember(
+                    "GetLastError",
+                    BindingFlags.InvokeMethod,
+                    null,
+                    czkemInstance,
+                    args,
+                    new ParameterModifier[] { errMods },
+                    null,
+                    null);
+
+                return Convert.ToInt32(args[0]);
+            }
+            catch
+            {
+                return 0;
+            }
         }
     }
 }

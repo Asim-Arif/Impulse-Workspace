@@ -118,8 +118,8 @@ namespace DataAccessLibrary.DAC.Payroll
                         DateTime tOut = ParseTimeString(punchTimeStr, date);
                         double hrs = tOut > tIn ? Math.Round((tOut - tIn).TotalHours, 2) : 0;
 
-                        string updateSql = "UPDATE EmpTimes SET OutTime = @OutTime, Hrs = @Hrs, PayableHrs = @Hrs WHERE EntryID = @EntryID";
-                        await db.ExecuteAsync(updateSql, new { OutTime = punchTimeStr, Hrs = hrs, EntryID = (int)openEntry.EntryID }, trans);
+                        string updateSql = "UPDATE EmpTimes SET OutTime = @OutTime, Hrs = @Hrs, PayableHrs = @Hrs, UserName = @UserName, ComputerName = @ComputerName WHERE EntryID = @EntryID";
+                        await db.ExecuteAsync(updateSql, new { OutTime = punchTimeStr, Hrs = hrs, UserName = userName, ComputerName = string.IsNullOrWhiteSpace(computerName) ? "Unknown" : computerName, EntryID = (int)openEntry.EntryID }, trans);
                     }
                     else
                     {
@@ -245,11 +245,11 @@ namespace DataAccessLibrary.DAC.Payroll
             }
         }
 
-        private async Task InsertEmpTimeRowAsync(IDbConnection db, IDbTransaction? trans, string empId, DateTime date, string inTimeStr, string outTimeStr, double hrs, double payableHrs, bool isOverTime, string userName, string computerName)
+        private async Task InsertEmpTimeRowAsync(IDbConnection db, IDbTransaction? trans, string empId, DateTime date, string inTimeStr, string outTimeStr, double hrs, double payableHrs, bool isOverTime, string userName, string computerName, bool manualEntry = false)
         {
             string sql = @"
                 INSERT INTO EmpTimes (EmpID, DT, InTime, OutTime, Hrs, PayableHrs, ManualEntry, UserName, ComputerName, EntryDT, OverTime)
-                VALUES (@EmpID, @DT, @InTime, @OutTime, @Hrs, @PayableHrs, 1, @UserName, @ComputerName, GETDATE(), @OverTime)";
+                VALUES (@EmpID, @DT, @InTime, @OutTime, @Hrs, @PayableHrs, @ManualEntry, @UserName, @ComputerName, GETDATE(), @OverTime)";
 
             await db.ExecuteAsync(sql, new
             {
@@ -259,6 +259,7 @@ namespace DataAccessLibrary.DAC.Payroll
                 OutTime = outTimeStr,
                 Hrs = hrs,
                 PayableHrs = payableHrs,
+                ManualEntry = manualEntry ? 1 : 0,
                 UserName = userName,
                 ComputerName = string.IsNullOrWhiteSpace(computerName) ? "Unknown" : computerName,
                 OverTime = isOverTime ? 1 : 0

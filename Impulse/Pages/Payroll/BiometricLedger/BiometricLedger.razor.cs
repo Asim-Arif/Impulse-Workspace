@@ -3,7 +3,9 @@ using Impulse.Constants;
 using Impulse.Services;
 using Impulse.Services.Payroll;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,12 +21,14 @@ namespace Impulse.Pages.Payroll.BiometricLedger
         public string? ReturnUrl { get; set; }
 
         // ── Injected Services ──────────────────────────────────────────────
-        [Inject] private IBiometricLedgerService  BiometricLedgerService  { get; set; } = default!;
-        [Inject] private IIFaceMachineService     IFaceMachineService     { get; set; } = default!;
-        [Inject] private IEmployeeService         EmployeeService         { get; set; } = default!;
-        [Inject] private INotificationService     NotificationService     { get; set; } = default!;
-        [Inject] private NavigationManager        NavigationManager       { get; set; } = default!;
-        [Inject] private IReportNavigationService ReportNavigationService { get; set; } = default!;
+        [Inject] private IBiometricLedgerService     BiometricLedgerService     { get; set; } = default!;
+        [Inject] private IIFaceMachineService        IFaceMachineService        { get; set; } = default!;
+        [Inject] private IEmployeeService            EmployeeService            { get; set; } = default!;
+        [Inject] private INotificationService        NotificationService        { get; set; } = default!;
+        [Inject] private NavigationManager           NavigationManager          { get; set; } = default!;
+        [Inject] private IReportNavigationService    ReportNavigationService    { get; set; } = default!;
+        [Inject] private AuthenticationStateProvider AuthenticationStateProvider{ get; set; } = default!;
+        [Inject] private IHttpContextAccessor        HttpContextAccessor        { get; set; } = default!;
 
         // ── State ──────────────────────────────────────────────────────────
         private bool IsLoading       = false;
@@ -155,16 +159,34 @@ namespace Impulse.Pages.Payroll.BiometricLedger
             StateHasChanged();
             try
             {
+                string userName = "System";
+                try
+                {
+                    var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                    var user = authState.User;
+                    if (user.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(user.Identity.Name))
+                    {
+                        userName = user.Identity.Name;
+                    }
+                }
+                catch { }
+
+                string clientIp = HttpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString() ?? "127.0.0.1";
+                if (clientIp == "::1") clientIp = "127.0.0.1";
+
                 var (recordsRead, recordsProcessed, message) =
-                    await IFaceMachineService.ReadAndProcessAsync(machine.IPAddress, machine.MachineNo);
+                    await IFaceMachineService.ReadAndProcessAsync(machine.IPAddress, machine.MachineNo, 4370, userName, clientIp);
 
                 if (recordsProcessed > 0)
+                {
                     NotificationService.ShowSuccess("Machine Read Complete", message);
+                    // Refresh the ledger to reflect newly imported punches
+                    await LoadDataAsync();
+                }
                 else
+                {
                     NotificationService.ShowWarning("Machine Read", message);
-
-                // Refresh the ledger to reflect newly imported punches
-                await LoadDataAsync();
+                }
             }
             catch (Exception ex)
             {
