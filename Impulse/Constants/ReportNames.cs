@@ -183,7 +183,7 @@ namespace Impulse.Constants
             private const string Folder = ""; // Flat in RptPath
             public const string StockLedger = Folder + "StockLedger.rpt";
             public const string SFTrayCard = Folder + "SF_Tray_Card.rpt";
-            public const string SFLedger = Folder + "SF_Ledger.rpt";
+            public const string SFLedger = Folder + "SFLedger.rpt";
             public const string SFOpeningSlip = Folder + "SF_Opening_Slip.rpt";
             public const string SFTransactions = Folder + "SFStockTransactions.rpt";
             public const string SFStockDetail = Folder + "Items_SFStock_Detail.rpt";

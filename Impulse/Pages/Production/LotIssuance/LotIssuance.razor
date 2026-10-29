@@ -178,7 +178,7 @@
                         <!-- Single Worker (Saved in VendIssued.IssEmpID) -->
                         <div class="col-md-4">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
-                                Factory Worker @(IsFactoryMaker ? "(Required)" : "(Optional)")
+                                Factory Worker @(IsFactoryMaker && RequireFactoryWorker ? "(Required)" : "(Optional)")
                             </label>
                             <BlazoredTypeahead SearchMethod="SearchEmployees"
                                                @bind-Value="SelectedWorker"
@@ -229,7 +229,7 @@
                         <!-- Counted By Employee (Saved in VendIssdDetail.CountedBy) -->
                         <div class="col-md-4">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
-                                Counted By
+                                Counted By @(RequireCountedBy ? "(Required)" : "")
                             </label>
                             <BlazoredTypeahead SearchMethod="SearchCountedByEmployees"
                                                @bind-Value="SelectedCountedBy"

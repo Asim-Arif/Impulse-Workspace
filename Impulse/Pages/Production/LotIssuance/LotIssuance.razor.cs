@@ -45,6 +45,12 @@ namespace Impulse.Pages.Production.LotIssuance
         [Inject]
         public Impulse.Services.WorkflowTasks.IWorkflowTaskEngine WorkflowTaskEngine { get; set; } = default!;
 
+        [Inject]
+        public Impulse.Services.Setup.ISystemFieldConfigurationService FieldConfigService { get; set; } = default!;
+
+        public bool RequireFactoryWorker { get; set; } = true;
+        public bool RequireCountedBy { get; set; } = false;
+
         public bool IsDirectorOrAdmin { get; set; } = false;
         public string CurrentUserName { get; set; } = "System";
         private long _factoryMakerVendId = 0;
@@ -123,6 +129,17 @@ namespace Impulse.Pages.Production.LotIssuance
             try
             {
                 _factoryMakerVendId = await LotIssuanceService.GetFactoryMakerVendIdAsync();
+
+                try
+                {
+                    RequireFactoryWorker = await FieldConfigService.IsFieldRequiredAsync("Production", "LotIssuance", "FactoryWorker", defaultIfMissing: true);
+                    RequireCountedBy = await FieldConfigService.IsFieldRequiredAsync("Production", "LotIssuance", "CountedBy", defaultIfMissing: false);
+                }
+                catch
+                {
+                    RequireFactoryWorker = true;
+                    RequireCountedBy = false;
+                }
 
                 var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
                 if (authState?.User?.Identity?.IsAuthenticated == true)
@@ -468,13 +485,25 @@ namespace Impulse.Pages.Production.LotIssuance
                 return;
             }
 
-            if (IsFactoryMaker && SelectedWorker == null)
+            if (RequireFactoryWorker && IsFactoryMaker && SelectedWorker == null)
             {
                 NotificationService.Notify(new Radzen.NotificationMessage
                 {
                     Severity = Radzen.NotificationSeverity.Warning,
                     Summary = "Worker Required",
                     Detail = "Please select an in-house factory worker.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            if (RequireCountedBy && SelectedCountedBy == null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Counted By Required",
+                    Detail = "Please select 'Counted By' employee.",
                     Duration = 4000
                 });
                 return;

@@ -35,6 +35,13 @@ namespace Impulse.Pages.Production.ReceiveLot
         [Inject]
         public IHttpContextAccessor HttpContextAccessor { get; set; } = default!;
 
+        [Inject]
+        public Impulse.Services.Setup.ISystemFieldConfigurationService FieldConfigService { get; set; } = default!;
+
+        public bool RequireFactoryWorker { get; set; } = true;
+        public bool RequireCheckedBy { get; set; } = true;
+        public bool RequireCountedBy { get; set; } = true;
+
         public string SearchLotNo { get; set; } = string.Empty;
         public string MillCertNo { get; set; } = string.Empty;
 
@@ -80,6 +87,19 @@ namespace Impulse.Pages.Production.ReceiveLot
         {
             AllEmployees = await MakerPOService.GetEmployeesAsync();
             AvailableEmployees = new List<EmployeeLookupModel>(AllEmployees);
+
+            try
+            {
+                RequireFactoryWorker = await FieldConfigService.IsFieldRequiredAsync("Production", "LotReceiving", "FactoryWorker", defaultIfMissing: true);
+                RequireCheckedBy = await FieldConfigService.IsFieldRequiredAsync("Production", "LotReceiving", "CheckedBy", defaultIfMissing: true);
+                RequireCountedBy = await FieldConfigService.IsFieldRequiredAsync("Production", "LotReceiving", "CountedBy", defaultIfMissing: true);
+            }
+            catch
+            {
+                RequireFactoryWorker = true;
+                RequireCheckedBy = true;
+                RequireCountedBy = true;
+            }
         }
 
         public async Task HandleSearchKeyUp(KeyboardEventArgs e)
@@ -298,7 +318,7 @@ namespace Impulse.Pages.Production.ReceiveLot
                 return;
             }
 
-            if (LotHeader.IsFactoryMaker && !SelectedWorkers.Any())
+            if (RequireFactoryWorker && LotHeader.IsFactoryMaker && !SelectedWorkers.Any())
             {
                 NotificationService.Notify(new Radzen.NotificationMessage
                 {
@@ -310,7 +330,7 @@ namespace Impulse.Pages.Production.ReceiveLot
                 return;
             }
 
-            if (SelectedCheckedBy == null)
+            if (RequireCheckedBy && SelectedCheckedBy == null)
             {
                 NotificationService.Notify(new Radzen.NotificationMessage
                 {
@@ -335,18 +355,21 @@ namespace Impulse.Pages.Production.ReceiveLot
                 return;
             }
 
-            foreach (var line in activeReceivingLines)
+            if (RequireCountedBy)
             {
-                if (line.SelectedCountedBy == null && string.IsNullOrWhiteSpace(line.CountedBy))
+                foreach (var line in activeReceivingLines)
                 {
-                    NotificationService.Notify(new Radzen.NotificationMessage
+                    if (line.SelectedCountedBy == null && string.IsNullOrWhiteSpace(line.CountedBy))
                     {
-                        Severity = Radzen.NotificationSeverity.Warning,
-                        Summary = "Counted By Required",
-                        Detail = $"Please select 'Counted By' employee for item [{line.ItemCode}].",
-                        Duration = 4000
-                    });
-                    return;
+                        NotificationService.Notify(new Radzen.NotificationMessage
+                        {
+                            Severity = Radzen.NotificationSeverity.Warning,
+                            Summary = "Counted By Required",
+                            Detail = $"Please select 'Counted By' employee for item [{line.ItemCode}].",
+                            Duration = 4000
+                        });
+                        return;
+                    }
                 }
             }
 

@@ -2124,3 +2124,42 @@ tr.table-row-active:hover > td {
     background-color: #b6d4fe !important;
 }
 
+
+
+/* ==========================================================================
+   Blazored Typeahead Single-Line Truncation & Overflow Protection
+   Prevents multi-line item names from spilling over inputs, labels, and rows
+   ========================================================================== */
+html body .blazored-typeahead .blazored-typeahead__controls,
+.blazored-typeahead__controls {
+    min-width: 0 !important;
+}
+
+html body .blazored-typeahead .blazored-typeahead__input-mask-wrapper,
+.blazored-typeahead__input-mask-wrapper {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    flex: 1 1 auto !important;
+}
+
+html body .blazored-typeahead .blazored-typeahead__input-mask,
+.blazored-typeahead__input-mask {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: block !important;
+    line-height: inherit;
+}
+
+html body .blazored-typeahead .blazored-typeahead__input-mask > *,
+.blazored-typeahead__input-mask > * {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 100% !important;
+    display: inline-block !important;
+    vertical-align: middle !important;
+}

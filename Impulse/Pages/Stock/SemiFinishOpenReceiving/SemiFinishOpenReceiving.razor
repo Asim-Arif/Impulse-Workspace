@@ -57,7 +57,7 @@
                     <div class="col-md-6">
                         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Select Article (Item)</label>
                         <BlazoredTypeahead SearchMethod="SearchArticles" @bind-Value="SelectedArticle" Placeholder="Search Article Code or Name..." EnableDropDown="true" MaximumSuggestions="1000">
-                            <SelectedTemplate>@context.ItemName</SelectedTemplate>
+                            <SelectedTemplate><span title="@context.ItemName">@context.ItemName</span></SelectedTemplate>
                             <ResultTemplate>@context.ItemName</ResultTemplate>
                         </BlazoredTypeahead>
                     </div>
@@ -313,12 +313,27 @@
         padding-bottom: 0 !important;
         box-sizing: border-box !important;
     }
-    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper {
+    .blazored-typeahead__input-mask-wrapper {
         height: 33px !important;
         display: flex !important;
         align-items: center !important;
         box-sizing: border-box !important;
         max-width: 100% !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+    }
+    .blazored-typeahead__input-mask {
+        height: 33px !important;
+        line-height: 33px !important;
+        display: block !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
     }
     .blazored-typeahead__input-icon {
         padding: 0 0.5rem !important;

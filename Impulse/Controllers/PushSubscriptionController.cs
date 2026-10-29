@@ -81,7 +81,14 @@ namespace Impulse.Controllers
                     }
                 }
 
-                var userAgent = Request.Headers.UserAgent.ToString();
+                var deviceName = !string.IsNullOrWhiteSpace(dto.DeviceName) 
+                    ? dto.DeviceName 
+                    : Request.Headers.UserAgent.ToString();
+
+                if (!string.IsNullOrEmpty(deviceName) && deviceName.Length > 500)
+                {
+                    deviceName = deviceName.Substring(0, 500);
+                }
 
                 await _pushData.UpsertSubscriptionAsync(
                     userName: userName,
@@ -89,7 +96,7 @@ namespace Impulse.Controllers
                     endpoint: dto.Endpoint,
                     p256dh: dto.Keys.P256dh,
                     auth: dto.Keys.Auth,
-                    deviceName: userAgent
+                    deviceName: deviceName
                 );
                 _logger.LogInformation("Successfully registered/updated push subscription for user {UserName} (ID: {UserId}) on device {Endpoint}", userName, parsedUserId, dto.Endpoint);
 

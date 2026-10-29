@@ -2,9 +2,9 @@ window.getWindowWidth = function () {
     return window.innerWidth;
 };
 
-// Automatic native tooltips on hover for all sidebar navigation links and headers
+// Automatic native tooltips on hover for sidebar navigation and BlazoredTypeahead selected inputs
 document.addEventListener('mouseover', function (e) {
-    var link = e.target.closest('.sidebar .nav-link, .sidebar .nav-section-header, .sidebar .nav-sub-header');
+    var link = e.target.closest('.sidebar .nav-link, .sidebar .nav-section-header, .sidebar .nav-sub-header, .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper');
     if (link && !link.getAttribute('title')) {
         var text = (link.textContent || link.innerText || '').trim();
         if (text) {

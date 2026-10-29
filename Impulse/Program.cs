@@ -524,6 +524,8 @@ builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IUserPermissionData
 builder.Services.AddScoped<Impulse.Services.Setup.IUserPermissionService, Impulse.Services.Setup.UserPermissionService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IFavouriteDataAccess, DataAccessLibrary.DAC.Setup.FavouriteDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Setup.IFavouriteService, Impulse.Services.Setup.FavouriteService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.ISystemFieldConfigurationDataAccess, DataAccessLibrary.DAC.Setup.SystemFieldConfigurationDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Setup.ISystemFieldConfigurationService, Impulse.Services.Setup.SystemFieldConfigurationService>();
 
 // Web Push Notification Registrations
 builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IPushNotificationDataAccess, DataAccessLibrary.DAC.Setup.PushNotificationDataAccess>();

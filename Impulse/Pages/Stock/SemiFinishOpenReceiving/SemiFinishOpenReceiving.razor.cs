@@ -284,7 +284,10 @@ namespace Impulse.Pages.Stock.SemiFinishOpenReceiving
             var request = new ReportRequest
             {
                 ReportName = ReportNames.Stock.SFLedger,
-                SelectionFormula = $"{{VStockOrderOpening.ItemID}}='{SelectedArticle.ItemID}'"
+                Parameters = new Dictionary<string, object>
+                {
+                    { "@ItemID", SelectedArticle.ItemID }
+                }
             };
 
             await ReportNavigation.PrintReportAsync(request);
