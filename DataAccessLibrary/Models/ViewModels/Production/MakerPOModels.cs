@@ -96,6 +96,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string SpecialInstructions { get; set; } = string.Empty;
         public string IssEmpID { get; set; } = string.Empty;
         public string CountedBy { get; set; } = string.Empty;
+        public long Rcvd_RefID { get; set; } = 0;
     }
 
     public class CreateMakerPOHeaderModel
@@ -129,6 +130,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string CountedBy { get; set; } = string.Empty;
         public string IssEmpID { get; set; } = string.Empty;
         public string Remarks { get; set; } = string.Empty;
+        public long Rcvd_RefID { get; set; } = 0;
     }
 
     public class MakerBalanceSummaryModel

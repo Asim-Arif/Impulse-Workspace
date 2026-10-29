@@ -80,7 +80,7 @@ namespace Impulse.Services.Production
             var orderNo = request.OrderNo;
             var plannerUser = request.PlannedBy ?? "PPC Planner";
 
-            // ── 1. Stock User Role Task & Notification ───────────────────────
+            // ── 1. Stock User Role Task & Notification (Finish Stock) ────────
             int totalStockQty = request.Items.Sum(i => i.StockQty);
             int stockItemsCount = request.Items.Count(i => i.StockQty > 0);
 
@@ -93,19 +93,48 @@ namespace Impulse.Services.Production
                         SourceEntityType = "CustomerOrder",
                         SourceEntityRefId = orderNo,
                         TargetRole = "Stock",
-                        Title = $"Stock Issuance Request for Order #{orderNo}",
-                        Description = $"PPC has planned in-hand stock issuance of {totalStockQty:N0} pcs across {stockItemsCount} items for Customer Order #{orderNo}. Please review and issue from store.",
+                        Title = $"Finish Stock Issuance Request for Order #{orderNo}",
+                        Description = $"PPC has planned Finish Stock issuance of {totalStockQty:N0} pcs across {stockItemsCount} items for Customer Order #{orderNo}. Please review and issue from store.",
                         ActionUrl = $"/stock/stock-order-adjustment?orderNo={orderNo}",
                         Priority = 2, // High
                         DueDate = DateTime.Today.AddDays(2),
                         CreatedBy = plannerUser
                     });
 
-                    _logger.LogInformation("Stock issuance task dispatched for Order #{OrderNo} ({StockQty} pcs)", orderNo, totalStockQty);
+                    _logger.LogInformation("Finish stock issuance task dispatched for Order #{OrderNo} ({StockQty} pcs)", orderNo, totalStockQty);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Failed to create Stock role task for Order #{OrderNo}", orderNo);
+                }
+            }
+
+            // ── 1b. Semi-Finished (SF) Stock Role Task & Notification ────────
+            int totalSFQty = request.Items.Sum(i => i.SFStockQty);
+            int sfItemsCount = request.Items.Count(i => i.SFStockQty > 0);
+
+            if (totalSFQty > 0)
+            {
+                try
+                {
+                    await _workflowTaskEngine.CreateRoleTaskAsync(new WorkflowTaskCreateRequest
+                    {
+                        SourceEntityType = "CustomerOrder",
+                        SourceEntityRefId = orderNo,
+                        TargetRole = "Stock",
+                        Title = $"Semi-Finished Stock Issuance for Order #{orderNo}",
+                        Description = $"PPC has planned Semi-Finished stock issuance of {totalSFQty:N0} pcs across {sfItemsCount} items for Customer Order #{orderNo}. Please issue via 'Maker Issuance from SF' to return to production.",
+                        ActionUrl = $"/production/maker-issuance-from-sf?orderNo={orderNo}&returnUrl={Uri.EscapeDataString($"/production/order-planning?orderNo={orderNo}")}",
+                        Priority = 2, // High
+                        DueDate = DateTime.Today.AddDays(2),
+                        CreatedBy = plannerUser
+                    });
+
+                    _logger.LogInformation("Semi-finished stock task dispatched for Order #{OrderNo} ({SFQty} pcs)", orderNo, totalSFQty);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to create SF Stock role task for Order #{OrderNo}", orderNo);
                 }
             }
 

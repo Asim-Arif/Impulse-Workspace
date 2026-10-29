@@ -957,6 +957,22 @@ namespace DataAccessLibrary.DAC.Production
                 throw;
             }
         }
+
+        public async Task<long> GetRejectionGatePassWastageCountAsync(IEnumerable<long> vendReceivedEntryIds)
+        {
+            var idList = vendReceivedEntryIds?.Where(id => id > 0).Distinct().ToList();
+            if (idList == null || !idList.Any()) return 0;
+
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            const string sql = @"
+                SELECT ISNULL(SUM(WD.Qty), 0)
+                FROM VendRcvdDetail VRD
+                INNER JOIN VendRcvdDetailWastageDetail WD ON VRD.EntryID = WD.VRD_RefID
+                INNER JOIN VendReceived VR ON VR.EntryID = VRD.RefID
+                WHERE VR.EntryID IN @Ids";
+
+            return await db.ExecuteScalarAsync<long>(sql, new { Ids = idList });
+        }
     }
 }
 

@@ -81,12 +81,52 @@ namespace DataAccessLibrary.DAC.Production
                 return (maxLot + 1).ToString();
             }
 
-            string subSql = @"SELECT MAX(CAST(RIGHT(LotNo, LEN(LotNo) - LEN(@RefLotNo)) AS INT)) 
-                             FROM VendIssdDetail 
-                             WHERE LotNo LIKE @RefLotNo + '%' AND LEN(LotNo) > LEN(@RefLotNo) AND ISNUMERIC(RIGHT(LotNo, LEN(LotNo) - LEN(@RefLotNo))) = 1";
+            string baseLot = refLotNo.Trim();
+            int hyphenIndex = baseLot.IndexOf('-');
+            if (hyphenIndex > 0)
+            {
+                baseLot = baseLot.Substring(0, hyphenIndex);
+            }
 
-            int nextSubNo = (await db.ExecuteScalarAsync<int?>(subSql, new { RefLotNo = refLotNo }) ?? 0) + 1;
-            return $"{refLotNo}{nextSubNo}";
+            string prefix = baseLot + "-";
+            int prefixLen = prefix.Length;
+
+            const string subSql = @"
+                SELECT 
+                    ISNULL((SELECT MAX(CAST(REPLACE(LotNo, @Prefix, '') AS INT)) 
+                            FROM Lots_List 
+                            WHERE LEFT(LotNo, @Len) = @Prefix 
+                              AND CHARINDEX('-', REPLACE(LotNo, @Prefix, '')) = 0 
+                              AND ISNUMERIC(REPLACE(LotNo, @Prefix, '')) = 1), 0) AS LL,
+                    ISNULL((SELECT MAX(CAST(REPLACE(LotNo, @Prefix, '') AS INT)) 
+                            FROM VendIssdDetail 
+                            WHERE LEFT(LotNo, @Len) = @Prefix 
+                              AND CHARINDEX('-', REPLACE(LotNo, @Prefix, '')) = 0 
+                              AND ISNUMERIC(REPLACE(LotNo, @Prefix, '')) = 1), 0) AS VID,
+                    ISNULL((SELECT MAX(CAST(REPLACE(LotNo, @Prefix, '') AS INT)) 
+                            FROM VendRcvdDetail 
+                            WHERE LEFT(LotNo, @Len) = @Prefix 
+                              AND CHARINDEX('-', REPLACE(LotNo, @Prefix, '')) = 0 
+                              AND ISNUMERIC(REPLACE(LotNo, @Prefix, '')) = 1), 0) AS VRD,
+                    ISNULL((SELECT MAX(CAST(REPLACE(LotNo_Manual, @Prefix, '') AS INT)) 
+                            FROM StockOrderOpening 
+                            WHERE LEFT(LotNo_Manual, @Len) = @Prefix 
+                              AND CHARINDEX('-', REPLACE(LotNo_Manual, @Prefix, '')) = 0 
+                              AND ISNUMERIC(REPLACE(LotNo_Manual, @Prefix, '')) = 1), 0) AS SOO;";
+
+            var res = await db.QueryFirstOrDefaultAsync<dynamic>(subSql, new { Prefix = prefix, Len = prefixLen });
+            int maxSub = 0;
+            if (res != null)
+            {
+                int ll = (int)(res.LL ?? 0);
+                int vid = (int)(res.VID ?? 0);
+                int vrd = (int)(res.VRD ?? 0);
+                int soo = (int)(res.SOO ?? 0);
+
+                maxSub = Math.Max(ll, Math.Max(vid, Math.Max(vrd, soo)));
+            }
+
+            return $"{prefix}{maxSub + 1}";
         }
 
         public async Task<string> GetNextReceivingReceiptIDAsync(DateTime dt)

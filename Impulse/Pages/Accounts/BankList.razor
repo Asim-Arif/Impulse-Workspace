@@ -1,206 +1,886 @@
 @page "/accounts/banklist"
 @attribute [Authorize]
-<PageTitle>Bank List</PageTitle>
 
-@using System.Collections.ObjectModel
-@using Microsoft.AspNetCore.Components.Web
 @using BlazorContextMenu
-@using Microsoft.Extensions.Options
-@using DataAccessLibrary
 @using DataAccessLibrary.Models.ViewModels.Accounts
-@using Impulse.Configurations
-@using DataAccessLibrary.Interface.Accounts
-@using Microsoft.Extensions.Options
-@using Microsoft.AspNetCore.Components.Web.Virtualization
 
-@inject IJSRuntime JS
-@inject NavigationManager Navigation
-@inject IChartOfAccountsDataAccess ChartOfAccountsService
-@inject Radzen.NotificationService NotificationService
+<PageTitle>Banks & Bank Accounts | Impulse ERP</PageTitle>
 
-<RadzenNotification />
+<style>
+    .tree-node-bank {
+        cursor: pointer;
+        font-weight: 700;
+        color: #1e3a8a;
+        background-color: #f1f5f9;
+        border-radius: 6px;
+        padding: 7px 10px;
+        transition: background-color 0.15s ease-in-out;
+        user-select: none;
+    }
+    .tree-node-bank:hover {
+        background-color: #e2e8f0;
+    }
+    .tree-node-bank.active-bank {
+        background-color: #e0f2fe;
+        color: #0369a1;
+        border: 1px solid #7dd3fc;
+    }
+    .tree-node-branch {
+        cursor: pointer;
+        font-weight: 600;
+        color: #475569;
+        padding: 5px 8px;
+        border-radius: 4px;
+        transition: background-color 0.15s ease-in-out;
+        user-select: none;
+    }
+    .tree-node-branch:hover {
+        background-color: #f1f5f9;
+    }
+    .tree-node-branch.active-branch {
+        background-color: #f8fafc;
+        color: #0f172a;
+        font-weight: 700;
+    }
+    .tree-node-account {
+        cursor: pointer;
+        padding: 6px 8px;
+        border-radius: 6px;
+        border-left: 3px solid transparent;
+        transition: all 0.15s ease-in-out;
+        user-select: none;
+    }
+    .tree-node-account:hover {
+        background-color: #f8fafc;
+        border-left-color: #0d6efd;
+    }
+    .tree-node-account.active {
+        background-color: #e0f2fe;
+        border-left-color: #0284c7;
+        font-weight: 600;
+        color: #0369a1;
+    }
+    .win11-context-menu-container .win11-menu-item {
+        font-size: 0.85rem;
+        padding: 6px 12px;
+    }
+    .win11-icon {
+        margin-right: 8px;
+        width: 16px;
+        text-align: center;
+    }
+    .context-menu-list {
+        max-height: 40vh;
+        overflow-y: auto;
+    }
+</style>
 
-<div class="container-fluid mt-0" style="font-family: Calibri, sans-serif;">
-    <div class="card shadow-sm border-0 rounded-1 bg-transparent">
-        <div class="card-header text-white d-flex justify-content-between align-items-center rounded-top-4 px-3 py-2 theme-color"
-             style="position: sticky; top: 0; z-index: 1000;">
-            <h5 class="mb-0"><i class="fa fa-university"></i> Banks List </h5>
-            <div class="d-flex align-items-center gap-2">
-                <button class="btn btn-light btn-sm fw-semibold" @onclick="ShowAddModal">
-                    <i class="fas fa-plus"></i> Add New Bank
-                </button>
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-3">
 
-                <button class="btn btn-light btn-sm fw-semibold" @onclick="GoToIndexPage">
-                    <i class="fas fa-times"></i> Close
-                </button>
-            </div>
-        </div>
-
-        <!-- TABLE START HERE -->
-            <div class="card-body p-0">
-                @if (IsLoading)
-                {
-                <div class="progress" style="width: 100%">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
-                            role="progressbar" style="width: 100%">
-                        Loading Data please wait...
+            <!-- ── Top Header & Global Actions ────────────────────────── -->
+            <div class="d-flex align-items-end pb-2 mb-3 border-bottom flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <div style="width:38px;height:38px;background:linear-gradient(135deg,#0284c7,#0369a1);border-radius:10px;display:flex;align-items:center;justify-content:center;">
+                        <i class="fas fa-building-columns text-white" style="font-size:1.05rem;"></i>
+                    </div>
+                    <div>
+                        <h1 class="mb-0 fw-bold" style="font-size:1.25rem;color:#0369a1;">Banks & Bank Accounts</h1>
+                        <small class="text-muted" style="font-size:0.75rem;">Manage institutional banking branches, GL-mapped bank accounts, overdraft limits, and default routing</small>
                     </div>
                 </div>
-                }
-            else if (BankListfromDB?.Any() ?? false)
-                {
-                <div style="width: 100%">
-                    <ContextMenuProvider Id="tableContextMenu">
-                        <table class="table table-bordered table-hover align-middle mb-0"
-                               style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
-                            <thead class="theme-color"
-                                    style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
-                                <tr>
-                                    <th>Bank Name</th>
-                                    <th>Branch</th>
-                                    <th>City</th>
-                                    <th>Account No</th>
-                                    <th>Phone No.</th>
-                                    <th>Email</th>
-                                    <th> </th>
-                                </tr>
-                            </thead>
-                            <tbody style="font-family: Calibri, 'Segoe UI'; font-size: 9pt;">
-                                <Virtualize Items="@BankListfromDB" Context="banks">
-                                    <ContextMenuTrigger WrapperTag="tr"
-                                                        MenuId="accountContextMenu"
-                                                        Data="banks"
-                                                        MouseButtonTrigger="MouseButtonTrigger.Right"
-                                                        CssClass="@($"key-{banks.BankID}")">
-                                        <td style="width: 25%;">@banks.Bank</td>
-                                        <td style="width: 25%;">@banks.Branch</td>
-                                        <td class="text-center" style="width: 15%;">@banks.City</td>
-                                        <td class="text-center" style="width: 10%;">@banks.BankAccNo</td>
-                                        <td class="text-center" style="width: 10%;">@banks.Phone1</td>
-                                        <td class="text-center" style="width: 10%;">@banks.Email</td>
-                                        <td style="width: 5%;">
-                                            <ContextMenuTrigger MenuId="accountContextMenu"
-                                                            Data="banks"
-                                                            MouseButtonTrigger="MouseButtonTrigger.Both">
-                                            <button class="btn btn-sm btn-primary" style="border:none; background:none;">
-                                                <i class="fa-solid fa-ellipsis-vertical" style="color:black"></i>
-                                            </button>
-                                            </ContextMenuTrigger>
-                                        </td>
-                                    </ContextMenuTrigger>
-                                </Virtualize>
-                            </tbody>
-                        </table>
-                    </ContextMenuProvider>
+
+                <div class="ms-auto d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-primary px-3 shadow-sm fw-semibold" @onclick="OpenAddBranchModal">
+                        <i class="fas fa-plus-circle me-1"></i> Add Bank / Branch
+                    </button>
+                    @if (SelectedBranch != null)
+                    {
+                        <button class="btn btn-sm btn-success px-3 shadow-sm fw-semibold" @onclick="() => OpenAddAccountModal(SelectedBranch.BankID)">
+                            <i class="fas fa-credit-card me-1"></i> Add Account to @SelectedBranch.Branch
+                        </button>
+                    }
+                    <button class="btn btn-sm btn-outline-secondary px-3" @onclick="GoBack">
+                        <i class="fas fa-xmark me-1"></i> Close
+                    </button>
                 </div>
-                }
-                else
-                {
-                    <div class="text-center py-3 text-muted">No accounts found.</div>
-                }
+            </div>
 
-            <ContextMenu Id="accountContextMenu"  
-                         UseDefaultEventHandlers="true"
-                         Template="Win11Style">
+            <!-- ── Main Workspace: Explorer (Left) & Inspector/Grid (Right) ── -->
+            <div class="row g-3">
 
-                    <Item Onclick="@Refreshlist">
-                    <i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh
-                    </Item>
+                <!-- LEFT COLUMN: HIERARCHICAL TREE EXPLORER -->
+                <div class="col-lg-4 col-md-5">
+                    <div class="card border h-100 shadow-sm" style="background: #ffffff; border-radius: 8px;">
+                        <div class="card-header py-2 bg-light d-flex align-items-center justify-content-between" style="border-radius: 8px 8px 0 0;">
+                            <span class="fw-bold text-secondary" style="font-size: 0.85rem;">
+                                <i class="fas fa-sitemap text-primary me-1"></i> Banking Explorer
+                            </span>
+                            <div class="d-flex align-items-center gap-1">
+                                <span class="badge bg-primary" title="Total Bank Branches">@Branches.Count Branches</span>
+                                <span class="badge bg-secondary" title="Total Bank Accounts">@Accounts.Count Accounts</span>
+                            </div>
+                        </div>
 
-                    <div class="menu-divider "></div>
-                    <Seperator />
+                        <!-- Instant Live Search Bar -->
+                        <div class="p-2 border-bottom bg-light">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-white border-end-0 text-muted">
+                                    <i class="fas fa-search"></i>
+                                </span>
+                                <input type="text"
+                                       class="form-control border-start-0"
+                                       placeholder="Filter by bank, branch, city, account..."
+                                       @bind="SearchText"
+                                       @bind:event="oninput" />
+                                @if (!string.IsNullOrWhiteSpace(SearchText))
+                                {
+                                    <button class="btn btn-outline-secondary" type="button" @onclick="() => SearchText = string.Empty">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                }
+                            </div>
+                        </div>
 
-                    <Item OnClick="ShowAddModal">
-                    <i class="fas fa-plus-circle fa-fw win11-icon"></i> Add New Bank
-                    </Item>
+                        <!-- Tree Content -->
+                        <div class="card-body p-2" style="max-height: 65vh; overflow-y: auto;">
+                            @if (IsLoading)
+                            {
+                                <div class="text-center py-4 text-muted">
+                                    <span class="spinner-border spinner-border-sm text-primary me-1" role="status" aria-hidden="true"></span>
+                                    <span style="font-size: 0.85rem;">Loading Banking Structure...</span>
+                                </div>
+                            }
+                            else
+                            {
+                                var groups = GetFilteredHierarchy();
+                                @if (groups.Any())
+                                {
+                                    <div class="d-flex flex-column gap-2">
+                                        @foreach (var bankGroup in groups)
+                                        {
+                                            bool isBankExpanded = ExpandedBanks.Contains(bankGroup.BankName);
+                                            bool isCurrentBank = SelectedBankName == bankGroup.BankName;
 
-                    <Item OnClick="EditSelectedBank">
-                    <i class="fas fa-edit fa-fw win11-icon"></i> Edit Selected Bank
-                    </Item>
+                                            <div class="border rounded p-1 bg-white">
+                                                <!-- Level 1: Bank Institution -->
+                                                <ContextMenuTrigger WrapperTag="div"
+                                                                    MenuId="bankNodeMenu"
+                                                                    Data="bankGroup.BankName"
+                                                                    MouseButtonTrigger="MouseButtonTrigger.Right">
+                                                    <div class="tree-node-bank d-flex align-items-center justify-content-between @(isCurrentBank ? "active-bank" : "")"
+                                                         @onclick="() => OnBankHeaderClick(bankGroup)">
+                                                        <span class="d-flex align-items-center gap-2">
+                                                            <i class="fas @(isBankExpanded ? "fa-folder-open text-warning" : "fa-folder text-warning")"></i>
+                                                            <span class="fw-bold">@bankGroup.BankName</span>
+                                                        </span>
+                                                        <span class="badge bg-secondary-subtle text-secondary small">
+                                                            @bankGroup.Branches.Sum(b => b.Accounts.Count) A/c
+                                                        </span>
+                                                    </div>
+                                                </ContextMenuTrigger>
 
-                    <Item OnClick="@(async (e) => await DeleteSelectedBank(e))">
-                    <i class="fas fa-trash-alt fa-fw win11-icon"></i> Delete Bank
-                    </Item>
+                                                @if (isBankExpanded)
+                                                {
+                                                    <div class="ms-3 mt-1 d-flex flex-column gap-1 border-start ps-2">
+                                                        @foreach (var branchGroup in bankGroup.Branches)
+                                                        {
+                                                            bool isBranchExpanded = ExpandedBranches.Contains(branchGroup.Branch.BankID);
+                                                            bool isBranchSelected = SelectedBranch?.BankID == branchGroup.Branch.BankID;
 
-            </ContextMenu>
+                                                            <div>
+                                                                <!-- Level 2: Branch -->
+                                                                <ContextMenuTrigger WrapperTag="div"
+                                                                                    MenuId="branchNodeMenu"
+                                                                                    Data="branchGroup.Branch"
+                                                                                    MouseButtonTrigger="MouseButtonTrigger.Right">
+                                                                    <div class="tree-node-branch d-flex align-items-center justify-content-between @(isBranchSelected ? "active-branch" : "")"
+                                                                         @onclick="() => OnBranchHeaderClick(branchGroup)">
+                                                                        <span class="d-flex align-items-center gap-1">
+                                                                            <i class="fas @(isBranchExpanded ? "fa-chevron-down text-secondary" : "fa-chevron-right text-secondary")" style="font-size: 0.75rem;"></i>
+                                                                            <i class="fas fa-code-branch text-primary me-1" style="font-size: 0.8rem;"></i>
+                                                                            <span style="font-size: 0.82rem;">@branchGroup.Branch.Branch</span>
+                                                                            @if (!string.IsNullOrWhiteSpace(branchGroup.Branch.City))
+                                                                            {
+                                                                                <small class="text-muted">(@branchGroup.Branch.City)</small>
+                                                                            }
+                                                                        </span>
+                                                                        <span class="badge bg-light text-secondary border small" style="font-size: 0.7rem;">@branchGroup.Accounts.Count</span>
+                                                                    </div>
+                                                                </ContextMenuTrigger>
+
+                                                                @if (isBranchExpanded)
+                                                                {
+                                                                    <div class="ms-3 d-flex flex-column gap-1 border-start ps-2 mt-1">
+                                                                        @if (!branchGroup.Accounts.Any())
+                                                                        {
+                                                                            <div class="text-muted small py-1 fst-italic" style="font-size: 0.75rem;">
+                                                                                No accounts in this branch.
+                                                                                <a href="javascript:void(0)" class="text-primary text-decoration-none ms-1" @onclick="() => OpenAddAccountModal(branchGroup.Branch.BankID)">+ Add Account</a>
+                                                                            </div>
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            @foreach (var acc in branchGroup.Accounts)
+                                                                            {
+                                                                                bool isAccountSelected = SelectedAccount?.AccNo == acc.AccNo;
+
+                                                                                <!-- Level 3: Bank Account -->
+                                                                                <ContextMenuTrigger WrapperTag="div"
+                                                                                                    MenuId="accountNodeMenu"
+                                                                                                    Data="acc"
+                                                                                                    MouseButtonTrigger="MouseButtonTrigger.Right">
+                                                                                    <div class="tree-node-account d-flex align-items-center justify-content-between @(isAccountSelected ? "active" : "")"
+                                                                                         @onclick="() => SelectAccount(acc)">
+                                                                                        <div class="d-flex align-items-start gap-1 flex-grow-1" style="font-size: 0.82rem;">
+                                                                                            <i class="fas fa-credit-card mt-1 @(isAccountSelected ? "text-primary" : "text-muted")" style="font-size: 0.8rem;"></i>
+                                                                                            <div class="d-flex flex-column">
+                                                                                                <span class="fw-semibold text-truncate" style="max-width: 180px;" title="@acc.AccTitle">@acc.AccTitle</span>
+                                                                                                <span class="text-muted small" style="font-size: 0.73rem;">
+                                                                                                    [@acc.AccNo] @(string.IsNullOrEmpty(acc.BankAccNo) ? "" : $"• A/c {acc.BankAccNo}")
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <div class="d-flex align-items-center gap-1 ms-1">
+                                                                                            @if (acc.DefaultBank)
+                                                                                            {
+                                                                                                <span class="badge bg-primary" style="font-size: 0.65rem;" title="Default Bank Account">Default</span>
+                                                                                            }
+                                                                                            @if (acc.AllowOD)
+                                                                                            {
+                                                                                                <span class="badge bg-warning text-dark" style="font-size: 0.65rem;" title="Overdraft Allowed">OD</span>
+                                                                                            }
+                                                                                            <ContextMenuTrigger MenuId="accountNodeMenu" Data="acc" MouseButtonTrigger="MouseButtonTrigger.Left">
+                                                                                                <button class="btn btn-sm btn-link text-secondary p-0 ms-1" title="Options" @onclick:stopPropagation="true">
+                                                                                                    <i class="fas fa-ellipsis-vertical" style="font-size: 0.75rem;"></i>
+                                                                                                </button>
+                                                                                            </ContextMenuTrigger>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </ContextMenuTrigger>
+                                                                            }
+                                                                        }
+                                                                    </div>
+                                                                }
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="text-center py-4 text-muted small">
+                                        <i class="fas fa-search me-1"></i> No matching banks or accounts found.
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RIGHT COLUMN: CONTEXT-SENSITIVE INSPECTOR & ACTION CANVAS -->
+                <div class="col-lg-8 col-md-7">
+
+                    <!-- SCENARIO 1: An Account is Selected -->
+                    @if (SelectedAccount != null)
+                    {
+                        <div class="card border shadow-sm mb-3" style="background: #ffffff; border-radius: 8px;">
+                            <div class="card-header py-2 bg-light d-flex align-items-center justify-content-between flex-wrap gap-2" style="border-radius: 8px 8px 0 0;">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-info text-dark fw-bold">ACCOUNT VIEW</span>
+                                    <span class="fw-bold text-dark" style="font-size: 0.95rem;">
+                                        [@SelectedAccount.AccNo] @SelectedAccount.AccTitle
+                                    </span>
+                                    @if (SelectedAccount.DefaultBank)
+                                    {
+                                        <span class="badge bg-primary"><i class="fas fa-star me-1"></i> Default Account</span>
+                                    }
+                                    @if (SelectedAccount.AllowOD)
+                                    {
+                                        <span class="badge bg-warning text-dark"><i class="fas fa-shield-alt me-1"></i> Overdraft Limit</span>
+                                    }
+                                </div>
+                                <div class="d-flex align-items-center gap-1">
+                                    @if (!SelectedAccount.DefaultBank)
+                                    {
+                                        <button class="btn btn-sm btn-outline-primary" @onclick="() => SetAsDefault(SelectedAccount.AccNo)">
+                                            <i class="fas fa-star me-1"></i> Set as Default
+                                        </button>
+                                    }
+                                    <button class="btn btn-sm btn-outline-warning text-dark" @onclick="() => OpenODModal(SelectedAccount)">
+                                        <i class="fas fa-shield-alt me-1"></i> Overdraft
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => OpenEditAccountModal(SelectedAccount)">
+                                        <i class="fas fa-pencil-alt me-1"></i> Edit
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => OpenDeleteAccountConfirm(SelectedAccount)">
+                                        <i class="fas fa-trash me-1"></i> Delete
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="card-body p-3">
+                                <!-- Top Highlight Metric Cards -->
+                                <div class="row g-2 mb-3">
+                                    <div class="col-sm-6 col-lg-3">
+                                        <div class="p-2 border rounded bg-light">
+                                            <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.7rem;">Ledger Balance</small>
+                                            <div class="fw-bold @(SelectedAccount.Balance >= 0 ? "text-success" : "text-danger")" style="font-size: 1.15rem;">
+                                                @(SelectedAccount.Balance.ToString("N2"))
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-sm-6 col-lg-3">
+                                        <div class="p-2 border rounded bg-light">
+                                            <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.7rem;">Bank A/c No</small>
+                                            <div class="fw-bold text-dark text-truncate" style="font-size: 1.05rem;" title="@SelectedAccount.BankAccNo">
+                                                @(string.IsNullOrWhiteSpace(SelectedAccount.BankAccNo) ? "—" : SelectedAccount.BankAccNo)
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-sm-6 col-lg-3">
+                                        <div class="p-2 border rounded bg-light">
+                                            <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.7rem;">Account Type</small>
+                                            <div class="fw-bold text-secondary" style="font-size: 1.05rem;">
+                                                @SelectedAccount.Type
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-sm-6 col-lg-3">
+                                        <div class="p-2 border rounded bg-light d-flex align-items-center justify-content-between">
+                                            <div>
+                                                <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.7rem;">Cheque Books</small>
+                                                <div class="fw-bold text-primary" style="font-size: 1.05rem;">
+                                                    @SelectedAccount.ChqBooksCount Registered
+                                                </div>
+                                            </div>
+                                            <button class="btn btn-sm btn-outline-primary p-1 px-2" title="Go to Cheque Book Details" @onclick="GoToChequeBooks">
+                                                <i class="fas fa-arrow-up-right-from-square"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Extended Account & Branch Details -->
+                                <div class="row g-2 mb-3" style="font-size: 0.85rem;">
+                                    <div class="col-md-6">
+                                        <table class="table table-sm table-bordered mb-0">
+                                            <tbody>
+                                                <tr>
+                                                    <td class="bg-light fw-semibold text-secondary" style="width: 40%;">Bank Institution</td>
+                                                    <td>@SelectedAccount.Bank</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="bg-light fw-semibold text-secondary">Branch Name</td>
+                                                    <td>@SelectedAccount.Branch</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="bg-light fw-semibold text-secondary">Branch City</td>
+                                                    <td>@SelectedAccount.City</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="bg-light fw-semibold text-secondary">GL Account Code</td>
+                                                    <td><code>@SelectedAccount.AccNo</code></td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <table class="table table-sm table-bordered mb-0">
+                                            <tbody>
+                                                <tr>
+                                                    <td class="bg-light fw-semibold text-secondary" style="width: 40%;">Overdraft Facility</td>
+                                                    <td>
+                                                        @if (SelectedAccount.AllowOD)
+                                                        {
+                                                            <span class="text-warning fw-bold">Allowed</span>
+                                                            @if (SelectedAccount.ODAmt.HasValue)
+                                                            {
+                                                                <span class="ms-1">(Limit: @SelectedAccount.ODAmt.Value.ToString("N2"))</span>
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="text-muted">Not Allowed</span>
+                                                        }
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="bg-light fw-semibold text-secondary">Cheque Print Format</td>
+                                                    <td>@(string.IsNullOrWhiteSpace(SelectedAccount.Chqformat) ? "Default" : SelectedAccount.Chqformat)</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="bg-light fw-semibold text-secondary">Opening Balance</td>
+                                                    <td>@SelectedAccount.OpenBal.ToString("N2")</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="bg-light fw-semibold text-secondary">Opening Date</td>
+                                                    <td>@(SelectedAccount.OpenDate.HasValue ? SelectedAccount.OpenDate.Value.ToString("dd-MMM-yyyy") : "—")</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- SCENARIO 2: A Branch is Selected -->
+                    @if (SelectedBranch != null)
+                    {
+                        <div class="card border shadow-sm" style="background: #ffffff; border-radius: 8px;">
+                            <div class="card-header py-2 bg-light d-flex align-items-center justify-content-between flex-wrap gap-2" style="border-radius: 8px 8px 0 0;">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-primary fw-bold">BRANCH PROFILE</span>
+                                    <span class="fw-bold text-dark" style="font-size: 0.95rem;">
+                                        @SelectedBranch.Bank — @SelectedBranch.Branch
+                                    </span>
+                                    @if (!string.IsNullOrWhiteSpace(SelectedBranch.City))
+                                    {
+                                        <span class="badge bg-secondary">@SelectedBranch.City</span>
+                                    }
+                                </div>
+                                <div class="d-flex align-items-center gap-1">
+                                    <button class="btn btn-sm btn-success fw-semibold" @onclick="() => OpenAddAccountModal(SelectedBranch.BankID)">
+                                        <i class="fas fa-plus-circle me-1"></i> Add Account to this Branch
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => OpenEditBranchModal(SelectedBranch)">
+                                        <i class="fas fa-pencil-alt me-1"></i> Edit Branch
+                                    </button>
+                                    @if (SelectedBranch.AccountsCount == 0)
+                                    {
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => OpenDeleteBranchConfirm(SelectedBranch)">
+                                            <i class="fas fa-trash me-1"></i> Delete
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="card-body p-3">
+                                <!-- Branch Profile Metadata -->
+                                <div class="row g-2 mb-3" style="font-size: 0.85rem;">
+                                    <div class="col-md-6">
+                                        <div class="p-2 border rounded bg-light h-100">
+                                            <div class="mb-1"><span class="fw-semibold text-secondary">Manager:</span> @(string.IsNullOrWhiteSpace(SelectedBranch.Manager) ? "—" : SelectedBranch.Manager)</div>
+                                            <div class="mb-1"><span class="fw-semibold text-secondary">Phone 1:</span> @(string.IsNullOrWhiteSpace(SelectedBranch.Phone1) ? "—" : SelectedBranch.Phone1)</div>
+                                            <div class="mb-1"><span class="fw-semibold text-secondary">Phone 2:</span> @(string.IsNullOrWhiteSpace(SelectedBranch.Phone2) ? "—" : SelectedBranch.Phone2)</div>
+                                            <div><span class="fw-semibold text-secondary">Email:</span> @(string.IsNullOrWhiteSpace(SelectedBranch.Email) ? "—" : SelectedBranch.Email)</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="p-2 border rounded bg-light h-100">
+                                            <div class="mb-1"><span class="fw-semibold text-secondary">Address:</span> @(string.IsNullOrWhiteSpace(SelectedBranch.Address) ? "—" : SelectedBranch.Address)</div>
+                                            <div class="mb-1"><span class="fw-semibold text-secondary">Fax:</span> @(string.IsNullOrWhiteSpace(SelectedBranch.Fax) ? "—" : SelectedBranch.Fax)</div>
+                                            <div><span class="fw-semibold text-secondary">Remittance Info:</span> @(string.IsNullOrWhiteSpace(SelectedBranch.Remittance) ? "—" : SelectedBranch.Remittance)</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Accounts Table inside this Branch -->
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <span class="fw-bold text-secondary" style="font-size: 0.85rem;">
+                                        <i class="fas fa-list text-primary me-1"></i> Bank Accounts in this Branch (@SelectedBranchAccounts.Count)
+                                    </span>
+                                </div>
+
+                                @if (SelectedBranchAccounts.Any())
+                                {
+                                    <div class="table-responsive border rounded">
+                                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase;">
+                                                <tr>
+                                                    <th>GL Code</th>
+                                                    <th>Account Title</th>
+                                                    <th>Bank A/c No</th>
+                                                    <th>Type</th>
+                                                    <th class="text-end">Balance</th>
+                                                    <th class="text-center">Status</th>
+                                                    <th class="text-center" style="width: 120px;">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var acc in SelectedBranchAccounts)
+                                                {
+                                                    bool isRowSelected = SelectedAccount?.AccNo == acc.AccNo;
+                                                    <tr class="@(isRowSelected ? "table-primary" : "")" style="cursor: pointer;" @onclick="() => SelectAccount(acc)">
+                                                        <td><code>@acc.AccNo</code></td>
+                                                        <td class="fw-semibold">@acc.AccTitle</td>
+                                                        <td>@(string.IsNullOrWhiteSpace(acc.BankAccNo) ? "—" : acc.BankAccNo)</td>
+                                                        <td><span class="badge bg-light text-dark border">@acc.Type</span></td>
+                                                        <td class="text-end fw-bold @(acc.Balance >= 0 ? "text-success" : "text-danger")">
+                                                            @acc.Balance.ToString("N2")
+                                                        </td>
+                                                        <td class="text-center">
+                                                            @if (acc.DefaultBank)
+                                                            {
+                                                                <span class="badge bg-primary" title="Primary default account">Default</span>
+                                                            }
+                                                            @if (acc.AllowOD)
+                                                            {
+                                                                <span class="badge bg-warning text-dark" title="Overdraft permitted">OD</span>
+                                                            }
+                                                        </td>
+                                                        <td class="text-center" @onclick:stopPropagation="true">
+                                                            <div class="btn-group btn-group-sm">
+                                                                @if (!acc.DefaultBank)
+                                                                {
+                                                                    <button class="btn btn-outline-secondary btn-sm" title="Set as Default Bank" @onclick="() => SetAsDefault(acc.AccNo)">
+                                                                        <i class="fas fa-star text-warning"></i>
+                                                                    </button>
+                                                                }
+                                                                <button class="btn btn-outline-secondary btn-sm" title="Configure Overdraft" @onclick="() => OpenODModal(acc)">
+                                                                    <i class="fas fa-shield-alt text-primary"></i>
+                                                                </button>
+                                                                <button class="btn btn-outline-secondary btn-sm" title="Edit Account" @onclick="() => OpenEditAccountModal(acc)">
+                                                                    <i class="fas fa-pencil-alt text-secondary"></i>
+                                                                </button>
+                                                                <button class="btn btn-outline-danger btn-sm" title="Delete Account" @onclick="() => OpenDeleteAccountConfirm(acc)">
+                                                                    <i class="fas fa-trash"></i>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="text-center py-4 border rounded bg-light text-muted">
+                                        <i class="fas fa-credit-card fa-2x mb-2 text-secondary opacity-50"></i>
+                                        <p class="mb-2">No bank accounts have been added to this branch yet.</p>
+                                        <button class="btn btn-sm btn-primary fw-semibold" @onclick="() => OpenAddAccountModal(SelectedBranch.BankID)">
+                                            <i class="fas fa-plus me-1"></i> Add Bank Account
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <!-- SCENARIO 3: Empty State (Nothing selected) -->
+                    @if (SelectedBranch == null && SelectedAccount == null)
+                    {
+                        <div class="card border shadow-sm text-center py-5" style="background: #ffffff; border-radius: 8px;">
+                            <div class="card-body">
+                                <i class="fas fa-building-columns fa-3x text-primary opacity-50 mb-3"></i>
+                                <h5 class="fw-bold text-dark">Welcome to Banks & Accounts Management</h5>
+                                <p class="text-muted" style="max-width: 480px; margin: 0 auto 1.5rem auto;">
+                                    Select any bank, branch, or bank account from the explorer on the left to view details, configure overdraft limits, or set default accounts.
+                                </p>
+                                <div class="d-flex justify-content-center gap-2">
+                                    <button class="btn btn-sm btn-primary px-3 fw-semibold" @onclick="OpenAddBranchModal">
+                                        <i class="fas fa-plus-circle me-1"></i> Add New Bank Branch
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                </div>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Modal for New/Edit Bank -->
-    @if (ShowModal)
-    {
-    <div class="modal fade show d-block" tabindex="-1" role="dialog" style="font-family: Calibri, sans-serif; display: flex; align-items: center; justify-content: center;">
-        <div class="modal-dialog modal-dialog-centered" role="document">
-            <div class="modal-content">
-                
-            <!-- Header -->
-                <div class="modal-header text-white rounded-top-4" style="background-color:rgb(7, 44, 96)">
-                    <h5 class="modal-title fw-bold d-flex align-items-center">
-                        <i class="bi bi-bank me-2"></i>
-                          Bank Profile
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" @onclick="HideModal" aria-label="Close"></button>
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- MODAL 1: ADD / EDIT BANK BRANCH                                      -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+@if (ShowBranchModal)
+{
+    <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(4px); z-index: 100050; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; font-family: 'Calibri', 'Segoe UI', sans-serif;">
+        <div class="shadow-lg border-0" style="width: 1000px; max-width: 96vw; max-height: 92vh; background: #ffffff; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden;">
+            <div class="bg-primary text-white py-2 px-3 d-flex align-items-center justify-content-between" style="flex-shrink: 0;">
+                <h6 class="modal-title fw-bold mb-0" style="font-size: 1.05rem;">
+                    <i class="fas fa-building-columns me-2"></i>
+                    <span>@(BranchModel.BankID > 0 ? "Edit Bank Branch" : "Add New Bank / Branch")</span>
+                </h6>
+                <button type="button" class="btn-close btn-close-white" @onclick="() => ShowBranchModal = false"></button>
+            </div>
+
+            <div class="p-3 p-md-4" style="overflow-y: auto; flex-grow: 1; font-size: 0.88rem;">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small mb-1">Bank Name <span class="text-danger">*</span></label>
+                        <input list="bankNamesList" class="form-control form-control-sm" placeholder="e.g. Meezan Bank, Allied Bank" @bind="BranchModel.Bank" />
+                        <datalist id="bankNamesList">
+                            @foreach (var b in DistinctBankNames)
+                            {
+                                <option value="@b"></option>
+                            }
+                        </datalist>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small mb-1">Branch Name <span class="text-danger">*</span></label>
+                        <input class="form-control form-control-sm" placeholder="e.g. Paris Road Branch, Main Branch" @bind="BranchModel.Branch" />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small mb-1">City</label>
+                        <input list="citiesList" class="form-control form-control-sm" placeholder="e.g. Sialkot, Lahore" @bind="BranchModel.City" />
+                        <datalist id="citiesList">
+                            @foreach (var c in DistinctCities)
+                            {
+                                <option value="@c"></option>
+                            }
+                        </datalist>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small mb-1">Phone 1</label>
+                        <input class="form-control form-control-sm" placeholder="e.g. 052-1234567" @bind="BranchModel.Phone1" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small mb-1">Phone 2</label>
+                        <input class="form-control form-control-sm" placeholder="e.g. 052-7654321" @bind="BranchModel.Phone2" />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small mb-1">Email</label>
+                        <input type="email" class="form-control form-control-sm" placeholder="e.g. branch@bank.com" @bind="BranchModel.Email" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small mb-1">Fax</label>
+                        <input class="form-control form-control-sm" placeholder="e.g. 052-1234568" @bind="BranchModel.Fax" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small mb-1">Manager Name</label>
+                        <input class="form-control form-control-sm" placeholder="e.g. Branch Manager" @bind="BranchModel.Manager" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small mb-1">Branch Address</label>
+                        <textarea class="form-control form-control-sm" rows="3" placeholder="Full address of the bank branch" @bind="BranchModel.Address"></textarea>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small mb-1">Remittance Instructions / Swift Code</label>
+                        <textarea class="form-control form-control-sm" rows="3" placeholder="Remittance notes, IBAN instructions, or Swift codes" @bind="BranchModel.Remittance"></textarea>
+                    </div>
                 </div>
+            </div>
 
-                <div class="modal-body">
-                        <div class="row">
-                            <div class="col-md-12 mb-2">
-                            <label class="fw-semibold">Bank Name :</label>
-                            <input class="form-control form-control-sm shadow-sm" @bind="CurrentBank.Bank" />
-                            </div>
-                            
-                            <div class="col-md-6 mb-2">
-                            <label class="fw-semibold">Branch Name :</label>
-                            <input class="form-control form-control-sm shadow-sm" @bind="CurrentBank.Branch" />
-                            </div>
-
-                            <div class="col-md-6 mb-2">
-                            <label class="fw-semibold">City :</label>
-                            <input class="form-control form-control-sm shadow-sm" @bind="CurrentBank.City" />
-                            </div>
-
-                            <div class="col-md-4 mb-2">
-                            <label class="fw-semibold">Bank Account No :</label>
-                            <input class="form-control form-control-sm shadow-sm" @bind="CurrentBank.BankAccNo" />
-                            </div>
-                            <div class="col-md-4 mb-2">
-                            <label class="fw-semibold">Phone 1 :</label>
-                            <input class="form-control form-control-sm shadow-sm" @bind="CurrentBank.Phone1" />
-                            </div>
-                            <div class="col-md-4 mb-2">
-                            <label class="fw-semibold">Phone 2 :</label>
-                            <input class="form-control form-control-sm shadow-sm" @bind="CurrentBank.Phone2" />
-                            </div>
-                            <div class="col-md-4 mb-2">
-                            <label class="fw-semibold">Fax No :</label>
-                            <input class="form-control form-control-sm shadow-sm" @bind="CurrentBank.FaxNo" />
-                            </div>
-                            <div class="col-md-4 mb-2">
-                            <label class="fw-semibold">E-Mail :</label>
-                            <input type="email" class="form-control form-control-sm shadow-sm" @bind="CurrentBank.Email" />
-                            </div>
-                            <div class="col-md-4 mb-2">
-                            <label class="fw-semibold">Manager Name :</label>
-                            <input class="form-control form-control-sm shadow-sm" @bind="CurrentBank.Manager" />
-                            </div>
-                            <div class="mb-2">
-                            <label class="fw-semibold">Remittance :</label>
-                            <input class="form-control form-control-sm shadow-sm" rows="1" @bind="CurrentBank.Remittance"></input>
-                            </div>
-                            <div class="mb-2">
-                            <label class="fw-semibold">Address :</label>
-                            <textarea class="form-control form-control-sm shadow-sm" rows="1" @bind="CurrentBank.Address"></textarea>
-                            </div>
-
-                        </div>
-
-                        <div class="ml-2 mt-3 text-end">
-                            <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="SaveBank">Save</button>
-                            <button class="btn btn-sm text-white" style="background-color:rgb(7, 44, 96)" @onclick="HideModal">Close</button>
-                        </div>
-                </div>
+            <div class="modal-footer border-top py-2 px-3 bg-light d-flex justify-content-end gap-2" style="flex-shrink: 0;">
+                <button type="button" class="btn btn-secondary btn-sm px-3" @onclick="() => ShowBranchModal = false">
+                    <i class="fas fa-times me-1"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-primary btn-sm px-3 fw-semibold" @onclick="SaveBranch" disabled="@IsSaving">
+                    @if (IsSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    <i class="fas fa-check me-1"></i> Save Branch
+                </button>
             </div>
         </div>
     </div>
 }
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- MODAL 2: ADD / EDIT BANK ACCOUNT                                     -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+@if (ShowAccountModal)
+{
+    <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(4px); z-index: 100050; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; font-family: 'Calibri', 'Segoe UI', sans-serif;">
+        <div class="shadow-lg border-0" style="width: 1000px; max-width: 96vw; max-height: 92vh; background: #ffffff; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden;">
+            <div class="text-white py-2 px-3 d-flex align-items-center justify-content-between" style="background: linear-gradient(135deg, #15803d, #166534); flex-shrink: 0;">
+                <h6 class="modal-title fw-bold mb-0" style="font-size: 1.05rem;">
+                    <i class="fas fa-credit-card me-2"></i>
+                    <span>@(AccountModel.IsNew ? "Add New Bank Account" : "Edit Bank Account")</span>
+                </h6>
+                <button type="button" class="btn-close btn-close-white" @onclick="() => ShowAccountModal = false"></button>
+            </div>
+
+            <div class="p-3 p-md-4" style="overflow-y: auto; flex-grow: 1; font-size: 0.88rem;">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small mb-1">Target Bank Branch <span class="text-danger">*</span></label>
+                        <select class="form-select form-select-sm" @bind="AccountModel.BankID" disabled="@(!AccountModel.IsNew)">
+                            @foreach (var b in Branches)
+                            {
+                                <option value="@b.BankID">@b.Bank — @b.Branch (@b.City)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small mb-1">Bank Account No <span class="text-danger">*</span></label>
+                        <input class="form-control form-control-sm" placeholder="e.g. 01020304050607" @bind="AccountModel.BankAccNo" />
+                    </div>
+
+                    <div class="col-md-8">
+                        <label class="form-label fw-semibold small mb-1">GL Account Title <span class="text-danger">*</span></label>
+                        <input class="form-control form-control-sm" placeholder="e.g. Meezan Bank - PKR Operational A/c" @bind="AccountModel.AccTitle" />
+                        <small class="text-muted" style="font-size: 0.72rem;">This will be the title displayed across vouchers, cheque books, and ledgers.</small>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small mb-1">Account Type</label>
+                        <select class="form-select form-select-sm" @bind="AccountModel.Type">
+                            <option value="Current">Current</option>
+                            <option value="Savings">Savings</option>
+                            <option value="PLS">PLS</option>
+                            <option value="Foreign Currency">Foreign Currency</option>
+                            <option value="Escrow">Escrow</option>
+                            <option value="Loan">Loan</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small mb-1">Cheque Print Format</label>
+                        <input class="form-control form-control-sm" placeholder="e.g. Standard, Meezan_Format" @bind="AccountModel.Chqformat" />
+                    </div>
+                    @if (AccountModel.IsNew)
+                    {
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold small mb-1">Opening Balance</label>
+                            <input type="number" step="0.01" class="form-control form-control-sm text-end" @bind="AccountModel.OpenBal" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold small mb-1">Opening Date</label>
+                            <input type="date" class="form-control form-control-sm" @bind="AccountModel.OpenDate" />
+                        </div>
+                    }
+
+                    <!-- Toggles & Overdraft Details Panel -->
+                    <div class="col-12">
+                        <div class="p-3 border rounded-3 bg-light">
+                            <div class="d-flex align-items-center gap-4 flex-wrap">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="chkDefaultBank" @bind="AccountModel.DefaultBank" />
+                                    <label class="form-check-label fw-semibold small" for="chkDefaultBank">
+                                        <i class="fas fa-star text-warning me-1"></i> Set as Primary Default Bank Account
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="chkAllowOD" @bind="AccountModel.AllowOD" />
+                                    <label class="form-check-label fw-semibold small" for="chkAllowOD">
+                                        <i class="fas fa-shield-alt text-primary me-1"></i> Allow Overdraft (OD) Facility
+                                    </label>
+                                </div>
+                            </div>
+
+                            @if (AccountModel.AllowOD)
+                            {
+                                <div class="row g-2 mt-2 pt-2 border-top">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold small mb-1">Overdraft Limit Amount</label>
+                                        <input type="number" step="0.01" class="form-control form-control-sm text-end" @bind="AccountModel.ODAmt" placeholder="0.00" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold small mb-1">Overdraft Interest Rate (%)</label>
+                                        <input type="number" step="0.01" class="form-control form-control-sm text-end" @bind="AccountModel.ODRate" placeholder="0.00" />
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer border-top py-2 px-3 bg-light d-flex justify-content-end gap-2" style="flex-shrink: 0;">
+                <button type="button" class="btn btn-secondary btn-sm px-3" @onclick="() => ShowAccountModal = false">
+                    <i class="fas fa-times me-1"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-success btn-sm px-3 fw-semibold" @onclick="SaveAccount" disabled="@IsSaving">
+                    @if (IsSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    <i class="fas fa-check me-1"></i> Save Bank Account
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- MODAL 3: OVERDRAFT CONFIGURATION                                     -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+@if (ShowODModal)
+{
+    <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(4px); z-index: 100050; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; font-family: 'Calibri', 'Segoe UI', sans-serif;">
+        <div class="shadow-lg border-0" style="width: 500px; max-width: 96vw; background: #ffffff; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden;">
+            <div class="bg-warning text-dark py-2 px-3 d-flex align-items-center justify-content-between" style="flex-shrink: 0;">
+                <h6 class="modal-title fw-bold mb-0" style="font-size: 1.05rem;">
+                    <i class="fas fa-shield-alt me-2"></i> Bank Overdraft
+                </h6>
+                <button type="button" class="btn-close" @onclick="() => ShowODModal = false"></button>
+            </div>
+            <div class="p-3" style="overflow-y: auto; flex-grow: 1; font-size: 0.88rem;">
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="chkODConfig" @bind="ODModel.AllowOD" />
+                    <label class="form-check-label fw-semibold small" for="chkODConfig">
+                        Allow Overdraft on this Account
+                    </label>
+                </div>
+                @if (ODModel.AllowOD)
+                {
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small mb-1">Overdraft Limit Amount</label>
+                        <input type="number" step="0.01" class="form-control form-control-sm text-end" @bind="ODModel.ODAmt" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small mb-1">Overdraft Rate (%)</label>
+                        <input type="number" step="0.01" class="form-control form-control-sm text-end" @bind="ODModel.ODRate" />
+                    </div>
+                }
+            </div>
+            <div class="modal-footer border-top py-2 px-3 bg-light d-flex justify-content-end gap-2" style="flex-shrink: 0;">
+                <button type="button" class="btn btn-secondary btn-sm px-3" @onclick="() => ShowODModal = false">
+                    <i class="fas fa-times me-1"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-warning btn-sm px-3 text-dark fw-semibold" @onclick="SaveOD" disabled="@IsSaving">
+                    @if (IsSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    <i class="fas fa-check me-1"></i> Update OD
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- CONTEXT MENUS (Windows 11 Style)                                    -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<ContextMenu Id="bankNodeMenu" Template="Win11Style">
+    <Item OnClick="@((e) => OpenAddBranchForBank(e.Data as string))">
+        <i class="fas fa-plus fa-fw win11-icon text-primary"></i> Add Another Branch to this Bank
+    </Item>
+</ContextMenu>
+
+<ContextMenu Id="branchNodeMenu" Template="Win11Style">
+    <Item OnClick="@((e) => { var b = e.Data as BankBranchRecord; if(b != null) OpenAddAccountModal(b.BankID); })">
+        <i class="fas fa-plus-circle fa-fw win11-icon text-success"></i> Add Bank Account to this Branch
+    </Item>
+    <Item OnClick="@((e) => { var b = e.Data as BankBranchRecord; if(b != null) OpenEditBranchModal(b); })">
+        <i class="fas fa-pencil-alt fa-fw win11-icon text-secondary"></i> Edit Branch Details
+    </Item>
+    <Seperator />
+    <Item OnClick="@((e) => { var b = e.Data as BankBranchRecord; if(b != null) OpenDeleteBranchConfirm(b); })">
+        <i class="fas fa-trash fa-fw win11-icon text-danger"></i> Delete Branch
+    </Item>
+</ContextMenu>
+
+<ContextMenu Id="accountNodeMenu" Template="Win11Style">
+    <Item OnClick="@((e) => { var a = e.Data as BankAccountItem; if(a != null) OpenEditAccountModal(a); })">
+        <i class="fas fa-pencil-alt fa-fw win11-icon text-secondary"></i> Edit Account
+    </Item>
+    <Item OnClick="@((e) => { var a = e.Data as BankAccountItem; if(a != null) SetAsDefault(a.AccNo); })">
+        <i class="fas fa-star fa-fw win11-icon text-warning"></i> Set as Default Bank
+    </Item>
+    <Item OnClick="@((e) => { var a = e.Data as BankAccountItem; if(a != null) OpenODModal(a); })">
+        <i class="fas fa-shield-alt fa-fw win11-icon text-primary"></i> Configure Overdraft
+    </Item>
+    <Seperator />
+    <Item OnClick="@((e) => GoToChequeBooks())">
+        <i class="fas fa-book-bookmark fa-fw win11-icon text-info"></i> View Cheque Books
+    </Item>
+    <Seperator />
+    <Item OnClick="@((e) => { var a = e.Data as BankAccountItem; if(a != null) OpenDeleteAccountConfirm(a); })">
+        <i class="fas fa-trash fa-fw win11-icon text-danger"></i> Delete Account
+    </Item>
+</ContextMenu>

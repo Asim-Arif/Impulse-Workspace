@@ -4,49 +4,62 @@
 
 <div class="row g-3">
 
-    <!-- ── Row 1: GD, Custom Date, Gate Pass ─────────────────────── -->
-    <div class="col-md-3">
-        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">GD No.</label>
-        <input type="text" class="form-control form-control-sm" @bind="Invoice.GDNo" />
-    </div>
-    <div class="col-md-3">
-        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Custom DT</label>
-        <input type="date" class="form-control form-control-sm" @bind="Invoice.CustomDT" />
-    </div>
-    <div class="col-md-2">
-        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Gate Pass No.</label>
-        <input type="text" class="form-control form-control-sm" @bind="Invoice.GatePassNo" />
-    </div>
-    <div class="col-md-2">
-        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Gate Pass DT</label>
-        <input type="date" class="form-control form-control-sm" @bind="Invoice.GatePassDT" />
-    </div>
-    <div class="col-md-2">
-        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Gross Weight</label>
-        <input type="number" step="0.01" class="form-control form-control-sm" @bind="Invoice.GrossWeight" />
-    </div>
-    <div class="col-md-2">
-        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Total Cartons</label>
-        <input type="number" class="form-control form-control-sm" @bind="Invoice.TotalCartons" />
-    </div>
-
-    <!-- ── Row 2: Checkboxes ──────────────────────────────────────── -->
-    <div class="col-12 d-flex gap-4 flex-wrap">
-        <div class="form-check">
-            <input class="form-check-input" type="checkbox" @bind="Invoice.NoSRO" id="chkNoSRO">
-            <label class="form-check-label fw-bold text-secondary" for="chkNoSRO" style="font-size: 0.85rem;">No SRO</label>
-        </div>
-        <div class="form-check">
-            <input class="form-check-input" type="checkbox" @bind="Invoice.CIFTradeTerms" id="chkCIF">
-            <label class="form-check-label fw-bold text-secondary" for="chkCIF" style="font-size: 0.85rem;">CIF Trade Terms</label>
-        </div>
-        <div class="form-check">
-            <input class="form-check-input" type="checkbox" @bind="Invoice.SampleInvoice" id="chkSample">
-            <label class="form-check-label fw-bold text-secondary" for="chkSample" style="font-size: 0.85rem;">Sample Invoice</label>
-        </div>
-        <div class="form-check">
-            <input class="form-check-input" type="checkbox" @bind="Invoice.FreeSamples" id="chkFreeSamples">
-            <label class="form-check-label fw-bold text-secondary" for="chkFreeSamples" style="font-size: 0.85rem;">Free Samples</label>
+    <!-- ── Top Customs & Gate Info Card ── -->
+    <div class="col-12">
+        <div class="card border-0 shadow-sm" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0 !important;">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 pb-2 mb-3 border-bottom">
+                    <div class="d-flex align-items-center justify-content-center rounded-2" style="width: 28px; height: 28px; background: #e0f2fe; color: #0284c7;">
+                        <i class="fas fa-file-invoice" style="font-size: 0.85rem;"></i>
+                    </div>
+                    <span class="fw-bold text-dark" style="font-size: 0.88rem;">Customs &amp; Dispatch Info</span>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">GD No.</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Invoice.GDNo" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Custom DT</label>
+                        <input type="date" class="form-control form-control-sm" @bind="Invoice.CustomDT" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Gate Pass No.</label>
+                        <input type="text" class="form-control form-control-sm" @bind="Invoice.GatePassNo" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Gate Pass DT</label>
+                        <input type="date" class="form-control form-control-sm" @bind="Invoice.GatePassDT" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Gross Weight</label>
+                        <input type="number" step="0.01" class="form-control form-control-sm" @bind="Invoice.GrossWeight" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Total Cartons</label>
+                        <input type="number" class="form-control form-control-sm" @bind="Invoice.TotalCartons" />
+                    </div>
+                </div>
+                <!-- Checkboxes -->
+                <div class="d-flex gap-4 flex-wrap pt-2 border-top">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" @bind="Invoice.NoSRO" id="chkNoSRO">
+                        <label class="form-check-label fw-bold text-secondary small" for="chkNoSRO">No SRO</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" @bind="Invoice.CIFTradeTerms" id="chkCIF">
+                        <label class="form-check-label fw-bold text-secondary small" for="chkCIF">CIF Trade Terms</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" @bind="Invoice.SampleInvoice" id="chkSample">
+                        <label class="form-check-label fw-bold text-secondary small" for="chkSample">Sample Invoice</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" @bind="Invoice.FreeSamples" id="chkFreeSamples">
+                        <label class="form-check-label fw-bold text-secondary small" for="chkFreeSamples">Free Samples</label>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -54,11 +67,14 @@
     <div class="col-md-6">
 
         <!-- Port of Loading -->
-        <div class="card mb-3 border" style="border-radius:8px;">
-            <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; font-size:0.8rem; border-radius:8px 8px 0 0;">
-                <i class="fas fa-anchor me-1 text-primary"></i> Port of Loading
-            </div>
-            <div class="card-body py-2">
+        <div class="card border-0 shadow-sm mb-3" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0 !important;">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 pb-2 mb-3 border-bottom">
+                    <div class="d-flex align-items-center justify-content-center rounded-2" style="width: 28px; height: 28px; background: #e0f2fe; color: #0284c7;">
+                        <i class="fas fa-anchor" style="font-size: 0.85rem;"></i>
+                    </div>
+                    <span class="fw-bold text-dark" style="font-size: 0.88rem;">Port of Loading</span>
+                </div>
                 <div class="row g-2">
                     <div class="col-12">
                         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Country</label>
@@ -94,11 +110,14 @@
         </div>
 
         <!-- Port of Discharge -->
-        <div class="card mb-3 border" style="border-radius:8px;">
-            <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; font-size:0.8rem; border-radius:8px 8px 0 0;">
-                <i class="fas fa-ship me-1 text-primary"></i> Port of Discharge
-            </div>
-            <div class="card-body py-2">
+        <div class="card border-0 shadow-sm mb-3" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0 !important;">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 pb-2 mb-3 border-bottom">
+                    <div class="d-flex align-items-center justify-content-center rounded-2" style="width: 28px; height: 28px; background: #e0f2fe; color: #0284c7;">
+                        <i class="fas fa-ship" style="font-size: 0.85rem;"></i>
+                    </div>
+                    <span class="fw-bold text-dark" style="font-size: 0.88rem;">Port of Discharge</span>
+                </div>
                 <div class="row g-2">
                     <div class="col-12">
                         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Country</label>
@@ -151,11 +170,14 @@
         </div>
 
         <!-- Shipping Details -->
-        <div class="card mb-3 border border-primary-subtle" style="border-radius:8px;">
-            <div class="card-header bg-primary-subtle text-primary-emphasis fw-bold py-2" style="font-size: 0.85rem;">
-                <i class="fas fa-ship me-1"></i> Shipping Details
-            </div>
-            <div class="card-body py-2">
+        <div class="card border-0 shadow-sm mb-3" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0 !important;">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 pb-2 mb-3 border-bottom">
+                    <div class="d-flex align-items-center justify-content-center rounded-2" style="width: 28px; height: 28px; background: #ede9fe; color: #7c3aed;">
+                        <i class="fas fa-dolly" style="font-size: 0.85rem;"></i>
+                    </div>
+                    <span class="fw-bold text-dark" style="font-size: 0.88rem;">Shipping Details</span>
+                </div>
                 <div class="row g-2">
                     <div class="col-md-6">
                         <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Trade Terms</label>
@@ -220,11 +242,14 @@
     <div class="col-md-6">
 
         <!-- Banking & Agents -->
-        <div class="card mb-3 border border-info-subtle" style="border-radius:8px;">
-            <div class="card-header bg-info-subtle text-info-emphasis fw-bold py-2" style="font-size: 0.85rem;">
-                <i class="fas fa-university me-1"></i> Banking &amp; Agents
-            </div>
-            <div class="card-body py-2">
+        <div class="card border-0 shadow-sm mb-3" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0 !important;">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 pb-2 mb-3 border-bottom">
+                    <div class="d-flex align-items-center justify-content-center rounded-2" style="width: 28px; height: 28px; background: #dcfce7; color: #16a34a;">
+                        <i class="fas fa-university" style="font-size: 0.85rem;"></i>
+                    </div>
+                    <span class="fw-bold text-dark" style="font-size: 0.88rem;">Banking &amp; Agents</span>
+                </div>
                 <div class="row g-2">
                     <div class="col-12">
                         <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Our Bank</label>
@@ -285,21 +310,27 @@
         </div>
 
         <!-- Consignee / Bank Address -->
-        <div class="card mb-3 border" style="border-radius:8px;">
-            <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; font-size:0.8rem; border-radius:8px 8px 0 0;">
-                <i class="fas fa-building me-1 text-primary"></i> Consignee (Bank Address)
-            </div>
-            <div class="card-body py-2">
+        <div class="card border-0 shadow-sm mb-3" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0 !important;">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 pb-2 mb-3 border-bottom">
+                    <div class="d-flex align-items-center justify-content-center rounded-2" style="width: 28px; height: 28px; background: #f1f5f9; color: #475569;">
+                        <i class="fas fa-building" style="font-size: 0.85rem;"></i>
+                    </div>
+                    <span class="fw-bold text-dark" style="font-size: 0.88rem;">Consignee (Bank Address)</span>
+                </div>
                 <textarea class="form-control form-control-sm" @bind="Invoice.Consignee" rows="3"></textarea>
             </div>
         </div>
 
         <!-- Invoice Of / Invoice Description / DTRE Description -->
-        <div class="card mb-3 border" style="border-radius:8px;">
-            <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; font-size:0.8rem; border-radius:8px 8px 0 0;">
-                <i class="fas fa-file-alt me-1 text-primary"></i> Invoice Details
-            </div>
-            <div class="card-body py-2">
+        <div class="card border-0 shadow-sm mb-3" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0 !important;">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 pb-2 mb-3 border-bottom">
+                    <div class="d-flex align-items-center justify-content-center rounded-2" style="width: 28px; height: 28px; background: #fef3c7; color: #d97706;">
+                        <i class="fas fa-file-alt" style="font-size: 0.85rem;"></i>
+                    </div>
+                    <span class="fw-bold text-dark" style="font-size: 0.88rem;">Invoice Details</span>
+                </div>
                 <div class="row g-2">
                     <div class="col-12">
                         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Invoice Of</label>
@@ -318,27 +349,18 @@
         </div>
 
         <!-- Declarations -->
-        <div class="card mb-3 border" style="border-radius:8px;">
-            <div class="card-header py-2 fw-bold text-secondary" style="background:#eef0f7; font-size:0.8rem; border-radius:8px 8px 0 0;">
-                <i class="fas fa-scroll me-1 text-warning"></i> Declarations
-            </div>
-            <div class="card-body py-2">
+        <div class="card border-0 shadow-sm mb-3" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0 !important;">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 pb-2 mb-3 border-bottom">
+                    <div class="d-flex align-items-center justify-content-center rounded-2" style="width: 28px; height: 28px; background: #ffedd5; color: #ea580c;">
+                        <i class="fas fa-scroll" style="font-size: 0.85rem;"></i>
+                    </div>
+                    <span class="fw-bold text-dark" style="font-size: 0.88rem;">Declarations</span>
+                </div>
                 <div class="row g-2">
                     <div class="col-12">
-                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Footballs</label>
-                        <textarea class="form-control form-control-sm" @bind="Invoice.DeclarationsBalls" rows="2"></textarea>
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Garments</label>
-                        <textarea class="form-control form-control-sm" @bind="Invoice.DeclarationsGarments" rows="2"></textarea>
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Gloves</label>
-                        <textarea class="form-control form-control-sm" @bind="Invoice.DeclarationsGloves" rows="2"></textarea>
-                    </div>
-                    <div class="col-12">
                         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.78rem;">Manual Declaration</label>
-                        <textarea class="form-control form-control-sm" @bind="Invoice.ManDeclaration" rows="2"></textarea>
+                        <textarea class="form-control form-control-sm" @bind="Invoice.ManDeclaration" rows="3"></textarea>
                     </div>
                 </div>
             </div>

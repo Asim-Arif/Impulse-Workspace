@@ -34,6 +34,24 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string Message { get; set; } = string.Empty;
     }
 
+    public class DeleteDispatchResult
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
+
+    public class DispatchLotRevertRecord
+    {
+        public long VRD_RefID { get; set; }
+        public int Qty { get; set; }
+    }
+
+    public class DispatchItemRevertRecord
+    {
+        public string ItemCode { get; set; } = string.Empty;
+        public decimal Qty { get; set; }
+    }
+
     public class EditDispatchListHeaderDto
     {
         public long EntryID { get; set; }

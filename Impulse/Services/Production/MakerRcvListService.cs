@@ -45,6 +45,9 @@ namespace Impulse.Services.Production
         public Task<InspectionDataDto> GetInspectionDataAsync(long vrdEntryId) => _dataAccess.GetInspectionDataAsync(vrdEntryId);
         public Task<List<InspectionParameterItem>> GetProcessInspectionParametersAsync(int processId) => _dataAccess.GetProcessInspectionParametersAsync(processId);
         public Task<bool> SaveInspectionDataAsync(SaveInspectionRequest request) => _dataAccess.SaveInspectionDataAsync(request);
+
+        // Rejection Gate-Pass
+        public Task<long> GetRejectionGatePassWastageCountAsync(IEnumerable<long> vendReceivedEntryIds) => _dataAccess.GetRejectionGatePassWastageCountAsync(vendReceivedEntryIds);
     }
 }
 

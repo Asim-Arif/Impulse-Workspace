@@ -94,4 +94,24 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string LotNo { get; set; } = string.Empty;
         public string Remarks { get; set; } = string.Empty;
     }
+
+    public class PlannedSFLotAllocationModel
+    {
+        public int EntryID { get; set; }
+        public string OrderNo { get; set; } = string.Empty;
+        public string ItemID { get; set; } = string.Empty;
+        public string ItemName { get; set; } = string.Empty;
+        public int SOO_RefID { get; set; }
+        public int ProcessID { get; set; }
+        public string ProcessName { get; set; } = string.Empty;
+        public string LotNo { get; set; } = string.Empty;
+        public string BatchNo { get; set; } = string.Empty;
+        public int Shelf_RefID { get; set; }
+        public string StoreLocation { get; set; } = string.Empty;
+        public int AllocatedQty { get; set; }
+        public int IssuedQty { get; set; }
+        public int RemainingToIssue => Math.Max(0, AllocatedQty - IssuedQty);
+        public string DisplayText => $"[{ItemID}] {ItemName} | Lot: {LotNo} | Loc: {StoreLocation} | Planned: {AllocatedQty:N0} pcs (Rem: {RemainingToIssue:N0} pcs)";
+    }
 }
+

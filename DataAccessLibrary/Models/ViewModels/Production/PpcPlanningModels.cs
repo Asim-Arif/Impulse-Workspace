@@ -49,21 +49,28 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public int OrderQty { get; set; }
         public bool Authorized { get; set; } = true;
         public int AuthorizedQty { get; set; }
+        public bool IsSavedPlan { get; set; } = false;
         private bool _isPlanned;
         public bool IsPlanned
         {
-            get => _isPlanned || StockQty > 0 || Purchases.Any(p => p.PurchaseQty > 0 && p.ProcessID > 0);
+            get => _isPlanned || IsSavedPlan || StockQty > 0 || SFStockQty > 0 || Purchases.Any(p => p.PurchaseQty > 0 && p.ProcessID > 0);
             set => _isPlanned = value;
         }
         public int AvailableInHandStock { get; set; }
 
-        // 1. Stock Allocation
+        // 1. Stock Allocation (Finish Stock)
         public int StockQty { get; set; }
 
-        // 2. Multiple Purchase Allocations per Item
+        // 2. Semi-Finished (SF) Stock Allocation
+        public int SFStockQty => SFStockAllocations.Sum(a => a.AllocatedQty);
+        public int AvailableSFStock => AvailableSFLots.Sum(l => l.AvailableQty);
+        public List<PpcItemSFLotDto> AvailableSFLots { get; set; } = new();
+        public List<PpcItemSFAllocationDto> SFStockAllocations { get; set; } = new();
+
+        // 3. Multiple Purchase Allocations per Item
         public List<PpcItemPurchaseAllocationDto> Purchases { get; set; } = new();
 
-        // 3. Manufacturing Hubs & Schedules
+        // 4. Manufacturing Hubs & Schedules
         public int GroupID { get; set; }
         public string GroupName { get; set; } = string.Empty;
         public List<PpcItemHubScheduleDto> HubSchedules { get; set; } = new();
@@ -73,9 +80,36 @@ namespace DataAccessLibrary.Models.ViewModels.Production
 
         // Derived Properties
         public int TotalPurchaseQty => Purchases.Sum(p => p.PurchaseQty);
-        public int ProductionQty => Math.Max(0, OrderQty - StockQty - TotalPurchaseQty);
-        public int TotalPlannedQty => StockQty + TotalPurchaseQty + ProductionQty;
-        public bool IsBalanced => (StockQty + TotalPurchaseQty + ProductionQty) == OrderQty;
+        public int ProductionQty => Math.Max(0, OrderQty - StockQty - SFStockQty - TotalPurchaseQty);
+        public int TotalPlannedQty => StockQty + SFStockQty + TotalPurchaseQty + ProductionQty;
+        public bool IsBalanced => (StockQty + SFStockQty + TotalPurchaseQty + ProductionQty) == OrderQty;
+    }
+
+    public class PpcItemSFLotDto
+    {
+        public int EntryID { get; set; }
+        public string ItemID { get; set; } = string.Empty;
+        public int ProcessID { get; set; }
+        public string ProcessName { get; set; } = string.Empty;
+        public string LotNo { get; set; } = string.Empty;
+        public string BatchNo { get; set; } = string.Empty;
+        public int Shelf_RefID { get; set; }
+        public string StoreLocation { get; set; } = string.Empty;
+        public int AvailableQty { get; set; }
+    }
+
+    public class PpcItemSFAllocationDto
+    {
+        public int EntryID { get; set; }
+        public int SOO_RefID { get; set; }
+        public int ProcessID { get; set; }
+        public string ProcessName { get; set; } = string.Empty;
+        public string LotNo { get; set; } = string.Empty;
+        public string BatchNo { get; set; } = string.Empty;
+        public int Shelf_RefID { get; set; }
+        public string StoreLocation { get; set; } = string.Empty;
+        public int AvailableQty { get; set; }
+        public int AllocatedQty { get; set; }
     }
 
     public class PpcItemPurchaseAllocationDto

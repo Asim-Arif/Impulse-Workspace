@@ -31,7 +31,7 @@
                                     @onclick="() => SetTab(0)">
                                 <i class="fas fa-list-check me-1"></i> Lots Finalyzed
                                 <span class="badge @(ActiveTab == 0 ? "bg-light text-primary" : "bg-secondary text-white") ms-1">
-                                    @AvailableLots.Count
+                                    @DisplayedAvailableLots.Count
                                 </span>
                             </button>
                         </li>
@@ -248,7 +248,7 @@
                                         </td>
                                     </tr>
                                 }
-                                else if (!AvailableLots.Any())
+                                else if (!DisplayedAvailableLots.Any())
                                 {
                                     <tr>
                                         <td colspan="10" class="text-center py-4 text-muted">
@@ -260,8 +260,9 @@
                                 else
                                 {
                                     int idx = 1;
-                                    @foreach (var item in AvailableLots)
+                                    @foreach (var item in DisplayedAvailableLots)
                                     {
+                                        decimal effectiveAvail = GetEffectiveAvailQty(item);
                                         <tr class="@(item.IsSelected ? "table-primary table-active" : "")">
                                             <td class="text-center" @onclick:stopPropagation="true">
                                                 <input class="form-check-input" type="checkbox" @bind="item.IsSelected" @bind:after="OnSelectionChanged" />
@@ -272,12 +273,12 @@
                                             <td>@item.DT.ToString("dd-MMM-yyyy")</td>
                                             <td><span class="badge bg-info text-dark">@item.Description</span></td>
                                             <td>@item.FullArticle</td>
-                                            <td class="text-center fw-bold text-success">@item.AvailQty.ToString("N0")</td>
+                                            <td class="text-center fw-bold text-success">@effectiveAvail.ToString("N0")</td>
                                             <td class="text-center" @onclick:stopPropagation="true">
                                                 <input type="number" class="form-control form-control-sm text-center py-0"
                                                        @bind="item.DispatchQty"
                                                        @bind:after="OnSelectionChanged"
-                                                       max="@item.AvailQty"
+                                                       max="@effectiveAvail"
                                                        min="1"
                                                        style="max-width: 95px; margin: 0 auto;" />
                                             </td>

@@ -195,7 +195,6 @@
                                     <th>Process</th>
                                     <th class="text-end">Rcvd Qty</th>
                                     <th class="text-end" style="width: 100px;">Wastage</th>
-                                    <th class="text-end" style="width: 90px;">Lost Qty</th>
                                     <th class="text-end" style="width: 100px;">Rework Qty</th>
                                     <th class="text-end">Repair Amt</th>
                                     <th class="text-center" style="width: 110px;">Actions</th>
@@ -229,14 +228,6 @@
                                                     @item.WastageBreakdowns.Count
                                                 </span>
                                             </div>
-                                        </td>
-
-                                        <!-- LOST QTY -->
-                                        <td class="text-end">
-                                            <input type="number" class="form-control form-control-sm text-end fw-bold text-warning-emphasis py-0"
-                                                   style="height: 28px; width: 65px;"
-                                                   @bind="item.LostQty"
-                                                   min="0" />
                                         </td>
 
                                         <!-- REWORK QTY (100% LOCKED FOR DIRECT INPUT / CLICK OPENS MODAL) -->
@@ -276,7 +267,7 @@
                                 @if (!PendingItems.Any() && !IsLoading)
                                 {
                                     <tr>
-                                        <td colspan="14" class="text-center text-muted py-5">
+                                        <td colspan="13" class="text-center text-muted py-5">
                                             <i class="fas fa-check-circle text-success me-1" style="font-size: 2rem;"></i>
                                             <div class="mt-2 fw-semibold">No Received Entries Pending Authorization</div>
                                             <div class="small">All received lot entries are currently authorized.</div>

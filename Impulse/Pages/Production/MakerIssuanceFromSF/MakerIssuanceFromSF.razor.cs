@@ -45,8 +45,21 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
         public bool IsDirectorOrAdmin { get; set; } = false;
         public string CurrentUserName { get; set; } = "System";
 
+        [Parameter]
+        public string? OrderNo { get; set; }
+
+        [SupplyParameterFromQuery(Name = "orderNo")]
+        public string? QueryOrderNo { get; set; }
+
         [SupplyParameterFromQuery(Name = "returnUrl")]
         public string? ReturnUrl { get; set; }
+
+        public string? EffectiveOrderNo => !string.IsNullOrWhiteSpace(OrderNo) ? OrderNo : QueryOrderNo;
+
+        public bool IsPlannedOrderMode { get; set; } = false;
+        public List<PlannedSFLotAllocationModel> PlannedAllocations { get; set; } = new();
+        public PlannedSFLotAllocationModel? SelectedPlannedAllocation { get; set; }
+        public int TotalPlannedRemaining => PlannedAllocations.Sum(p => p.RemainingToIssue);
 
         public void NavigateBack()
         {
@@ -190,6 +203,145 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
             }
 
             await LoadInitialLookupsAsync();
+
+            if (!string.IsNullOrWhiteSpace(EffectiveOrderNo))
+            {
+                await SetupPlannedOrderModeAsync(EffectiveOrderNo);
+            }
+        }
+
+        protected override async Task OnParametersSetAsync()
+        {
+            if (!string.IsNullOrWhiteSpace(EffectiveOrderNo) &&
+                (!IsPlannedOrderMode || !string.Equals(SelectedOrder?.OrderNo, EffectiveOrderNo, StringComparison.OrdinalIgnoreCase)))
+            {
+                if (Processes.Any())
+                {
+                    await SetupPlannedOrderModeAsync(EffectiveOrderNo);
+                }
+            }
+        }
+
+        public async Task SetupPlannedOrderModeAsync(string orderNo)
+        {
+            try
+            {
+                PlannedAllocations = await SFIssuanceService.GetPlannedSFAllocationsForOrderAsync(orderNo);
+                if (PlannedAllocations.Any())
+                {
+                    IsPlannedOrderMode = true;
+
+                    // 1. Lock/Pre-select Order
+                    SelectedOrder = new UnshippedOrderLookupModel
+                    {
+                        OrderNo = orderNo,
+                        InternalRefNo = ""
+                    };
+                    UnshippedOrders = new List<UnshippedOrderLookupModel> { SelectedOrder };
+
+                    // 2. Filter available SF items to ONLY the planned items
+                    var plannedItemIds = PlannedAllocations.Select(p => p.ItemID).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                    var matchedItems = AvailableSFItems
+                        .Where(i => plannedItemIds.Contains(i.ItemID, StringComparer.OrdinalIgnoreCase))
+                        .ToList();
+
+                    foreach (var alloc in PlannedAllocations)
+                    {
+                        if (!matchedItems.Any(i => i.ItemID.Equals(alloc.ItemID, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            matchedItems.Add(new SFStockItemLookupModel
+                            {
+                                ItemID = alloc.ItemID,
+                                ItemName = alloc.ItemName
+                            });
+                        }
+                    }
+                    AvailableSFItems = matchedItems;
+
+                    // 3. Pre-select active allocation (prefer remaining > 0)
+                    var activeAlloc = PlannedAllocations.FirstOrDefault(p => p.RemainingToIssue > 0)
+                                      ?? PlannedAllocations.First();
+                    SelectedPlannedAllocation = activeAlloc;
+
+                    await ApplyPlannedAllocationAsync(activeAlloc);
+
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Info,
+                        Summary = "PPC Plan Mode Active",
+                        Detail = $"Order #{orderNo} planned SF stock pre-selected. [{activeAlloc.ItemID}] in {activeAlloc.ProcessName} at {activeAlloc.StoreLocation} ({activeAlloc.RemainingToIssue} pcs remaining).",
+                        Duration = 6000
+                    });
+                }
+                else
+                {
+                    IsPlannedOrderMode = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error setting up planned order mode: {ex.Message}");
+            }
+        }
+
+        public async Task ApplyPlannedAllocationAsync(PlannedSFLotAllocationModel alloc)
+        {
+            SelectedPlannedAllocation = alloc;
+
+            // 1. Item
+            _selectedItem = AvailableSFItems.FirstOrDefault(i => i.ItemID.Equals(alloc.ItemID, StringComparison.OrdinalIgnoreCase))
+                            ?? new SFStockItemLookupModel { ItemID = alloc.ItemID, ItemName = alloc.ItemName };
+            Header.ItemID = _selectedItem.ItemID;
+
+            // 2. Process
+            _selectedProcess = Processes.FirstOrDefault(p => p.ProcessID == alloc.ProcessID);
+            _selectedReturnProcess = _selectedProcess;
+            if (_selectedProcess != null)
+            {
+                Header.ProcessID = _selectedProcess.ProcessID;
+                Makers = await MakerPOService.GetMakersForProcessAsync(_selectedProcess.ProcessID);
+            }
+
+            // 3. Stock Location - restrict strictly to the planned lot & store
+            var allLocations = await SFIssuanceService.GetStockOpeningLocationsForItemAsync(alloc.ItemID, alloc.ProcessID);
+            OpeningLocations = allLocations.Where(l => l.EntryID == alloc.SOO_RefID).ToList();
+            if (!OpeningLocations.Any())
+            {
+                OpeningLocations = new List<SFStockOpeningLocationModel>
+                {
+                    new SFStockOpeningLocationModel
+                    {
+                        EntryID = alloc.SOO_RefID,
+                        ItemID = alloc.ItemID,
+                        ProcessID = alloc.ProcessID,
+                        Shelf_RefID = alloc.Shelf_RefID,
+                        StoreName = alloc.StoreLocation,
+                        LotNo = alloc.LotNo,
+                        InHandQty = alloc.AllocatedQty
+                    }
+                };
+            }
+            SelectedLocation = OpeningLocations.FirstOrDefault(l => l.EntryID == alloc.SOO_RefID) ?? OpeningLocations.FirstOrDefault();
+
+            // 4. Quantity to issue
+            var alreadyStaged = StagedLines.Where(l => l.OpeningEntryID == alloc.SOO_RefID && l.OrderNo == alloc.OrderNo).Sum(l => l.IssQty);
+            LineIssQty = Math.Max(0, alloc.RemainingToIssue - alreadyStaged);
+            LineRemarks = $"PPC Plan Order #{alloc.OrderNo} - Lot {alloc.LotNo} (Batch: {alloc.BatchNo})";
+
+            await RefreshLineRateAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+
+        public async Task OnPlannedAllocationSelectChange(ChangeEventArgs e)
+        {
+            if (int.TryParse(e.Value?.ToString(), out int allocId))
+            {
+                var alloc = PlannedAllocations.FirstOrDefault(p => p.EntryID == allocId);
+                if (alloc != null)
+                {
+                    await ApplyPlannedAllocationAsync(alloc);
+                }
+            }
         }
 
         private async Task LoadInitialLookupsAsync()
@@ -293,7 +445,10 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
         {
             _selectedMaker = null;
             Makers.Clear();
-            SelectedItem = null;
+            if (!IsPlannedOrderMode)
+            {
+                SelectedItem = null;
+            }
 
             if (process != null)
             {
@@ -305,10 +460,13 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
                 Makers = await MakerPOService.GetMakersForProcessAsync(process.ProcessID);
             }
 
-            int procId = SelectedProcess?.ProcessID ?? 0;
-            long vendId = SelectedMaker?.VendID ?? 0;
-            int retProcId = SelectedReturnProcess?.ProcessID ?? 0;
-            AvailableSFItems = await SFIssuanceService.GetAvailableSFItemsAsync(procId, vendId, retProcId);
+            if (!IsPlannedOrderMode)
+            {
+                int procId = SelectedProcess?.ProcessID ?? 0;
+                long vendId = SelectedMaker?.VendID ?? 0;
+                int retProcId = SelectedReturnProcess?.ProcessID ?? 0;
+                AvailableSFItems = await SFIssuanceService.GetAvailableSFItemsAsync(procId, vendId, retProcId);
+            }
 
             await RefreshLineRateAsync();
             await InvokeAsync(StateHasChanged);
@@ -316,10 +474,13 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
 
         private async Task OnReturnProcessChangedAsync(ProcessPOLookupModel? returnProcess)
         {
-            int procId = SelectedProcess?.ProcessID ?? 0;
-            long vendId = SelectedMaker?.VendID ?? 0;
-            int retProcId = returnProcess?.ProcessID ?? 0;
-            AvailableSFItems = await SFIssuanceService.GetAvailableSFItemsAsync(procId, vendId, retProcId);
+            if (!IsPlannedOrderMode)
+            {
+                int procId = SelectedProcess?.ProcessID ?? 0;
+                long vendId = SelectedMaker?.VendID ?? 0;
+                int retProcId = returnProcess?.ProcessID ?? 0;
+                AvailableSFItems = await SFIssuanceService.GetAvailableSFItemsAsync(procId, vendId, retProcId);
+            }
 
             await RefreshLineRateAsync();
             await InvokeAsync(StateHasChanged);
@@ -329,7 +490,11 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
         {
             MakerBalances.Clear();
             MakerHistory.Clear();
-            SelectedItem = null;
+
+            if (!IsPlannedOrderMode)
+            {
+                SelectedItem = null;
+            }
 
             if (maker != null)
             {
@@ -338,10 +503,13 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
                 MakerHistory = await MakerPOService.GetMakerIssuanceHistoryAsync(maker.VendID);
             }
 
-            int procId = SelectedProcess?.ProcessID ?? 0;
-            long vendId = SelectedMaker?.VendID ?? 0;
-            int retProcId = SelectedReturnProcess?.ProcessID ?? 0;
-            AvailableSFItems = await SFIssuanceService.GetAvailableSFItemsAsync(procId, vendId, retProcId);
+            if (!IsPlannedOrderMode)
+            {
+                int procId = SelectedProcess?.ProcessID ?? 0;
+                long vendId = SelectedMaker?.VendID ?? 0;
+                int retProcId = SelectedReturnProcess?.ProcessID ?? 0;
+                AvailableSFItems = await SFIssuanceService.GetAvailableSFItemsAsync(procId, vendId, retProcId);
+            }
 
             await RefreshLineRateAsync();
             await InvokeAsync(StateHasChanged);
@@ -350,14 +518,26 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
         private async Task OnItemChangedAsync(SFStockItemLookupModel? item)
         {
             OpeningLocations.Clear();
-            UnshippedOrders.Clear();
             SelectedLocation = null;
-            SelectedOrder = null;
 
             if (item != null)
             {
                 Header.ItemID = item.ItemID;
                 int procId = SelectedProcess?.ProcessID ?? 0;
+
+                if (IsPlannedOrderMode)
+                {
+                    var itemAlloc = PlannedAllocations.FirstOrDefault(p => p.ItemID.Equals(item.ItemID, StringComparison.OrdinalIgnoreCase) && p.RemainingToIssue > 0)
+                                    ?? PlannedAllocations.FirstOrDefault(p => p.ItemID.Equals(item.ItemID, StringComparison.OrdinalIgnoreCase));
+                    if (itemAlloc != null)
+                    {
+                        await ApplyPlannedAllocationAsync(itemAlloc);
+                        return;
+                    }
+                }
+
+                UnshippedOrders.Clear();
+                SelectedOrder = null;
                 OpeningLocations = await SFIssuanceService.GetStockOpeningLocationsForItemAsync(item.ItemID, procId);
                 UnshippedOrders = await SFIssuanceService.GetUnshippedOrdersForItemAsync(item.ItemID);
 
@@ -497,6 +677,23 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
                 return;
             }
 
+            if (IsPlannedOrderMode && SelectedPlannedAllocation != null)
+            {
+                var alreadyStaged = StagedLines.Where(l => l.OpeningEntryID == SelectedLocation.EntryID && l.OrderNo == EffectiveOrderNo).Sum(l => l.IssQty);
+                var remainingAllowed = SelectedPlannedAllocation.RemainingToIssue - (int)alreadyStaged;
+                if (LineIssQty > remainingAllowed)
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Warning,
+                        Summary = "Quantity Exceeds Plan",
+                        Detail = $"Entered Qty ({LineIssQty:N0}) exceeds remaining planned allocation ({remainingAllowed:N0} pcs) for Order #{EffectiveOrderNo}.",
+                        Duration = 5000
+                    });
+                    return;
+                }
+            }
+
             var line = new StagedSFIssuanceItemModel
             {
                 LineNo = StagedLines.Count + 1,
@@ -515,7 +712,16 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
 
             StagedLines.Add(line);
             LineIssQty = 0;
-            SelectedLocation = null;
+            if (!IsPlannedOrderMode)
+            {
+                SelectedLocation = null;
+            }
+            else
+            {
+                var alreadyStaged = StagedLines.Where(l => l.OpeningEntryID == SelectedLocation.EntryID && l.OrderNo == EffectiveOrderNo).Sum(l => l.IssQty);
+                var rem = Math.Max(0, (SelectedPlannedAllocation?.RemainingToIssue ?? 0) - (int)alreadyStaged);
+                LineIssQty = rem;
+            }
 
             NotificationService.Notify(new Radzen.NotificationMessage
             {
@@ -534,15 +740,27 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
             {
                 l.LineNo = idx++;
             }
+            if (IsPlannedOrderMode && SelectedPlannedAllocation != null)
+            {
+                var alreadyStaged = StagedLines.Where(l => l.OpeningEntryID == SelectedPlannedAllocation.SOO_RefID && l.OrderNo == EffectiveOrderNo).Sum(l => l.IssQty);
+                LineIssQty = Math.Max(0, SelectedPlannedAllocation.RemainingToIssue - (int)alreadyStaged);
+            }
         }
 
         public void ClearForm()
         {
             StagedLines.Clear();
-            SelectedItem = null;
-            SelectedLocation = null;
-            SelectedOrder = null;
-            Header = new CreateSFIssuanceHeaderModel();
+            if (!IsPlannedOrderMode)
+            {
+                SelectedItem = null;
+                SelectedLocation = null;
+                SelectedOrder = null;
+                Header = new CreateSFIssuanceHeaderModel();
+            }
+            else if (SelectedPlannedAllocation != null)
+            {
+                _ = ApplyPlannedAllocationAsync(SelectedPlannedAllocation);
+            }
         }
 
         public async Task SaveSFIssuance()
@@ -634,6 +852,11 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
                 }
 
                 ClearForm();
+
+                if (IsPlannedOrderMode && !string.IsNullOrWhiteSpace(EffectiveOrderNo))
+                {
+                    await SetupPlannedOrderModeAsync(EffectiveOrderNo);
+                }
             }
             catch (Exception ex)
             {

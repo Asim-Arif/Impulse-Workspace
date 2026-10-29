@@ -1,6 +1,33 @@
 @using DataAccessLibrary.Models.ViewModels.Production
 @using BlazorContextMenu
 
+<style>
+    .table-nav-container:focus {
+        box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.4) !important;
+        border-color: #0d6efd !important;
+    }
+
+    tr.table-row-active > td,
+    tr.table-row-active > th {
+        background-color: #cfe2ff !important;
+        border-top: 2px solid #0d6efd !important;
+        border-bottom: 2px solid #0d6efd !important;
+        color: #084298 !important;
+    }
+
+    tr.table-row-active > td:first-child {
+        border-left: 5px solid #0d6efd !important;
+    }
+
+    tr.table-row-active > td:last-child {
+        border-right: 2px solid #0d6efd !important;
+    }
+
+    tr.table-row-active:hover > td {
+        background-color: #b6d4fe !important;
+    }
+</style>
+
 <div class="card border-0 shadow-none">
     <!-- Grid Action Bar -->
     <div class="d-flex align-items-center justify-content-between p-2 mb-2 bg-light rounded-3 border">
@@ -24,15 +51,22 @@
         </div>
 
         <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-white text-secondary border px-2 py-1 shadow-sm small d-none d-md-inline-block" title="Keyboard Navigation Enabled">
+                <i class="fas fa-keyboard text-primary me-1"></i> <kbd class="bg-light text-dark border">↑</kbd> <kbd class="bg-light text-dark border">↓</kbd> Move &bull; <kbd class="bg-light text-dark border">Space</kbd> Check &bull; <kbd class="bg-light text-dark border">Enter</kbd> Rate
+            </span>
             <div class="input-group input-group-sm" style="width: 220px;">
                 <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
-                <input type="text" class="form-control" placeholder="Search Lot #..." @bind="SearchLotText" @bind:event="oninput" />
+                <input type="text" class="form-control" placeholder="Search Lot #..." @bind="SearchLotText" @bind:event="oninput" @onkeydown:stopPropagation="true" />
             </div>
         </div>
     </div>
 
     <!-- Main Grid Table with 14 Specific Columns -->
-    <div class="table-responsive border rounded-3 mb-3" style="max-height: 48vh; overflow: auto;">
+    <div class="table-responsive border rounded-3 mb-3 table-nav-container"
+         tabindex="0"
+         data-keyboard-nav="true"
+         @onkeydown="HandleKeyDown"
+         style="max-height: 48vh; overflow: auto; outline: none;">
         <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem; white-space: nowrap;">
             <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
                 <tr>
@@ -77,11 +111,21 @@
                     int idx = 1;
                     @foreach (var lot in FilteredLots)
                     {
-                        <ContextMenuTrigger MenuId="lotContextMenu" Data="@lot" WrapperTag="tr" class="@(lot.Audited ? "table-primary text-primary" : (lot.IsSelected ? "table-light" : ""))" @onclick="() => ShowImagePreview(lot.ItemCode)">
-                            <td class="text-center" @onclick:stopPropagation="true">
+                        <ContextMenuTrigger MenuId="lotContextMenu"
+                                            Data="@lot"
+                                            WrapperTag="tr"
+                                            CssClass="@GetRowClass(lot)"
+                                            @onclick="() => OnRowClicked(lot)">
+                            <td id="@($"maker-lot-{lot.EntryID}")" class="text-center" @onclick="() => OnRowClicked(lot)" @onclick:stopPropagation="true">
                                 <input class="form-check-input" type="checkbox" @bind="lot.IsSelected" @bind:after="OnSelectionChanged" />
                             </td>
-                            <td>@(idx++)</td>
+                            <td>
+                                @if (lot == ActiveLot)
+                                {
+                                    <i class="fas fa-play text-primary me-1" style="font-size: 0.65rem;" title="Active Row"></i>
+                                }
+                                @(idx++)
+                            </td>
                             <td>@lot.DT.ToString("dd-MMM-yy")</td>
                             <td class="fw-semibold">@lot.InternalRefNo</td>
                             <td><span class="badge bg-secondary" style="font-size: 0.92rem; font-weight: 600; padding: 4px 8px;">@lot.ItemCode</span></td>
@@ -95,7 +139,7 @@
                                 @if (EditingLotId == lot.EntryID)
                                 {
                                     <div class="input-group input-group-sm" style="min-width: 110px;">
-                                        <input type="number" class="form-control form-control-sm text-end fw-bold py-0" @bind="EditingRate" @onkeydown="@(e => OnRateKeyDown(e, lot))" autofocus />
+                                        <input type="number" class="form-control form-control-sm text-end fw-bold py-0" @bind="EditingRate" @onkeydown="@(e => OnRateKeyDown(e, lot))" @onkeydown:stopPropagation="true" autofocus />
                                         <button class="btn btn-sm btn-success py-0 px-1" @onclick="() => SaveRate(lot)"><i class="fas fa-check"></i></button>
                                         <button class="btn btn-sm btn-secondary py-0 px-1" @onclick="CancelRateEdit"><i class="fas fa-times"></i></button>
                                     </div>

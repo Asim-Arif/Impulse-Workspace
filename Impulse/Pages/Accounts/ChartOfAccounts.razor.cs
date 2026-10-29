@@ -29,6 +29,16 @@ namespace Impulse.Pages.Accounts
         private INotificationService NotificationServiceManager { get; set; }
         [Inject]
         protected IReportNavigationService ReportNavigationService { get; set; }
+        [Inject]
+        protected IBlazorContextMenuService BlazorContextMenuService { get; set; }
+
+        private async Task OpenRowMenu(MouseEventArgs e, ChartOfAccountsModel account)
+        {
+            SelectedAccount = account;
+            int targetX = Math.Max(10, (int)e.ClientX - 220);
+            int targetY = (int)e.ClientY + 10;
+            await BlazorContextMenuService.ShowMenu("accountContextMenu", targetX, targetY, account);
+        }
 
         private ChartOfAccountsModel SelectedAccount;
         private ChartOfAccountsModel CurrentAccount;
@@ -167,7 +177,7 @@ namespace Impulse.Pages.Accounts
             {
                 StateHasChanged();
 
-                var account = e.Data as ChartOfAccountsModel;
+                var account = (e.Data as ChartOfAccountsModel) ?? SelectedAccount;
                 SelectedAccount = account;
 
                 if (SelectedAccount == null)
@@ -266,14 +276,12 @@ namespace Impulse.Pages.Accounts
                         return;
                     }
 
-                    if (CurrentAccount.BalType == 2)
-                    {
-                        CurrentAccount.Balance = -Math.Abs(CurrentAccount.Balance);
-                    }
-                    else
-                    {
-                        CurrentAccount.Balance = Math.Abs(CurrentAccount.Balance);
-                    }
+                    decimal signedOpenBal = CurrentAccount.BalType == 2
+                        ? -Math.Abs(CurrentAccount.OpeningBalance)
+                        : Math.Abs(CurrentAccount.OpeningBalance);
+
+                    CurrentAccount.OpeningBalance = signedOpenBal;
+                    CurrentAccount.Balance = signedOpenBal;
 
                     await iChartOfAccountsDataAccess.SaveNewAccount(CurrentAccount);
                     NotificationServiceManager.ShowSuccess("Success", "Account created successfully.");
@@ -286,14 +294,13 @@ namespace Impulse.Pages.Accounts
                         NotificationServiceManager.ShowWarning("Validation", "Cannot Proceed Without Account Title.");
                         return;
                     }
-                    if (CurrentAccount.BalType == 2)
-                    {
-                        CurrentAccount.Balance = -Math.Abs(CurrentAccount.Balance);
-                    }
-                    else 
-                    {
-                        CurrentAccount.Balance = Math.Abs(CurrentAccount.Balance);
-                    }
+                    decimal signedOpenBal = CurrentAccount.BalType == 2
+                        ? -Math.Abs(CurrentAccount.OpeningBalance)
+                        : Math.Abs(CurrentAccount.OpeningBalance);
+
+                    CurrentAccount.OpeningBalance = signedOpenBal;
+                    CurrentAccount.Balance = signedOpenBal;
+
                     await iChartOfAccountsDataAccess.EditAccount(CurrentAccount, CurrentAccount.AccNo);
                     NotificationServiceManager.ShowSuccess("Success", "Account updated successfully.");
                     await Refreshlist(bshowinactive);
@@ -476,16 +483,16 @@ namespace Impulse.Pages.Accounts
             await Refreshlist(bshowinactive);
             StateHasChanged();
         }
-        private async void EditSelectedAccount(ItemClickEventArgs e)
+        private async Task EditSelectedAccount(ItemClickEventArgs e)
         {
-            var account = e.Data as ChartOfAccountsModel;
+            var account = (e.Data as ChartOfAccountsModel) ?? SelectedAccount;
             SelectedAccount = account;
 
             if (SelectedAccount != null)
             {
                 accheadsforlist = await iChartOfAccountsDataAccess.GetAccountsHeads();
 
-                if (SelectedAccount.Balance < 0)
+                if (SelectedAccount.OpeningBalance < 0)
                     SelectedAccount.BalType = 2; // Credit
                 else
                     SelectedAccount.BalType = 1; // Debit
@@ -499,9 +506,10 @@ namespace Impulse.Pages.Accounts
                     SubAccTitle = SelectedAccount.SubAccTitle,
                     HeadTypeNo = SelectedAccount.HeadTypeNo,
                     HeadType = SelectedAccount.HeadType,
-                    OpeningBalance = SelectedAccount.OpeningBalance,
+                    OpeningBalance = Math.Abs(SelectedAccount.OpeningBalance),
                     BalType = SelectedAccount.BalType,
-                    OpenDate = SelectedAccount.OpenDate
+                    OpenDate = SelectedAccount.OpenDate == default ? DateTime.Today : SelectedAccount.OpenDate,
+                    AccType = SelectedAccount.AccType
                 };
                 
                 IsAdding = false;
@@ -515,13 +523,12 @@ namespace Impulse.Pages.Accounts
 
         private Char dialog = default!;
 
-        //private async void MakeAccountActive(ItemClickEventArgs e)
         private async Task MakeAccountActive(ItemClickEventArgs e)
 
         {
             try
             {
-                var account = e.Data as ChartOfAccountsModel;
+                var account = (e.Data as ChartOfAccountsModel) ?? SelectedAccount;
                 SelectedAccount = account;
 
                 if (SelectedAccount == null)

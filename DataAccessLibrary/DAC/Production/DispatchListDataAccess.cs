@@ -121,5 +121,120 @@ namespace DataAccessLibrary.DAC.Production
                 Message = "Dispatch List finalized successfully."
             };
         }
+
+        public async Task<DeleteDispatchResult> DeleteDispatchListAsync(long entryId, string dispatchListNo, string userName, string machineName)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            db.Open();
+            using var tx = db.BeginTransaction();
+            try
+            {
+                // 1. Check if dispatch list has been called into creating an export invoice (CustomInvoice/CustomPList)
+                const string checkInvoiceSql = @"
+                    SELECT TOP 1 ISNULL(cp.CustomInvoice, 'Export Invoice')
+                    FROM CustomPList_DispatchListDetail cpdl
+                    LEFT JOIN CustomPList cp ON cpdl.CustomPList_RefID = cp.ID
+                    WHERE cpdl.DP_RefID = @EntryID";
+
+                string? linkedInvoice = await db.ExecuteScalarAsync<string?>(checkInvoiceSql, new { EntryID = entryId }, tx);
+                if (!string.IsNullOrWhiteSpace(linkedInvoice))
+                {
+                    tx.Rollback();
+                    return new DeleteDispatchResult
+                    {
+                        Success = false,
+                        Message = $"Cannot delete Dispatch List '{dispatchListNo}'. It has already been called into creating Export Invoice '{linkedInvoice}'."
+                    };
+                }
+
+                // 2. Revert VendRcvdDetail.IssQty for all lots dispatched in this list
+                const string getVrdSql = @"
+                    SELECT VRD_RefID, Qty
+                    FROM DispatchListDetail_VRD
+                    WHERE DLD_RefID IN (SELECT EntryID FROM DispatchListDetails_Adv WHERE RefID = @EntryID)";
+
+                var vrdDetails = (await db.QueryAsync<DispatchLotRevertRecord>(getVrdSql, new { EntryID = entryId }, tx)).ToList();
+                foreach (var d in vrdDetails)
+                {
+                    await db.ExecuteAsync(@"
+                        UPDATE VendRcvdDetail
+                        SET IssQty = IssQty - @Qty
+                        WHERE EntryID = @VRD_RefID",
+                        new { Qty = d.Qty, VRD_RefID = d.VRD_RefID }, tx);
+                }
+
+                // 3. Revert Items.InHand (if incremented during creation)
+                const string getItemsSql = @"
+                    SELECT ItemCode, SUM(Qty) AS Qty
+                    FROM DispatchListDetails_Adv
+                    WHERE RefID = @EntryID
+                    GROUP BY ItemCode";
+
+                var itemDetails = (await db.QueryAsync<DispatchItemRevertRecord>(getItemsSql, new { EntryID = entryId }, tx)).ToList();
+                foreach (var itm in itemDetails)
+                {
+                    await db.ExecuteAsync(@"
+                        UPDATE Items
+                        SET InHand = InHand - @Qty
+                        WHERE ItemID = @ItemCode",
+                        new { Qty = itm.Qty, ItemCode = itm.ItemCode }, tx);
+                }
+
+                // 4. Delete child records
+                await db.ExecuteAsync(@"
+                    IF OBJECT_ID('DispatchListInnerLabelPrinting', 'U') IS NOT NULL
+                        DELETE FROM DispatchListInnerLabelPrinting
+                        WHERE DLDA_RefID IN (SELECT EntryID FROM DispatchListDetails_Adv WHERE RefID = @EntryID)",
+                    new { EntryID = entryId }, tx);
+
+                await db.ExecuteAsync(@"
+                    DELETE FROM DispatchListDetail_VRD
+                    WHERE DLD_RefID IN (SELECT EntryID FROM DispatchListDetails_Adv WHERE RefID = @EntryID)",
+                    new { EntryID = entryId }, tx);
+
+                await db.ExecuteAsync(@"
+                    DELETE FROM DispatchListDetail_Inners
+                    WHERE RefID IN (SELECT EntryID FROM DispatchListDetails_Adv WHERE RefID = @EntryID)",
+                    new { EntryID = entryId }, tx);
+
+                await db.ExecuteAsync(@"
+                    DELETE FROM DispatchListDetail_Cartons
+                    WHERE RefID IN (SELECT EntryID FROM DispatchListDetails_Adv WHERE RefID = @EntryID)",
+                    new { EntryID = entryId }, tx);
+
+                await db.ExecuteAsync(@"
+                    DELETE FROM DispatchListDetails_Adv
+                    WHERE RefID = @EntryID",
+                    new { EntryID = entryId }, tx);
+
+                await db.ExecuteAsync(@"
+                    DELETE FROM DispatchListDetail
+                    WHERE RefID = @EntryID",
+                    new { EntryID = entryId }, tx);
+
+                // 5. Delete header
+                await db.ExecuteAsync(@"
+                    DELETE FROM DispatchList
+                    WHERE EntryID = @EntryID",
+                    new { EntryID = entryId }, tx);
+
+                tx.Commit();
+
+                return new DeleteDispatchResult
+                {
+                    Success = true,
+                    Message = $"Dispatch List '{dispatchListNo}' and its staged lots were deleted successfully."
+                };
+            }
+            catch (Exception ex)
+            {
+                tx.Rollback();
+                return new DeleteDispatchResult
+                {
+                    Success = false,
+                    Message = ex.Message
+                };
+            }
+        }
     }
 }

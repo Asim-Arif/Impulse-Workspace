@@ -34,7 +34,8 @@ namespace DataAccessLibrary.DAC.Production
                                   VI.ProcessID, ISNULL(P.Description, 'N/A') AS ProcessName, ISNULL(VI.ItemID, '') AS ItemID, VI.DT,
                                   VI.Authorized, ISNULL(VI.Closed, 0) AS Closed, ISNULL(VI.IssEmpID, '') AS IssEmpID,
                                   ISNULL(VI.ExcessQtyPercentage, 50) AS ExcessQtyPercentage,
-                                  CASE WHEN M.VenderName LIKE '%FACTORY%' OR M.VendID1 LIKE '%FAC%' OR M.VendID = 79 OR M.VendID = 129 OR M.VendID = (SELECT TOP 1 CAST(DataValue AS BIGINT) FROM GeneralData WHERE DataName = 'FactoryMaker') THEN 1 ELSE 0 END AS IsFactoryMaker
+                                  CASE WHEN M.VenderName LIKE '%FACTORY%' OR M.VendID1 LIKE '%FAC%' OR M.VendID = 79 OR M.VendID = 129 OR M.VendID = (SELECT TOP 1 CAST(DataValue AS BIGINT) FROM GeneralData WHERE DataName = 'FactoryMaker') THEN 1 ELSE 0 END AS IsFactoryMaker,
+                                  ISNULL(P.AuthRequired, 0) AS AuthRequired
                            FROM VendIssued VI
                            LEFT JOIN VMakers M ON VI.VendID = M.VendID
                            LEFT JOIN Processes P ON VI.ProcessID = P.ProcessID
@@ -137,10 +138,10 @@ namespace DataAccessLibrary.DAC.Production
                     // Insert into VendRcvdDetail
                     string insertLineSql = @"INSERT INTO VendRcvdDetail (
                                                 RefID, RecieptID, ItemCode, NextProcessID, RcvdQty, IssQty, Wastage, Rate,
-                                                LotNo, ReqAuth, OrderNo, CountedBy, Issue_RefID, ProcessID, RcvdWeight, ReWorkLot, Repair_RefID, Insp_EmpID
+                                                LotNo, ReqAuth, OrderNo, CountedBy, Issue_RefID, ProcessID, RcvdWeight, ReWorkLot, Repair_RefID, Insp_EmpID, LostQty
                                              ) VALUES (
                                                 @RefID, @RecieptID, @ItemCode, @NextProcessID, @RcvdQty, 0, 0, @Rate,
-                                                @LotNo, @ReqAuth, @OrderNo, @CountedBy, @IssueRefID, @ProcessID, 0, @ReWorkLot, @RepairType, @InspEmpID
+                                                @LotNo, @ReqAuth, @OrderNo, @CountedBy, @IssueRefID, @ProcessID, 0, @ReWorkLot, @RepairType, @InspEmpID, 0
                                              );";
 
                     await db.ExecuteAsync(insertLineSql, new

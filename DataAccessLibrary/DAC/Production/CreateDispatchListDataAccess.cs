@@ -78,16 +78,26 @@ namespace DataAccessLibrary.DAC.Production
                        ISNULL(IssQty, 0) AS IssQty, ISNULL(ReWorkQty, 0) AS ReWorkQty,
                        OrderNo, LotNo
                 FROM VVendReceivingList
-                WHERE OnlyDT >= @DtFrom AND OnlyDT <= @DtTo
-                  AND CustCode = @CustCode
+                WHERE CustCode = @CustCode
                   AND (RcvdQty - ISNULL(Wastage,0) - ISNULL(LostQty,0) - ISNULL(ReWorkQty,0)) > IssQty
                   AND ReqAuth = 0
                   AND NextProcessID IS NULL";
 
             var p = new DynamicParameters();
             p.Add("@CustCode", filter.CustCode);
-            p.Add("@DtFrom", filter.DtFrom.Date);
-            p.Add("@DtTo", filter.DtTo.Date.AddDays(1).AddTicks(-1));
+
+            // In legacy VB6 parity: If LotNo is specified, bypass the date range filter so removed or past lots can be found
+            if (!string.IsNullOrWhiteSpace(filter.LotNo))
+            {
+                sql += " AND LotNo LIKE @LotNo";
+                p.Add("@LotNo", $"%{filter.LotNo.Trim()}%");
+            }
+            else
+            {
+                sql += " AND OnlyDT >= @DtFrom AND OnlyDT <= @DtTo";
+                p.Add("@DtFrom", filter.DtFrom.Date);
+                p.Add("@DtTo", filter.DtTo.Date.AddDays(1).AddTicks(-1));
+            }
 
             if (filter.MakerId > 0)
             {
@@ -105,12 +115,6 @@ namespace DataAccessLibrary.DAC.Production
             {
                 sql += " AND OrderNo LIKE @OrderNo";
                 p.Add("@OrderNo", $"%{filter.OrderNo.Trim()}%");
-            }
-
-            if (!string.IsNullOrWhiteSpace(filter.LotNo))
-            {
-                sql += " AND LotNo LIKE @LotNo";
-                p.Add("@LotNo", $"%{filter.LotNo.Trim()}%");
             }
 
             sql += " ORDER BY DT";
@@ -248,7 +252,7 @@ namespace DataAccessLibrary.DAC.Production
                     // Handle Deleted Rows: revert IssQty and remove inner records
                     if (request.DeletedInnerIDs != null && request.DeletedInnerIDs.Any())
                     {
-                        var delDetails = (await db.QueryAsync<(long VRD_RefID, int Qty)>(@"
+                        var delDetails = (await db.QueryAsync<DelDetailRecord>(@"
                             SELECT VRD_RefID, Qty
                             FROM DispatchListDetail_VRD
                             WHERE DLDC_RefID IN @DelIDs",
@@ -443,5 +447,11 @@ namespace DataAccessLibrary.DAC.Production
                 };
             }
         }
+    }
+
+    public class DelDetailRecord
+    {
+        public long VRD_RefID { get; set; }
+        public int Qty { get; set; }
     }
 }

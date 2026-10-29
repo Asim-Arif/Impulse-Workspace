@@ -39,25 +39,31 @@ namespace DataAccessLibrary.DAC.Production
                         ISNULL(o.CustCode, '') AS CustCode,
                         ISNULL(fc.Name, '') AS CustomerName,
                         ISNULL(o.Country, '') AS Country,
-                        COUNT(DISTINCT oi.CompItemCode) AS TotalItems,
-                        COUNT(DISTINCT CASE WHEN ISNULL(oi.Authorized, 0) = 1 AND pip.ItemID IS NOT NULL THEN pip.ItemID END) AS PlannedItems,
-                        ISNULL(SUM(oi.Qty), 0) AS TotalOrderQty,
-                        CASE 
-                            WHEN COUNT(DISTINCT oi.CompItemCode) > 0 
-                                 AND COUNT(DISTINCT CASE WHEN ISNULL(oi.Authorized, 0) = 1 AND pip.ItemID IS NOT NULL THEN pip.ItemID END) >= COUNT(DISTINCT oi.CompItemCode) 
-                                 AND ISNULL(o.Authorized, 0) = 1
-                            THEN 1 
-                            ELSE 0 
-                        END AS IsPlanned,
+                        ISNULL(v_counts.TotalItems, ISNULL(oi_counts.TotalItems, 0)) AS TotalItems,
+                        ISNULL(pip_counts.PlannedItems, 0) AS PlannedItems,
+                        ISNULL(oi_counts.TotalOrderQty, 0) AS TotalOrderQty,
+                        CASE WHEN pm.Status = 'Planned' THEN 1 ELSE 0 END AS IsPlanned,
                         pm.PlannedBy,
                         pm.PlannedAt
                     FROM FCustomerOrders o
                     LEFT JOIN ForeignCustomers fc ON o.CustCode = fc.CustCode AND o.Country = fc.Country
-                    LEFT JOIN FOrderItems oi ON o.OrderNo = oi.OrderNo
                     LEFT JOIN PPC_Order_Planning_Master pm ON o.OrderNo = pm.OrderNo
-                    LEFT JOIN PPC_Order_Item_Planning pip ON o.OrderNo = pip.OrderNo AND oi.CompItemCode = pip.ItemID
+                    OUTER APPLY (
+                        SELECT COUNT(DISTINCT CompItemID) AS TotalItems
+                        FROM VrptOrders_ForProduction v
+                        WHERE v.OrderNo = o.OrderNo
+                    ) v_counts
+                    OUTER APPLY (
+                        SELECT COUNT(DISTINCT ItemID) AS PlannedItems
+                        FROM PPC_Order_Item_Planning pip
+                        WHERE pip.OrderNo = o.OrderNo
+                    ) pip_counts
+                    OUTER APPLY (
+                        SELECT COUNT(DISTINCT CompItemCode) AS TotalItems, SUM(Qty) AS TotalOrderQty
+                        FROM FOrderItems oi
+                        WHERE oi.OrderNo = o.OrderNo
+                    ) oi_counts
                     WHERE o.Authorized = 1 OR EXISTS (SELECT 1 FROM FOrderItems foi WHERE foi.OrderNo = o.OrderNo AND ISNULL(foi.Authorized, 0) = 1)
-                    GROUP BY o.OrderNo, o.DT, o.DeliveryDT, o.CustCode, fc.Name, o.Country, o.Authorized, pm.OrderNo, pm.PlannedBy, pm.PlannedAt
                     ORDER BY o.DT DESC, o.OrderNo DESC";
 
                 var list = await db.QueryAsync<PpcOrderSummaryListItem>(sql);
@@ -107,7 +113,10 @@ namespace DataAccessLibrary.DAC.Production
                         ISNULL(v.ItemName, v.Description) AS ItemName,
                         v.Qty AS OrderQty,
                         ISNULL(foi.Authorized, 0) AS Authorized,
-                        ISNULL(foi.AuthorizedQty, 0) AS AuthorizedQty,
+                        CASE 
+                            WHEN v.SetItem = 1 THEN ISNULL(foi.AuthorizedQty, 0) * ISNULL(inset.Qty, 1)
+                            ELSE ISNULL(foi.AuthorizedQty, 0)
+                        END AS AuthorizedQty,
                         ISNULL(v.InHand, 0) AS AvailableInHandStock,
                         COALESCE(ipg.PG_RefID, i.GroupID, 0) AS GroupID,
                         ISNULL(pg.GroupName, '') AS GroupName
@@ -118,7 +127,8 @@ namespace DataAccessLibrary.DAC.Production
                                SUM(ISNULL(AuthorizedQty, 0)) AS AuthorizedQty
                         FROM FOrderItems
                         GROUP BY OrderNo, CompItemCode
-                    ) foi ON v.OrderNo = foi.OrderNo AND v.CompItemID = foi.CompItemCode
+                    ) foi ON v.OrderNo = foi.OrderNo AND COALESCE(v.OrderItemID, v.CompItemID) = foi.CompItemCode
+                    LEFT JOIN ItemsSets inset ON v.OrderItemID = inset.ItemID AND v.CompItemID = inset.Set_ItemID
                     LEFT JOIN Items i ON v.CompItemID = i.ItemID
                     LEFT JOIN ItemProcessGroups ipg ON v.CompItemID = ipg.ItemID
                     LEFT JOIN ProcessGroups pg ON COALESCE(ipg.PG_RefID, i.GroupID) = pg.EntryID
@@ -135,11 +145,46 @@ namespace DataAccessLibrary.DAC.Production
 
                 // 1. Fetch saved item planning if previously saved
                 const string savedPlanningSql = @"
-                    SELECT ItemID, StockQty, TotalPurchaseQty, ProductionQty
+                    SELECT ItemID, StockQty, ISNULL(SFStockQty, 0) AS SFStockQty, TotalPurchaseQty, ProductionQty
                     FROM PPC_Order_Item_Planning
                     WHERE OrderNo = @OrderNo";
                 var savedPlanning = (await db.QueryAsync(savedPlanningSql, new { OrderNo = orderNo })).ToList();
                 var savedPlanMap = savedPlanning.ToDictionary(x => (string)x.ItemID, x => x);
+
+                // 1b. Fetch available semi-finished stock lots for items
+                const string sfLotsSql = @"
+                    SELECT 
+                        SOO.EntryID,
+                        SOO.ItemID,
+                        SOO.ProcessID,
+                        ISNULL(SOO.Description, '') AS ProcessName,
+                        ISNULL(SOO.LotNo_Manual, '') AS LotNo,
+                        ISNULL(SOO.BatchNo_Manual, '') AS BatchNo,
+                        ISNULL(SOO.Shelf_RefID, 0) AS Shelf_RefID,
+                        (ISNULL(SOO.StoreName, '') + CASE WHEN ISNULL(SOO.RackNo, '') <> '' THEN ' (Rack ' + SOO.RackNo + ', Shelf ' + ISNULL(SOO.ShelfNo, '') + ')' ELSE '' END) AS StoreLocation,
+                        CAST((SOO.Qty - ISNULL(SOO.IssdQty, 0)) AS INT) AS AvailableQty
+                    FROM VStockOrderOpening SOO
+                    WHERE SOO.ItemID IN @ItemIds AND (SOO.Qty - ISNULL(SOO.IssdQty, 0)) > 0
+                    ORDER BY SOO.EntryID DESC";
+                var availableSfLots = (await db.QueryAsync<PpcItemSFLotDto>(sfLotsSql, new { ItemIds = itemIds })).ToList();
+
+                // 1c. Fetch saved semi-finished stock allocations for this order
+                const string savedSfAllocSql = @"
+                    SELECT 
+                        EntryID,
+                        OrderNo,
+                        ItemID,
+                        SOO_RefID,
+                        ProcessID,
+                        ISNULL(ProcessName, '') AS ProcessName,
+                        ISNULL(LotNo, '') AS LotNo,
+                        ISNULL(BatchNo, '') AS BatchNo,
+                        ISNULL(Shelf_RefID, 0) AS Shelf_RefID,
+                        ISNULL(StoreLocation, '') AS StoreLocation,
+                        AllocatedQty
+                    FROM PPC_Order_Item_SF_Allocations
+                    WHERE OrderNo = @OrderNo";
+                var savedSfAllocations = (await db.QueryAsync<dynamic>(savedSfAllocSql, new { OrderNo = orderNo })).ToList();
 
                 // 2. Fetch saved purchases
                 const string savedPurchasesSql = @"
@@ -220,16 +265,47 @@ namespace DataAccessLibrary.DAC.Production
                             ProcessName = (string)r.ProcessName
                         }).ToList();
 
+                    // Available SF lots
+                    item.AvailableSFLots = availableSfLots
+                        .Where(l => l.ItemID == item.CompItemID)
+                        .ToList();
+
                     // Restore saved planning values if available (only for authorized items)
                     if (item.Authorized && savedPlanMap.TryGetValue(item.CompItemID, out var plan))
                     {
                         item.StockQty = (int)plan.StockQty;
+                        item.IsSavedPlan = true;
                         item.IsPlanned = true;
                     }
                     else
                     {
                         item.StockQty = 0;
+                        item.IsSavedPlan = false;
                         item.IsPlanned = false;
+                    }
+
+                    // Restore saved SF allocations (only for authorized items)
+                    if (item.Authorized)
+                    {
+                        var itemSavedSf = savedSfAllocations.Where(a => (string)a.ItemID == item.CompItemID).ToList();
+                        foreach (var sa in itemSavedSf)
+                        {
+                            int sooRefId = (int)sa.SOO_RefID;
+                            var matchingLot = item.AvailableSFLots.FirstOrDefault(l => l.EntryID == sooRefId);
+                            item.SFStockAllocations.Add(new PpcItemSFAllocationDto
+                            {
+                                EntryID = (int)sa.EntryID,
+                                SOO_RefID = sooRefId,
+                                ProcessID = (int)sa.ProcessID,
+                                ProcessName = (string)sa.ProcessName,
+                                LotNo = (string)sa.LotNo,
+                                BatchNo = (string)sa.BatchNo,
+                                Shelf_RefID = (int)sa.Shelf_RefID,
+                                StoreLocation = (string)sa.StoreLocation,
+                                AvailableQty = matchingLot?.AvailableQty ?? (int)sa.AllocatedQty,
+                                AllocatedQty = (int)sa.AllocatedQty
+                            });
+                        }
                     }
 
                     // Restore saved purchases (only for authorized items)
@@ -386,8 +462,9 @@ namespace DataAccessLibrary.DAC.Production
                     ? "Planned"
                     : (plannedItems.Count > 0 ? "Partially Planned" : "Draft");
 
-                // 1. Delete previous hub schedules, item planning, and master records (Purchases are upserted to preserve issued POs)
+                // 1. Delete previous hub schedules, item planning, SF allocations, and master records (Purchases are upserted to preserve issued POs)
                 await conn.ExecuteAsync("DELETE FROM PPC_Order_Item_Hub_Schedules WHERE OrderNo = @OrderNo", new { OrderNo = orderNo }, trans);
+                await conn.ExecuteAsync("DELETE FROM PPC_Order_Item_SF_Allocations WHERE OrderNo = @OrderNo", new { OrderNo = orderNo }, trans);
                 await conn.ExecuteAsync("DELETE FROM PPC_Order_Item_Planning WHERE OrderNo = @OrderNo", new { OrderNo = orderNo }, trans);
                 await conn.ExecuteAsync("DELETE FROM PPC_Order_Planning_Master WHERE OrderNo = @OrderNo", new { OrderNo = orderNo }, trans);
 
@@ -415,9 +492,15 @@ namespace DataAccessLibrary.DAC.Production
                 // 3. Insert Item Planning & Upsert Purchases & Hub Schedules (only for planned items)
                 const string itemPlanSql = @"
                     INSERT INTO PPC_Order_Item_Planning 
-                        (OrderNo, ItemID, OrderQty, StockQty, TotalPurchaseQty, ProductionQty, Remarks, CreatedAt, CreatedBy)
+                        (OrderNo, ItemID, OrderQty, StockQty, SFStockQty, TotalPurchaseQty, ProductionQty, Remarks, CreatedAt, CreatedBy)
                     VALUES 
-                        (@OrderNo, @ItemID, @OrderQty, @StockQty, @TotalPurchaseQty, @ProductionQty, @Remarks, GETUTCDATE(), @CreatedBy)";
+                        (@OrderNo, @ItemID, @OrderQty, @StockQty, @SFStockQty, @TotalPurchaseQty, @ProductionQty, @Remarks, GETUTCDATE(), @CreatedBy)";
+
+                const string insertSfAllocSql = @"
+                    INSERT INTO PPC_Order_Item_SF_Allocations
+                        (OrderNo, ItemID, SOO_RefID, ProcessID, ProcessName, LotNo, BatchNo, Shelf_RefID, StoreLocation, AllocatedQty, CreatedAt, CreatedBy)
+                    VALUES
+                        (@OrderNo, @ItemID, @SOO_RefID, @ProcessID, @ProcessName, @LotNo, @BatchNo, @Shelf_RefID, @StoreLocation, @AllocatedQty, GETUTCDATE(), @CreatedBy)";
 
                 const string insertPurchaseSql = @"
                     INSERT INTO PPC_Order_Item_Purchases 
@@ -450,11 +533,31 @@ namespace DataAccessLibrary.DAC.Production
                         ItemID = item.CompItemID,
                         OrderQty = item.OrderQty,
                         StockQty = item.StockQty,
+                        SFStockQty = item.SFStockQty,
                         TotalPurchaseQty = item.TotalPurchaseQty,
                         ProductionQty = item.ProductionQty,
                         Remarks = "",
                         CreatedBy = user
                     }, trans);
+
+                    // Semi-finished stock allocations
+                    foreach (var sfAlloc in item.SFStockAllocations.Where(a => a.AllocatedQty > 0))
+                    {
+                        await conn.ExecuteAsync(insertSfAllocSql, new
+                        {
+                            OrderNo = orderNo,
+                            ItemID = item.CompItemID,
+                            sfAlloc.SOO_RefID,
+                            sfAlloc.ProcessID,
+                            sfAlloc.ProcessName,
+                            sfAlloc.LotNo,
+                            sfAlloc.BatchNo,
+                            sfAlloc.Shelf_RefID,
+                            sfAlloc.StoreLocation,
+                            sfAlloc.AllocatedQty,
+                            CreatedBy = user
+                        }, trans);
+                    }
 
                     // Multi-purchase split rows: upsert without breaking already-issued POs
                     foreach (var p in item.Purchases.Where(x => x.PurchaseQty > 0 && x.ProcessID > 0))

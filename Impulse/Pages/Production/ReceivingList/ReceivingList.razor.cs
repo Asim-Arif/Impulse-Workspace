@@ -451,9 +451,9 @@ namespace Impulse.Pages.Production.ReceivingList
             await BlazorContextMenuService.ShowMenu("optionsBarMenu", (int)e.ClientX, (int)e.ClientY + 15);
         }
 
-        private void ResolveRowItem(ItemClickEventArgs args)
+        private void ResolveRowItem(ItemClickEventArgs? args)
         {
-            if (args.Data is MakerRcvListItem item)
+            if (args?.Data is MakerRcvListItem item)
                 SelectedItem = item;
         }
 
@@ -1987,6 +1987,72 @@ namespace Impulse.Pages.Production.ReceivingList
                 {
                     { "DateRange", $"'{dateRangeStr}'" }
                 }
+            });
+        }
+
+        public async Task PrintRejectionGatePass(ItemClickEventArgs? args = null)
+        {
+            if (args != null)
+            {
+                ResolveRowItem(args);
+            }
+
+            List<long> headerIds;
+
+            if (SelectedVrdEntryIds.Any())
+            {
+                headerIds = AllItems
+                    .Where(i => SelectedVrdEntryIds.Contains(i.VRD_EntryID))
+                    .Select(i => i.EntryID)
+                    .Where(id => id > 0)
+                    .Distinct()
+                    .ToList();
+            }
+            else if (SelectedItem != null && SelectedItem.EntryID > 0)
+            {
+                headerIds = new List<long> { SelectedItem.EntryID };
+            }
+            else
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Selection Required",
+                    Detail = "Please select or check receiving record(s) to print Rejection Gate-Pass.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            if (!headerIds.Any())
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Selection Required",
+                    Detail = "No valid receiving records found in current selection.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            long wastageCount = await RcvListService.GetRejectionGatePassWastageCountAsync(headerIds);
+            if (wastageCount <= 0)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Rejection Gate-Pass",
+                    Detail = "No rejection / wastage details found for the selected receiving record(s).",
+                    Duration = 5000
+                });
+                return;
+            }
+
+            await ReportNavigationService.PrintReportAsync(new ReportRequest
+            {
+                ReportName = "RepairIssGP.rpt",
+                SelectionFormula = $"{{VendReceived.EntryID}} IN [{string.Join(",", headerIds)}]"
             });
         }
 

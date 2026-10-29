@@ -370,6 +370,7 @@ namespace Impulse.Pages.Production.ReceiveAgainstPO
                 });
 
                 long issuanceEntryId = MasterPO.EntryID;
+                bool authRequired = MasterPO.AuthRequired;
 
                 if (PrintSlip)
                 {
@@ -381,6 +382,12 @@ namespace Impulse.Pages.Production.ReceiveAgainstPO
                 }
 
                 ClearForm();
+
+                if (authRequired)
+                {
+                    NavigationManager.NavigateTo($"/production/authorize-received?refId={rcvHeaderId}");
+                    return;
+                }
             }
             catch (Exception ex)
             {

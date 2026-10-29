@@ -195,7 +195,12 @@ namespace DataAccessLibrary.DAC.Accounts
                 try
                 {
                     string sql = @"
-                    UPDATE Accounts SET AccTitle=@AccTitle, openbal=@OpenBal, opendate=@OpenDate WHERE AccNo=@AccNo";
+                    UPDATE Accounts 
+                    SET AccTitle = @AccTitle, 
+                        openbal = @OpenBal, 
+                        opendate = @OpenDate,
+                        Balance = ISNULL(Balance - openbal, 0) + @OpenBal 
+                    WHERE AccNo = @AccNo";
 
                     var parameters = new
                     {

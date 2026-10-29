@@ -7,6 +7,31 @@
         .win11-menu-item { display: flex; align-items: center; gap: 8px; }
         .win11-icon { width: 16px; text-align: center; }
         .blazor-context-menu { max-height: 40vh !important; overflow-y: auto !important; }
+
+        .table-nav-container:focus {
+            box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.4) !important;
+            border-color: #0d6efd !important;
+        }
+
+        tr.table-row-active > td,
+        tr.table-row-active > th {
+            background-color: #cfe2ff !important;
+            border-top: 2px solid #0d6efd !important;
+            border-bottom: 2px solid #0d6efd !important;
+            color: #084298 !important;
+        }
+
+        tr.table-row-active > td:first-child {
+            border-left: 5px solid #0d6efd !important;
+        }
+
+        tr.table-row-active > td:last-child {
+            border-right: 2px solid #0d6efd !important;
+        }
+
+        tr.table-row-active:hover > td {
+            background-color: #b6d4fe !important;
+        }
     </style>
     <Item OnClick="OnHideFromBilling">
         <div class="win11-menu-item">
@@ -16,7 +41,20 @@
     </Item>
 </ContextMenu>
 
-<div class="table-wrapper" style="position: relative; z-index: 1; overflow-x: auto; max-height: 420px; overflow-y: auto;">
+@if (!IsLoading && Rows.Any())
+{
+    <div class="d-flex justify-content-end mb-2">
+        <span class="badge bg-white text-secondary border px-2 py-1 shadow-sm small" title="Keyboard Navigation Enabled">
+            <i class="fas fa-keyboard text-primary me-1"></i> <kbd class="bg-light text-dark border">↑</kbd> <kbd class="bg-light text-dark border">↓</kbd> Move &bull; <kbd class="bg-light text-dark border">Space</kbd> Check &bull; <kbd class="bg-light text-dark border">Enter</kbd> Rate
+        </span>
+    </div>
+}
+
+<div class="table-wrapper table-nav-container"
+     tabindex="0"
+     data-keyboard-nav="true"
+     @onkeydown="HandleKeyDown"
+     style="position: relative; z-index: 1; overflow-x: auto; max-height: 420px; overflow-y: auto; outline: none;">
     @if (IsLoading)
     {
         <div class="text-center py-4">
@@ -54,15 +92,23 @@
                 {
                     idx++;
                     var capturedRow = row;
-                    <tr @oncontextmenu="(e) => OnRowRightClick(e, capturedRow)"
+                    <tr id="@($"vendor-row-{row.EntryID}")"
+                        @onclick="() => OnRowClicked(capturedRow)"
+                        @oncontextmenu="(e) => OnRowRightClick(e, capturedRow)"
                         @oncontextmenu:preventDefault
-                        class="@(row.IsChecked ? "table-primary" : "")">
-                        <td>
+                        class="@GetRowClass(capturedRow)">
+                        <td @onclick="() => OnRowClicked(capturedRow)" @onclick:stopPropagation="true">
                             <input type="checkbox" class="form-check-input"
                                    checked="@row.IsChecked"
                                    @onchange="(e) => OnRowChecked(capturedRow, e)" />
                         </td>
-                        <td class="text-muted">@idx</td>
+                        <td class="text-muted">
+                            @if (row == ActiveRow)
+                            {
+                                <i class="fas fa-play text-primary me-1" style="font-size: 0.65rem;" title="Active Row"></i>
+                            }
+                            @idx
+                        </td>
                         <td><span class="fw-semibold text-dark">@row.PORefNo</span></td>
                         <td>@row.RcvDate.ToString("dd-MMM-yy")</td>
                         <td>
@@ -82,6 +128,7 @@
                                        value="@row.EditingRate"
                                        @onchange="(e) => OnRateChanged(capturedRow, e)"
                                        @onkeydown="(e) => OnRateKeyDown(capturedRow, e)"
+                                       @onkeydown:stopPropagation="true"
                                        @onblur="() => OnRateBlur(capturedRow)"
                                        autofocus />
                             }

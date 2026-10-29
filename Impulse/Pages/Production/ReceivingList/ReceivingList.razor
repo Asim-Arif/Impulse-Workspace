@@ -219,6 +219,9 @@
                             <i class="fas fa-check-square me-1"></i> Selected: <strong>@SelectedVrdEntryIds.Count.ToString("N0")</strong>
                             <button type="button" class="btn btn-link text-white p-0 ms-1 text-decoration-none" @onclick="ClearSelection" title="Clear Selection"><i class="fas fa-times-circle"></i></button>
                         </span>
+                        <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 shadow-sm" style="font-size: 0.75rem; height: 24px;" @onclick="() => PrintRejectionGatePass()" title="Print Rejection Gate-Pass for selected records">
+                            <i class="fas fa-ticket-alt me-1"></i>Print Rejection Gate-Pass
+                        </button>
                     }
                     else if (TotalCount > 0)
                     {
@@ -488,198 +491,7 @@
                 </div>
             }
 
-            <!-- Split / Transfer Lot Modal Dialog -->
-            @if (ShowSplitTransferModal && SelectedItem != null)
-            {
-                <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 10500;">
-                    <div class="modal-dialog modal-lg modal-dialog-centered">
-                        <div class="modal-content border-0 shadow" style="background: rgba(255, 255, 255, 0.98); backdrop-filter: blur(12px); border-radius: 12px;">
-                            <div class="modal-header border-bottom py-2 px-3 bg-light rounded-top">
-                                <div class="d-flex align-items-center gap-2">
-                                    <i class="fas fa-exchange-alt text-primary fs-5"></i>
-                                    <h5 class="modal-title fw-bold text-dark mb-0" style="font-size: 1.05rem;">
-                                        Change / Split / Transfer Lot — <span class="badge bg-info text-dark">Lot #@SelectedItem.LotNo</span>
-                                    </h5>
-                                </div>
-                                <button type="button" class="btn-close btn-sm" @onclick="CloseSplitTransferModal" disabled="@IsProcessingSplit"></button>
-                            </div>
-                            <div class="modal-body p-3">
-                                <!-- Mode Selector Pills -->
-                                <div class="d-flex gap-2 p-1 bg-light rounded-3 border mb-3">
-                                    <button type="button" class="btn btn-sm flex-fill fw-semibold @(SplitMode == 0 ? "btn-primary shadow-sm" : "btn-light text-secondary")" @onclick="@(() => OnSplitModeChanged(0))">
-                                        <i class="fas fa-edit me-1"></i> Change Customer Order No.
-                                    </button>
-                                    <button type="button" class="btn btn-sm flex-fill fw-semibold @(SplitMode == 1 ? "btn-primary shadow-sm" : "btn-light text-secondary")" @onclick="@(() => OnSplitModeChanged(1))">
-                                        <i class="fas fa-cut me-1"></i> Split Lot
-                                    </button>
-                                    <button type="button" class="btn btn-sm flex-fill fw-semibold @(SplitMode == 2 ? "btn-primary shadow-sm" : "btn-light text-secondary")" @onclick="@(() => OnSplitModeChanged(2))">
-                                        <i class="fas fa-warehouse me-1"></i> Transfer to S/F Stock
-                                    </button>
-                                </div>
 
-                                <!-- Current Lot Context Bar -->
-                                <div class="p-2 mb-3 bg-light rounded-3 border d-flex flex-wrap gap-3 align-items-center" style="font-size: 0.82rem;">
-                                    <div><span class="text-muted fw-bold">Current Order:</span> <span class="badge bg-secondary">@SelectedItem.OrderNo</span></div>
-                                    <div><span class="text-muted fw-bold">Current Article:</span> <span class="fw-semibold">@SelectedItem.FullArticle</span></div>
-                                    <div><span class="text-muted fw-bold">Rcvd Qty:</span> <span class="badge bg-success">@SelectedItem.RcvdQty.ToString("N0")</span></div>
-                                    @if (SelectedItem.IssQty > 0)
-                                    {
-                                        <div><span class="text-muted fw-bold">Already Issued:</span> <span class="badge bg-danger">@SelectedItem.IssQty.ToString("N0")</span></div>
-                                    }
-                                </div>
-
-                                <!-- MODE 0: Change Customer Order No -->
-                                @if (SplitMode == 0)
-                                {
-                                    <div class="row g-2 mb-2">
-                                        <div class="col-12 mb-2">
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="chkModalCOStockOrder" @bind="ChangeOrderModel.TransferToStockOrder" />
-                                                <label class="form-check-label fw-bold text-primary" for="chkModalCOStockOrder">
-                                                    Transfer to Stock Order (Order No: 'Stock-Order')
-                                                </label>
-                                            </div>
-                                        </div>
-                                        @if (!ChangeOrderModel.TransferToStockOrder)
-                                        {
-                                            <div class="col-md-4">
-                                                <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Customer</label>
-                                                <BlazoredTypeahead SearchMethod="SearchSplitCustomers" @bind-Value="SelectedSplitCustomer" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Customer...">
-                                                    <SelectedTemplate>@context.Name</SelectedTemplate>
-                                                    <ResultTemplate>@context.Name</ResultTemplate>
-                                                </BlazoredTypeahead>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Order No.</label>
-                                                <BlazoredTypeahead SearchMethod="SearchSplitOrders" @bind-Value="SelectedSplitOrder" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Order No...">
-                                                    <SelectedTemplate>@context.DisplayName</SelectedTemplate>
-                                                    <ResultTemplate>@context.DisplayName</ResultTemplate>
-                                                </BlazoredTypeahead>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Item / Article</label>
-                                                <BlazoredTypeahead SearchMethod="SearchSplitArticles" @bind-Value="SelectedSplitArticle" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Article...">
-                                                    <SelectedTemplate>@context.Name</SelectedTemplate>
-                                                    <ResultTemplate>@context.Name</ResultTemplate>
-                                                </BlazoredTypeahead>
-                                            </div>
-                                        }
-                                        else
-                                        {
-                                            <div class="col-12">
-                                                <div class="alert alert-info py-2 px-3 mb-0 small">
-                                                    <i class="fas fa-info-circle me-1"></i> Order No. will be updated to <strong>'Stock-Order'</strong> and item will remain <strong>@SelectedItem.FullArticle</strong>.
-                                                </div>
-                                            </div>
-                                        }
-                                    </div>
-                                }
-
-                                <!-- MODE 1: Split Lot -->
-                                @if (SplitMode == 1)
-                                {
-                                    @if (SelectedItem.IssQty > 0)
-                                    {
-                                        <div class="alert alert-danger py-2 px-3 mb-2 small">
-                                            <i class="fas fa-exclamation-triangle me-1"></i> <strong>Cannot Split:</strong> This Lot has already been issued (@SelectedItem.IssQty.ToString("N0") issued).
-                                        </div>
-                                    }
-                                    <div class="row g-2 mb-2">
-                                        <div class="col-md-4">
-                                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Customer</label>
-                                            <BlazoredTypeahead SearchMethod="SearchSplitCustomers" @bind-Value="SelectedSplitCustomer" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Customer...">
-                                                <SelectedTemplate>@context.Name</SelectedTemplate>
-                                                <ResultTemplate>@context.Name</ResultTemplate>
-                                            </BlazoredTypeahead>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Order No.</label>
-                                            <BlazoredTypeahead SearchMethod="SearchSplitOrders" @bind-Value="SelectedSplitOrder" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Order No...">
-                                                <SelectedTemplate>@context.DisplayName</SelectedTemplate>
-                                                <ResultTemplate>@context.DisplayName</ResultTemplate>
-                                            </BlazoredTypeahead>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Target Article</label>
-                                            <BlazoredTypeahead SearchMethod="SearchSplitArticles" @bind-Value="SelectedSplitArticle" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Article...">
-                                                <SelectedTemplate>@context.Name</SelectedTemplate>
-                                                <ResultTemplate>@context.Name</ResultTemplate>
-                                            </BlazoredTypeahead>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Split Qty (Max: @SelectedItem.RcvdQty.ToString("N0"))</label>
-                                            <input type="number" class="form-control form-control-sm text-center fw-bold" @bind="SplitLotModel.SplitQty" min="1" max="@SelectedItem.RcvdQty" />
-                                        </div>
-                                        <div class="col-md-8">
-                                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Remarks</label>
-                                            <input type="text" class="form-control form-control-sm" @bind="SplitLotModel.Remarks" placeholder="Enter transfer remarks..." />
-                                        </div>
-                                    </div>
-                                }
-
-                                <!-- MODE 2: Transfer to S/F Stock -->
-                                @if (SplitMode == 2)
-                                {
-                                    @if (SelectedItem.IssQty > 0)
-                                    {
-                                        <div class="alert alert-danger py-2 px-3 mb-2 small">
-                                            <i class="fas fa-exclamation-triangle me-1"></i> <strong>Cannot Transfer:</strong> This entry has already been issued.
-                                        </div>
-                                    }
-                                    <div class="row g-2 mb-2">
-                                        <div class="col-md-6">
-                                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Store</label>
-                                            <BlazoredTypeahead SearchMethod="SearchStores" @bind-Value="SelectedStore" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Store...">
-                                                <SelectedTemplate>@context.StoreName</SelectedTemplate>
-                                                <ResultTemplate>@context.StoreName</ResultTemplate>
-                                            </BlazoredTypeahead>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Location / Shelf</label>
-                                            <BlazoredTypeahead SearchMethod="SearchShelves" @bind-Value="SelectedShelf" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Shelf Location...">
-                                                <SelectedTemplate>@context.DisplayName</SelectedTemplate>
-                                                <ResultTemplate>@context.DisplayName</ResultTemplate>
-                                            </BlazoredTypeahead>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Transfer Qty</label>
-                                            <input type="number" class="form-control form-control-sm text-center fw-bold" @bind="TransferSFModel.TransferQty" min="1" max="@(SelectedItem.RcvdQty - SelectedItem.Wastage - SelectedItem.ReWorkQty)" />
-                                        </div>
-                                        <div class="col-md-8">
-                                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Remarks</label>
-                                            <input type="text" class="form-control form-control-sm" @bind="TransferSFModel.Remarks" placeholder="Remarks for opening..." />
-                                        </div>
-                                    </div>
-                                }
-                            </div>
-                            <div class="modal-footer border-top py-2 px-3 bg-light rounded-bottom d-flex justify-content-between">
-                                <div class="text-muted small">
-                                    @if (SplitMode == 1)
-                                    {
-                                        <span><i class="fas fa-magic text-primary me-1"></i> A new Lot number will be automatically generated.</span>
-                                    }
-                                </div>
-                                <div class="d-flex gap-2">
-                                    <button type="button" class="btn btn-sm btn-secondary" @onclick="CloseSplitTransferModal" disabled="@IsProcessingSplit">
-                                        <i class="fas fa-times me-1"></i> Cancel
-                                    </button>
-                                    <button type="button" class="btn btn-sm btn-primary fw-bold px-3" @onclick="ExecuteSplitTransfer" disabled="@IsProcessingSplit">
-                                        @if (IsProcessingSplit)
-                                        {
-                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                                        }
-                                        else
-                                        {
-                                            <i class="fas fa-check-circle me-1"></i>
-                                        }
-                                        Post
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            }
 
             <!-- Inspection Data Modal Dialog -->
             @if (ShowInspectionModal && InspectionDto != null)
@@ -873,6 +685,196 @@
     </div>
 </div>
 
+<!-- Split / Transfer Lot Modal Dialog -->
+@if (ShowSplitTransferModal && SelectedItem != null)
+{
+    <div style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(4px); z-index: 100050; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; font-family: 'Calibri', 'Segoe UI', sans-serif;">
+        <div class="shadow-lg border-0" style="width: 1000px; max-width: 96vw; max-height: 92vh; background: #ffffff; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden;">
+            <div class="bg-primary text-white py-2 px-3 d-flex align-items-center justify-content-between" style="flex-shrink: 0;">
+                <h6 class="modal-title fw-bold mb-0" style="font-size: 1.05rem;">
+                    <i class="fas fa-exchange-alt me-2"></i>
+                    <span>Change / Split / Transfer Lot</span>
+                    <span class="badge bg-info text-dark ms-2">Lot #@SelectedItem.LotNo</span>
+                </h6>
+                <button type="button" class="btn-close btn-close-white" @onclick="CloseSplitTransferModal" disabled="@IsProcessingSplit"></button>
+            </div>
+            <div class="p-3 p-md-4" style="overflow-y: auto; flex-grow: 1; font-size: 0.88rem;">
+                <!-- Mode Selector Pills -->
+                <div class="d-flex gap-2 p-1 bg-light rounded-3 border mb-3">
+                    <button type="button" class="btn btn-sm flex-fill fw-semibold @(SplitMode == 0 ? "btn-primary shadow-sm" : "btn-light text-secondary")" @onclick="@(() => OnSplitModeChanged(0))">
+                        <i class="fas fa-edit me-1"></i> Change Customer Order No.
+                    </button>
+                    <button type="button" class="btn btn-sm flex-fill fw-semibold @(SplitMode == 1 ? "btn-primary shadow-sm" : "btn-light text-secondary")" @onclick="@(() => OnSplitModeChanged(1))">
+                        <i class="fas fa-cut me-1"></i> Split Lot
+                    </button>
+                    <button type="button" class="btn btn-sm flex-fill fw-semibold @(SplitMode == 2 ? "btn-primary shadow-sm" : "btn-light text-secondary")" @onclick="@(() => OnSplitModeChanged(2))">
+                        <i class="fas fa-warehouse me-1"></i> Transfer to S/F Stock
+                    </button>
+                </div>
+
+                <!-- Current Lot Context Bar -->
+                <div class="p-2 mb-3 bg-light rounded-3 border d-flex flex-wrap gap-3 align-items-center" style="font-size: 0.82rem;">
+                    <div><span class="text-muted fw-bold">Current Order:</span> <span class="badge bg-secondary">@SelectedItem.OrderNo</span></div>
+                    <div><span class="text-muted fw-bold">Current Article:</span> <span class="fw-semibold">@SelectedItem.FullArticle</span></div>
+                    <div><span class="text-muted fw-bold">Rcvd Qty:</span> <span class="badge bg-success">@SelectedItem.RcvdQty.ToString("N0")</span></div>
+                    @if (SelectedItem.IssQty > 0)
+                    {
+                        <div><span class="text-muted fw-bold">Already Issued:</span> <span class="badge bg-danger">@SelectedItem.IssQty.ToString("N0")</span></div>
+                    }
+                </div>
+
+                <!-- MODE 0: Change Customer Order No -->
+                @if (SplitMode == 0)
+                {
+                    <div class="row g-2 mb-2">
+                        <div class="col-12 mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="chkModalCOStockOrder" @bind="ChangeOrderModel.TransferToStockOrder" />
+                                <label class="form-check-label fw-bold text-primary" for="chkModalCOStockOrder">
+                                    Transfer to Stock Order (Order No: 'Stock-Order')
+                                </label>
+                            </div>
+                        </div>
+                        @if (!ChangeOrderModel.TransferToStockOrder)
+                        {
+                            <div class="col-md-4">
+                                <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Customer</label>
+                                <BlazoredTypeahead SearchMethod="SearchSplitCustomers" @bind-Value="SelectedSplitCustomer" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Customer...">
+                                    <SelectedTemplate>@context.Name</SelectedTemplate>
+                                    <ResultTemplate>@context.Name</ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Order No.</label>
+                                <BlazoredTypeahead SearchMethod="SearchSplitOrders" @bind-Value="SelectedSplitOrder" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Order No...">
+                                    <SelectedTemplate>@context.DisplayName</SelectedTemplate>
+                                    <ResultTemplate>@context.DisplayName</ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Item / Article</label>
+                                <BlazoredTypeahead SearchMethod="SearchSplitArticles" @bind-Value="SelectedSplitArticle" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Article...">
+                                    <SelectedTemplate>@context.Name</SelectedTemplate>
+                                    <ResultTemplate>@context.Name</ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="col-12">
+                                <div class="alert alert-info py-2 px-3 mb-0 small">
+                                    <i class="fas fa-info-circle me-1"></i> Order No. will be updated to <strong>'Stock-Order'</strong> and item will remain <strong>@SelectedItem.FullArticle</strong>.
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <!-- MODE 1: Split Lot -->
+                @if (SplitMode == 1)
+                {
+                    @if (SelectedItem.IssQty > 0)
+                    {
+                        <div class="alert alert-danger py-2 px-3 mb-2 small">
+                            <i class="fas fa-exclamation-triangle me-1"></i> <strong>Cannot Split:</strong> This Lot has already been issued (@SelectedItem.IssQty.ToString("N0") issued).
+                        </div>
+                    }
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Customer</label>
+                            <BlazoredTypeahead SearchMethod="SearchSplitCustomers" @bind-Value="SelectedSplitCustomer" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Customer...">
+                                <SelectedTemplate>@context.Name</SelectedTemplate>
+                                <ResultTemplate>@context.Name</ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Order No.</label>
+                            <BlazoredTypeahead SearchMethod="SearchSplitOrders" @bind-Value="SelectedSplitOrder" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Order No...">
+                                <SelectedTemplate>@context.DisplayName</SelectedTemplate>
+                                <ResultTemplate>@context.DisplayName</ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Target Article</label>
+                            <BlazoredTypeahead SearchMethod="SearchSplitArticles" @bind-Value="SelectedSplitArticle" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Article...">
+                                <SelectedTemplate>@context.Name</SelectedTemplate>
+                                <ResultTemplate>@context.Name</ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Split Qty (Max: @SelectedItem.RcvdQty.ToString("N0"))</label>
+                            <input type="number" class="form-control form-control-sm text-center fw-bold" @bind="SplitLotModel.SplitQty" min="1" max="@SelectedItem.RcvdQty" />
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Remarks</label>
+                            <input type="text" class="form-control form-control-sm" @bind="SplitLotModel.Remarks" placeholder="Enter transfer remarks..." />
+                        </div>
+                    </div>
+                }
+
+                <!-- MODE 2: Transfer to S/F Stock -->
+                @if (SplitMode == 2)
+                {
+                    @if (SelectedItem.IssQty > 0)
+                    {
+                        <div class="alert alert-danger py-2 px-3 mb-2 small">
+                            <i class="fas fa-exclamation-triangle me-1"></i> <strong>Cannot Transfer:</strong> This entry has already been issued.
+                        </div>
+                    }
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Store</label>
+                            <BlazoredTypeahead SearchMethod="SearchStores" @bind-Value="SelectedStore" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Store...">
+                                <SelectedTemplate>@context.StoreName</SelectedTemplate>
+                                <ResultTemplate>@context.StoreName</ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Location / Shelf</label>
+                            <BlazoredTypeahead SearchMethod="SearchShelves" @bind-Value="SelectedShelf" EnableDropDown="true" MaximumSuggestions="1000" Placeholder="Select Shelf Location...">
+                                <SelectedTemplate>@context.DisplayName</SelectedTemplate>
+                                <ResultTemplate>@context.DisplayName</ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Transfer Qty</label>
+                            <input type="number" class="form-control form-control-sm text-center fw-bold" @bind="TransferSFModel.TransferQty" min="1" max="@(SelectedItem.RcvdQty - SelectedItem.Wastage - SelectedItem.ReWorkQty)" />
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Remarks</label>
+                            <input type="text" class="form-control form-control-sm" @bind="TransferSFModel.Remarks" placeholder="Remarks for opening..." />
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="modal-footer border-top py-2 px-3 bg-light d-flex justify-content-between align-items-center" style="flex-shrink: 0;">
+                <div class="text-muted small">
+                    @if (SplitMode == 1)
+                    {
+                        <span><i class="fas fa-magic text-primary me-1"></i> A new Lot number will be automatically generated.</span>
+                    }
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-secondary px-3" @onclick="CloseSplitTransferModal" disabled="@IsProcessingSplit">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary fw-bold px-3" @onclick="ExecuteSplitTransfer" disabled="@IsProcessingSplit">
+                        @if (IsProcessingSplit)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-check-circle me-1"></i>
+                        }
+                        Post
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 <!-- Deletion Reason Modal Dialog (Director Approval Required) -->
 @if (ShowDeleteReasonModal && DeletingItem != null)
 {
@@ -956,6 +958,7 @@
     <Item OnClick="@PrintPTCMini"><i class="fas fa-file-alt text-dark me-2"></i> Print PTC (Mini)</Item>
     <Item OnClick="@PrintPTCWithCost"><i class="fas fa-file-invoice-dollar text-success me-2"></i> Print PTC (With Cost)</Item>
     <Item OnClick="@PrintRepairSlip"><i class="fas fa-tools text-secondary me-2"></i> Print Repair Slip</Item>
+    <Item OnClick="@PrintRejectionGatePass"><i class="fas fa-ticket-alt text-danger me-2"></i> Print Rejection Gate-Pass</Item>
 
     <div class="win11-section-header px-3 py-1 text-muted small fw-bold border-bottom border-top mt-1">QC & INSPECTION</div>
     <Item OnClick="@PrintQCReport"><i class="fas fa-clipboard-check text-info me-2"></i> Print QC Report</Item>
@@ -977,6 +980,7 @@
     <div class="win11-section-header px-3 py-1 text-muted small fw-bold border-bottom">LIST REPORTS</div>
     <Item OnClick="@PrintList"><i class="fas fa-list text-primary me-2"></i> Print List</Item>
     <Item OnClick="@PrintListSelection"><i class="fas fa-check-square text-primary me-2"></i> Print List (Selection)</Item>
+    <Item OnClick="@PrintRejectionGatePass"><i class="fas fa-ticket-alt text-danger me-2"></i> Print Rejection Gate-Pass</Item>
     <Item OnClick="@PrintProcessList"><i class="fas fa-list-ol text-primary me-2"></i> Print Process List</Item>
     <Item OnClick="@PrintListSummary"><i class="fas fa-compress-alt text-info me-2"></i> Print List (Summary)</Item>
     <Item OnClick="@PrintProcesswiseIssueReceive"><i class="fas fa-tasks text-info me-2"></i> Processwise Issue Receive</Item>

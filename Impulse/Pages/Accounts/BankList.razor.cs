@@ -1,280 +1,645 @@
-using BlazorBootstrap;
 using BlazorContextMenu;
-using DataAccessLibrary;
-using DataAccessLibrary.DAC.Accounts;
 using DataAccessLibrary.Interface.Accounts;
-using DataAccessLibrary.Models;
 using DataAccessLibrary.Models.ViewModels.Accounts;
-using DocumentFormat.OpenXml.Office2010.CustomUI;
 using Impulse.Services;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.JSInterop;
-using Microsoft.VisualBasic;
 using Radzen;
-using System.Collections.ObjectModel;
-using System.Security.AccessControl;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
-using OpenXmlMenu = DocumentFormat.OpenXml.Office2010.CustomUI;
 
 namespace Impulse.Pages.Accounts
 {
-    public partial class BankList : ComponentBase
+    public partial class BankList : ComponentBase, IDisposable
     {
-        private BankListModel banklistmodel = new();
+        [SupplyParameterFromQuery]
+        public string? ReturnUrl { get; set; }
 
         [Inject]
-        protected IBankListDataAccess BankListDataAccess { get; set; }
-        [Inject]
-        protected IDBHelper IDBHelper { get; set; }
-        [Inject]
-        protected IChartOfAccountsDataAccess iChartOfAccountsDataAccess { get; set; }
-        [Inject]
-        private INotificationService NotificationServiceManager { get; set; }
+        private IBankListDataAccess BankListDataAccess { get; set; } = default!;
 
-        private List<BankListModel> BankListfromDB { get; set; } = new List<BankListModel>();
-        private BankListModel SelectedBank;
-        private BankListModel CurrentBank = new BankListModel();
-        private List<BankListModel> accheadsforlist = new List<BankListModel>();
+        [Inject]
+        private IAuditService _auditService { get; set; } = default!;
 
-        private bool ShowModal;
-        private bool IsLoading=true;
-        private bool IsAdding;
-        private bool IsEdit;
-        private bool bshowinactive = false;
+        [Inject]
+        private INotificationService NotificationServiceManager { get; set; } = default!;
+
+        [Inject]
+        private DialogService DialogService { get; set; } = default!;
+
+        [Inject]
+        private NavigationManager Navigation { get; set; } = default!;
+
+        [Inject]
+        private IJSRuntime JS { get; set; } = default!;
+
+        // Data Collections
+        private List<BankBranchRecord> Branches { get; set; } = new();
+        private List<BankAccountItem> Accounts { get; set; } = new();
+        private List<string> DistinctBankNames { get; set; } = new();
+        private List<string> DistinctCities { get; set; } = new();
+
+        // Selected Entity State
+        private string? SelectedBankName;
+        private BankBranchRecord? SelectedBranch;
+        private BankAccountItem? SelectedAccount;
+        private List<BankAccountItem> SelectedBranchAccounts { get; set; } = new();
+
+        // Tree Expansion & Search
+        private string SearchText = string.Empty;
+        private HashSet<string> ExpandedBanks = new(StringComparer.OrdinalIgnoreCase);
+        private HashSet<int> ExpandedBranches = new();
+
+        // Loading & Saving Spinners
+        private bool IsLoading = true;
+        private bool IsSaving = false;
+
+        // Modal Controls & Form State
+        private bool ShowBranchModal = false;
+        private SaveBankBranchDto BranchModel = new();
+
+        private bool ShowAccountModal = false;
+        private SaveBankAccountDto AccountModel = new();
+
+        private bool ShowODModal = false;
+        private OverdraftConfigDto ODModel = new();
+
+        private string strUserName = "System";
+        private string strComputerName = "Web";
+
+        // Hierarchical Grouping Model
+        public class BankHierarchyGroup
+        {
+            public string BankName { get; set; } = string.Empty;
+            public List<BranchHierarchyGroup> Branches { get; set; } = new();
+        }
+
+        public class BranchHierarchyGroup
+        {
+            public BankBranchRecord Branch { get; set; } = new();
+            public List<BankAccountItem> Accounts { get; set; } = new();
+        }
 
         protected override async Task OnInitializedAsync()
         {
             IsLoading = true;
             try
             {
-                await Refreshlist();
+                strUserName = _auditService.GetCurrentUserName();
+                strComputerName = _auditService.GetClientIpAddress();
+
+                await LoadDataAsync();
+
+                // Auto-select Default Bank Account (or first account / branch if available)
+                var defaultAcc = Accounts.FirstOrDefault(a => a.DefaultBank) ?? Accounts.FirstOrDefault();
+                if (defaultAcc != null)
+                {
+                    SelectAccount(defaultAcc);
+                }
+                else if (Branches.Any())
+                {
+                    SelectBranch(Branches.First());
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error fetching Data: {ex.Message}");
+                NotificationServiceManager.ShowError("Load Error", $"Failed to load banking data: {ex.Message}");
             }
             finally
             {
                 IsLoading = false;
             }
         }
-        private async Task SaveBank()
-        {
-            if (IsAdding)
-            {
-                if (string.IsNullOrWhiteSpace(CurrentBank.Bank))
-                {
-                    await JS.InvokeVoidAsync("alert", "Cannot Save Bank. Cannot Save Without Bank Name.");
-                    return;
-                }
-                else if (string.IsNullOrWhiteSpace(CurrentBank.Branch))
-                {
-                    await JS.InvokeVoidAsync("alert", "Cannot Save Bank. Cannot Save Without Branch Name.");
-                    return;
-                }
-                else if (string.IsNullOrWhiteSpace(CurrentBank.City))
-                {
-                    await JS.InvokeVoidAsync("alert", "Cannot Save Bank. Cannot Save Without City");
-                    return;
-                }
-                    string strBankParent = await IDBHelper.getSingleStringValue("DataValue", "GeneralData", "WHERE DataName='BankParent'");
-                    string NextAccountNo = await iChartOfAccountsDataAccess.GetNextAccountNumberAsync("22", CurrentBank.Bank, false, strBankParent);
-                    CurrentBank.AccNo = NextAccountNo;
-                    CurrentBank.SubAccOf= strBankParent;
-                    CurrentBank.AccType = "22";
-                await BankListDataAccess.SaveNewBank(CurrentBank);
-            }
 
-            else if (IsEdit)
-            {
-                if (string.IsNullOrWhiteSpace(CurrentBank.Bank))
-                {
-                    await JS.InvokeVoidAsync("alert", "Cannot Save Bank. Cannot Save Without Bank Name.");
-                    return;
-                }
-                else if (string.IsNullOrWhiteSpace(CurrentBank.Branch))
-                {
-                    await JS.InvokeVoidAsync("alert", "Cannot Save Bank. Cannot Save Without Branch Name.");
-                    return;
-                }
-                else if (string.IsNullOrWhiteSpace(CurrentBank.City))
-                {
-                    await JS.InvokeVoidAsync("alert", "Cannot Save Bank. Cannot Save Without City.");
-                    return;
-                }
-                await BankListDataAccess.EditBankAsync(CurrentBank, CurrentBank.BankID);
-                ShowSuccess("Bank Saved", "Bank Saved successfully.");
-            }
-            ResetForm();
-            HideModal();
-            Refreshlist();
+        public void Dispose()
+        {
         }
 
-        private async void EditSelectedBank(ItemClickEventArgs e)
+        private async Task LoadDataAsync()
         {
-            var bank = e.Data as BankListModel;
-            SelectedBank = bank;
+            Branches = await BankListDataAccess.GetAllBankBranchesAsync();
+            Accounts = await BankListDataAccess.GetAllBankAccountsAsync();
+            DistinctBankNames = await BankListDataAccess.GetDistinctBankNamesAsync();
+            DistinctCities = await BankListDataAccess.GetDistinctCitiesAsync();
 
-            if (SelectedBank != null)
+            // Auto-expand all banks and branches by default for instant visibility
+            foreach (var b in Branches)
             {
-                CurrentBank = new BankListModel
+                if (!string.IsNullOrWhiteSpace(b.Bank))
                 {
-                    BankID = SelectedBank.BankID,
-                    Bank= SelectedBank.Bank,
-                    Branch = SelectedBank.Branch,
-                    City = SelectedBank.City,
-                    Phone1 = SelectedBank.Phone1,
-                    Phone2 = SelectedBank.Phone2,
-                    FaxNo = SelectedBank.FaxNo,
-                    Remittance = SelectedBank.Remittance,
-                    Manager = SelectedBank.Manager,
-                    Address = SelectedBank.Address,
-                    BankAccNo=SelectedBank.BankAccNo,
-                    Email = SelectedBank.Email,
-                };
+                    ExpandedBanks.Add(b.Bank);
+                }
+                ExpandedBranches.Add(b.BankID);
+            }
 
-                IsAdding = false;
-                ShowModal = true;
-                IsEdit = true;
-                StateHasChanged();
-                Console.WriteLine($"Editing: {SelectedBank.BankID}");
+            // Sync currently selected account or branch if one was selected
+            if (SelectedAccount != null)
+            {
+                SelectedAccount = Accounts.FirstOrDefault(a => a.AccNo == SelectedAccount.AccNo);
+            }
+            if (SelectedBranch != null)
+            {
+                SelectedBranch = Branches.FirstOrDefault(b => b.BankID == SelectedBranch.BankID);
+                if (SelectedBranch != null)
+                {
+                    SelectedBranchAccounts = Accounts.Where(a => a.BankID == SelectedBranch.BankID).ToList();
+                }
             }
         }
 
-        private void ResetForm()
+        // ─────────────────────────────────────────────────────────────
+        // Tree Hierarchy Building & Filtering
+        // ─────────────────────────────────────────────────────────────
+
+        private List<BankHierarchyGroup> GetFilteredHierarchy()
         {
+            var search = SearchText?.Trim() ?? string.Empty;
+            var list = new List<BankHierarchyGroup>();
+
+            // Distinct bank names from branches
+            var bankNames = Branches
+                .Select(b => b.Bank)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(name => name);
+
+            foreach (var bankName in bankNames)
+            {
+                var branchList = Branches
+                    .Where(b => string.Equals(b.Bank, bankName, StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(b => b.Branch)
+                    .ToList();
+
+                var branchHierarchyList = new List<BranchHierarchyGroup>();
+
+                foreach (var branch in branchList)
+                {
+                    var branchAccounts = Accounts
+                        .Where(a => a.BankID == branch.BankID)
+                        .OrderByDescending(a => a.DefaultBank)
+                        .ThenBy(a => a.AccTitle)
+                        .ToList();
+
+                    // Apply search filter if present
+                    if (!string.IsNullOrWhiteSpace(search))
+                    {
+                        bool branchMatches =
+                            branch.Bank.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                            branch.Branch.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                            branch.City.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                            (branch.Address != null && branch.Address.Contains(search, StringComparison.OrdinalIgnoreCase));
+
+                        var matchingAccounts = branchAccounts.Where(a =>
+                            a.AccTitle.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                            a.AccNo.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                            a.BankAccNo.Contains(search, StringComparison.OrdinalIgnoreCase)
+                        ).ToList();
+
+                        if (branchMatches || matchingAccounts.Any())
+                        {
+                            branchHierarchyList.Add(new BranchHierarchyGroup
+                            {
+                                Branch = branch,
+                                Accounts = branchMatches ? branchAccounts : matchingAccounts
+                            });
+                        }
+                    }
+                    else
+                    {
+                        branchHierarchyList.Add(new BranchHierarchyGroup
+                        {
+                            Branch = branch,
+                            Accounts = branchAccounts
+                        });
+                    }
+                }
+
+                if (branchHierarchyList.Any())
+                {
+                    list.Add(new BankHierarchyGroup
+                    {
+                        BankName = bankName,
+                        Branches = branchHierarchyList
+                    });
+                }
+            }
+
+            return list;
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // Tree Selection Handlers
+        // ─────────────────────────────────────────────────────────────
+
+        private void OnBankHeaderClick(BankHierarchyGroup bankGroup)
+        {
+            if (ExpandedBanks.Contains(bankGroup.BankName))
+            {
+                ExpandedBanks.Remove(bankGroup.BankName);
+            }
+            else
+            {
+                ExpandedBanks.Add(bankGroup.BankName);
+            }
+
+            SelectedBankName = bankGroup.BankName;
+            var firstBranch = bankGroup.Branches.FirstOrDefault()?.Branch;
+            if (firstBranch != null)
+            {
+                SelectBranch(firstBranch);
+            }
+        }
+
+        private void OnBranchHeaderClick(BranchHierarchyGroup branchGroup)
+        {
+            if (ExpandedBranches.Contains(branchGroup.Branch.BankID))
+            {
+                ExpandedBranches.Remove(branchGroup.Branch.BankID);
+            }
+            else
+            {
+                ExpandedBranches.Add(branchGroup.Branch.BankID);
+            }
+
+            SelectBranch(branchGroup.Branch);
+        }
+
+        private void SelectBranch(BankBranchRecord branch)
+        {
+            SelectedBranch = branch;
+            SelectedBankName = branch.Bank;
+            SelectedBranchAccounts = Accounts.Where(a => a.BankID == branch.BankID).ToList();
+
+            // If selected account doesn't belong to this branch, select first account in branch
+            if (SelectedAccount == null || SelectedAccount.BankID != branch.BankID)
+            {
+                SelectedAccount = SelectedBranchAccounts.FirstOrDefault();
+            }
+
             StateHasChanged();
-            if (!string.IsNullOrWhiteSpace(CurrentBank.Bank))
-            { 
-                CurrentBank.Bank= "";
-                CurrentBank.BankAccNo= "";
-                CurrentBank.Branch = "";
-                CurrentBank.City = "";
-                CurrentBank.Email = "";
-                CurrentBank.FaxNo = "";
-                CurrentBank.Phone1 = "";
-                CurrentBank.Phone2 = "";
-                CurrentBank.Address = "";
-                CurrentBank.BankID = 0;
-                SelectedBank = null;
+        }
+
+        private void SelectAccount(BankAccountItem acc)
+        {
+            SelectedAccount = acc;
+            SelectedBranch = Branches.FirstOrDefault(b => b.BankID == acc.BankID);
+            SelectedBankName = acc.Bank;
+
+            if (SelectedBranch != null)
+            {
+                SelectedBranchAccounts = Accounts.Where(a => a.BankID == acc.BankID).ToList();
+                ExpandedBranches.Add(SelectedBranch.BankID);
             }
+            if (!string.IsNullOrWhiteSpace(acc.Bank))
+            {
+                ExpandedBanks.Add(acc.Bank);
+            }
+
             StateHasChanged();
         }
 
-        private void GoToIndexPage()
+        // ─────────────────────────────────────────────────────────────
+        // Modal Handlers: Bank Branch
+        // ─────────────────────────────────────────────────────────────
+
+        private void OpenAddBranchModal()
         {
-            Navigation.NavigateTo("/", true);
+            BranchModel = new SaveBankBranchDto
+            {
+                BankID = 0,
+                Bank = SelectedBankName ?? string.Empty,
+                City = "Sialkot"
+            };
+            ShowBranchModal = true;
         }
 
-        private void ShowAddModal()
+        private void OpenAddBranchForBank(string? bankName)
         {
-            CurrentBank = new BankListModel { };
-            IsAdding = true;
-            ShowModal = true;
-            IsEdit = false;
+            BranchModel = new SaveBankBranchDto
+            {
+                BankID = 0,
+                Bank = bankName ?? string.Empty,
+                City = "Sialkot"
+            };
+            ShowBranchModal = true;
         }
 
-        private void HideModal()
+        private void OpenEditBranchModal(BankBranchRecord branch)
         {
-            CurrentBank = null;
-            IsAdding = false;
-            ShowModal = false;
-            IsEdit = false;
-        }
-        private void ShowWarning(string summary, string detail)
-        {
-            NotificationService.Notify(new NotificationMessage
+            BranchModel = new SaveBankBranchDto
             {
-                Severity = NotificationSeverity.Warning,
-                Summary = $"⚠️ {summary}",
-                Detail = detail,
-                Duration = 3000,
-                Style = MsgStyle("#fff3cd", "#856404", "#ffc107")
-            });
-        }
-        private void ShowSuccess(string summary, string detail)
-        {
-            NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Success,
-                Summary = summary,
-                Detail = detail,
-                Duration = 3000,
-                Style = MsgStyle("#d4edda", "#155724", "#28a745")
-            });
-        }
-        private void ShowError(string summary, string detail)
-        {
-            NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Error,
-                Summary = summary,
-                Detail = detail,
-                Duration = 3000,
-                Style = MsgStyle("#f8d7da", "#721c24", "#dc3545")
-            });
-        }
-        private string MsgStyle(string bgColor, string textColor, string borderColor)
-        {
-            return $@"
-                    background-color: {bgColor};
-                    color: {textColor};
-                    font-weight: 600;
-                    font-size: 14px;
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    position: fixed;
-                    top: 20px;
-                    right: 20px;
-                    z-index: 9999;
-                    min-width: 360px;
-                    max-width: 480px;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-                    border-left: 6px solid {borderColor};
-                    border-radius: 6px;
-                    padding: 16px 20px;
-                    display: flex;
-                    align-items: flex-start;
-                    gap: 12px;";
+                BankID = branch.BankID,
+                Bank = branch.Bank,
+                Branch = branch.Branch,
+                City = branch.City,
+                Phone1 = branch.Phone1,
+                Phone2 = branch.Phone2,
+                Fax = branch.Fax,
+                Email = branch.Email,
+                Manager = branch.Manager,
+                Address = branch.Address,
+                Remittance = branch.Remittance,
+                CompanyRefID = branch.CompanyRefID
+            };
+            ShowBranchModal = true;
         }
 
-        private async Task Refreshlist()
+        private async Task SaveBranch()
         {
-            IsLoading = true;
-            try
+            if (string.IsNullOrWhiteSpace(BranchModel.Bank))
             {
-                var BanksFromDb = await BankListDataAccess.GetBankList();
-                BankListfromDB = BanksFromDb.ToList();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error fetching Data: {ex.Message}");
-            }
-            finally
-            {
-                IsLoading = false;
-                StateHasChanged();
-            }
-        }
-
-        [Inject]
-        protected Radzen.NotificationService Notification { get; set; }
-
-        private async Task DeleteSelectedBank(ItemClickEventArgs e)
-        {
-            try
-            {
-                NotificationServiceManager.ShowWarning("Cannot delete this bank.", "Option Restricted.");
+                NotificationServiceManager.ShowWarning("Validation", "Bank Name is required.");
                 return;
-                StateHasChanged();
+            }
+            if (string.IsNullOrWhiteSpace(BranchModel.Branch))
+            {
+                NotificationServiceManager.ShowWarning("Validation", "Branch Name is required.");
+                return;
+            }
+
+            IsSaving = true;
+            try
+            {
+                var result = await BankListDataAccess.SaveBankBranchAsync(BranchModel, strUserName, strComputerName);
+                if (result.Success)
+                {
+                    NotificationServiceManager.ShowSuccess("Success", result.Message);
+                    ShowBranchModal = false;
+                    await LoadDataAsync();
+
+                    var savedBranch = Branches.FirstOrDefault(b => b.BankID == result.BankID);
+                    if (savedBranch != null)
+                    {
+                        SelectBranch(savedBranch);
+                    }
+                }
+                else
+                {
+                    NotificationServiceManager.ShowError("Save Failed", result.Message);
+                }
             }
             catch (Exception ex)
             {
-                //Console.WriteLine($"Error fetching Data: {ex.Message}");
-                NotificationServiceManager.ShowError("System Error Message", $"Failed to delete: {ex.Message}.");
+                NotificationServiceManager.ShowError("Error", ex.Message);
+            }
+            finally
+            {
+                IsSaving = false;
             }
         }
 
+        // ─────────────────────────────────────────────────────────────
+        // Modal Handlers: Bank Account
+        // ─────────────────────────────────────────────────────────────
+
+        private void OpenAddAccountModal(int bankId)
+        {
+            var branch = Branches.FirstOrDefault(b => b.BankID == bankId);
+            string defaultTitle = branch != null ? $"{branch.Bank} - {branch.Branch}" : string.Empty;
+
+            AccountModel = new SaveBankAccountDto
+            {
+                BankID = bankId,
+                IsNew = true,
+                Type = "Current",
+                AccTitle = defaultTitle,
+                OpenBal = 0,
+                OpenDate = DateTime.Today,
+                DefaultBank = !Accounts.Any() // automatically make default if it's the very first account
+            };
+            ShowAccountModal = true;
+        }
+
+        private void OpenEditAccountModal(BankAccountItem acc)
+        {
+            AccountModel = new SaveBankAccountDto
+            {
+                BankID = acc.BankID,
+                AccNo = acc.AccNo,
+                AccTitle = acc.AccTitle,
+                BankAccNo = acc.BankAccNo,
+                Type = acc.Type,
+                DefaultBank = acc.DefaultBank,
+                AllowOD = acc.AllowOD,
+                ODAmt = acc.ODAmt,
+                ODRate = acc.ODRate,
+                Chqformat = acc.Chqformat,
+                OpenBal = acc.OpenBal,
+                OpenDate = acc.OpenDate,
+                IsNew = false
+            };
+            ShowAccountModal = true;
+        }
+
+        private async Task SaveAccount()
+        {
+            if (AccountModel.BankID <= 0)
+            {
+                NotificationServiceManager.ShowWarning("Validation", "Please select a target Bank Branch.");
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(AccountModel.AccTitle))
+            {
+                NotificationServiceManager.ShowWarning("Validation", "Account Title is required.");
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(AccountModel.BankAccNo))
+            {
+                NotificationServiceManager.ShowWarning("Validation", "Bank Account Number is required.");
+                return;
+            }
+
+            IsSaving = true;
+            try
+            {
+                var result = await BankListDataAccess.SaveBankAccountAsync(AccountModel, strUserName, strComputerName);
+                if (result.Success)
+                {
+                    NotificationServiceManager.ShowSuccess("Success", $"{result.Message} (GL: {result.GeneratedAccNo})");
+                    ShowAccountModal = false;
+                    await LoadDataAsync();
+
+                    var savedAcc = Accounts.FirstOrDefault(a => a.AccNo == result.GeneratedAccNo);
+                    if (savedAcc != null)
+                    {
+                        SelectAccount(savedAcc);
+                    }
+                }
+                else
+                {
+                    NotificationServiceManager.ShowError("Save Failed", result.Message);
+                }
+            }
+            catch (Exception ex)
+            {
+                NotificationServiceManager.ShowError("Error", ex.Message);
+            }
+            finally
+            {
+                IsSaving = false;
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // Overdraft & Default Bank Operations
+        // ─────────────────────────────────────────────────────────────
+
+        private async Task SetAsDefault(string accNo)
+        {
+            try
+            {
+                var result = await BankListDataAccess.SetDefaultBankAccountAsync(accNo);
+                if (result.Success)
+                {
+                    NotificationServiceManager.ShowSuccess("Default Bank Set", result.Message);
+                    await LoadDataAsync();
+                }
+                else
+                {
+                    NotificationServiceManager.ShowError("Operation Failed", result.Message);
+                }
+            }
+            catch (Exception ex)
+            {
+                NotificationServiceManager.ShowError("Error", ex.Message);
+            }
+        }
+
+        private void OpenODModal(BankAccountItem acc)
+        {
+            ODModel = new OverdraftConfigDto
+            {
+                AccNo = acc.AccNo,
+                AllowOD = acc.AllowOD,
+                ODAmt = acc.ODAmt ?? 0,
+                ODRate = acc.ODRate ?? 0
+            };
+            ShowODModal = true;
+        }
+
+        private async Task SaveOD()
+        {
+            IsSaving = true;
+            try
+            {
+                var result = await BankListDataAccess.UpdateOverdraftAsync(ODModel);
+                if (result.Success)
+                {
+                    NotificationServiceManager.ShowSuccess("Overdraft Updated", result.Message);
+                    ShowODModal = false;
+                    await LoadDataAsync();
+                }
+                else
+                {
+                    NotificationServiceManager.ShowError("Failed", result.Message);
+                }
+            }
+            catch (Exception ex)
+            {
+                NotificationServiceManager.ShowError("Error", ex.Message);
+            }
+            finally
+            {
+                IsSaving = false;
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // Delete Confirmations
+        // ─────────────────────────────────────────────────────────────
+
+        private async Task OpenDeleteAccountConfirm(BankAccountItem acc)
+        {
+            bool? confirmed = await DialogService.Confirm(
+                $"Are you sure you want to permanently delete Bank Account '[{acc.AccNo}] {acc.AccTitle}'?\n\nThis will remove the mapping from BankAccounts and Accounts.",
+                "Delete Bank Account",
+                new ConfirmOptions
+                {
+                    OkButtonText = "Yes, Delete",
+                    CancelButtonText = "Cancel",
+                    AutoFocusFirstElement = false
+                });
+
+            if (confirmed == true)
+            {
+                try
+                {
+                    var result = await BankListDataAccess.DeleteBankAccountAsync(acc.AccNo);
+                    if (result.Success)
+                    {
+                        NotificationServiceManager.ShowSuccess("Deleted", result.Message);
+                        SelectedAccount = null;
+                        await LoadDataAsync();
+                    }
+                    else
+                    {
+                        NotificationServiceManager.ShowWarning("Cannot Delete", result.Message);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    NotificationServiceManager.ShowError("Error", ex.Message);
+                }
+            }
+        }
+
+        private async Task OpenDeleteBranchConfirm(BankBranchRecord branch)
+        {
+            bool? confirmed = await DialogService.Confirm(
+                $"Are you sure you want to delete branch '{branch.Bank} — {branch.Branch}'?",
+                "Delete Bank Branch",
+                new ConfirmOptions
+                {
+                    OkButtonText = "Yes, Delete",
+                    CancelButtonText = "Cancel",
+                    AutoFocusFirstElement = false
+                });
+
+            if (confirmed == true)
+            {
+                try
+                {
+                    var result = await BankListDataAccess.DeleteBankBranchAsync(branch.BankID);
+                    if (result.Success)
+                    {
+                        NotificationServiceManager.ShowSuccess("Deleted", result.Message);
+                        SelectedBranch = null;
+                        SelectedAccount = null;
+                        await LoadDataAsync();
+                    }
+                    else
+                    {
+                        NotificationServiceManager.ShowWarning("Cannot Delete", result.Message);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    NotificationServiceManager.ShowError("Error", ex.Message);
+                }
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // Navigation Handlers
+        // ─────────────────────────────────────────────────────────────
+
+        private void GoToChequeBooks()
+        {
+            Navigation.NavigateTo("/accounts/chqbookdetail");
+        }
+
+        private void GoBack()
+        {
+            if (!string.IsNullOrEmpty(ReturnUrl))
+            {
+                Navigation.NavigateTo(ReturnUrl);
+            }
+            else
+            {
+                Navigation.NavigateTo("/");
+            }
+        }
     }
 }

@@ -44,6 +44,11 @@ namespace Impulse.Services.Production
             return _dataAccess.GetItemRateAsync(vendId, processId, returnProcessId, itemId);
         }
 
+        public Task<List<PlannedSFLotAllocationModel>> GetPlannedSFAllocationsForOrderAsync(string orderNo)
+        {
+            return _dataAccess.GetPlannedSFAllocationsForOrderAsync(orderNo);
+        }
+
         public Task<long> SaveSFIssuanceAsync(CreateSFIssuanceHeaderModel header, List<CreateSFIssuanceLineModel> lines, string userName, int userId, string machineName)
         {
             return _dataAccess.SaveSFIssuanceAsync(header, lines, userName, userId, machineName);

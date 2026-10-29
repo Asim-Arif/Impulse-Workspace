@@ -46,9 +46,8 @@
             else if (ChartOfAccountsfromDB?.Any() ?? false)
             {
                 <div style="width: 100%">
-                    <ContextMenuProvider Id="tableContextMenu">
-                        <table class="table table-bordered table-hover align-middle mb-0"
-                               style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
+                    <table class="table table-bordered table-hover align-middle mb-0"
+                           style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">
                             <thead class="theme-color"
                                    style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">                                   
                                
@@ -113,17 +112,10 @@
                                             }
                                         </td>
 
-                                        <td style="width: 5%;">
-                                            <ContextMenuTrigger 
-                                                MenuId="accountContextMenu"
-                                                Data="account"
-                                                MouseButtonTrigger="MouseButtonTrigger.Both">
-
-                                                <button class="btn btn-sm btn-primary" style="border:none; background:none;">
-                                                    <i class="fa-solid fa-ellipsis-vertical" style="color:black "></i>
-                                                </button>
-
-                                            </ContextMenuTrigger>
+                                        <td style="width: 5%;" class="text-center" @onclick:stopPropagation="true">
+                                            <button type="button" class="btn btn-sm btn-link text-dark p-0" title="Options" @onclick="(e) => OpenRowMenu(e, account)">
+                                                <i class="fas fa-ellipsis-vertical"></i>
+                                            </button>
                                         </td>
 
                                 </ContextMenuTrigger>
@@ -131,99 +123,15 @@
                                 </Virtualize>
                             </tbody>
                         </table>
-                    </ContextMenuProvider>
                 </div>
             }
             else
             {
                 <div class="text-center py-3 text-muted">No accounts found.</div>
             }
-@* POP MENU START FROM HERE *@
-            @* <ContextMenu Id="accountContextMenu" 
-                          UseDefaultEventHandlers="true"
-                         class="list-group shadow-sm rounded-3 border-0 context-menu-small"
-                         style="min-width: 150px; background: #ffffff; font-family: 'Segoe UI', Calibri, sans-serif; font-size: 6pt;"> *@
-            
-            <ContextMenu Id="accountContextMenu"  
-                         UseDefaultEventHandlers="true"
-                         Template="Win11Style"
-                         >
-
-                <!-- Section 1: General Actions -->
-                @* <Item OnClick="@RefreshData" class="menu-item">
-                    <i class="fas fa-sync-alt fa-fw me-3 text-primary"></i> Refresh
-                </Item> *@
-                <Item OnClick="@RefreshData">
-                    <i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh
-                </Item>
-                @* <Item OnClick="@(async (e) => ShowInActive(e, !bshowinactive))" class="menu-item">
-                    <i class="fas fa-filter fa-fw me-3 text-secondary"></i> Show InActive Accounts
-                 </Item>*@
-                <Item OnClick="@(async (e) => ShowInActive(e, !bshowinactive))">
-                    <i class="fas fa-eye fa-fw win11-icon"></i> Show InActive Accounts
-                </Item>
-                <div class="menu-divider"></div>
-                <Seperator/>
-
-                @* <div class="menu-section text-uppercase text-muted small px-3 mt-2 mb-1">Options</div> *@
-
-                <!-- Section 2: Account Management -->
-                <Item OnClick="ShowAddModal" class="menu-item">
-                    <i class="fas fa-plus fa-fw win11-icon"></i> Add New Account
-                </Item>
-
-                @* <Item OnClick="EditSelectedAccount" class="menu-item"> *@
-                <Item OnClick="EditSelectedAccount" class="menu-item">
-                    <i class="fas fa-pen fa-fw win11-icon"></i> Edit Selected Account
-                </Item>
-
-                @* <Item OnClick="DeleteSelectedAccount" class="menu-item"> *@
-               <Item OnClick="@(async (e) => await DeleteSelectedAccount(e))" class="menu-item">
-                    <i class="fas fa-trash-alt fa-fw win11-icon"></i> Delete Account
-                </Item>
-
-                <Item OnClick="MakeAccountActive" class="menu-item">
-                    <i class="fas fa-toggle-off fa-fw win11-icon"></i> Make This Account InActive
-                </Item>
-
-                <div class="menu-divider"></div>
-                <Seperator />
-                <!-- Section 3: Reports -->
-                @* <div class="menu-section text-uppercase text-muted small px-3 mt-2 mb-1">Reports</div> *@
-
-                <Item class="menu-item" OnClick="@(() => PrintChartOfAccounts(1))">
-                    <i class="fas fa-book fa-fw win11-icon"></i> Print Chart Of Accounts
-                </Item>
-
-                <Item class="menu-item" OnClick="@(() => PrintChartOfAccounts(2))">
-                    <i class="fas fa-box-open fa-fw win11-icon"></i> Print Accounts Opening
-                </Item>
-
-                <Item class="menu-item" OnClick="@(() => PrintChartOfAccounts(1))">
-                    <i class="fas fa-balance-scale-left fa-fw win11-icon"></i> Print Current Balances
-                </Item>
-
-                @* <Item class="menu-item">
-                    <i class="fas fa-list-alt fa-fw win11-icon"></i> Print Ledgers (Sub Accounts)
-                </Item> *@
-
-            </ContextMenu>
-
-            @if (IsContextMenuVisible)
-            {
-                @* <div class="context-menu position-absolute bg-white border rounded shadow-sm p-2"
-                     style="top:@ContextMenuToppx px; left:@ContextMenuLeftpx px; z-index:1000;">
-                    <div class="menu-item py-1 px-2" @onclick="EditSelectedAccount">✏️ Edit</div>
-                    <div class="menu-item py-1 px-2" @onclick="DeleteSelectedAccount">🗑️ Delete</div>
-                    <div class="menu-item py-1 px-2" @onclick="ViewDetails">👁️ View Details</div>
-                </div> *@
-            }
-
         </div>
-
-
         <!-- TABLE END HERE -->
-    @* </div> *@
+    </div>
 
 </div>
     
@@ -315,11 +223,11 @@
                                 <input type="text" id="AccNo" name="AccNo" @bind="CurrentAccount.AccNo" class="form-control" readonly /> 
                             </div>
 
-                            @if (IsEdit == false)
+                            @if (IsEdit == false || !CurrentAccount.AccType)
                             {
                                 <div class="col-md-6">
                                     <label class="form-label fw-semibold">Opening Balance :</label>
-                                    <input @bind="CurrentAccount.Balance" type="number" step="0.01" class="form-control" />
+                                    <input @bind="CurrentAccount.OpeningBalance" type="number" step="0.01" class="form-control" />
                                 </div>
                             }
                             <div class="col-md-6">
@@ -327,16 +235,8 @@
                                 <input @bind="CurrentAccount.OpenDate" type="date" class="form-control" />
                             </div>
 
-                            @* <div class="col-md-6">
-                                <label class="form-label fw-semibold" for="opt1">Debit</label>
-                                <input type="radio" id="optDr" name="options" checked="@(CurrentAccount.BalType==1) " @onchange="@(() => OnChangedBalanceType(1))" />
-
-                                <label class="form-label fw-semibold" for="opt2">Credit</label>
-                                 <input type="radio" id="optCr" name="options" checked="@((CurrentAccount.BalType == 2)) " @onchange="@(() => OnChangedBalanceType(2))" />
-                            </div> *@
-                            @if (IsEdit == false)
+                            @if (IsEdit == false || !CurrentAccount.AccType)
                             {
-
                                 <div class="col-md-6 d-flex align-items-center">
                                     <InputRadioGroup @bind-Value="CurrentAccount.BalType">
                                         <div class="form-check me-3">
@@ -372,5 +272,47 @@
             </div>
         </div>
     }
-</div>
+
+<!-- Windows 11 Style Context Menu (Placed at root level for accurate mouse-click coordinates) -->
+<ContextMenu Id="accountContextMenu" Template="Win11Style">
+    <Item OnClick="@RefreshData">
+        <i class="fas fa-sync-alt fa-fw win11-icon text-primary"></i> Refresh
+    </Item>
+    <Item OnClick="@(async (e) => ShowInActive(e, !bshowinactive))">
+        <i class="fas fa-eye fa-fw win11-icon text-secondary"></i> Show InActive Accounts
+    </Item>
+    <Seperator />
+
+    <Item OnClick="ShowAddModal" class="win11-menu-item">
+        <i class="fas fa-plus fa-fw win11-icon text-success"></i> Add New Account
+    </Item>
+    <Item OnClick="EditSelectedAccount" class="win11-menu-item">
+        <i class="fas fa-pen fa-fw win11-icon text-secondary"></i> Edit Selected Account
+    </Item>
+    <Item OnClick="@(async (e) => await DeleteSelectedAccount(e))" class="win11-menu-item">
+        <i class="fas fa-trash-alt fa-fw win11-icon text-danger"></i> Delete Account
+    </Item>
+    <Item OnClick="MakeAccountActive" class="win11-menu-item">
+        <i class="fas fa-toggle-off fa-fw win11-icon text-warning"></i> Make This Account InActive
+    </Item>
+    <Seperator />
+
+    <Item class="win11-menu-item" OnClick="@(() => PrintChartOfAccounts(1))">
+        <i class="fas fa-book fa-fw win11-icon text-info"></i> Print Chart Of Accounts
+    </Item>
+    <Item class="win11-menu-item" OnClick="@(() => PrintChartOfAccounts(2))">
+        <i class="fas fa-box-open fa-fw win11-icon text-info"></i> Print Accounts Opening
+    </Item>
+    <Item class="win11-menu-item" OnClick="@(() => PrintChartOfAccounts(1))">
+        <i class="fas fa-balance-scale-left fa-fw win11-icon text-info"></i> Print Current Balances
+    </Item>
+</ContextMenu>
+
+<style>
+    .win11-context-menu-container, .blazor-context-menu {
+        max-height: 45vh !important;
+        overflow-y: auto !important;
+        z-index: 100000 !important;
+    }
+</style>
 

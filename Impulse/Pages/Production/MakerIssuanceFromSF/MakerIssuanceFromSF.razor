@@ -1,5 +1,7 @@
 @page "/production/maker-issuance-from-sf"
+@page "/production/maker-issuance-from-sf/{OrderNo}"
 @page "/stock/maker-issuance-from-sf"
+@page "/stock/maker-issuance-from-sf/{OrderNo}"
 @attribute [Authorize]
 @using DataAccessLibrary.Models.ViewModels.Production
 @using Blazored.Typeahead
@@ -82,24 +84,27 @@
                     </div>
                 </div>
                 <div class="ms-auto d-flex align-items-center gap-3">
-                    <div class="form-check form-switch mb-0">
-                        <input class="form-check-input" type="checkbox" id="chkIssByLotNo" @bind="Header.IssuanceByLotNo" />
-                        <label class="form-check-label fw-bold text-danger me-2" for="chkIssByLotNo" style="font-size:0.85rem;">
-                            Issuance by Lot No.
-                        </label>
-                    </div>
-
-                    @if (Header.IssuanceByLotNo)
+                    @if (!IsPlannedOrderMode)
                     {
-                        <div class="input-group input-group-sm" style="width: 260px;">
-                            <input type="text" class="form-control fw-bold border-danger text-uppercase"
-                                   placeholder="Enter Lot No..."
-                                   @bind="Header.SearchedLotNo"
-                                   @onkeyup="HandleLotSearchKeyUp" />
-                            <button type="button" class="btn btn-danger" @onclick="SearchLotNoAsync">
-                                <i class="fas fa-search me-1"></i> Fetch
-                            </button>
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" id="chkIssByLotNo" @bind="Header.IssuanceByLotNo" />
+                            <label class="form-check-label fw-bold text-danger me-2" for="chkIssByLotNo" style="font-size:0.85rem;">
+                                Issuance by Lot No.
+                            </label>
                         </div>
+
+                        @if (Header.IssuanceByLotNo)
+                        {
+                            <div class="input-group input-group-sm" style="width: 260px;">
+                                <input type="text" class="form-control fw-bold border-danger text-uppercase"
+                                       placeholder="Enter Lot No..."
+                                       @bind="Header.SearchedLotNo"
+                                       @onkeyup="HandleLotSearchKeyUp" />
+                                <button type="button" class="btn btn-danger" @onclick="SearchLotNoAsync">
+                                    <i class="fas fa-search me-1"></i> Fetch
+                                </button>
+                            </div>
+                        }
                     }
 
                     <div class="form-check form-switch mb-0 ms-2">
@@ -110,6 +115,60 @@
                     </div>
                 </div>
             </div>
+
+            <!-- ── Planned Order Banner ────────────────────────────────── -->
+            @if (IsPlannedOrderMode)
+            {
+                <div class="alert alert-primary py-2 px-3 mb-3 d-flex align-items-center justify-content-between shadow-sm" style="border-radius: 8px;">
+                    <div class="d-flex align-items-center gap-2">
+                        <div style="width:34px;height:34px;background:rgba(13,110,253,0.15);border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                            <i class="fas fa-clipboard-check text-primary fa-lg"></i>
+                        </div>
+                        <div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fw-bold" style="font-size: 0.95rem;">PPC Planned SF Issuance:</span>
+                                <span class="badge bg-primary fs-6">Order #@EffectiveOrderNo</span>
+                                @if (SelectedPlannedAllocation != null)
+                                {
+                                    <span class="badge bg-light text-dark border ms-1">
+                                        <i class="fas fa-cogs text-primary me-1"></i> @SelectedPlannedAllocation.ProcessName
+                                    </span>
+                                }
+                            </div>
+                            <small class="text-secondary d-block" style="font-size: 0.78rem;">
+                                Issuing planned Semi-Finished lot back to production. Selection is restricted to the planned item and stock store.
+                            </small>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        @if (PlannedAllocations.Count > 1)
+                        {
+                            <div class="d-flex align-items-center gap-1">
+                                <small class="fw-bold text-secondary">Select Lot:</small>
+                                <select class="form-select form-select-sm" style="width: auto; font-size: 0.8rem;"
+                                        value="@SelectedPlannedAllocation?.EntryID"
+                                        @onchange="OnPlannedAllocationSelectChange">
+                                    @foreach (var pa in PlannedAllocations)
+                                    {
+                                        <option value="@pa.EntryID">
+                                            @pa.LotNo (@pa.ItemName) - Rem: @pa.RemainingToIssue pcs
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+                        }
+                        <span class="badge @(TotalPlannedRemaining > 0 ? "bg-warning text-dark border" : "bg-success") px-2 py-1 shadow-sm" style="font-size: 0.82rem;">
+                            @(TotalPlannedRemaining > 0 ? $"Planned Rem: {TotalPlannedRemaining} pcs" : "All Lots Issued")
+                        </span>
+                        @if (!string.IsNullOrEmpty(ReturnUrl))
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-primary" style="height: 31px;" @onclick="NavigateBack">
+                                <i class="fas fa-arrow-left me-1"></i> Back to Plan
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
 
             <!-- SECTION 1: GENERAL HEADER PANEL -->
             <div class="card mb-3 border card-header-row" style="background:#f8f9fb; border-radius:8px;">
@@ -129,19 +188,26 @@
                         <div class="col-md-3">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
                                 Process <span class="text-danger">*</span>
+                                @if (IsPlannedOrderMode)
+                                {
+                                    <small class="text-primary ms-1"><i class="fas fa-lock fa-xs"></i> (Planned Process)</small>
+                                }
                             </label>
-                            <BlazoredTypeahead SearchMethod="SearchProcesses"
-                                               @bind-Value="SelectedProcess"
-                                               Placeholder="Select Process..."
-                                               EnableDropDown="true"
-                                               MaximumSuggestions="1000">
-                                <SelectedTemplate Context="p">
-                                    @p.Description
-                                </SelectedTemplate>
-                                <ResultTemplate Context="p">
-                                    @p.SNO. @p.Description
-                                </ResultTemplate>
-                            </BlazoredTypeahead>
+                            <div class="@(IsPlannedOrderMode ? "disabled-typeahead-wrapper" : "")">
+                                <BlazoredTypeahead SearchMethod="SearchProcesses"
+                                                   @bind-Value="SelectedProcess"
+                                                   Placeholder="Select Process..."
+                                                   EnableDropDown="true"
+                                                   Disabled="IsPlannedOrderMode"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="p">
+                                        @p.Description
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="p">
+                                        @p.SNO. @p.Description
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
                         </div>
 
                         <!-- Return Process -->
@@ -224,32 +290,43 @@
                         <div class="col-md-4">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
                                 Select SF Item <span class="text-danger">*</span>
+                                @if (IsPlannedOrderMode)
+                                {
+                                    <small class="text-primary ms-1"><i class="fas fa-lock fa-xs"></i> (Planned Item)</small>
+                                }
                             </label>
-                            <BlazoredTypeahead SearchMethod="SearchSFItems"
-                                               @bind-Value="SelectedItem"
-                                               Placeholder="Select Available Item..."
-                                               EnableDropDown="true"
-                                               MaximumSuggestions="1000">
-                                <SelectedTemplate Context="i">
-                                    @i.DisplayText
-                                </SelectedTemplate>
-                                <ResultTemplate Context="i">
-                                    @i.DisplayText
-                                </ResultTemplate>
-                            </BlazoredTypeahead>
+                            <div class="@((IsPlannedOrderMode && AvailableSFItems.Count <= 1) ? "disabled-typeahead-wrapper" : "")">
+                                <BlazoredTypeahead SearchMethod="SearchSFItems"
+                                                   @bind-Value="SelectedItem"
+                                                   Placeholder="Select Available Item..."
+                                                   EnableDropDown="true"
+                                                   Disabled="IsPlannedOrderMode && AvailableSFItems.Count <= 1"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="i">
+                                        @i.DisplayText
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="i">
+                                        @i.DisplayText
+                                    </ResultTemplate>
+                                </BlazoredTypeahead>
+                            </div>
                         </div>
 
                         <!-- Stock Location / Shelf / In-Hand Qty -->
                         <div class="col-md-5">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
                                 Stock Location / Rack / Lot <span class="text-danger">*</span>
+                                @if (IsPlannedOrderMode)
+                                {
+                                    <small class="text-primary ms-1"><i class="fas fa-lock fa-xs"></i> (Planned Store Lot)</small>
+                                }
                             </label>
-                            <div class="@(SelectedItem == null ? "disabled-typeahead-wrapper" : "")">
+                            <div class="@((SelectedItem == null || (IsPlannedOrderMode && OpeningLocations.Count <= 1)) ? "disabled-typeahead-wrapper" : "")">
                                 <BlazoredTypeahead SearchMethod="SearchOpeningLocations"
                                                    @bind-Value="SelectedLocation"
                                                    Placeholder="Select Stock Location..."
                                                    EnableDropDown="true"
-                                                   Disabled="SelectedItem == null"
+                                                   Disabled="SelectedItem == null || (IsPlannedOrderMode && OpeningLocations.Count <= 1)"
                                                    MaximumSuggestions="1000">
                                     <SelectedTemplate Context="loc">
                                         @loc.DisplayText
@@ -263,13 +340,19 @@
 
                         <!-- Customer Order No -->
                         <div class="col-md-3">
-                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">Order No.</label>
-                            <div class="@(SelectedItem == null ? "disabled-typeahead-wrapper" : "")">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
+                                Order No.
+                                @if (IsPlannedOrderMode)
+                                {
+                                    <small class="text-primary ms-1"><i class="fas fa-lock fa-xs"></i> (Locked to Plan)</small>
+                                }
+                            </label>
+                            <div class="@((SelectedItem == null || IsPlannedOrderMode) ? "disabled-typeahead-wrapper" : "")">
                                 <BlazoredTypeahead SearchMethod="SearchOrders"
                                                    @bind-Value="SelectedOrder"
                                                    Placeholder="Select Order No..."
                                                    EnableDropDown="true"
-                                                   Disabled="SelectedItem == null"
+                                                   Disabled="SelectedItem == null || IsPlannedOrderMode"
                                                    MaximumSuggestions="1000">
                                     <SelectedTemplate Context="o">
                                         @o.DisplayText
@@ -286,8 +369,14 @@
                     <!-- Line Entry Controls -->
                     <div class="row g-2 align-items-end p-2 bg-light rounded border" style="position: relative; z-index: 1;">
                         <div class="col-md-2">
-                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Qty to Issue</label>
-                            <input type="number" class="form-control form-control-sm text-end fw-bold" @bind="LineIssQty" placeholder="0" />
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
+                                Qty to Issue @(IsPlannedOrderMode && SelectedPlannedAllocation != null ? $"(Max: {SelectedPlannedAllocation.RemainingToIssue})" : "")
+                            </label>
+                            <input type="number" class="form-control form-control-sm text-end fw-bold @(IsPlannedOrderMode ? "border-primary" : "")"
+                                   @bind="LineIssQty"
+                                   placeholder="0"
+                                   min="1"
+                                   max="@(IsPlannedOrderMode && SelectedPlannedAllocation != null ? SelectedPlannedAllocation.RemainingToIssue : (SelectedLocation?.InHandQty ?? 0))" />
                         </div>
                         <div class="col-md-2">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Unit Rate (Pcs)</label>

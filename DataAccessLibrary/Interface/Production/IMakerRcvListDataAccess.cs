@@ -37,6 +37,9 @@ namespace DataAccessLibrary.Interface.Production
         Task<InspectionDataDto> GetInspectionDataAsync(long vrdEntryId);
         Task<List<InspectionParameterItem>> GetProcessInspectionParametersAsync(int processId);
         Task<bool> SaveInspectionDataAsync(SaveInspectionRequest request);
+
+        // Rejection Gate-Pass
+        Task<long> GetRejectionGatePassWastageCountAsync(IEnumerable<long> vendReceivedEntryIds);
     }
 }
 

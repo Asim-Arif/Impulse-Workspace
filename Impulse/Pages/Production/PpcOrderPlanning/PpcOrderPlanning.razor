@@ -17,7 +17,7 @@
                     </div>
                     <div>
                         <h1 class="mb-0 fw-bold" style="font-size:1.25rem;color:#1565C0;">PPC Order Planning</h1>
-                        <small class="text-muted" style="font-size:0.75rem;">Material planning, live stock allocation, purchase orders, and hub manufacturing schedules</small>
+                        <small class="text-muted" style="font-size:0.75rem;">Material planning, finish stock, semi-finished stock, maker purchase orders, and hub manufacturing schedules</small>
                     </div>
                 </div>
 
@@ -164,7 +164,7 @@
                         <div class="card border rounded-3 shadow-none order-item-card" style="background-color: @(item.Authorized ? "#ffffff" : "#fbfcfe"); border-color: @(item.Authorized ? "#d8deea" : "#e2e8f0") !important;">
                             
                             <!-- Item Header Banner -->
-                            <div class="card-header py-2 px-3 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2" style="background-color: #f8fafc;">
+                            <div class="card-header py-2 px-3 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2" style="background-color: #f8fafc; font-size: 0.88rem;">
                                 <div class="d-flex align-items-center gap-2">
                                     <span class="badge bg-primary px-2 py-1" style="font-size: 0.85rem;">
                                         @item.CompItemID
@@ -234,7 +234,10 @@
                                         <strong>Order Qty:</strong> @item.OrderQty.ToString("N0") pcs
                                     </span>
                                     <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle px-2 py-1">
-                                        <i class="fas fa-warehouse me-1 text-primary"></i> In-Hand Stock: @item.AvailableInHandStock.ToString("N0") pcs
+                                        <i class="fas fa-warehouse me-1 text-primary"></i> Finish Stock: @item.AvailableInHandStock.ToString("N0") pcs
+                                    </span>
+                                    <span class="badge @(item.AvailableSFStock > 0 ? "bg-info-subtle text-info-emphasis border border-info-subtle" : "bg-light text-muted border") px-2 py-1">
+                                        <i class="fas fa-cubes me-1 text-info"></i> SF Stock: @item.AvailableSFStock.ToString("N0") pcs
                                     </span>
                                     @if (!item.Authorized)
                                     {
@@ -272,9 +275,10 @@
                                     
                                     <!-- 1. Stock Allocation Column -->
                                     <div class="col-lg-4 col-md-5 border-end pe-lg-3">
+                                        <!-- 1a. Finish Stock -->
                                         <div class="p-2 rounded-2 mb-2" style="background-color: #f8fafc; border: 1px dashed #cbd5e1;">
                                             <label class="form-label form-label-sm fw-bold text-secondary mb-1 d-flex align-items-center justify-content-between" style="font-size: 0.83rem;">
-                                                <span><i class="fas fa-boxes me-1 text-primary"></i> Issue from Live Stock</span>
+                                                <span><i class="fas fa-boxes me-1 text-primary"></i> Finish Stock</span>
                                                 <small class="text-muted">(Max: @item.AvailableInHandStock)</small>
                                             </label>
                                             <div class="input-group input-group-sm">
@@ -284,7 +288,7 @@
                                                        max="@item.AvailableInHandStock"
                                                        @bind="item.StockQty"
                                                        @bind:event="oninput"
-                                                       disabled="@(IsSaving || !item.Authorized)" />
+                                                       disabled="@(IsSaving || !item.Authorized || item.IsSavedPlan || item.Purchases.Any(p => p.IsIssued))" />
                                                 <span class="input-group-text bg-white text-muted">pcs</span>
                                             </div>
                                             @if (item.StockQty > item.AvailableInHandStock)
@@ -295,11 +299,71 @@
                                             }
                                         </div>
 
+                                        <!-- 1b. Semi-Finished (SF) Stock -->
+                                        <div class="p-2 rounded-2 mb-2" style="background-color: #f8fafc; border: 1px dashed #cbd5e1;">
+                                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                                <span class="fw-bold text-secondary" style="font-size: 0.83rem;">
+                                                    <i class="fas fa-cubes me-1 text-info"></i> Semi-Finished (SF) Stock
+                                                </span>
+                                                <small class="text-muted">(Available: @item.AvailableSFStock)</small>
+                                            </div>
+
+                                            @if (item.AvailableSFStock > 0)
+                                            {
+                                                <div class="d-flex align-items-center justify-content-between gap-2 p-1 px-2 rounded bg-white border">
+                                                    <div>
+                                                        <small class="text-muted d-block" style="font-size: 0.74rem;">Allocated SF:</small>
+                                                        <strong class="text-info" style="font-size: 0.92rem;">@item.SFStockQty.ToString("N0") pcs</strong>
+                                                        <small class="text-muted ms-1" style="font-size: 0.74rem;">(@item.SFStockAllocations.Count(a => a.AllocatedQty > 0) lot(s))</small>
+                                                    </div>
+                                                    @if (item.IsSavedPlan || item.Purchases.Any(p => p.IsIssued))
+                                                    {
+                                                        @if (item.SFStockQty > 0)
+                                                        {
+                                                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 0.78rem;"
+                                                                    @onclick="() => OpenSfModal(item)"
+                                                                    title="View allocated SF lots (Read-only)">
+                                                                <i class="fas fa-eye me-1"></i> View SF Lots
+                                                            </button>
+                                                        }
+                                                        else
+                                                        {
+                                                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 0.78rem;"
+                                                                    disabled
+                                                                    title="This item is already planned">
+                                                                <i class="fas fa-lock me-1"></i> Planned
+                                                            </button>
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 0.78rem;"
+                                                                @onclick="() => OpenSfModal(item)"
+                                                                disabled="@(IsSaving || !item.Authorized)"
+                                                                title="Manage SF Lots">
+                                                            <i class="fas fa-tasks me-1"></i> Manage SF Lots
+                                                        </button>
+                                                    }
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <div class="py-1 px-2 rounded bg-white border text-muted small d-flex align-items-center justify-content-between" style="font-size: 0.78rem;">
+                                                    <span><i class="fas fa-info-circle me-1 text-secondary"></i> No SF stock in store</span>
+                                                    <span class="badge bg-light text-muted border">0 pcs</span>
+                                                </div>
+                                            }
+                                        </div>
+
                                         <!-- Summary Box -->
                                         <div class="p-2 rounded bg-light border small text-secondary">
                                             <div class="d-flex justify-content-between mb-1">
-                                                <span>Stock Issuance:</span>
+                                                <span>Finish Stock:</span>
                                                 <strong class="text-dark">@item.StockQty.ToString("N0") pcs</strong>
+                                            </div>
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span>Semi-Finished (SF) Stock:</span>
+                                                <strong class="text-info">@item.SFStockQty.ToString("N0") pcs</strong>
                                             </div>
                                             <div class="d-flex justify-content-between mb-1">
                                                 <span>Purchases (Maker):</span>
@@ -319,7 +383,9 @@
                                                 <i class="fas fa-shopping-cart me-1 text-success"></i> Maker Purchase Allocations
                                                 <span class="badge bg-secondary rounded-pill ms-1">@item.Purchases.Count</span>
                                             </div>
-                                            <button type="button" class="btn btn-sm btn-outline-success fw-bold py-0 px-2" style="font-size: 0.8rem;" @onclick="async () => await AddPurchaseSplit(item)" disabled="@(IsSaving || !item.Authorized)">
+                                            <button type="button" class="btn btn-sm btn-outline-success fw-bold py-0 px-2" style="font-size: 0.8rem;"
+                                                    @onclick="async () => await AddPurchaseSplit(item)"
+                                                    disabled="@(IsSaving || !item.Authorized || item.IsSavedPlan || item.Purchases.Any(p => p.IsIssued))">
                                                 <i class="fas fa-plus me-1"></i> Add Purchase Split
                                             </button>
                                         </div>
@@ -547,6 +613,134 @@
         </div>
     </div>
 </div>
+
+@if (ShowSfModal && ActiveSfItem != null)
+{
+    <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(4px); z-index: 100050; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; font-family: 'Calibri', 'Segoe UI', sans-serif;" @onclick="CloseSfModal">
+        <div class="shadow-lg border-0" style="width: 960px; max-width: 96vw; max-height: 92vh; background: #ffffff; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden;" @onclick:stopPropagation="true">
+            <!-- Header: AttachmentModal Style -->
+            <div class="bg-primary text-white py-2 px-3 d-flex align-items-center justify-content-between" style="flex-shrink: 0;">
+                <h6 class="modal-title fw-bold mb-0 d-flex align-items-center" style="font-size: 1.05rem;">
+                    <i class="fas fa-cubes me-2"></i>
+                    <span>Select Semi-Finished (SF) Stock Lots</span>
+                    <span class="fw-normal opacity-90 ms-2" style="font-size: 0.92rem;">— @ActiveSfItem.CompItemID (@ActiveSfItem.ItemName)</span>
+                </h6>
+                <button type="button" class="btn-close btn-close-white" aria-label="Close" @onclick="CloseSfModal"></button>
+            </div>
+
+            <!-- Body -->
+            <div class="p-3" style="overflow-y: auto; flex-grow: 1;">
+                <div class="alert alert-info py-2 px-3 mb-3 d-flex align-items-center justify-content-between" style="font-size: 0.83rem;">
+                    <div>
+                        <i class="fas fa-info-circle me-1"></i>
+                        Allocate quantity from available lots stored at intermediate process stages. Remaining processes will be completed after issuing via <strong>Maker Issuance from SF</strong>.
+                    </div>
+                    <span class="badge bg-white text-dark border px-2 py-1 shadow-sm ms-2" style="white-space: nowrap;">
+                        Total SF Available: <strong>@ActiveSfItem.AvailableSFStock pcs</strong>
+                    </span>
+                </div>
+
+                <div class="border rounded mb-3" style="overflow-x: hidden;">
+                    <table class="table table-sm table-hover align-middle mb-0" style="font-size: 0.85rem; width: 100%; table-layout: fixed;">
+                        <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase;">
+                            <tr>
+                                <th style="width: 20%; white-space: nowrap;">Current Process</th>
+                                <th style="width: 13%; white-space: nowrap;">Lot #</th>
+                                <th style="width: 9%; white-space: nowrap;">Batch</th>
+                                <th style="width: 28%; white-space: nowrap;">Location (Store / Shelf)</th>
+                                <th style="width: 10%; white-space: nowrap;" class="text-center">Available</th>
+                                <th style="width: 10%; white-space: nowrap;" class="text-center">Allocate Qty</th>
+                                <th style="width: 10%; white-space: nowrap;" class="text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var alloc in ActiveSfItem.SFStockAllocations)
+                            {
+                                <tr class="@(alloc.AllocatedQty > 0 ? "table-info-subtle" : "")">
+                                    <td class="text-truncate">
+                                        <span class="badge bg-light text-dark border">
+                                            <i class="fas fa-cogs me-1 text-primary"></i> @alloc.ProcessName
+                                        </span>
+                                    </td>
+                                    <td class="fw-bold font-monospace text-truncate">@alloc.LotNo</td>
+                                    <td class="text-muted text-truncate">@(string.IsNullOrEmpty(alloc.BatchNo) ? "-" : alloc.BatchNo)</td>
+                                    <td class="small text-secondary text-truncate" style="white-space: nowrap;" title="@alloc.StoreLocation">
+                                        <i class="fas fa-map-marker-alt me-1 text-danger opacity-75"></i> @alloc.StoreLocation
+                                    </td>
+                                    <td class="text-center fw-bold text-secondary text-nowrap">
+                                        @alloc.AvailableQty pcs
+                                    </td>
+                                    <td class="text-center">
+                                        <input type="number"
+                                               class="form-control form-control-sm text-center fw-bold mx-auto @(alloc.AllocatedQty > alloc.AvailableQty ? "is-invalid text-danger" : (alloc.AllocatedQty > 0 ? "text-primary border-primary" : ""))"
+                                               style="width: 70px !important; max-width: 70px !important; display: inline-block !important;"
+                                               min="0"
+                                               max="@alloc.AvailableQty"
+                                               @bind="alloc.AllocatedQty"
+                                               @bind:event="oninput"
+                                               disabled="@(ActiveSfItem.IsSavedPlan || ActiveSfItem.Purchases.Any(p => p.IsIssued))" />
+                                    </td>
+                                    <td class="text-center text-nowrap">
+                                        @if (!ActiveSfItem.IsSavedPlan && !ActiveSfItem.Purchases.Any(p => p.IsIssued))
+                                        {
+                                            @if (alloc.AllocatedQty > 0)
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 0.75rem;" title="Clear allocation" @onclick="() => ClearSfAllocation(alloc)">
+                                                    <i class="fas fa-times me-1"></i> Clear
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 0.75rem;" title="Allocate full available lot" @onclick="() => SetMaxSfAllocation(alloc)">
+                                                    Max
+                                                </button>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary-subtle text-secondary border">Locked</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="p-2 rounded bg-light border d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div>
+                        <span class="text-secondary small">Total SF Allocated: </span>
+                        <strong class="text-primary fs-6">@ActiveSfItem.SFStockQty.ToString("N0") pcs</strong>
+                    </div>
+                    <div class="small text-muted">
+                        Order Qty: <strong>@ActiveSfItem.OrderQty</strong> | Finish Stock: <strong>@ActiveSfItem.StockQty</strong> | Purchases: <strong>@ActiveSfItem.TotalPurchaseQty</strong> | Remaining: <strong class="text-primary">@ActiveSfItem.ProductionQty</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer: AttachmentModal Style -->
+            <div class="modal-footer border-top py-2 px-3 bg-light d-flex justify-content-between align-items-center" style="flex-shrink: 0;">
+                <div class="small text-muted">
+                    @if (ActiveSfItem.IsSavedPlan || ActiveSfItem.Purchases.Any(p => p.IsIssued))
+                    {
+                        <span class="text-warning-emphasis"><i class="fas fa-lock me-1"></i> This item is already planned. Modifications are locked.</span>
+                    }
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-secondary btn-sm px-3" @onclick="CloseSfModal">
+                        <i class="fas fa-times me-1"></i> Close
+                    </button>
+                    @if (!ActiveSfItem.IsSavedPlan && !ActiveSfItem.Purchases.Any(p => p.IsIssued))
+                    {
+                        <button type="button" class="btn btn-primary btn-sm px-4 fw-bold" @onclick="CloseSfModal">
+                            <i class="fas fa-check me-1"></i> Apply &amp; Close
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
 
 <style>
     .order-item-card {

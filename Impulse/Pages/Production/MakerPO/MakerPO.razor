@@ -236,6 +236,12 @@
             <div class="card mb-3 border card-item-row" style="background:#ffffff; border-radius:8px;">
                 <div class="card-header py-2 bg-light fw-bold text-secondary d-flex align-items-center justify-content-between" style="font-size:0.85rem; border-radius:8px 8px 0 0;">
                     <span><i class="fas fa-boxes-stacked me-1 text-primary"></i> Item &amp; Pending Order Lines Selection</span>
+                    @if (SelectedItem != null)
+                    {
+                        <button type="button" class="btn btn-xs btn-outline-primary fw-semibold" @onclick="SelectStockOrderLine" title="Issue directly from stock under Stock-OrderIss">
+                            <i class="fas fa-cubes-stacked me-1"></i> Issue as Stock Order (Stock-OrderIss)
+                        </button>
+                    }
                 </div>
                 <div class="card-body py-3">
                     <div class="row g-3 align-items-end mb-3" style="position: relative; z-index: 9999;">
@@ -288,13 +294,36 @@
                                     }
                                     else
                                     {
+                                        @if (SelectedIssuableOrder != null && SelectedIssuableOrder.OrderNo == "Stock-OrderIss" && !IssuableOrders.Any(o => o.OrderNo == "Stock-OrderIss"))
+                                        {
+                                            <tr class="table-info" style="cursor:pointer;">
+                                                <td class="text-center">
+                                                    <input type="radio" name="orderSelection" checked="true" />
+                                                </td>
+                                                <td class="fw-bold text-primary">
+                                                    <span class="badge bg-primary me-1">Stock Order</span> Stock-OrderIss
+                                                </td>
+                                                <td class="text-muted">Stock Issuance</td>
+                                                <td class="fw-bold text-primary">@SelectedIssuableOrder.CompItemID</td>
+                                                <td>@SelectedIssuableOrder.ItemName</td>
+                                                <td class="text-end text-muted">-</td>
+                                                <td class="text-end fw-bold text-info">New Stock Issuance</td>
+                                            </tr>
+                                        }
+
                                         @foreach (var order in IssuableOrders)
                                         {
                                             <tr @onclick="() => SelectIssuableOrder(order)" style="cursor:pointer;" class="@(SelectedIssuableOrder == order ? "table-primary" : "")">
                                                 <td class="text-center">
                                                     <input type="radio" name="orderSelection" checked="@(SelectedIssuableOrder == order)" />
                                                 </td>
-                                                <td class="fw-bold text-dark">@order.OrderNo</td>
+                                                <td class="fw-bold text-dark">
+                                                    @if (order.OrderNo == "Stock-OrderIss")
+                                                    {
+                                                        <span class="badge bg-primary me-1">Stock Order</span>
+                                                    }
+                                                    @order.OrderNo
+                                                </td>
                                                 <td class="text-muted">@(string.IsNullOrEmpty(order.InternalRefNo) ? "-" : order.InternalRefNo)</td>
                                                 <td class="fw-bold text-primary">@order.CompItemID</td>
                                                 <td>@order.ItemName</td>
@@ -303,11 +332,14 @@
                                             </tr>
                                         }
 
-                                        @if (!IssuableOrders.Any())
+                                        @if (!IssuableOrders.Any() && SelectedIssuableOrder?.OrderNo != "Stock-OrderIss")
                                         {
                                             <tr>
                                                 <td colspan="7" class="text-center text-muted py-3">
-                                                    <i class="fas fa-info-circle me-1"></i> No pending orders available for this item.
+                                                    <div><i class="fas fa-info-circle me-1"></i> No pending customer orders available for this item.</div>
+                                                    <button type="button" class="btn btn-xs btn-outline-primary mt-2" @onclick="SelectStockOrderLine">
+                                                        <i class="fas fa-cubes-stacked me-1"></i> Issue as Stock Order (Stock-OrderIss)
+                                                    </button>
                                                 </td>
                                             </tr>
                                         }
@@ -377,7 +409,13 @@
                                 {
                                     <tr>
                                         <td class="fw-bold text-muted">@line.LineNo</td>
-                                        <td class="fw-semibold">@line.OrderNo</td>
+                                        <td class="fw-semibold">
+                                            @if (line.OrderNo == "Stock-OrderIss")
+                                            {
+                                                <span class="badge bg-primary me-1" style="font-size:0.7rem;">Stock Order</span>
+                                            }
+                                            @line.OrderNo
+                                        </td>
                                         <td class="fw-bold text-primary">@line.ItemCode</td>
                                         <td>@line.ItemName</td>
                                         <td class="text-end fw-bold text-dark">@line.IssQty.ToString("N0")</td>

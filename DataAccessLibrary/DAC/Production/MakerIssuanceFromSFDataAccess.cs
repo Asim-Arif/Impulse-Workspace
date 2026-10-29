@@ -125,6 +125,29 @@ namespace DataAccessLibrary.DAC.Production
             return rate ?? 0m;
         }
 
+        public async Task<List<PlannedSFLotAllocationModel>> GetPlannedSFAllocationsForOrderAsync(string orderNo)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            string sql = @"
+                SELECT A.EntryID, A.OrderNo, A.ItemID, ISNULL(I.ItemName, '') AS ItemName,
+                       A.SOO_RefID, A.ProcessID, ISNULL(A.ProcessName, P.Description) AS ProcessName,
+                       A.LotNo, ISNULL(A.BatchNo, '') AS BatchNo, ISNULL(A.Shelf_RefID, 0) AS Shelf_RefID,
+                       ISNULL(A.StoreLocation, '') AS StoreLocation, A.AllocatedQty,
+                       ISNULL((
+                           SELECT SUM(SOOI.QtyIssd)
+                           FROM StockOrderOpening_Issuance SOOI
+                           INNER JOIN VendIssdDetail VID ON SOOI.VID_RefID = VID.EntryID
+                           WHERE VID.OrderNo = A.OrderNo AND SOOI.SOO_RefID = A.SOO_RefID
+                       ), 0) AS IssuedQty
+                FROM PPC_Order_Item_SF_Allocations A
+                LEFT JOIN Items I ON A.ItemID = I.ItemID
+                LEFT JOIN Processes P ON A.ProcessID = P.ProcessID
+                WHERE A.OrderNo = @OrderNo
+                ORDER BY A.EntryID";
+
+            return (await db.QueryAsync<PlannedSFLotAllocationModel>(sql, new { OrderNo = orderNo })).ToList();
+        }
+
         public async Task<long> SaveSFIssuanceAsync(CreateSFIssuanceHeaderModel header, List<CreateSFIssuanceLineModel> lines, string userName, int userId, string machineName)
         {
             using IDbConnection db = new SqlConnection(ConnectionString);

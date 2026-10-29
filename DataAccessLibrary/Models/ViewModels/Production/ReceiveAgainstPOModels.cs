@@ -19,6 +19,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string IssEmpID { get; set; } = string.Empty;
         public bool IsFactoryMaker { get; set; }
         public float ExcessQtyPercentage { get; set; } = 50f;
+        public bool AuthRequired { get; set; }
     }
 
     public class MasterPOLineItemModel

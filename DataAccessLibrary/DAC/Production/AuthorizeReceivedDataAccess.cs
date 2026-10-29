@@ -120,7 +120,7 @@ namespace DataAccessLibrary.DAC.Production
                                             SET ReqAuth = 0, 
                                                 Wastage = @Wastage, 
                                                 RepairAmt = @RepairAmt, 
-                                                LostQty = @LostQty, 
+                                                LostQty = 0, 
                                                 ReWorkQty = @ReWorkQty, 
                                                 Insp_EmpID = @InspEmpID 
                                             WHERE EntryID = @EntryID";
@@ -129,7 +129,6 @@ namespace DataAccessLibrary.DAC.Production
                     {
                         Wastage = totalWastage,
                         RepairAmt = item.RepairAmt,
-                        LostQty = item.LostQty,
                         ReWorkQty = totalReWork,
                         InspEmpID = inspectorEmpId ?? "",
                         EntryID = item.EntryID

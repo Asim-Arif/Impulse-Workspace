@@ -16,6 +16,7 @@ namespace Impulse.Pages.Production.DispatchList
     public partial class DispatchList : ComponentBase
     {
         [Inject] private IDispatchListService DispatchService { get; set; } = default!;
+        [Inject] private SecurityService SecurityService { get; set; } = default!;
         [Inject] private NavigationManager Navigation { get; set; } = default!;
         [Inject] private Radzen.NotificationService NotificationService { get; set; } = default!;
         [Inject] private IReportNavigationService ReportNavigationService { get; set; } = default!;
@@ -246,6 +247,71 @@ namespace Impulse.Pages.Production.DispatchList
                 {
                     Severity = Radzen.NotificationSeverity.Error,
                     Summary = "Error Finalizing",
+                    Detail = ex.Message,
+                    Duration = 5000
+                });
+            }
+        }
+
+        public async Task ContextDelete(ItemClickEventArgs args)
+        {
+            ResolveRowItem(args);
+            if (ContextRowItem == null) return;
+
+            // Verify Password via Global Security Service against "Delete_Dispatch"
+            bool isAuthorized = await SecurityService.VerifyActionAsync("Delete_Dispatch");
+            if (!isAuthorized)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Authorization Failed",
+                    Detail = "Incorrect password or action cancelled.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            try
+            {
+                string userName = await GetCurrentUserName();
+                string machineName = Environment.MachineName;
+
+                var result = await DispatchService.DeleteDispatchListAsync(
+                    ContextRowItem.EntryID,
+                    ContextRowItem.DispatchListNo,
+                    userName,
+                    machineName);
+
+                if (result.Success)
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Success,
+                        Summary = "Dispatch List Deleted",
+                        Detail = result.Message,
+                        Duration = 5000
+                    });
+
+                    await LoadDispatchListsAsync();
+                }
+                else
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Warning,
+                        Summary = "Deletion Blocked",
+                        Detail = result.Message,
+                        Duration = 6000
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Error Deleting",
                     Detail = ex.Message,
                     Duration = 5000
                 });

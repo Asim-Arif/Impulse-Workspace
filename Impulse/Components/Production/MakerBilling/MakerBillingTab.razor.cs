@@ -3,6 +3,7 @@ using DataAccessLibrary.Models.ViewModels.Production;
 using Impulse.Services.Production;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.JSInterop;
 using Radzen;
 using System;
 using System.Collections.Generic;
@@ -15,6 +16,7 @@ namespace Impulse.Components.Production.MakerBilling
     {
         [Inject] private IMakerBillingService BillingService { get; set; } = default!;
         [Inject] private Radzen.NotificationService NotificationService { get; set; } = default!;
+        [Inject] private Microsoft.JSInterop.IJSRuntime JSRuntime { get; set; } = default!;
 
         [Parameter] public List<MakerBillingLotItem> Lots { get; set; } = new List<MakerBillingLotItem>();
         [Parameter] public bool IsLoading { get; set; } = false;
@@ -289,6 +291,120 @@ namespace Impulse.Components.Production.MakerBilling
             else
             {
                 ContextRowItem = null;
+            }
+        }
+
+        public MakerBillingLotItem? ActiveLot { get; set; } = null;
+
+        protected override void OnParametersSet()
+        {
+            if (ActiveLot != null && !Lots.Contains(ActiveLot))
+            {
+                ActiveLot = FilteredLots.FirstOrDefault();
+            }
+            else if (ActiveLot == null && FilteredLots.Any())
+            {
+                ActiveLot = FilteredLots.FirstOrDefault();
+            }
+        }
+
+        public string GetRowClass(MakerBillingLotItem lot)
+        {
+            var classes = new List<string>();
+            if (lot == ActiveLot)
+            {
+                classes.Add("table-row-active");
+            }
+            if (lot.Audited)
+            {
+                classes.Add("table-primary text-primary");
+            }
+            else if (lot.IsSelected)
+            {
+                classes.Add("table-light");
+            }
+            return string.Join(" ", classes);
+        }
+
+        public async Task OnRowClicked(MakerBillingLotItem lot)
+        {
+            ActiveLot = lot;
+            await ShowImagePreview(lot.ItemCode);
+        }
+
+        public async Task HandleKeyDown(KeyboardEventArgs e)
+        {
+            var currentLots = FilteredLots.ToList();
+            if (!currentLots.Any()) return;
+
+            if (EditingLotId != 0) return;
+
+            int currentIndex = ActiveLot != null ? currentLots.IndexOf(ActiveLot) : -1;
+
+            if (e.Key == "ArrowDown")
+            {
+                int newIndex = currentIndex < currentLots.Count - 1 ? currentIndex + 1 : currentLots.Count - 1;
+                if (newIndex >= 0 && newIndex < currentLots.Count)
+                {
+                    ActiveLot = currentLots[newIndex];
+                    await ScrollRowIntoView($"maker-lot-{ActiveLot.EntryID}");
+                    await ShowImagePreview(ActiveLot.ItemCode);
+                }
+            }
+            else if (e.Key == "ArrowUp")
+            {
+                int newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+                if (newIndex >= 0 && newIndex < currentLots.Count)
+                {
+                    ActiveLot = currentLots[newIndex];
+                    await ScrollRowIntoView($"maker-lot-{ActiveLot.EntryID}");
+                    await ShowImagePreview(ActiveLot.ItemCode);
+                }
+            }
+            else if (e.Key == " " || e.Code == "Space")
+            {
+                if (ActiveLot != null)
+                {
+                    ActiveLot.IsSelected = !ActiveLot.IsSelected;
+                    OnSelectionChanged();
+                }
+                else if (currentLots.Any())
+                {
+                    ActiveLot = currentLots[0];
+                    ActiveLot.IsSelected = !ActiveLot.IsSelected;
+                    OnSelectionChanged();
+                }
+            }
+            else if (e.Key == "Home")
+            {
+                ActiveLot = currentLots[0];
+                await ScrollRowIntoView($"maker-lot-{ActiveLot.EntryID}");
+                await ShowImagePreview(ActiveLot.ItemCode);
+            }
+            else if (e.Key == "End")
+            {
+                ActiveLot = currentLots[currentLots.Count - 1];
+                await ScrollRowIntoView($"maker-lot-{ActiveLot.EntryID}");
+                await ShowImagePreview(ActiveLot.ItemCode);
+            }
+            else if (e.Key == "Enter")
+            {
+                if (ActiveLot != null && EditingLotId == 0)
+                {
+                    StartRateEdit(ActiveLot);
+                }
+            }
+        }
+
+        private async Task ScrollRowIntoView(string rowId)
+        {
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("scrollElementIntoView", rowId);
+            }
+            catch
+            {
+                // Ignored if DOM element not present
             }
         }
     }

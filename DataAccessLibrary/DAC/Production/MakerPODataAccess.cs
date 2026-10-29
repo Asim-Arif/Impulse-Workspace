@@ -206,13 +206,119 @@ namespace DataAccessLibrary.DAC.Production
                     lastDetailNo++;
                     string detailReceiptId = $"ISU-{dtFormatted}{lastDetailNo}";
 
+                    long rcvdRefId = line.Rcvd_RefID;
+
+                    // If this is a Stock-OrderIss line, ensure stock order prerequisites & receiving records exist
+                    if (string.Equals(line.OrderNo, "Stock-OrderIss", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // 1. ForeignCustomers check/insert
+                        string ensureCustSql = @"IF NOT EXISTS (SELECT 1 FROM ForeignCustomers WHERE CustCode = 'Stock' AND Country = 'PK')
+                                                 INSERT INTO ForeignCustomers (Custcode, Country) VALUES ('Stock', 'PK');";
+                        await db.ExecuteAsync(ensureCustSql, transaction: trans);
+
+                        // 2. FCustomerOrders check/insert
+                        string ensureOrderSql = @"IF NOT EXISTS (SELECT 1 FROM FCustomerOrders WHERE OrderNo = 'Stock-OrderIss')
+                                                  INSERT INTO FCustomerOrders (CustCode, Country, OrderNo, DT) VALUES ('Stock', 'PK', 'Stock-OrderIss', @Dt);";
+                        await db.ExecuteAsync(ensureOrderSql, new { Dt = header.DT }, trans);
+
+                        // 3. FCustomerCatalog check/insert
+                        string ensureCatalogSql = @"IF NOT EXISTS (SELECT 1 FROM FCustomerCatalog WHERE Custcode = 'Stock' AND Country = 'PK' AND CompItemID = @ItemCode)
+                                                    INSERT INTO FCustomerCatalog (Custcode, Country, ItemID, CompItemID) VALUES ('Stock', 'PK', @ItemCode, @ItemCode);";
+                        await db.ExecuteAsync(ensureCatalogSql, new { ItemCode = line.ItemCode }, trans);
+
+                        // 4. FOrderItems check/insert or update
+                        string upsertOrderItemSql = @"IF NOT EXISTS (SELECT 1 FROM FOrderItems WHERE OrderNo = 'Stock-OrderIss' AND CompItemCode = @ItemCode)
+                                                          INSERT INTO FOrderItems (OrderNo, ItemCode, CompItemCode, Qty, DeliveryDT, Stamps, Quality, Remarks)
+                                                          VALUES ('Stock-OrderIss', @ItemCode, @ItemCode, @Qty, @Dt, '', '', '');
+                                                      ELSE
+                                                          UPDATE FOrderItems SET Qty = Qty + @Qty WHERE OrderNo = 'Stock-OrderIss' AND CompItemCode = @ItemCode;";
+                        await db.ExecuteAsync(upsertOrderItemSql, new { ItemCode = line.ItemCode, Qty = line.IssQty, Dt = header.DT }, trans);
+
+                        // 5. StockOrderOpening check/insert or update
+                        string checkSooSql = @"SELECT ISNULL(MAX(EntryID), 0) FROM StockOrderOpening WHERE ItemID = @ItemCode AND ProcessID = @ProcessId;";
+                        long sooEntryId = await db.ExecuteScalarAsync<long>(checkSooSql, new { ItemCode = line.ItemCode, ProcessId = header.ProcessID }, trans);
+
+                        if (sooEntryId == 0)
+                        {
+                            string insertSooSql = @"INSERT INTO StockOrderOpening (ItemID, ProcessID, Qty, Location, UserName, MachineName, Shelf_RefID, Remarks)
+                                                    VALUES (@ItemCode, @ProcessId, @Qty, '', @UserName, @MachineName, 0, '');
+                                                    SELECT SCOPE_IDENTITY();";
+                            sooEntryId = await db.ExecuteScalarAsync<long>(insertSooSql, new
+                            {
+                                ItemCode = line.ItemCode,
+                                ProcessId = header.ProcessID,
+                                Qty = line.IssQty,
+                                UserName = userName,
+                                MachineName = machineName
+                            }, trans);
+                        }
+                        else
+                        {
+                            string updateSooSql = @"UPDATE StockOrderOpening SET Qty = Qty + @Qty WHERE EntryID = @EntryId;";
+                            await db.ExecuteAsync(updateSooSql, new { Qty = line.IssQty, EntryId = sooEntryId }, trans);
+                        }
+
+                        // 6. VendReceived header insert
+                        string insertVendRcvSql = @"INSERT INTO VendReceived (VendID, DT, RecieptID, UserID, ProcessID, Issuance_RefID)
+                                                    VALUES (@VendId, @Dt, '', @UserId, @ProcessId, 0);
+                                                    SELECT SCOPE_IDENTITY();";
+                        long rcvEntryId = await db.ExecuteScalarAsync<long>(insertVendRcvSql, new
+                        {
+                            VendId = header.VendID,
+                            Dt = header.DT,
+                            UserId = userId,
+                            ProcessId = header.ProcessID
+                        }, trans);
+
+                        // 7. Get Previous Process ID
+                        long prevProcessId = 0;
+                        try
+                        {
+                            var pParams = new DynamicParameters();
+                            pParams.Add("@ItemCode", line.ItemCode);
+                            pParams.Add("@ProcID", header.ProcessID);
+                            pParams.Add("@PrevProcID", dbType: DbType.Int32, direction: ParameterDirection.Output);
+                            await db.ExecuteAsync("SP_GetPrevProcID", pParams, transaction: trans, commandType: CommandType.StoredProcedure);
+                            int? outProcId = pParams.Get<int?>("@PrevProcID");
+                            prevProcessId = outProcId ?? 0;
+                        }
+                        catch
+                        {
+                            string fallbackSql = @"DECLARE @SNo INT = (SELECT TOP 1 ItemSNo FROM VItemProcesses WHERE IsExist = @ItemCode AND ProcessID = @ProcessId);
+                                                   SELECT ISNULL((SELECT TOP 1 ProcessID FROM VItemProcesses WHERE IsExist = @ItemCode AND ItemSNo < @SNo ORDER BY ItemSNo DESC), 0);";
+                            prevProcessId = await db.ExecuteScalarAsync<long?>(fallbackSql, new { ItemCode = line.ItemCode, ProcessId = header.ProcessID }, trans) ?? 0;
+                        }
+
+                        // 8. VendRcvdDetail insert
+                        string insertRcvDetailSql = @"INSERT INTO VendRcvdDetail (
+                                                          RefID, ItemCode, RecieptID, RcvdQty, Rate, LotNo, NextProcessID, OrderNo,
+                                                          CountedBy, Issue_RefID, ProcessID, RcvdWeight, Opening_RefID
+                                                      ) VALUES (
+                                                          @RefId, @ItemCode, '', @RcvdQty, 0, '0', @NextProcessId, 'Stock-OrderIss',
+                                                          @CountedBy, 0, @PrevProcessId, 0, @OpeningRefId
+                                                      );
+                                                      SELECT SCOPE_IDENTITY();";
+                        long rcvdDetailEntryId = await db.ExecuteScalarAsync<long>(insertRcvDetailSql, new
+                        {
+                            RefId = rcvEntryId,
+                            ItemCode = line.ItemCode,
+                            RcvdQty = line.IssQty,
+                            NextProcessId = header.ProcessID,
+                            CountedBy = line.CountedBy ?? "",
+                            PrevProcessId = prevProcessId,
+                            OpeningRefId = sooEntryId
+                        }, trans);
+
+                        rcvdRefId = rcvdDetailEntryId;
+                    }
+
                     string insertLineSql = @"INSERT INTO VendIssdDetail (
                                                 RefID, RecieptID, ItemCode, Rate, IssQty, ReqAuth, OrderNo, RcvProcessID,
                                                 ReturnDT, Priority, Rcvd_RefID, LotNo, ReWorkLot, Repair_RefID, Batch_No,
                                                 CountedBy, VID_EmpID
                                              ) VALUES (
                                                 @RefID, @RecieptID, @ItemCode, @Rate, @IssQty, 0, @OrderNo, @RcvProcessID,
-                                                @ReturnDT, @Priority, 0, '0', 0, 0, @Batch_No,
+                                                @ReturnDT, @Priority, @Rcvd_RefID, '0', 0, 0, @Batch_No,
                                                 @CountedBy, @VID_EmpID
                                              );
                                              SELECT SCOPE_IDENTITY();";
@@ -228,6 +334,7 @@ namespace DataAccessLibrary.DAC.Production
                         RcvProcessID = line.ReturnProcessID,
                         ReturnDT = line.ReturnDT,
                         Priority = line.Priority,
+                        Rcvd_RefID = rcvdRefId,
                         Batch_No = line.BatchNo,
                         CountedBy = line.CountedBy,
                         VID_EmpID = line.IssEmpID

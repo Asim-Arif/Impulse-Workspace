@@ -136,3 +136,25 @@ document.addEventListener('mouseover', function (e) {
         advanceFocus(container, currentControl, e.shiftKey);
     });
 })();
+
+// ── Table Keyboard Navigation Helper (Arrow Up/Down, Space, Home, End) ───────
+document.addEventListener('keydown', function (e) {
+    var tableNav = e.target.closest('[data-keyboard-nav="true"]');
+    if (!tableNav) return;
+
+    // Do not prevent default if focused on an editable form input
+    if (['INPUT', 'SELECT', 'TEXTAREA'].indexOf(e.target.tagName) !== -1) {
+        return;
+    }
+
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === ' ' || e.key === 'Home' || e.key === 'End') {
+        e.preventDefault();
+    }
+});
+
+window.scrollElementIntoView = function (elementId) {
+    var el = document.getElementById(elementId);
+    if (el) {
+        el.scrollIntoView({ block: 'nearest' });
+    }
+};

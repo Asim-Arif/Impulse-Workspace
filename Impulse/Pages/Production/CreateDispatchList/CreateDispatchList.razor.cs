@@ -62,12 +62,29 @@ namespace Impulse.Pages.Production.CreateDispatchList
         public int AssignedCartonNo { get; set; } = 1;
         public DispatchListStagedItem? ContextRowItem { get; set; } = null;
 
+        // In-memory staged quantity tracking
+        public decimal GetStagedQtyForLot(long vrdEntryId)
+        {
+            return StagedItems
+                .Where(s => s.InnerEntryID == 0 && s.VRD_EntryID == vrdEntryId)
+                .Sum(s => s.Qty);
+        }
+
+        public decimal GetEffectiveAvailQty(FinalizedLotItem item)
+        {
+            decimal staged = GetStagedQtyForLot(item.VRD_EntryID);
+            return Math.Max(0, item.AvailQty - staged);
+        }
+
+        public List<FinalizedLotItem> DisplayedAvailableLots =>
+            AvailableLots.Where(x => GetEffectiveAvailQty(x) > 0).ToList();
+
         // Computed Properties
-        public List<FinalizedLotItem> SelectedLots => AvailableLots.Where(x => x.IsSelected).ToList();
+        public List<FinalizedLotItem> SelectedLots => DisplayedAvailableLots.Where(x => x.IsSelected).ToList();
         public List<DispatchListStagedItem> SelectedStagedItems => StagedItems.Where(x => x.IsSelected).ToList();
 
-        public decimal TotalAvailableQty => AvailableLots.Sum(x => x.AvailQty);
-        public decimal TotalSelectedQty => SelectedLots.Sum(x => x.DispatchQty);
+        public decimal TotalAvailableQty => DisplayedAvailableLots.Sum(x => GetEffectiveAvailQty(x));
+        public decimal TotalSelectedQty => SelectedLots.Sum(x => Math.Min(x.DispatchQty, GetEffectiveAvailQty(x)));
         public decimal TotalStagedQty => StagedItems.Sum(x => x.Qty);
         public int TotalCartonsCount => StagedItems.Where(x => x.CartonNo > 0).Select(x => x.CartonNo).Distinct().Count();
 
@@ -270,6 +287,10 @@ namespace Impulse.Pages.Production.CreateDispatchList
             try
             {
                 AvailableLots = await DispatchListService.GetAvailableFinalizedLotsAsync(Filter);
+                foreach (var lot in AvailableLots)
+                {
+                    lot.DispatchQty = GetEffectiveAvailQty(lot);
+                }
                 IsAllSelected = false;
             }
             catch (Exception ex)
@@ -288,27 +309,46 @@ namespace Impulse.Pages.Production.CreateDispatchList
             }
         }
 
-        public void SetTab(int tab)
+        public async Task SetTab(int tab)
         {
             ActiveTab = tab;
+            if (tab == 0)
+            {
+                if (DeletedInnerIDs.Any())
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Warning,
+                        Summary = "Unsaved Removed Boxes",
+                        Detail = "You have removed boxes from the dispatch list. Click 'Save Dispatch List' on the Dispatch List tab to commit these lots back to available stock in the database.",
+                        Duration = 6000
+                    });
+                }
+
+                if (!AvailableLots.Any() && !string.IsNullOrWhiteSpace(Filter.CustCode))
+                {
+                    await LoadLotsAsync();
+                }
+            }
         }
 
         public void ToggleSelectAll(ChangeEventArgs e)
         {
             IsAllSelected = (bool)(e.Value ?? false);
-            foreach (var item in AvailableLots)
+            foreach (var item in DisplayedAvailableLots)
             {
                 item.IsSelected = IsAllSelected;
-                if (item.DispatchQty <= 0)
+                decimal eff = GetEffectiveAvailQty(item);
+                if (item.DispatchQty <= 0 || item.DispatchQty > eff)
                 {
-                    item.DispatchQty = item.AvailQty;
+                    item.DispatchQty = eff;
                 }
             }
         }
 
         public void OnSelectionChanged()
         {
-            IsAllSelected = AvailableLots.Any() && AvailableLots.All(x => x.IsSelected);
+            IsAllSelected = DisplayedAvailableLots.Any() && DisplayedAvailableLots.All(x => x.IsSelected);
         }
 
         public void OpenStageModal()
@@ -394,6 +434,13 @@ namespace Impulse.Pages.Production.CreateDispatchList
                     }
                 }
             }
+
+            foreach (var lot in AvailableLots)
+            {
+                lot.IsSelected = false;
+                lot.DispatchQty = GetEffectiveAvailQty(lot);
+            }
+            IsAllSelected = false;
 
             ShowStageModal = false;
             NotificationService.Notify(new Radzen.NotificationMessage
@@ -512,26 +559,63 @@ namespace Impulse.Pages.Production.CreateDispatchList
         {
             if (args.Data is DispatchListStagedItem item)
             {
-                if (item.InnerEntryID > 0)
+                bool isExisting = item.InnerEntryID > 0;
+                if (isExisting)
                 {
                     DeletedInnerIDs.Add(item.InnerEntryID);
                 }
                 StagedItems.Remove(item);
                 IsAllStagedSelected = false;
+
+                var matchingLot = AvailableLots.FirstOrDefault(x => x.VRD_EntryID == item.VRD_EntryID);
+                if (matchingLot != null)
+                {
+                    matchingLot.DispatchQty = GetEffectiveAvailQty(matchingLot);
+                }
+
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Info,
+                    Summary = "Box Removed",
+                    Detail = isExisting
+                        ? $"Box with lot '{item.LotNo}' removed. Click 'Save Dispatch List' to commit changes back to available stock in database."
+                        : $"Staged box with lot '{item.LotNo}' removed and restored to Lots Finalyzed.",
+                    Duration = 4500
+                });
             }
         }
 
         public void RemoveSelectedStaged()
         {
-            foreach (var s in StagedItems.Where(x => x.IsSelected))
+            var selected = StagedItems.Where(x => x.IsSelected).ToList();
+            if (!selected.Any()) return;
+
+            bool hasExisting = false;
+            foreach (var s in selected)
             {
                 if (s.InnerEntryID > 0)
                 {
                     DeletedInnerIDs.Add(s.InnerEntryID);
+                    hasExisting = true;
                 }
             }
             StagedItems.RemoveAll(x => x.IsSelected);
             IsAllStagedSelected = false;
+
+            foreach (var lot in AvailableLots)
+            {
+                lot.DispatchQty = GetEffectiveAvailQty(lot);
+            }
+
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Info,
+                Summary = "Selected Boxes Removed",
+                Detail = hasExisting
+                    ? $"{selected.Count} box(es) removed. Click 'Save Dispatch List' to commit changes back to available stock in database."
+                    : $"{selected.Count} staged box(es) removed and restored to Lots Finalyzed.",
+                Duration = 4500
+            });
         }
 
         public async Task SaveDispatchList()
@@ -583,6 +667,7 @@ namespace Impulse.Pages.Production.CreateDispatchList
                 if (result.Success)
                 {
                     SavedEntryId = result.DispatchListEntryID;
+                    DeletedInnerIDs.Clear();
                     NotificationService.Notify(new Radzen.NotificationMessage
                     {
                         Severity = Radzen.NotificationSeverity.Success,

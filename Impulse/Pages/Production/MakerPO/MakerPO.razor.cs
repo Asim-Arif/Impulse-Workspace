@@ -250,6 +250,50 @@ namespace Impulse.Pages.Production.MakerPO
                 SteelTypes.Where(st => st.SteelType.Contains(searchText, StringComparison.OrdinalIgnoreCase)));
         }
 
+        public void SelectStockOrderLine()
+        {
+            if (SelectedProcess == null || SelectedMaker == null || SelectedItem == null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Selection Required",
+                    Detail = "Please select Process, Maker, and an Item first.",
+                    Duration = 3500
+                });
+                return;
+            }
+
+            var existingStockOrder = IssuableOrders.FirstOrDefault(o => string.Equals(o.OrderNo, "Stock-OrderIss", StringComparison.OrdinalIgnoreCase));
+            if (existingStockOrder != null)
+            {
+                SelectIssuableOrder(existingStockOrder);
+            }
+            else
+            {
+                SelectedIssuableOrder = new IssuableOrderItemModel
+                {
+                    ProcessID = SelectedProcess.ProcessID,
+                    OrderNo = "Stock-OrderIss",
+                    ItemID = SelectedItem.ItemID,
+                    CompItemID = SelectedItem.ItemID,
+                    ItemName = SelectedItem.ItemName,
+                    OrderQty = 0,
+                    IssQty = 0,
+                    InternalRefNo = "Stock Issuance"
+                };
+                LineIssQty = 0;
+            }
+
+            NotificationService.Notify(new Radzen.NotificationMessage
+            {
+                Severity = Radzen.NotificationSeverity.Info,
+                Summary = "Stock Order Selected",
+                Detail = "Enter quantity to issue under Stock-OrderIss.",
+                Duration = 3000
+            });
+        }
+
         public void AddLineToPO()
         {
             if (SelectedProcess == null || SelectedMaker == null || SelectedItem == null || SelectedIssuableOrder == null)
@@ -404,7 +448,8 @@ namespace Impulse.Pages.Production.MakerPO
                     BatchNo = l.BatchNo,
                     CountedBy = SelectedCountedBy?.Name ?? "",
                     IssEmpID = Header.IssEmpID,
-                    Remarks = Header.SpecialInstructions
+                    Remarks = Header.SpecialInstructions,
+                    Rcvd_RefID = l.Rcvd_RefID
                 }).ToList();
 
                 long headerId = await MakerPOService.SaveMakerPOAsync(Header, lines, userName, userId, machineName);

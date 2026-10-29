@@ -265,7 +265,7 @@ namespace Impulse.Pages.Stock.SFTransactions
                 var req = new ReportRequest
                 {
                     ReportName = ReportNames.Stock.SFOpeningSlip,
-                    SelectionFormula = $"{{StockOrderOpening.EntryID}} = {item.EntryID}"
+                    SelectionFormula = $"{{VStockOrderOpening.EntryID}} = {item.EntryID}"
                 };
                 await ReportNavigation.PrintReportAsync(req);
             }

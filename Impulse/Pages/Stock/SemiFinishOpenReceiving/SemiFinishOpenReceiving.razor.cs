@@ -253,7 +253,7 @@ namespace Impulse.Pages.Stock.SemiFinishOpenReceiving
                 var printReq = new ReportRequest
                 {
                     ReportName = ReportNames.Stock.SFOpeningSlip,
-                    SelectionFormula = $"{{StockOrderOpening.EntryID}}={newEntryId}"
+                    SelectionFormula = $"{{VStockOrderOpening.EntryID}}={newEntryId}"
                 };
                 await ReportNavigation.PrintReportAsync(printReq);
 

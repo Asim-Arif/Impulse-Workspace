@@ -9,5 +9,6 @@ namespace Impulse.Services.Production
         Task<List<LookupItemString>> GetCustomersAsync();
         Task<List<DispatchListSummaryItem>> GetDispatchListsAsync(DispatchListSearchFilter filter);
         Task<FinalizeDispatchResult> FinalizeDispatchListAsync(long entryId, string userName, string machineName);
+        Task<DeleteDispatchResult> DeleteDispatchListAsync(long entryId, string dispatchListNo, string userName, string machineName);
     }
 }

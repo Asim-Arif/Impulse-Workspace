@@ -174,10 +174,10 @@ namespace DataAccessLibrary.DAC.Production
                     // Insert into VendRcvdDetail
                     string insertLineSql = @"INSERT INTO VendRcvdDetail (
                                                 RefID, RecieptID, ItemCode, NextProcessID, RcvdQty, IssQty, Wastage, Rate,
-                                                LotNo, ReqAuth, OrderNo, CountedBy, Issue_RefID, ProcessID, RcvdWeight, ReWorkLot, Repair_RefID, Insp_EmpID
+                                                LotNo, ReqAuth, OrderNo, CountedBy, Issue_RefID, ProcessID, RcvdWeight, ReWorkLot, Repair_RefID, Insp_EmpID, LostQty
                                              ) VALUES (
                                                 @RefID, @RecieptID, @ItemCode, @NextProcessID, @RcvdQty, 0, 0, @Rate,
-                                                @LotNo, @ReqAuth, @OrderNo, @CountedBy, @IssueRefID, @ProcessID, 0, @ReWorkLot, @RepairType, @InspEmpID
+                                                @LotNo, @ReqAuth, @OrderNo, @CountedBy, @IssueRefID, @ProcessID, 0, @ReWorkLot, @RepairType, @InspEmpID, 0
                                              );";
 
                     await db.ExecuteAsync(insertLineSql, new

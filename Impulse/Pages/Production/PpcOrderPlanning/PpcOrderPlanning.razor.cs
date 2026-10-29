@@ -32,8 +32,61 @@ namespace Impulse.Pages.Production.PpcOrderPlanning
             OrderHeader != null &&
             OrderHeader.Items.Any(i => i.Authorized) &&
             !OrderHeader.Items.Where(i => i.Authorized).Any(i => i.StockQty > i.AvailableInHandStock || i.StockQty < 0) &&
+            !OrderHeader.Items.Where(i => i.Authorized).Any(i => i.SFStockAllocations.Any(a => a.AllocatedQty < 0 || a.AllocatedQty > a.AvailableQty)) &&
             !OrderHeader.Items.Where(i => i.Authorized).Any(i => i.Purchases.Any(p => p.PurchaseQty <= 0 || p.ProcessID <= 0)) &&
             !OrderHeader.Items.Where(i => i.Authorized).Any(i => i.HubSchedules.Any(h => h.StartDate > h.EndDate));
+
+        public PpcOrderItemDto? ActiveSfItem { get; set; }
+        public bool ShowSfModal { get; set; } = false;
+
+        public void OpenSfModal(PpcOrderItemDto item)
+        {
+            if (!item.Authorized) return;
+
+            // Ensure all available SF lots for this item have a corresponding allocation entry ready for editing
+            foreach (var lot in item.AvailableSFLots)
+            {
+                if (!item.SFStockAllocations.Any(a => a.SOO_RefID == lot.EntryID))
+                {
+                    item.SFStockAllocations.Add(new PpcItemSFAllocationDto
+                    {
+                        SOO_RefID = lot.EntryID,
+                        ProcessID = lot.ProcessID,
+                        ProcessName = lot.ProcessName,
+                        LotNo = lot.LotNo,
+                        BatchNo = lot.BatchNo,
+                        Shelf_RefID = lot.Shelf_RefID,
+                        StoreLocation = lot.StoreLocation,
+                        AvailableQty = lot.AvailableQty,
+                        AllocatedQty = 0
+                    });
+                }
+            }
+
+            ActiveSfItem = item;
+            ShowSfModal = true;
+        }
+
+        public void CloseSfModal()
+        {
+            if (ActiveSfItem != null)
+            {
+                // Clean up zero allocations
+                ActiveSfItem.SFStockAllocations.RemoveAll(a => a.AllocatedQty <= 0);
+            }
+            ShowSfModal = false;
+            ActiveSfItem = null;
+        }
+
+        public void SetMaxSfAllocation(PpcItemSFAllocationDto alloc)
+        {
+            alloc.AllocatedQty = alloc.AvailableQty;
+        }
+
+        public void ClearSfAllocation(PpcItemSFAllocationDto alloc)
+        {
+            alloc.AllocatedQty = 0;
+        }
 
         protected override async Task OnInitializedAsync()
         {
@@ -256,11 +309,26 @@ namespace Impulse.Pages.Production.PpcOrderPlanning
                     NotificationService.Notify(new NotificationMessage
                     {
                         Severity = NotificationSeverity.Warning,
-                        Summary = "Invalid Stock Qty",
-                        Detail = $"Stock quantity for {item.CompItemID} ({item.StockQty}) exceeds available in-hand stock ({item.AvailableInHandStock}).",
+                        Summary = "Invalid Finish Stock Qty",
+                        Detail = $"Finish Stock quantity for {item.CompItemID} ({item.StockQty}) exceeds available finish stock ({item.AvailableInHandStock}).",
                         Duration = 5000
                     });
                     return;
+                }
+
+                foreach (var sfAlloc in item.SFStockAllocations)
+                {
+                    if (sfAlloc.AllocatedQty > sfAlloc.AvailableQty)
+                    {
+                        NotificationService.Notify(new NotificationMessage
+                        {
+                            Severity = NotificationSeverity.Warning,
+                            Summary = "Invalid SF Allocation",
+                            Detail = $"Allocated quantity ({sfAlloc.AllocatedQty}) exceeds available SF stock ({sfAlloc.AvailableQty}) for lot {sfAlloc.LotNo} on item {item.CompItemID}.",
+                            Duration = 5000
+                        });
+                        return;
+                    }
                 }
 
                 if (item.Purchases.Any(p => p.PurchaseQty <= 0 || p.ProcessID <= 0))
