@@ -1,0 +1,475 @@
+@page "/qms/command-center"
+@page "/qms/customer-complaints"
+@attribute [Authorize]
+
+@using DataAccessLibrary.Models.QMS
+@using Impulse.Services
+@using Impulse.Components.Common
+@using Blazored.Typeahead
+@using BlazorContextMenu
+
+<PageTitle>QMS Command Center</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <!-- ── Top Header & Title ── -->
+            <div class="d-flex align-items-end justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center">
+                    <h5 class="mb-0 fw-bold text-dark-emphasis">
+                        <i class="fas fa-clipboard-check text-success me-2"></i>
+                        QMS Command Center
+                    </h5>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill ms-3 px-3 py-1" style="font-size: 0.8rem;">
+                        @(complaints.Count) Records
+                    </span>
+                    @if (SelectedCount > 0)
+                    {
+                        <span class="badge bg-primary text-white rounded-pill ms-2 px-3 py-1" style="font-size: 0.8rem;">
+                            @SelectedCount Selected
+                        </span>
+                    }
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="NavigateToHub" title="Back to QMS Hub">
+                        <i class="fas fa-arrow-left me-1"></i> QMS Hub
+                    </button>
+                    <button type="button" class="btn btn-success btn-sm" @onclick="AddNewComplaint" title="Add Customer Complaint">
+                        <i class="fas fa-plus-circle me-1"></i> Add Complaint
+                    </button>
+                    <button type="button" class="btn btn-outline-info btn-sm" @onclick="AddNewFeedback" title="Add Customer Feedback / Observation">
+                        <i class="fas fa-comment-dots me-1"></i> Add Feedback
+                    </button>
+                    <button type="button" class="btn btn-outline-warning btn-sm" @onclick="AddNewAudit" title="Add Internal / External Audit">
+                        <i class="fas fa-clipboard-check me-1"></i> Add Audit
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" id="optionsMenuButton" @onclick="OpenOptionsMenu" title="More Options & Reports">
+                        <i class="fas fa-bars me-1"></i> Options
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Filter Controls Row ── -->
+            <div class="row g-2 mb-2 align-items-end" style="position: relative !important; z-index: 9999 !important;">
+
+                <!-- Customer Typeahead -->
+                <div class="col-md-3 col-lg-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Customer</label>
+                    <BlazoredTypeahead SearchMethod="SearchCustomers"
+                                       EnableDropDown="true"
+                                       Data="customerList"
+                                       TValue="string"
+                                       TItem="string"
+                                       Value="selectedCustomer"
+                                       ValueChanged="OnCustomerChanged"
+                                       ValueExpression="@(() => selectedCustomer)"
+                                       Placeholder="All Customers"
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="cust">
+                            @cust
+                        </SelectedTemplate>
+                        <ResultTemplate Context="cust">
+                            @cust
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <!-- Country Dropdown -->
+                <div class="col-md-2 col-lg-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Country</label>
+                    <select class="form-select form-select-sm" value="@selectedCountry" @onchange="OnCountryChanged">
+                        <option value="">&lt;All Countries&gt;</option>
+                        @foreach (var c in countries)
+                        {
+                            <option value="@c">@c</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Date Range Preset -->
+                <div class="col-md-2 col-lg-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Period</label>
+                    <select class="form-select form-select-sm" value="@selectedRangeIndex" @onchange="OnDateRangePresetChanged">
+                        <option value="0">Today</option>
+                        <option value="1">Last 15 Days</option>
+                        <option value="2">Last 30 Days</option>
+                        <option value="3">Last 60 Days</option>
+                        <option value="4">Last 90 Days</option>
+                        <option value="5">Last 180 Days</option>
+                        <option value="6">Custom Range</option>
+                    </select>
+                </div>
+
+                <!-- Date From -->
+                <div class="col-md-2 col-lg-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Date From</label>
+                    <input type="date" class="form-control form-control-sm"
+                           value="@dateFrom?.ToString("yyyy-MM-dd")"
+                           @onchange="OnDateFromChanged"
+                           disabled="@(selectedRangeIndex != 6)" />
+                </div>
+
+                <!-- Date To -->
+                <div class="col-md-2 col-lg-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Date To</label>
+                    <input type="date" class="form-control form-control-sm"
+                           value="@dateTo?.ToString("yyyy-MM-dd")"
+                           @onchange="OnDateToChanged"
+                           disabled="@(selectedRangeIndex != 6)" />
+                </div>
+
+                <!-- Complaint No Search -->
+                <div class="col-md-2 col-lg-1">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Complaint #</label>
+                    <input type="text" class="form-control form-control-sm"
+                           placeholder="Search #"
+                           @bind="complaintNoSearch"
+                           @bind:event="oninput"
+                           @onkeyup="HandleSearchKeyUp" />
+                </div>
+
+                <!-- Refresh Button -->
+                <div class="col-auto">
+                    <button type="button" class="btn btn-primary btn-sm px-3" @onclick="LoadComplaintsAsync" title="Refresh list">
+                        <i class="fas fa-search me-1"></i> Refresh
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- ── Entry Type Filters Row ── -->
+            <div class="d-flex flex-wrap gap-4 align-items-center mb-3 px-3 py-2 bg-light rounded border border-light-subtle" style="font-size: 0.85rem;">
+                <span class="fw-bold text-secondary">
+                    <i class="fas fa-filter me-1 text-primary"></i> Show Types:
+                </span>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkComplaints" checked="@includeComplaints" @onchange="OnToggleComplaints" />
+                    <label class="form-check-label fw-semibold text-danger" for="chkComplaints">
+                        <i class="fas fa-exclamation-circle me-1"></i> Customer Complaints
+                    </label>
+                </div>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkFeedback" checked="@includeFeedback" @onchange="OnToggleFeedback" />
+                    <label class="form-check-label fw-semibold text-info-emphasis" for="chkFeedback">
+                        <i class="fas fa-comment-dots me-1"></i> Feedback / Observation
+                    </label>
+                </div>
+                <div class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkAudits" checked="@includeAudits" @onchange="OnToggleAudits" />
+                    <label class="form-check-label fw-semibold text-warning-emphasis" for="chkAudits">
+                        <i class="fas fa-clipboard-check me-1"></i> Internal / External Audit
+                    </label>
+                </div>
+            </div>
+
+            <!-- ── Data Table Area ── -->
+            <div class="table-responsive rounded-3 border" style="max-height: 64vh; overflow-y: auto; position: relative !important; z-index: 1 !important;">
+                @if (isLoading)
+                {
+                    <div class="d-flex align-items-center justify-content-center py-5">
+                        <div class="spinner-border text-primary me-2" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <span class="text-secondary fw-semibold">Loading QMS entries...</span>
+                    </div>
+                }
+                else if (complaints.Count == 0)
+                {
+                    <div class="text-center py-5 text-secondary">
+                        <i class="fas fa-inbox fa-3x mb-3 text-secondary opacity-50"></i>
+                        <p class="mb-0 fw-semibold">No records found matching your filter criteria.</p>
+                    </div>
+                }
+                else
+                {
+                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                        <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                            <tr>
+                                <th class="text-center ps-2" style="width: 40px;">
+                                    <input type="checkbox" class="form-check-input" checked="@isAllSelected" @onchange="ToggleSelectAll" title="Select / Deselect All" />
+                                </th>
+                                <th class="text-center" style="width: 50px;">S. #</th>
+                                <th>Customer</th>
+                                <th>Country</th>
+                                <th>Complaint #</th>
+                                <th>Type</th>
+                                <th>Date</th>
+                                <th class="text-center">NC No.</th>
+                                <th class="text-center">CAPA No.</th>
+                                <th class="text-center">Cr Note #</th>
+                                <th class="text-center" style="width: 120px;">Attachments</th>
+                                <th class="text-center" style="width: 90px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{ int sno = 1; }
+                            @foreach (var item in complaints)
+                            {
+                                <ContextMenuTrigger MenuId="rowContextMenu" Data="item" WrapperTag="tr" class="@(item.IsSelected ? "table-active" : "")">
+                                    <td class="text-center ps-2" @onclick:stopPropagation="true">
+                                        <input type="checkbox" class="form-check-input" checked="@item.IsSelected" @onchange="@((ChangeEventArgs e) => OnItemSelectionChanged(item, e))" />
+                                    </td>
+                                    <td class="text-center text-secondary" style="font-size: 0.8rem;">@(sno++)</td>
+                                    <td class="fw-bold text-dark">@item.CustCode</td>
+                                    <td>@item.Country</td>
+                                    <td class="fw-semibold text-primary" style="cursor: pointer;" @onclick="() => EditComplaint(item)" title="Edit @item.ComplaintNo">@item.ComplaintNo</td>
+                                    <td>
+                                        <span class="badge border @item.TypeBadgeClass px-2 py-1" style="font-size: 0.75rem;">
+                                            @item.TypeName
+                                        </span>
+                                    </td>
+                                    <td>@(item.DT?.ToString("dd-MMM-yyyy") ?? "-")</td>
+                                    <td class="text-center" @onclick:stopPropagation="true">
+                                        @if (!string.IsNullOrWhiteSpace(item.NCNo))
+                                        {
+                                            <span class="badge bg-secondary-subtle text-secondary border px-2"
+                                                  style="cursor: pointer;"
+                                                  @onclick="() => OpenNC(item)"
+                                                  title="View / Edit NC @item.NCNo">
+                                                @item.NCNo
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td class="text-center" @onclick:stopPropagation="true">
+                                        @if (!string.IsNullOrWhiteSpace(item.CAPANo))
+                                        {
+                                            <span class="badge bg-info-subtle text-info border px-2"
+                                                  style="cursor: pointer;"
+                                                  @onclick="() => GenerateCAPA(item)"
+                                                  title="View / Edit CAPA @item.CAPANo">
+                                                @item.CAPANo
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td class="text-center" @onclick:stopPropagation="true">
+                                        @if (!string.IsNullOrWhiteSpace(item.CreditNoteNo))
+                                        {
+                                            <span class="badge bg-warning-subtle text-dark border px-2"
+                                                  style="cursor: pointer;"
+                                                  @onclick="() => OpenCreditNote(item)"
+                                                  title="View / Edit Credit Note @item.CreditNoteNo">
+                                                @item.CreditNoteNo
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td class="text-center" @onclick:stopPropagation="true">
+                                        <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2"
+                                                @onclick="() => OpenAttachments(item)"
+                                                title="View & Manage Attachments">
+                                            <i class="fas fa-paperclip text-primary me-1"></i>
+                                            @if (item.AttachmentCount > 0)
+                                            {
+                                                <span class="badge bg-primary text-white rounded-pill px-1" style="font-size: 0.68rem;">@item.AttachmentCount</span>
+                                            }
+                                            @if (item.PDFAttached)
+                                            {
+                                                <span class="badge bg-danger text-white rounded-pill px-1 ms-1" style="font-size: 0.65rem;" title="Legacy PDF Attached">PDF</span>
+                                            }
+                                            @if (item.AttachmentCount == 0 && !item.PDFAttached)
+                                            {
+                                                <span class="text-muted" style="font-size: 0.72rem;">0</span>
+                                            }
+                                        </button>
+                                    </td>
+                                    <td class="text-center" @onclick:stopPropagation="true">
+                                        <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2"
+                                                @onclick="(e) => OpenManageMenu(e, item)"
+                                                title="Row Actions">
+                                            <i class="fas fa-ellipsis-v me-1"></i> Manage
+                                        </button>
+                                    </td>
+                                </ContextMenuTrigger>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ── Top Options Menu (Options Button) ── -->
+<ContextMenu Id="optionsBarMenu" Template="Win11Style">
+    <div class="win11-section-header">New Entries</div>
+    <Item class="win11-menu-item" OnClick="AddNewComplaint">
+        <i class="fas fa-exclamation-circle fa-fw win11-icon text-danger"></i> Add Customer Complaint
+    </Item>
+    <Item class="win11-menu-item" OnClick="AddNewFeedback">
+        <i class="fas fa-comment-dots fa-fw win11-icon text-info"></i> Add Feedback / Observation
+    </Item>
+    <Item class="win11-menu-item" OnClick="AddNewAudit">
+        <i class="fas fa-clipboard-check fa-fw win11-icon text-warning"></i> Add Internal / External Audit
+    </Item>
+    <div class="win11-divider"></div>
+    <div class="win11-section-header">Reports &amp; Printouts</div>
+    <Item class="win11-menu-item" OnClick="PrintSelectedList">
+        <i class="fas fa-print fa-fw win11-icon text-primary"></i> Print Selected List
+    </Item>
+    <Item class="win11-menu-item" OnClick="PrintSelectedListWithoutPrice">
+        <i class="fas fa-file-invoice fa-fw win11-icon text-secondary"></i> Print List (Without Price)
+    </Item>
+    <Item class="win11-menu-item" OnClick="OpenCapaReportModal">
+        <i class="fas fa-file-alt fa-fw win11-icon text-success"></i> Print CAPA Report / Logo Sheet
+    </Item>
+</ContextMenu>
+
+<!-- ── Row Context Menu (Right-Click on Table Row) ── -->
+<ContextMenu Id="rowContextMenu" Template="Win11Style">
+    @if (context.Data is CustomerComplaintListItemModel item)
+    {
+        <div class="win11-section-header">Complaint: @item.ComplaintNo (@item.CustCode)</div>
+        <Item class="win11-menu-item" OnClick="@(() => OpenAttachments(item))">
+            <i class="fas fa-paperclip fa-fw win11-icon text-primary"></i> Attachments
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => EditComplaint(item))">
+            <i class="fas fa-edit fa-fw win11-icon text-primary"></i> Edit Entry
+        </Item>
+        <div class="win11-divider"></div>
+        <Item class="win11-menu-item" OnClick="@(() => GenerateNC(item))">
+            <i class="fas fa-file-signature fa-fw win11-icon text-warning"></i> Generate NC
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => GenerateCAPA(item))">
+            <i class="fas fa-tools fa-fw win11-icon text-info"></i> Generate / Edit CAPA
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => GenerateCreditNote(item))">
+            <i class="fas fa-receipt fa-fw win11-icon text-success"></i> Generate Credit Note
+        </Item>
+        <div class="win11-divider"></div>
+        <div class="win11-section-header">Printing</div>
+        <Item class="win11-menu-item" OnClick="@(() => PrintEntry(item))">
+            <i class="fas fa-print fa-fw win11-icon text-primary"></i> Print Entry
+        </Item>
+        @if (!string.IsNullOrWhiteSpace(item.CAPANo))
+        {
+            <Item class="win11-menu-item" OnClick="@(() => PrintCAPA(item))">
+                <i class="fas fa-file-medical fa-fw win11-icon text-info"></i> Print CAPA
+            </Item>
+        }
+        @if (!string.IsNullOrWhiteSpace(item.CreditNoteNo))
+        {
+            <Item class="win11-menu-item" OnClick="@(() => PrintCreditNote(item))">
+                <i class="fas fa-file-invoice-dollar fa-fw win11-icon text-success"></i> Print Credit Note
+            </Item>
+        }
+    }
+</ContextMenu>
+
+<!-- ── Attachment Modal Instance ── -->
+<AttachmentModal @ref="attachmentModalRef" OnCountChanged="HandleAttachmentCountChanged" />
+
+<!-- ── CAPA Logo Sheet Date Range Modal ── -->
+@if (showCapaReportModal)
+{
+    <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); z-index: 100060; display: flex; align-items: center; justify-content: center; padding: 20px;">
+        <div class="card shadow-lg border-0" style="width: 420px; max-width: 95vw; border-radius: 12px; overflow: hidden;">
+            <div class="card-header bg-primary text-white py-2 px-3 d-flex align-items-center justify-content-between">
+                <h6 class="mb-0 fw-bold"><i class="fas fa-calendar-alt me-2"></i> CAPA Report Date Range</h6>
+                <button type="button" class="btn-close btn-close-white" @onclick="() => showCapaReportModal = false"></button>
+            </div>
+            <div class="card-body p-3">
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-secondary" style="font-size: 0.8rem;">From Date</label>
+                    <input type="date" class="form-control form-control-sm" @bind="capaReportFrom" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-secondary" style="font-size: 0.8rem;">To Date</label>
+                    <input type="date" class="form-control form-control-sm" @bind="capaReportTo" />
+                </div>
+            </div>
+            <div class="card-footer bg-light py-2 px-3 d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-secondary btn-sm" @onclick="() => showCapaReportModal = false">
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-primary btn-sm" @onclick="PrintCapaReportConfirm">
+                    <i class="fas fa-print me-1"></i> Print Report
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .win11-menu-item {
+        font-size: 0.85rem !important;
+        padding: 6px 12px !important;
+    }
+    .win11-menu-container {
+        max-height: 50vh !important;
+        overflow-y: auto !important;
+    }
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    .blazored-typeahead {
+        height: 35px !important;
+        min-height: 35px !important;
+        font-size: 0.875rem !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input, .blazored-typeahead__controls {
+        height: 33px !important;
+        min-height: 33px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+    }
+    .blazored-typeahead__input-mask {
+        height: 33px !important;
+        line-height: 33px !important;
+        display: block !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .blazored-typeahead__results {
+        z-index: 1050 !important;
+    }
+    .blazored-typeahead__input-icon {
+        padding: 0 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    input.form-control-sm, select.form-select-sm, .input-group-text, .btn-sm:not(.btn-xs) {
+        height: 35px !important;
+    }
+    .disabled-typeahead-wrapper .blazored-typeahead {
+        background-color: #e9ecef !important;
+        overflow: hidden !important;
+        border-radius: 4px;
+        pointer-events: none;
+        opacity: 0.7;
+    }
+</style>
+

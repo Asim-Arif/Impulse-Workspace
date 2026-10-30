@@ -1,0 +1,111 @@
+@page "/qms"
+@page "/qms/dashboard"
+@attribute [Authorize]
+
+@using Impulse.Shared.Components
+@using Impulse.Services
+@inject IReportManagerService ReportManager
+
+<PageTitle>QMS Dashboard</PageTitle>
+
+<div class="dashboard-shell">
+    <div class="dashboard-hero">
+        <div class="dashboard-icon-wrap" style="background:#dcf5f6; color:#086972;">
+            <i class="fas fa-award"></i>
+        </div>
+        <div>
+            <h1 class="dashboard-title">Quality Management System (QMS)</h1>
+            <p class="dashboard-subtitle">Quality assurance, complaints, audits, and document compliance</p>
+        </div>
+    </div>
+
+    <div class="dashboard-modules">
+        <SecureDashCard Href="/qms/command-center" OptionId="QMSCustomerComplaints" Module="QMS">
+            <i class="fas fa-clipboard-check"></i>
+            <span>QMS Command Center</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/qms/documents" OptionId="QMSDocuments" Module="QMS">
+            <i class="fas fa-folder-open"></i>
+            <span>Document Control</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/qms/document-types" OptionId="QMSDocumentTypes" Module="QMS">
+            <i class="fas fa-tags"></i>
+            <span>Document Types</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/qms/meetings" OptionId="QMSMeetings" Module="QMS">
+            <i class="fas fa-users-rectangle"></i>
+            <span>Quality Meetings</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/qms/supplier-evaluation-list" OptionId="QMSSupplierEvaluationList" Module="QMS">
+            <i class="fas fa-list-check"></i>
+            <span>Supplier Evaluation List</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/qms/supplier-reevaluation-list" OptionId="QMSSupplierReEvaluationList" Module="QMS">
+            <i class="fas fa-clipboard-list"></i>
+            <span>Supplier Re-Evaluation List</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/qms/calibrations" OptionId="AccCalibrations" Module="QMS">
+            <i class="fas fa-wrench"></i>
+            <span>Calibrations</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/qms/track-back" OptionId="QMSTrackBackItems" Module="QMS">
+            <i class="fas fa-route"></i>
+            <span>Track Back Items</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/qms/reasons" OptionId="QMSReasons" Module="QMS">
+            <i class="fas fa-question-circle"></i>
+            <span>QMS Reasons</span>
+        </SecureDashCard>
+        <SecureDashCard OptionId="ReasonwiseGraph" Module="QMS" @onclick='() => ReportManager.RequestReport("ReasonwiseGraph")'>
+            <i class="fas fa-chart-pie"></i>
+            <span>Reasonwise Graph</span>
+        </SecureDashCard>
+        <SecureDashCard OptionId="GroupwiseGraph" Module="QMS" @onclick='() => ReportManager.RequestReport("GroupwiseGraph")'>
+            <i class="fas fa-chart-bar"></i>
+            <span>Groupwise Graph</span>
+        </SecureDashCard>
+        <SecureDashCard OptionId="ClaimsStatistics" Module="QMS" @onclick='() => ReportManager.RequestReport("ClaimsStatistics")'>
+            <i class="fas fa-chart-line"></i>
+            <span>Claims Statistics</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/qms/standards" OptionId="QMSStandards" Module="QMS">
+            <i class="fas fa-book-bookmark"></i>
+            <span>Standards</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/qms/manuals" OptionId="QMSManuals" Module="QMS">
+            <i class="fas fa-book"></i>
+            <span>Manuals</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/qms/procedures" OptionId="QMSProcedures" Module="QMS">
+            <i class="fas fa-tasks"></i>
+            <span>Procedures</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/qms/work-instructions" OptionId="QMSWorkInstructions" Module="QMS">
+            <i class="fas fa-file-lines"></i>
+            <span>Work Instructions</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/qms/technical-files" OptionId="QMSTechnicalFiles" Module="QMS">
+            <i class="fas fa-file-shield"></i>
+            <span>Technical Files</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/qms/lean-management" OptionId="QMSLeanManagement" Module="QMS">
+            <i class="fas fa-chart-line"></i>
+            <span>Lean Management</span>
+        </SecureDashCard>
+    </div>
+</div>
+
+<style>
+    .dashboard-shell { padding: 2rem; max-width: 1100px; }
+    .dashboard-hero { display: flex; align-items: center; gap: 1.25rem; margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #e0e2ec; }
+    .dashboard-icon-wrap { width: 64px; height: 64px; border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 1.75rem; flex-shrink: 0; }
+    .dashboard-title { font-size: 2rem; font-weight: 700; color: #1b1b1f; margin: 0; line-height: 1.2; }
+    .dashboard-subtitle { color: #44474f; margin: 0.25rem 0 0; font-size: 0.95rem; }
+    .dashboard-modules { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 1rem; }
+    .dash-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; padding: 1.5rem 1rem; background: #ffffff; border: 1px solid #e0e2ec; border-radius: 16px; text-decoration: none; color: #1b1b1f; font-weight: 500; font-size: 0.875rem; text-align: center; transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease; cursor: pointer; }
+    .dash-card i { font-size: 1.75rem; color: #088395; }
+    .dash-card:hover { background: #eefbfb; box-shadow: 0 4px 16px rgba(8, 131, 149, 0.18); transform: translateY(-2px); color: #054e56; text-decoration: none; }
+    .dash-card:hover i { color: #054e56; }
+    .dash-card.coming-soon { opacity: 0.55; cursor: default; }
+</style>
+

@@ -1,0 +1,557 @@
+@page "/qms/track-back"
+@attribute [Authorize]
+
+<PageTitle>Item Traceability &amp; Trackback - QMS</PageTitle>
+
+@using BlazorContextMenu
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.QMS
+@using Impulse.Components.Common
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-3">
+
+            <!-- ── Top Header & Actions ── -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center pb-2 mb-3 border-bottom gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 42px; height: 42px;">
+                        <i class="fas fa-route fa-lg"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark-emphasis">Item Traceability &amp; Trackback</h5>
+                        <small class="text-muted">Backward Manufacturing Traceability from Custom Invoice to Lots, Production Orders &amp; Master POs</small>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="NavigateToHub">
+                        <i class="fas fa-arrow-left me-1"></i> QMS Hub
+                    </button>
+
+                    <!-- Quick Report Options for the Invoice -->
+                    <button type="button"
+                            class="btn btn-primary btn-sm"
+                            id="optionsBarMenuBtn"
+                            @onclick="ShowOptionsMenu"
+                            title="Invoice Reports"
+                            disabled="@(string.IsNullOrWhiteSpace(selectedInvoice))">
+                        <i class="fas fa-print me-1"></i> Invoice Reports <i class="fas fa-caret-down ms-1"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Invoice Selector Bar ── -->
+            <div class="row g-2 mb-3 align-items-end" style="position: relative !important; z-index: 9999 !important;">
+                <div class="col-md-5 col-lg-4">
+                    <label class="form-label text-secondary fw-semibold small mb-1">
+                        <i class="fas fa-file-invoice me-1 text-primary"></i> Custom Invoice No. <span class="text-danger">*</span>
+                    </label>
+                    <BlazoredTypeahead SearchMethod="SearchInvoices"
+                                       EnableDropDown="true"
+                                       Data="recentInvoices"
+                                       TValue="string"
+                                       TItem="string"
+                                       Value="selectedInvoice"
+                                       ValueChanged="OnInvoiceChanged"
+                                       ValueExpression="@(() => selectedInvoice)"
+                                       Placeholder="Select or type Custom Invoice No..."
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="inv">
+                            @inv
+                        </SelectedTemplate>
+                        <ResultTemplate Context="inv">
+                            <div>
+                                <i class="fas fa-file-invoice text-primary me-2"></i>
+                                <span class="fw-bold text-dark font-monospace">@inv</span>
+                            </div>
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <div class="col-auto">
+                    <button type="button"
+                            class="btn btn-primary btn-sm"
+                            @onclick="LoadInvoiceItems"
+                            disabled="@(string.IsNullOrWhiteSpace(selectedInvoice) || isLoadingItems)">
+                        <i class="fas fa-search @(isLoadingItems ? "fa-spin" : "") me-1"></i>
+                        Trace Invoice
+                    </button>
+                </div>
+
+                @if (invoiceItems.Any())
+                {
+                    <div class="col-md-4 ms-auto">
+                        <label class="form-label text-secondary fw-semibold small mb-1">
+                            <i class="fas fa-filter me-1"></i> Quick Filter Items
+                        </label>
+                        <input type="text"
+                               class="form-control form-control-sm"
+                               placeholder="Filter by item code or name..."
+                               value="@itemSearchFilter"
+                               @oninput="OnItemFilterInput" />
+                    </div>
+                }
+            </div>
+
+            <!-- ── Section 1: Dispatched Items in Invoice ── -->
+            <div class="card border rounded-3 p-2 mb-3 bg-white shadow-none" style="position: relative !important; z-index: 1 !important;">
+                <div class="d-flex justify-content-between align-items-center px-1 mb-2">
+                    <h6 class="fw-bold text-dark mb-0 small text-uppercase">
+                        <i class="fas fa-boxes text-primary me-1"></i> Dispatched Items in Invoice
+                    </h6>
+                    @if (invoiceItems.Any())
+                    {
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                            @filteredItems.Count Item(s) | Click an item to trace its lots, orders &amp; POs
+                        </span>
+                    }
+                </div>
+
+                <div class="table-responsive border rounded-3" style="max-height: 28vh;">
+                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                        <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                            <tr>
+                                <th style="width: 45px;" class="text-center">#</th>
+                                <th style="width: 200px;">Item Code</th>
+                                <th>Item Description</th>
+                                <th style="width: 140px;" class="text-end pe-3">Dispatched Qty</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (isLoadingItems)
+                            {
+                                <tr>
+                                    <td colspan="4" class="text-center py-4 text-muted">
+                                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                                        Tracing invoice items...
+                                    </td>
+                                </tr>
+                            }
+                            else if (!invoiceItems.Any())
+                            {
+                                <tr>
+                                    <td colspan="4" class="text-center py-4 text-muted">
+                                        <i class="fas fa-info-circle me-1 text-primary"></i>
+                                        Select an invoice above and click "Trace Invoice" to inspect items.
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                for (int i = 0; i < filteredItems.Count; i++)
+                                {
+                                    var item = filteredItems[i];
+                                    int rowNum = i + 1;
+                                    bool isSelected = selectedItem != null && selectedItem.CompItemCode == item.CompItemCode;
+                                    <tr class="clickable-row @(isSelected ? "table-primary border-primary" : "")"
+                                        @onclick="@(() => SelectItem(item))"
+                                        style="cursor: pointer;">
+                                        <td class="text-center text-muted small">@rowNum</td>
+                                        <td>
+                                            <span class="badge @(isSelected ? "bg-primary text-white" : "bg-light text-primary border") font-monospace fw-bold">
+                                                @item.CompItemCode
+                                            </span>
+                                        </td>
+                                        <td class="fw-semibold text-dark">
+                                            @item.ItemName
+                                        </td>
+                                        <td class="text-end pe-3 fw-bold text-dark">
+                                            @item.Qty.ToString("N0")
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ── Section 2: Three-Way Traceability Breakdown ── -->
+            <div class="row g-3" style="position: relative !important; z-index: 1 !important;">
+
+                <!-- 1. Lots Panel -->
+                <div class="col-lg-4">
+                    <div class="card border rounded-3 p-2 bg-white shadow-none h-100">
+                        <div class="d-flex justify-content-between align-items-center px-1 mb-2">
+                            <h6 class="fw-bold text-dark mb-0 small text-uppercase">
+                                <i class="fas fa-barcode text-primary me-1"></i> Production Lots
+                            </h6>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                                @lots.Count Lot(s)
+                            </span>
+                        </div>
+
+                        <div class="table-responsive border rounded-3 flex-grow-1" style="max-height: 42vh;">
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.75rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                    <tr>
+                                        <th style="width: 35px;" class="text-center">#</th>
+                                        <th>Lot No.</th>
+                                        <th style="width: 75px;" class="text-end">Qty</th>
+                                        <th style="width: 55px;" class="text-center">Files</th>
+                                        <th style="width: 70px;" class="text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (isLoadingDetails)
+                                    {
+                                        <tr>
+                                            <td colspan="5" class="text-center py-3 text-muted">
+                                                <div class="spinner-border spinner-border-sm text-primary me-1"></div> Loading lots...
+                                            </td>
+                                        </tr>
+                                    }
+                                    else if (!lots.Any())
+                                    {
+                                        <tr>
+                                            <td colspan="5" class="text-center py-4 text-muted small">
+                                                @(selectedItem == null ? "Select an item above" : "No lots recorded for this item")
+                                            </td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        for (int lIdx = 0; lIdx < lots.Count; lIdx++)
+                                        {
+                                            var lot = lots[lIdx];
+                                            int num = lIdx + 1;
+                                            <ContextMenuTrigger MenuId="lotRowMenu" Data="@lot" WrapperTag="tr" class="clickable-row">
+                                                <td class="text-center text-muted small">@num</td>
+                                                <td>
+                                                    <span class="badge bg-light text-dark border font-monospace fw-semibold">
+                                                        @lot.LotNo
+                                                    </span>
+                                                </td>
+                                                <td class="text-end fw-semibold text-dark">
+                                                    @lot.Qty.ToString("N0")
+                                                </td>
+                                                <td class="text-center" @onclick:stopPropagation="true">
+                                                    <button type="button"
+                                                            class="btn btn-xs @(lot.AttachmentCount > 0 ? "btn-outline-primary" : "btn-outline-secondary")"
+                                                            @onclick="@(() => OpenLotAttachment(lot.LotNo))"
+                                                            title="Lot Attachments">
+                                                        <i class="fas fa-paperclip"></i>
+                                                        @if (lot.AttachmentCount > 0)
+                                                        {
+                                                            <span class="badge bg-primary rounded-pill ms-1" style="font-size: 0.65rem;">@lot.AttachmentCount</span>
+                                                        }
+                                                    </button>
+                                                </td>
+                                                <td class="text-center" @onclick:stopPropagation="true">
+                                                    <button type="button"
+                                                            class="btn btn-outline-primary btn-xs"
+                                                            @onclick="@(() => PrintPTC(lot.LotNo))"
+                                                            title="Print PTC (Production Tracking Card)">
+                                                        <i class="fas fa-print me-1"></i> PTC
+                                                    </button>
+                                                </td>
+                                            </ContextMenuTrigger>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Master POs & Makers Panel -->
+                <div class="col-lg-4">
+                    <div class="card border rounded-3 p-2 bg-white shadow-none h-100">
+                        <div class="d-flex justify-content-between align-items-center px-1 mb-2">
+                            <h6 class="fw-bold text-dark mb-0 small text-uppercase">
+                                <i class="fas fa-truck-loading text-primary me-1"></i> Master POs &amp; Makers
+                            </h6>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                                @masterPOs.Count Master PO(s)
+                            </span>
+                        </div>
+
+                        <div class="table-responsive border rounded-3 flex-grow-1" style="max-height: 42vh;">
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.75rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                    <tr>
+                                        <th style="width: 35px;" class="text-center">#</th>
+                                        <th style="width: 110px;">Master PO #</th>
+                                        <th>Maker / Vendor</th>
+                                        <th style="width: 75px;" class="text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (isLoadingDetails)
+                                    {
+                                        <tr>
+                                            <td colspan="4" class="text-center py-3 text-muted">
+                                                <div class="spinner-border spinner-border-sm text-primary me-1"></div> Loading POs...
+                                            </td>
+                                        </tr>
+                                    }
+                                    else if (!masterPOs.Any())
+                                    {
+                                        <tr>
+                                            <td colspan="4" class="text-center py-4 text-muted small">
+                                                @(selectedItem == null ? "Select an item above" : "No master POs recorded")
+                                            </td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        for (int pIdx = 0; pIdx < masterPOs.Count; pIdx++)
+                                        {
+                                            var po = masterPOs[pIdx];
+                                            int num = pIdx + 1;
+                                            <ContextMenuTrigger MenuId="poRowMenu" Data="@po" WrapperTag="tr" class="clickable-row">
+                                                <td class="text-center text-muted small">@num</td>
+                                                <td>
+                                                    <span class="badge bg-light text-dark border font-monospace fw-semibold">
+                                                        @po.MasterPONo
+                                                    </span>
+                                                </td>
+                                                <td class="fw-semibold text-dark text-truncate" style="max-width: 140px;" title="@po.VenderName">
+                                                    @po.VenderName
+                                                </td>
+                                                <td class="text-center" @onclick:stopPropagation="true">
+                                                    <button type="button"
+                                                            class="btn btn-outline-primary btn-xs"
+                                                            @onclick="@(() => PrintMasterPOStatus(po.MasterPONo))"
+                                                            title="Print Master PO Status">
+                                                        <i class="fas fa-print me-1"></i> Status
+                                                    </button>
+                                                </td>
+                                            </ContextMenuTrigger>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Customer Orders Panel -->
+                <div class="col-lg-4">
+                    <div class="card border rounded-3 p-2 bg-white shadow-none h-100">
+                        <div class="d-flex justify-content-between align-items-center px-1 mb-2">
+                            <h6 class="fw-bold text-dark mb-0 small text-uppercase">
+                                <i class="fas fa-shopping-bag text-primary me-1"></i> Customer Orders
+                            </h6>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                                @orders.Count Order(s)
+                            </span>
+                        </div>
+
+                        <div class="table-responsive border rounded-3 flex-grow-1" style="max-height: 42vh;">
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.75rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                    <tr>
+                                        <th style="width: 35px;" class="text-center">#</th>
+                                        <th>Order No.</th>
+                                        <th style="width: 80px;" class="text-end">Qty</th>
+                                        <th style="width: 75px;" class="text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (isLoadingDetails)
+                                    {
+                                        <tr>
+                                            <td colspan="4" class="text-center py-3 text-muted">
+                                                <div class="spinner-border spinner-border-sm text-primary me-1"></div> Loading orders...
+                                            </td>
+                                        </tr>
+                                    }
+                                    else if (!orders.Any())
+                                    {
+                                        <tr>
+                                            <td colspan="4" class="text-center py-4 text-muted small">
+                                                @(selectedItem == null ? "Select an item above" : "No customer orders recorded")
+                                            </td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        for (int oIdx = 0; oIdx < orders.Count; oIdx++)
+                                        {
+                                            var ord = orders[oIdx];
+                                            int num = oIdx + 1;
+                                            <ContextMenuTrigger MenuId="orderRowMenu" Data="@ord" WrapperTag="tr" class="clickable-row">
+                                                <td class="text-center text-muted small">@num</td>
+                                                <td>
+                                                    <span class="badge bg-light text-primary border font-monospace fw-semibold">
+                                                        @ord.OrderNo
+                                                    </span>
+                                                </td>
+                                                <td class="text-end fw-semibold text-dark">
+                                                    @ord.Qty.ToString("N0")
+                                                </td>
+                                                <td class="text-center" @onclick:stopPropagation="true">
+                                                    <button type="button"
+                                                            class="btn btn-outline-primary btn-xs"
+                                                            @onclick="@(() => PrintSingleOrder(ord.OrderNo))"
+                                                            title="Print Customer Order">
+                                                        <i class="fas fa-print me-1"></i> Order
+                                                    </button>
+                                                </td>
+                                            </ContextMenuTrigger>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ── Right-Click Context Menus ── -->
+<ContextMenu Id="lotRowMenu" Template="Win11Style">
+    <Item class="win11-menu-item" OnClick="@((ItemClickEventArgs e) => { var l = e.Data as TrackBackLotDto; if(l != null) PrintPTC(l.LotNo); })">
+        <i class="fas fa-print fa-fw win11-icon text-primary"></i> Print PTC (Production Tracking Card)
+    </Item>
+    <Item class="win11-menu-item" OnClick="@((ItemClickEventArgs e) => { var l = e.Data as TrackBackLotDto; if(l != null) OpenLotAttachment(l.LotNo); })">
+        <i class="fas fa-paperclip fa-fw win11-icon text-info"></i> View Lot Attachments
+    </Item>
+</ContextMenu>
+
+<ContextMenu Id="orderRowMenu" Template="Win11Style">
+    <Item class="win11-menu-item" OnClick="@((ItemClickEventArgs e) => { var o = e.Data as TrackBackOrderDto; if(o != null) PrintSingleOrder(o.OrderNo); })">
+        <i class="fas fa-print fa-fw win11-icon text-primary"></i> Print Customer Order
+    </Item>
+</ContextMenu>
+
+<ContextMenu Id="poRowMenu" Template="Win11Style">
+    <Item class="win11-menu-item" OnClick="@((ItemClickEventArgs e) => { var p = e.Data as TrackBackMasterPODto; if(p != null) PrintMasterPOStatus(p.MasterPONo); })">
+        <i class="fas fa-print fa-fw win11-icon text-primary"></i> Master PO Status
+    </Item>
+</ContextMenu>
+
+<!-- ── Top Options Menu (Invoice Reports) ── -->
+<ContextMenu Id="optionsBarMenu" Template="Win11Style">
+    <div class="win11-section-header">Invoice Reports</div>
+    <Item class="win11-menu-item" OnClick="@(() => PrintDHR())">
+        <i class="fas fa-file-medical-alt fa-fw win11-icon text-primary"></i> Print DHR (Device History Record)
+    </Item>
+    <Item class="win11-menu-item" OnClick="@(() => PrintInvoiceItems())">
+        <i class="fas fa-file-invoice fa-fw win11-icon text-success"></i> Print Invoice Items
+    </Item>
+    <Item class="win11-menu-item" OnClick="@(() => PrintItemLabels())">
+        <i class="fas fa-tags fa-fw win11-icon text-warning"></i> Print Item Labels
+    </Item>
+    <Item class="win11-menu-item" OnClick="@(() => PrintTechnicalDrawings())">
+        <i class="fas fa-drafting-compass fa-fw win11-icon text-info"></i> Print Technical Drawings
+    </Item>
+    <div class="win11-divider"></div>
+    <Item class="win11-menu-item" OnClick="@(() => PrintPurchaseOrders())">
+        <i class="fas fa-shopping-bag fa-fw win11-icon text-secondary"></i> Print Purchase Orders (All POs)
+    </Item>
+    <Item class="win11-menu-item" OnClick="@(() => PrintProductionOrders())">
+        <i class="fas fa-cogs fa-fw win11-icon text-dark"></i> Print Production Orders
+    </Item>
+</ContextMenu>
+
+<!-- ── Attachment Modal ── -->
+<AttachmentModal @ref="attachmentModalRef" />
+
+<style>
+    #optionsBarMenu, .blazor-context-menu {
+        z-index: 100000 !important;
+    }
+    .clickable-row:hover {
+        background-color: rgba(13, 110, 253, 0.05) !important;
+    }
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    .win11-context-menu-container, .blazor-context-menu {
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+    }
+    .blazored-typeahead {
+        height: 35px !important;
+        min-height: 35px !important;
+        font-size: 0.875rem !important;
+        border: 1px solid #ced4da !important;
+        border-radius: 0.375rem !important;
+        background-color: #fff !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        align-items: center !important;
+        position: relative !important;
+    }
+    .blazored-typeahead:focus-within {
+        border-color: #86b7fe !important;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+    }
+    .blazored-typeahead__controls {
+        height: 33px !important;
+        min-height: 33px !important;
+        width: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        background: transparent !important;
+    }
+    .blazored-typeahead__input {
+        height: 31px !important;
+        min-height: 31px !important;
+        padding: 0 0.5rem !important;
+        background: transparent !important;
+        box-sizing: border-box !important;
+        font-size: 0.875rem !important;
+    }
+    .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+        background: transparent !important;
+    }
+    .blazored-typeahead__input-mask {
+        height: 31px !important;
+        line-height: 31px !important;
+        display: block !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        background: transparent !important;
+    }
+    .blazored-typeahead__results {
+        position: absolute !important;
+        top: 100% !important;
+        bottom: auto !important;
+        left: 0 !important;
+        right: auto !important;
+        width: 100% !important;
+        max-height: 280px !important;
+        overflow-y: auto !important;
+        margin-top: 2px !important;
+        z-index: 10050 !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+        border: 1px solid #ced4da !important;
+        border-radius: 6px !important;
+        background: #ffffff !important;
+    }
+    .blazored-typeahead__down-arrow path {
+        fill: #6c757d !important;
+    }
+    .blazored-typeahead__input-icon:hover .blazored-typeahead__down-arrow path {
+        fill: #212529 !important;
+    }
+    input.form-control-sm, select.form-select-sm, .input-group-text, .btn-sm {
+        height: 35px !important;
+    }
+</style>
+

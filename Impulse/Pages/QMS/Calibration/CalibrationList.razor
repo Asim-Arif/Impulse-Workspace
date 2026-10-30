@@ -1,0 +1,304 @@
+@page "/qms/calibrations"
+@using BlazorContextMenu
+@using DataAccessLibrary.Models.QMS
+@using Impulse.Components.Common
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-3">
+
+            <!-- ── Top Action & Title Header ── -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-4 text-warning"><i class="fas fa-wrench"></i></span>
+                    <h5 class="mb-0 fw-bold text-dark">Calibrations</h5>
+                    <span class="badge bg-primary-subtle text-primary border px-2">@calibrations.Count Records</span>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <NavLink href="/qms" class="btn btn-outline-secondary btn-sm px-3" title="Back to QMS Hub">
+                        <i class="fas fa-arrow-left me-1"></i> QMS Hub
+                    </NavLink>
+
+                    <button type="button" class="btn btn-primary btn-sm px-3" @onclick="CreateNewCalibration">
+                        <i class="fas fa-plus me-1"></i> Add Calibration
+                    </button>
+
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" @onclick="PrintList" title="Print Calibration List">
+                        <i class="fas fa-print me-1"></i> Print List
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Search & Filter Controls ── -->
+            <div class="row g-2 mb-3 align-items-end" style="position: relative; z-index: 10;">
+                <div class="col-md-3">
+                    <label class="form-label text-secondary small mb-1">Fixed Asset</label>
+                    <select class="form-select form-select-sm" value="@filter.AssetID" @onchange="OnAssetChanged">
+                        <option value="0">&lt;All Assets&gt;</option>
+                        @foreach (var asset in assets)
+                        {
+                            <option value="@asset.AssetID">@asset.DisplayText</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label text-secondary small mb-1">Period</label>
+                    <select class="form-select form-select-sm" value="@selectedRange" @onchange="OnRangeChanged">
+                        <option value="0">Today</option>
+                        <option value="15">Last 15 Days</option>
+                        <option value="30">Last 30 Days</option>
+                        <option value="60">Last 60 Days</option>
+                        <option value="90">Last 90 Days</option>
+                        <option value="180">Last 180 Days</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label text-secondary small mb-1">Date From</label>
+                    <input type="date"
+                           class="form-control form-control-sm"
+                           disabled="@(selectedRange != "custom")"
+                           value="@(filter.DateFrom?.ToString("yyyy-MM-dd"))"
+                           @onchange="OnDateFromChanged" />
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label text-secondary small mb-1">Date To</label>
+                    <input type="date"
+                           class="form-control form-control-sm"
+                           disabled="@(selectedRange != "custom")"
+                           value="@(filter.DateTo?.ToString("yyyy-MM-dd"))"
+                           @onchange="OnDateToChanged" />
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label text-secondary small mb-1">Search</label>
+                    <input type="text"
+                           class="form-control form-control-sm"
+                           placeholder="Cert #, Asset, Remarks..."
+                           @bind="filter.SearchTerm"
+                           @bind:event="oninput"
+                           @onkeyup="HandleSearchKeyUp" />
+                </div>
+
+                <div class="col-md-1">
+                    <button type="button" class="btn btn-outline-primary btn-sm w-100" @onclick="SearchCalibrations" title="Refresh records">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Data Table Container ── -->
+            <div class="card border rounded-3 overflow-hidden shadow-none" style="position: relative; z-index: 1;">
+                @if (isLoading)
+                {
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2 text-secondary">Loading calibration records...</p>
+                    </div>
+                }
+                else if (calibrations.Count == 0)
+                {
+                    <div class="text-center py-5 text-muted">
+                        <i class="fas fa-wrench fs-1 mb-3 text-secondary opacity-50"></i>
+                        <h6>No Calibration Records Found</h6>
+                        <p class="small mb-3">No calibration logs match the selected filter criteria.</p>
+                        <button type="button" class="btn btn-primary btn-sm px-3" @onclick="CreateNewCalibration">
+                            <i class="fas fa-plus me-1"></i> Add First Calibration
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive" style="max-height: 65vh;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                <tr>
+                                    <th style="width: 50px;" class="text-center">S. #</th>
+                                    <th>Asset</th>
+                                    <th style="width: 120px;">Calib. Date</th>
+                                    <th style="width: 130px;">Cert. #</th>
+                                    <th>Master Ref. / Vendor</th>
+                                    <th>Remarks</th>
+                                    <th style="width: 130px;" class="text-center">Next Due Date</th>
+                                    <th style="width: 90px;" class="text-center">Docs</th>
+                                    <th style="width: 100px;" class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{ int serial = 1; }
+                                @foreach (var item in calibrations)
+                                {
+                                    <ContextMenuTrigger MenuId="rowContextMenu" Data="item" WrapperTag="tr" class="cursor-pointer">
+                                        <td class="text-center text-muted small">@(serial++)</td>
+                                        <td>
+                                            <span class="fw-semibold text-dark">@item.AssetDisplay</span>
+                                        </td>
+                                        <td>
+                                            <span>@(item.DT?.ToString("dd-MMM-yyyy") ?? "-")</span>
+                                        </td>
+                                        <td>
+                                            @if (!string.IsNullOrWhiteSpace(item.CertificateNo))
+                                            {
+                                                <span class="badge bg-primary-subtle text-primary border px-2">@item.CertificateNo</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">-</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <div class="text-truncate" style="max-width: 200px;" title="@(!string.IsNullOrWhiteSpace(item.AccTitle) ? $"{item.AccTitle} ({item.MasterReference})" : item.MasterReference)">
+                                                @if (!string.IsNullOrWhiteSpace(item.MasterReference))
+                                                {
+                                                    <span class="fw-semibold text-secondary">@item.MasterReference</span>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(item.AccTitle))
+                                                {
+                                                    <small class="text-muted d-block">@item.AccTitle</small>
+                                                }
+                                                @if (string.IsNullOrWhiteSpace(item.MasterReference) && string.IsNullOrWhiteSpace(item.AccTitle))
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="text-truncate" style="max-width: 250px;" title="@item.Remarks">
+                                                @(string.IsNullOrWhiteSpace(item.Remarks) ? "-" : item.Remarks)
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
+                                            @if (item.NextDueDT.HasValue)
+                                            {
+                                                @if (item.IsOverdue)
+                                                {
+                                                    <span class="badge bg-danger-subtle text-danger border px-2" title="Overdue for Calibration!">
+                                                        <i class="fas fa-exclamation-triangle me-1"></i>@item.NextDueDT.Value.ToString("dd-MMM-yyyy")
+                                                    </span>
+                                                }
+                                                else if (item.IsDueSoon)
+                                                {
+                                                    <span class="badge bg-warning-subtle text-warning border px-2" title="Calibration Due Soon">
+                                                        <i class="fas fa-clock me-1"></i>@item.NextDueDT.Value.ToString("dd-MMM-yyyy")
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-success-subtle text-success border px-2">
+                                                        @item.NextDueDT.Value.ToString("dd-MMM-yyyy")
+                                                    </span>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">-</span>
+                                            }
+                                        </td>
+                                        <td class="text-center" @onclick:stopPropagation="true">
+                                            <button type="button"
+                                                    class="btn btn-sm btn-link p-0 position-relative text-decoration-none"
+                                                    @onclick="() => OpenAttachments(item)"
+                                                    title="View or upload attachments">
+                                                <i class="fas fa-paperclip @(item.AttachmentCount > 0 ? "text-primary" : "text-muted")"></i>
+                                                @if (item.AttachmentCount > 0)
+                                                {
+                                                    <span class="badge bg-primary rounded-pill position-absolute"
+                                                          style="top: -6px; right: -12px; font-size: 0.65rem; padding: 0.15em 0.4em;">
+                                                        @item.AttachmentCount
+                                                    </span>
+                                                }
+                                            </button>
+                                        </td>
+                                        <td class="text-end" @onclick:stopPropagation="true">
+                                            <div class="d-inline-flex gap-1">
+                                                <button type="button"
+                                                        class="btn btn-outline-primary btn-xs"
+                                                        @onclick="() => EditCalibration(item)"
+                                                        title="Edit Calibration">
+                                                    <i class="fas fa-pencil-alt"></i>
+                                                </button>
+                                                <button type="button"
+                                                        class="btn btn-outline-danger btn-xs"
+                                                        @onclick="() => DeleteCalibration(item)"
+                                                        title="Delete Calibration">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </ContextMenuTrigger>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ── Row Right-Click Context Menu ── -->
+<ContextMenu Id="rowContextMenu" Template="Win11Style">
+    @if (context.Data is CalibrationListItemModel item)
+    {
+        <div class="win11-section-header">Asset: @item.AssetID</div>
+        <Item class="win11-menu-item" OnClick="@(() => EditCalibration(item))">
+            <i class="fas fa-pencil-alt fa-fw win11-icon text-primary"></i> Edit Entry
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => OpenAttachments(item))">
+            <i class="fas fa-paperclip fa-fw win11-icon text-info"></i> Attachments (@item.AttachmentCount)
+        </Item>
+        <div class="win11-divider"></div>
+        <Item class="win11-menu-item" OnClick="@(() => DeleteCalibration(item))">
+            <i class="fas fa-trash fa-fw win11-icon text-danger"></i> Delete Entry
+        </Item>
+    }
+</ContextMenu>
+
+<!-- ── Quick Attachments Modal ── -->
+@if (showAttachmentsModal && selectedCalibrationForAttachments != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0, 0, 0, 0.5); z-index: 1050;">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header py-2 px-3 border-bottom bg-light">
+                    <h6 class="modal-title fw-bold text-dark mb-0">
+                        <i class="fas fa-paperclip text-primary me-2"></i>
+                        Attachments: Cert #@selectedCalibrationForAttachments.CertificateNo (Asset: @selectedCalibrationForAttachments.AssetID)
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="CloseAttachmentsModal"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <EntityAttachmentManager EntityType="Calibration"
+                                             EntityId="@selectedCalibrationForAttachments.EntryID.ToString()"
+                                             EntityDisplayName="@($"Cert #{selectedCalibrationForAttachments.CertificateNo} - Asset {selectedCalibrationForAttachments.AssetID}")"
+                                             OnCountChanged="HandleAttachmentCountChanged" />
+                </div>
+                <div class="modal-footer py-2 px-3 border-top">
+                    <button type="button" class="btn btn-secondary btn-sm px-3" @onclick="CloseAttachmentsModal">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    input.form-control-sm, select.form-select-sm, .input-group-text, .btn-sm:not(.btn-xs) {
+        height: 35px !important;
+    }
+    .cursor-pointer {
+        cursor: pointer;
+    }
+</style>
+

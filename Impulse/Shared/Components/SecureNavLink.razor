@@ -8,16 +8,34 @@
     @if (!string.IsNullOrEmpty(OptionId))
     {
         <ContextMenuTrigger MenuId="navLinkContextMenu" Data="@(new NavLinkContextData { OptionId = OptionId, Href = Href, Module = Module, Title = Title, IconClass = IconClass })" WrapperTag="span" class="d-inline-block w-100">
-            <NavLink class="@ComputedClass" href="@Href" Match="@Match" @attributes="AdditionalAttributes">
-                @ChildContent
-            </NavLink>
+            @if (!string.IsNullOrWhiteSpace(Href))
+            {
+                <NavLink class="@ComputedClass" href="@Href" Match="@Match" @attributes="AdditionalAttributes">
+                    @ChildContent
+                </NavLink>
+            }
+            else
+            {
+                <a class="@ComputedClass" role="button" tabindex="0" style="cursor: pointer;" @attributes="AdditionalAttributes">
+                    @ChildContent
+                </a>
+            }
         </ContextMenuTrigger>
     }
     else
     {
-        <NavLink class="@ComputedClass" href="@Href" Match="@Match" @attributes="AdditionalAttributes">
-            @ChildContent
-        </NavLink>
+        @if (!string.IsNullOrWhiteSpace(Href))
+        {
+            <NavLink class="@ComputedClass" href="@Href" Match="@Match" @attributes="AdditionalAttributes">
+                @ChildContent
+            </NavLink>
+        }
+        else
+        {
+            <a class="@ComputedClass" role="button" tabindex="0" style="cursor: pointer;" @attributes="AdditionalAttributes">
+                @ChildContent
+            </a>
+        }
     }
 }
 else

@@ -1,0 +1,603 @@
+@page "/qms/capa/new"
+@page "/qms/capa/{Id:int}"
+@using Impulse.Components.Common
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-3">
+
+            <!-- ── Top Action & Title Header ── -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-4 text-primary"><i class="fas fa-tools"></i></span>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark">
+                            @(IsEditMode ? $"Edit CAPA: {model.CAPANo}" : "New Corrective & Preventive Action (CAPA)")
+                        </h5>
+                        <small class="text-secondary">
+                            QMS Command Center / Corrective and Preventive Action Lifecycle
+                        </small>
+                    </div>
+                    @if (IsEditMode)
+                    {
+                        <span class="badge bg-primary-subtle text-primary border px-2 ms-2">Edit Mode</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-success-subtle text-success border px-2 ms-2">New Entry</span>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(model.ComplaintNo))
+                    {
+                        <span class="badge bg-light text-dark border px-2 ms-1" title="Linked Complaint">
+                            <i class="fas fa-exclamation-circle text-danger me-1"></i>@model.ComplaintNo
+                        </span>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(model.NCNo))
+                    {
+                        <span class="badge bg-warning-subtle text-warning border px-2 ms-1" title="Linked NC">
+                            <i class="fas fa-file-signature me-1"></i>@model.NCNo
+                        </span>
+                    }
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" @onclick="Cancel" title="Go back">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+
+                    @if (IsEditMode || !string.IsNullOrWhiteSpace(model.CAPANo))
+                    {
+                        <button type="button" class="btn btn-outline-info btn-sm px-3" @onclick="PrintCAPA" title="Print CAPA Report">
+                            <i class="fas fa-print me-1"></i> Print CAPA
+                        </button>
+                    }
+
+                    <button type="button" class="btn btn-outline-primary btn-sm px-3" @onclick="() => SaveCAPA(true)" disabled="@isSaving">
+                        <i class="fas fa-plus-circle me-1"></i> Save &amp; New
+                    </button>
+
+                    <button type="button" class="btn btn-primary btn-sm px-3" @onclick="() => SaveCAPA(false)" disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save me-1"></i>
+                            <span>Save &amp; Close</span>
+                        }
+                    </button>
+                </div>
+            </div>
+
+            @if (isLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-secondary">Loading CAPA record...</p>
+                </div>
+            }
+            else
+            {
+                <!-- ── Linked Reference Summary Accordion / Panel ── -->
+                @if (ComplaintId.HasValue && ComplaintId.Value > 0)
+                {
+                    <div class="card border mb-3 bg-light-subtle shadow-none">
+                        <div class="card-header bg-white py-2 px-3 d-flex justify-content-between align-items-center cursor-pointer"
+                             style="cursor: pointer;"
+                             @onclick="ToggleComplaintRef">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fas fa-link text-primary"></i>
+                                <span class="fw-semibold text-secondary" style="font-size: 0.88rem;">Linked References: Customer Complaint &amp; Non-Compliance</span>
+                                @if (!string.IsNullOrWhiteSpace(model.CustCode))
+                                {
+                                    <span class="badge bg-light text-secondary border">@model.CustCode (@model.Country)</span>
+                                }
+                            </div>
+                            <span class="text-muted small">
+                                <i class="fas @(showComplaintRef ? "fa-chevron-up" : "fa-chevron-down")"></i>
+                            </span>
+                        </div>
+
+                        @if (showComplaintRef)
+                        {
+                            <div class="card-body p-3 bg-white">
+                                <div class="row g-3">
+                                    <!-- Complaint Summary -->
+                                    <div class="col-md-6 border-end">
+                                        <div class="d-flex align-items-center gap-2 mb-2 pb-1 border-bottom">
+                                            <i class="fas fa-exclamation-circle text-danger"></i>
+                                            <span class="fw-bold text-dark" style="font-size: 0.82rem; text-transform: uppercase;">Customer Complaint Reference</span>
+                                        </div>
+                                        <div class="row g-2" style="font-size: 0.85rem;">
+                                            <div class="col-sm-4 text-muted">Customer / Country:</div>
+                                            <div class="col-sm-8 fw-semibold text-dark">@(model.CustCode ?? "-") / @(model.Country ?? "-")</div>
+
+                                            <div class="col-sm-4 text-muted">Complaint #:</div>
+                                            <div class="col-sm-8 fw-semibold text-primary">@(model.ComplaintNo ?? "-")</div>
+
+                                            <div class="col-sm-4 text-muted">Complaint Date:</div>
+                                            <div class="col-sm-8">@(model.ComplaintDate?.ToString("dd-MMM-yyyy") ?? "-")</div>
+
+                                            <div class="col-sm-4 text-muted">Lodged By / Desig:</div>
+                                            <div class="col-sm-8">@(model.ComplaintBy ?? "-") @(!string.IsNullOrWhiteSpace(model.Designation) ? $"({model.Designation})" : "")</div>
+
+                                            <div class="col-sm-4 text-muted">Penalty:</div>
+                                            <div class="col-sm-8">
+                                                <span class="badge bg-secondary-subtle text-secondary border">@model.PenaltyDisplay</span>
+                                                @if (model.PenaltyQty.HasValue && model.PenaltyQty.Value > 0)
+                                                {
+                                                    <span class="ms-1 small text-muted">Qty: @model.PenaltyQty</span>
+                                                }
+                                                @if (model.PenaltyAmount.HasValue && model.PenaltyAmount.Value > 0)
+                                                {
+                                                    <span class="ms-1 small text-muted">Amt: @model.PenaltyAmount @model.PenaltyCurrency</span>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- NC Summary -->
+                                    <div class="col-md-6">
+                                        <div class="d-flex align-items-center gap-2 mb-2 pb-1 border-bottom">
+                                            <i class="fas fa-file-signature text-warning"></i>
+                                            <span class="fw-bold text-dark" style="font-size: 0.82rem; text-transform: uppercase;">Non-Compliance (NC) Reference</span>
+                                        </div>
+                                        <div class="row g-2" style="font-size: 0.85rem;">
+                                            <div class="col-sm-4 text-muted">NC #:</div>
+                                            <div class="col-sm-8 fw-semibold text-warning">@(model.NCNo ?? "-")</div>
+
+                                            <div class="col-sm-4 text-muted">NC Date / Type:</div>
+                                            <div class="col-sm-8">@(model.NCDate?.ToString("dd-MMM-yyyy") ?? "-") / <span class="badge bg-light text-dark border">@(model.NCType ?? "-")</span></div>
+
+                                            <div class="col-sm-4 text-muted">Source / Dept:</div>
+                                            <div class="col-sm-8">@(model.NCSource ?? "-") / @(model.NCDepartment ?? "-")</div>
+
+                                            <div class="col-sm-4 text-muted">NC Description:</div>
+                                            <div class="col-sm-8 text-secondary fst-italic">@(model.NCDescription ?? "-")</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <!-- ── CAPA Primary Identifiers ── -->
+                <div class="card border rounded-3 p-3 mb-3 bg-white shadow-none">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-md-3">
+                            <label class="form-label text-secondary fw-semibold small mb-1">
+                                CAPA # <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-light text-muted"><i class="fas fa-hashtag"></i></span>
+                                <input type="text"
+                                       class="form-control form-control-sm fw-bold text-primary"
+                                       @bind="model.CAPANo"
+                                       readonly="@IsEditMode"
+                                       placeholder="e.g. CAPA-1/2026" />
+                            </div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label text-secondary fw-semibold small mb-1">
+                                CAPA Date <span class="text-danger">*</span>
+                            </label>
+                            <input type="date"
+                                   class="form-control form-control-sm"
+                                   value="@(model.DT?.ToString("yyyy-MM-dd"))"
+                                   @onchange="OnCAPADateChanged" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Multi-Tab Navigation Headers ── -->
+                <ul class="nav nav-tabs mb-3" style="font-size: 0.9rem;">
+                    <li class="nav-item">
+                        <button type="button"
+                                class="nav-link @(activeTab == "step1" ? "active fw-bold text-primary border-bottom-0" : "text-secondary")"
+                                @onclick='() => SetActiveTab("step1")'>
+                            <i class="fas fa-search me-1"></i> Step 1: Investigation &amp; Root Cause
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button type="button"
+                                class="nav-link @(activeTab == "step2" ? "active fw-bold text-primary border-bottom-0" : "text-secondary")"
+                                @onclick='() => SetActiveTab("step2")'>
+                            <i class="fas fa-clipboard-check me-1"></i> Step 2: Action Plan (CAR / PAR)
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button type="button"
+                                class="nav-link @(activeTab == "step3" ? "active fw-bold text-primary border-bottom-0" : "text-secondary")"
+                                @onclick='() => SetActiveTab("step3")'>
+                            <i class="fas fa-tasks me-1"></i> Step 3: Verification &amp; Closure
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button type="button"
+                                class="nav-link @(activeTab == "attachments" ? "active fw-bold text-primary border-bottom-0" : "text-secondary")"
+                                @onclick='() => SetActiveTab("attachments")'>
+                            <i class="fas fa-paperclip me-1"></i> Attachments &amp; Documents
+                            @if (attachmentCount > 0)
+                            {
+                                <span class="badge bg-primary rounded-pill ms-1">@attachmentCount</span>
+                            }
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- ── Tab 1: Step 1 (Investigation & Root Cause) ── -->
+                @if (activeTab == "step1")
+                {
+                    <div class="row g-3">
+                        <!-- Left Sub-Column -->
+                        <div class="col-lg-5">
+                            <!-- Reason Radio Selection -->
+                            <div class="card border rounded-3 p-3 mb-3 bg-white shadow-none">
+                                <label class="form-label text-dark fw-bold small mb-2">
+                                    <i class="fas fa-tag text-primary me-1"></i> Reason Type
+                                </label>
+                                <div class="d-flex flex-wrap gap-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="capaReason" id="reason0" value="0"
+                                               checked="@(model.Reason == 0)" @onchange="@(() => { model.Reason = 0; })" />
+                                        <label class="form-check-label small" for="reason0">Product</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="capaReason" id="reason1" value="1"
+                                               checked="@(model.Reason == 1)" @onchange="@(() => { model.Reason = 1; })" />
+                                        <label class="form-check-label small" for="reason1">Process</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="capaReason" id="reason2" value="2"
+                                               checked="@(model.Reason == 2)" @onchange="@(() => { model.Reason = 2; })" />
+                                        <label class="form-check-label small" for="reason2">System</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="capaReason" id="reason3" value="3"
+                                               checked="@(model.Reason == 3)" @onchange="@(() => { model.Reason = 3; })" />
+                                        <label class="form-check-label small" for="reason3">Service</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Applicable Management Systems -->
+                            <div class="card border rounded-3 p-3 mb-3 bg-white shadow-none">
+                                <label class="form-label text-dark fw-bold small mb-2">
+                                    <i class="fas fa-network-wired text-primary me-1"></i> Applicable Systems
+                                </label>
+                                <div class="row g-2">
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="sysQM" @bind="model.System_QM" />
+                                            <label class="form-check-label small" for="sysQM">Quality Management</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="sysEM" @bind="model.System_EM" />
+                                            <label class="form-check-label small" for="sysEM">Environment Management</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="sysGMP" @bind="model.System_cGMP" />
+                                            <label class="form-check-label small" for="sysGMP">cGMP / CFR 21 820</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="sysOHS" @bind="model.System_OHSM" />
+                                            <label class="form-check-label small" for="sysOHS">Occup. Health &amp; Safety Management</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="sysITS" @bind="model.System_ITSM" />
+                                            <label class="form-check-label small" for="sysITS">IT Security Management</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="sysMDD" @bind="model.System_MDD" />
+                                            <label class="form-check-label small" for="sysMDD">Medical Device Directive 93/42/EEC</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Acceptance for Further Action -->
+                            <div class="card border rounded-3 p-3 mb-3 bg-white shadow-none">
+                                <label class="form-label text-dark fw-bold small mb-2">
+                                    <i class="fas fa-check-circle text-primary me-1"></i> Acceptance Status
+                                </label>
+                                <div class="d-flex flex-column gap-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="capaAcceptance" id="acc0" value="0"
+                                               checked="@(model.Acceptance == 0)" @onchange="@(() => { model.Acceptance = 0; })" />
+                                        <label class="form-check-label small" for="acc0">Acceptance for further Action</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="capaAcceptance" id="acc1" value="1"
+                                               checked="@(model.Acceptance == 1)" @onchange="@(() => { model.Acceptance = 1; })" />
+                                        <label class="form-check-label small" for="acc1">Hold for further action</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Investigation Date -->
+                            <div class="card border rounded-3 p-3 bg-white shadow-none">
+                                <label class="form-label text-secondary fw-semibold small mb-1">
+                                    <i class="fas fa-calendar-alt text-muted me-1"></i> Investigation / Result Date
+                                </label>
+                                <input type="date"
+                                       class="form-control form-control-sm"
+                                       value="@(model.ResultDT?.ToString("yyyy-MM-dd"))"
+                                       @onchange="@(e => { model.ResultDT = DateTime.TryParse(e.Value?.ToString(), out var dt) ? dt : null; })" />
+                            </div>
+                        </div>
+
+                        <!-- Right Sub-Column -->
+                        <div class="col-lg-7">
+                            <div class="card border rounded-3 p-3 bg-white shadow-none">
+                                <div class="mb-3">
+                                    <label class="form-label text-secondary fw-semibold small mb-1">
+                                        Non-Conformity Description <span class="text-danger">*</span>
+                                    </label>
+                                    <textarea class="form-control form-control-sm"
+                                              rows="4"
+                                              placeholder="Enter detailed description of non-conformity..."
+                                              @bind="model.Description"></textarea>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label text-secondary fw-semibold small mb-1">
+                                        Team Nominated
+                                    </label>
+                                    <textarea class="form-control form-control-sm"
+                                              rows="3"
+                                              placeholder="Members of investigation team..."
+                                              @bind="model.TeamNominated"></textarea>
+                                </div>
+
+                                <div>
+                                    <label class="form-label text-secondary fw-semibold small mb-1">
+                                        Result of Investigation
+                                    </label>
+                                    <textarea class="form-control form-control-sm"
+                                              rows="5"
+                                              placeholder="Detailed findings and root cause analysis..."
+                                              @bind="model.ResultOfInvestigation"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <!-- ── Tab 2: Step 2 (Action Plan) ── -->
+                @if (activeTab == "step2")
+                {
+                    <div class="row g-3">
+                        <!-- Left Sub-Column -->
+                        <div class="col-lg-5">
+                            <!-- Corrective Action Reviewed by MR -->
+                            <div class="card border rounded-3 p-3 mb-3 bg-white shadow-none">
+                                <label class="form-label text-dark fw-bold small mb-2">
+                                    <i class="fas fa-user-check text-primary me-1"></i> Corrective Action Reviewed by MR
+                                </label>
+                                <div class="d-flex flex-column gap-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="carReview" id="car0" value="0"
+                                               checked="@(model.CAReview == 0)" @onchange="@(() => { model.CAReview = 0; })" />
+                                        <label class="form-check-label small" for="car0">Change in Corrective Action required</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="carReview" id="car1" value="1"
+                                               checked="@(model.CAReview == 1)" @onchange="@(() => { model.CAReview = 1; })" />
+                                        <label class="form-check-label small" for="car1">Change in Implementation Date required</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="carReview" id="car2" value="2"
+                                               checked="@(model.CAReview == 2)" @onchange="@(() => { model.CAReview = 2; })" />
+                                        <label class="form-check-label small" for="car2">Change in Follow-up Date required</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Remarks -->
+                            <div class="card border rounded-3 p-3 bg-white shadow-none">
+                                <label class="form-label text-secondary fw-semibold small mb-1">
+                                    <i class="fas fa-comment-dots text-muted me-1"></i> Reviewer Remarks
+                                </label>
+                                <textarea class="form-control form-control-sm"
+                                          rows="6"
+                                          placeholder="Additional reviewer notes / instructions..."
+                                          @bind="model.Remarks"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Right Sub-Column -->
+                        <div class="col-lg-7">
+                            <div class="card border rounded-3 p-3 bg-white shadow-none">
+                                <!-- Corrective Action & Target Date -->
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <label class="form-label text-secondary fw-semibold small mb-0">
+                                            Corrective Action Plan
+                                        </label>
+                                    </div>
+                                    <textarea class="form-control form-control-sm mb-2"
+                                              rows="4"
+                                              placeholder="Planned actions to eliminate cause of identified non-conformity..."
+                                              @bind="model.CorrectiveAction"></textarea>
+                                    <div class="row align-items-center">
+                                        <div class="col-sm-6">
+                                            <label class="form-label text-secondary small mb-1">Corrective Action Target Date</label>
+                                            <input type="date"
+                                                   class="form-control form-control-sm"
+                                                   value="@(model.CorrectiveActionDT?.ToString("yyyy-MM-dd"))"
+                                                   @onchange="@(e => { model.CorrectiveActionDT = DateTime.TryParse(e.Value?.ToString(), out var dt) ? dt : null; })" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <hr class="my-3 text-muted" />
+
+                                <!-- Preventive Action & Target Date -->
+                                <div>
+                                    <label class="form-label text-secondary fw-semibold small mb-1">
+                                        Preventive Action Plan
+                                    </label>
+                                    <textarea class="form-control form-control-sm mb-2"
+                                              rows="4"
+                                              placeholder="Planned actions to eliminate causes of potential non-conformities..."
+                                              @bind="model.PreventiveActions"></textarea>
+                                    <div class="row align-items-center">
+                                        <div class="col-sm-6">
+                                            <label class="form-label text-secondary small mb-1">Preventive Action Target Date</label>
+                                            <input type="date"
+                                                   class="form-control form-control-sm"
+                                                   value="@(model.PreventiveActionDT?.ToString("yyyy-MM-dd"))"
+                                                   @onchange="@(e => { model.PreventiveActionDT = DateTime.TryParse(e.Value?.ToString(), out var dt) ? dt : null; })" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <!-- ── Tab 3: Step 3 (Verification & Closure) ── -->
+                @if (activeTab == "step3")
+                {
+                    <div class="row g-3">
+                        <!-- Left Sub-Column -->
+                        <div class="col-lg-6">
+                            <!-- Evaluation of Response Selection -->
+                            <div class="card border rounded-3 p-3 mb-3 bg-white shadow-none">
+                                <label class="form-label text-dark fw-bold small mb-2">
+                                    <i class="fas fa-clipboard-list text-primary me-1"></i> Evaluation of Response
+                                </label>
+                                <div class="d-flex flex-column gap-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="respEval" id="eval0" value="0"
+                                               checked="@(model.ResponseEvaluation == 0)" @onchange="@(() => { model.ResponseEvaluation = 0; })" />
+                                        <label class="form-check-label small" for="eval0">Verification audit is required</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="respEval" id="eval1" value="1"
+                                               checked="@(model.ResponseEvaluation == 1)" @onchange="@(() => { model.ResponseEvaluation = 1; })" />
+                                        <label class="form-check-label small" for="eval1">Verification of submitted documentation or self declaration prior to closure</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="respEval" id="eval2" value="2"
+                                               checked="@(model.ResponseEvaluation == 2)" @onchange="@(() => { model.ResponseEvaluation = 2; })" />
+                                        <label class="form-check-label small" for="eval2">Proposal of corrective action acceptable. Verify effectiveness.</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Follow-up Details -->
+                            <div class="card border rounded-3 p-3 bg-white shadow-none">
+                                <label class="form-label text-secondary fw-semibold small mb-1">
+                                    <i class="fas fa-history text-muted me-1"></i> Follow-up Observations &amp; Verification
+                                </label>
+                                <textarea class="form-control form-control-sm"
+                                          rows="6"
+                                          placeholder="Enter verification audits, audit findings, and effectiveness status..."
+                                          @bind="model.FollowUp"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Right Sub-Column (Follow-up Dates & Closure) -->
+                        <div class="col-lg-6">
+                            <div class="card border rounded-3 p-3 bg-white shadow-none">
+                                <h6 class="fw-bold text-dark border-bottom pb-2 mb-3 small text-uppercase">
+                                    <i class="fas fa-calendar-check text-primary me-1"></i> Verification Dates &amp; Closure
+                                </h6>
+
+                                <div class="mb-3">
+                                    <label class="form-label text-secondary small mb-1">
+                                        Corrective Action Follow-up Date
+                                    </label>
+                                    <input type="date"
+                                           class="form-control form-control-sm"
+                                           value="@(model.CorrectiveActionFollowupDT?.ToString("yyyy-MM-dd"))"
+                                           @onchange="@(e => { model.CorrectiveActionFollowupDT = DateTime.TryParse(e.Value?.ToString(), out var dt) ? dt : null; })" />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label text-secondary small mb-1">
+                                        Preventive Action Follow-up Date
+                                    </label>
+                                    <input type="date"
+                                           class="form-control form-control-sm"
+                                           value="@(model.PreventiveActionFollowUpDT?.ToString("yyyy-MM-dd"))"
+                                           @onchange="@(e => { model.PreventiveActionFollowUpDT = DateTime.TryParse(e.Value?.ToString(), out var dt) ? dt : null; })" />
+                                </div>
+
+                                <hr class="my-3 text-muted" />
+
+                                <div class="p-3 rounded-2 border @(canCloseCapa ? "bg-light" : "bg-light-subtle")">
+                                    <label class="form-label fw-bold text-dark small mb-1">
+                                        <i class="fas fa-lock text-success me-1"></i> CAPA Close Date
+                                    </label>
+                                    <input type="date"
+                                           class="form-control form-control-sm"
+                                           value="@(model.CAPACloseDT?.ToString("yyyy-MM-dd"))"
+                                           disabled="@(!canCloseCapa)"
+                                           @onchange="@(e => { model.CAPACloseDT = DateTime.TryParse(e.Value?.ToString(), out var dt) ? dt : null; })" />
+
+                                    @if (!canCloseCapa)
+                                    {
+                                        <small class="text-muted d-block mt-1">
+                                            <i class="fas fa-info-circle me-1"></i> CAPA Closure requires <code>CloseCAPA</code> permission.
+                                        </small>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <!-- ── Tab 4: Attachments & Documents ── -->
+                @if (activeTab == "attachments")
+                {
+                    if (!IsEditMode)
+                    {
+                        <div class="card border rounded-3 p-4 text-center bg-white">
+                            <i class="fas fa-paperclip text-muted fs-1 mb-2"></i>
+                            <h6 class="text-secondary fw-semibold">Save CAPA to Attach Files</h6>
+                            <p class="text-muted small mb-3">
+                                You must save this CAPA record first before you can upload or attach supporting documents and pictures.
+                            </p>
+                            <button type="button" class="btn btn-primary btn-sm px-4 mx-auto" @onclick="() => SaveCAPA(false)">
+                                <i class="fas fa-save me-1"></i> Save CAPA Now
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="card border rounded-3 p-3 bg-white">
+                            <EntityAttachmentManager EntityType="CAPA"
+                                                     EntityId="@Id.ToString()"
+                                                     EntityDisplayName="@model.CAPANo"
+                                                     OnCountChanged="HandleAttachmentCountChanged" />
+                        </div>
+                    }
+                }
+            }
+
+        </div>
+    </div>
+</div>
+
+<style>
+    input.form-control-sm, select.form-select-sm, .input-group-text, .btn-sm {
+        height: 35px !important;
+    }
+</style>
+

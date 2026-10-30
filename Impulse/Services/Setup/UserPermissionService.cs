@@ -639,7 +639,17 @@ namespace Impulse.Services.Setup
             ["OfficeEmailSettings"] = new[] { "OfficeReports", "OfficeMessages" },
             ["IntraOfficeHealth"] = new[] { "Diagnostics", "Health", "SystemHealth" },
             ["ExpStatistics"] = new[] { "ExpOrderList", "ExpCustomer" },
-            ["StkStockOrderAdjustment"] = new[] { "StkFinishIssuance", "StkFinishStockIssuance" }
+            ["StkStockOrderAdjustment"] = new[] { "StkFinishIssuance", "StkFinishStockIssuance" },
+
+            // ==========================================
+            // QMS Aliases
+            // ==========================================
+            ["QMSSupplierEvaluationList"] = new[] { "QMSInitialEvaluation" },
+            ["QMSInitialEvaluation"] = new[] { "QMSSupplierEvaluationList" },
+            ["QMSSupplierReEvaluationList"] = new[] { "QMSSupplierEvaluationList", "QMSInitialEvaluation" },
+            ["ReasonwiseGraph"] = new[] { "QMSCustomerComplaints" },
+            ["GroupwiseGraph"] = new[] { "QMSCustomerComplaints" },
+            ["ClaimsStatistics"] = new[] { "QMSCustomerComplaints" }
         };
 
         public bool HasOptionAccess(string optionId)
@@ -858,6 +868,43 @@ namespace Impulse.Services.Setup
             ["stock/vendor-billing-list"] = ("Stock", "StkVenderBillingList"),
             ["stock/vendor-rm-assignment"] = ("Stock", "StkVendorRMAssign"),
             ["vendorlist"] = ("Stock", "StkVendorList"),
+
+            // QMS (Quality Management System)
+            ["qms"] = ("QMS", null),
+            ["qms/dashboard"] = ("QMS", null),
+            ["qms/command-center"] = ("QMS", "QMSCustomerComplaints"),
+            ["qms/customer-complaint"] = ("QMS", "QMSCustomerComplaints"),
+            ["qms/customer-complaints"] = ("QMS", "QMSCustomerComplaints"),
+            ["qms/customer-feedback"] = ("QMS", "QMSCustomerComplaints"),
+            ["qms/capa"] = ("QMS", "QMSCustomerComplaints"),
+            ["qms/non-compliance"] = ("QMS", "QMSCustomerComplaints"),
+            ["qms/credit-note"] = ("QMS", "QMSCustomerComplaints"),
+            ["qms/audit"] = ("QMS", "QMSCustomerComplaints"),
+            ["qms/documents"] = ("QMS", "QMSDocuments"),
+            ["qms/document-types"] = ("QMS", "QMSDocumentTypes"),
+            ["qms/meetings"] = ("QMS", "QMSMeetings"),
+            ["qms/supplier-evaluation"] = ("QMS", "QMSInitialEvaluation"),
+            ["qms/supplier-evaluation-list"] = ("QMS", "QMSSupplierEvaluationList"),
+            ["qms/supplier-evaluations"] = ("QMS", "QMSSupplierEvaluationList"),
+            ["qms/supplier-reevaluation"] = ("QMS", "QMSSupplierReEvaluationList"),
+            ["qms/supplier-reevaluation-list"] = ("QMS", "QMSSupplierReEvaluationList"),
+            ["qms/supplier-reevaluations"] = ("QMS", "QMSSupplierReEvaluationList"),
+            ["qms/calibrations"] = ("QMS", "AccCalibrations"),
+            ["qms/track-back"] = ("QMS", "QMSTrackBackItems"),
+            ["qms/reasons"] = ("QMS", "QMSReasons"),
+            ["qms/standards"] = ("QMS", "QMSStandards"),
+            ["qms/manuals"] = ("QMS", "QMSManuals"),
+            ["qms/procedures"] = ("QMS", "QMSProcedures"),
+            ["qms/work-instructions"] = ("QMS", "QMSWorkInstructions"),
+            ["qms/technical-files"] = ("QMS", "QMSTechnicalFiles"),
+            ["qms/lean-management"] = ("QMS", "QMSLeanManagement"),
+            ["qms/documents-ex/entry/standards"] = ("QMS", "QMSStandards"),
+            ["qms/documents-ex/entry/manuals"] = ("QMS", "QMSManuals"),
+            ["qms/documents-ex/entry/procedures"] = ("QMS", "QMSProcedures"),
+            ["qms/documents-ex/entry/work-instructions"] = ("QMS", "QMSWorkInstructions"),
+            ["qms/documents-ex/entry/technical-files"] = ("QMS", "QMSTechnicalFiles"),
+            ["qms/documents-ex/entry/lean-management"] = ("QMS", "QMSLeanManagement"),
+            ["qms/documents-ex"] = ("QMS", null),
         };
 
         public bool IsRouteAuthorized(string relativePath)
@@ -903,6 +950,7 @@ namespace Impulse.Services.Setup
                         "dashboards" => "DashBoard",
                         "setup" => "Setup",
                         "office" or "intraoffice" => "IntraOffice",
+                        "qms" => "QMS",
                         _ => null
                     };
                 }
@@ -1185,6 +1233,24 @@ namespace Impulse.Services.Setup
                 new() { OptionID = "OfficeMinuteTypes", OptionName = "Minute Types", ModuleName = "Setup" },
                 new() { OptionID = "OfficeEmailSettings", OptionName = "Email & SMTP Settings", ModuleName = "Setup" },
                 new() { OptionID = "IntraOfficeHealth", OptionName = "System Diagnostics", ModuleName = "Setup" },
+
+                // QMS (Quality Management System)
+                new() { OptionID = "QMSCustomerComplaints", OptionName = "QMS Command Center", ModuleName = "QMS" },
+                new() { OptionID = "QMSDocuments", OptionName = "Document Control", ModuleName = "QMS" },
+                new() { OptionID = "QMSDocumentTypes", OptionName = "Document Types", ModuleName = "QMS" },
+                new() { OptionID = "QMSMeetings", OptionName = "Quality Meetings", ModuleName = "QMS" },
+                new() { OptionID = "QMSInitialEvaluation", OptionName = "Supplier Evaluation", ModuleName = "QMS" },
+                new() { OptionID = "QMSSupplierEvaluationList", OptionName = "Supplier Evaluation List", ModuleName = "QMS" },
+                new() { OptionID = "QMSSupplierReEvaluationList", OptionName = "Supplier Re-Evaluation List", ModuleName = "QMS" },
+                new() { OptionID = "AccCalibrations", OptionName = "Calibrations", ModuleName = "QMS" },
+                new() { OptionID = "QMSTrackBackItems", OptionName = "Track Back Items", ModuleName = "QMS" },
+                new() { OptionID = "QMSReasons", OptionName = "Reasons", ModuleName = "QMS" },
+                new() { OptionID = "QMSStandards", OptionName = "Standards", ModuleName = "QMS" },
+                new() { OptionID = "QMSManuals", OptionName = "Manuals", ModuleName = "QMS" },
+                new() { OptionID = "QMSProcedures", OptionName = "Procedures", ModuleName = "QMS" },
+                new() { OptionID = "QMSWorkInstructions", OptionName = "Work Instructions", ModuleName = "QMS" },
+                new() { OptionID = "QMSTechnicalFiles", OptionName = "Technical Files", ModuleName = "QMS" },
+                new() { OptionID = "QMSLeanManagement", OptionName = "Lean Management", ModuleName = "QMS" },
 
                 // IntraOffice CRM
                 new() { OptionID = "OfficeHub", OptionName = "Collaboration Hub", ModuleName = "IntraOffice" },

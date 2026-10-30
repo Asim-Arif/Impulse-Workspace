@@ -214,5 +214,24 @@ namespace Impulse.Constants
             public const string CustStockList = Folder + "CustStockList.rpt";
             public const string CustPriceList = Folder + "rptCustomerPriceList.rpt";
         }
+
+        // QMS Subfolder
+        public static class QMS
+        {
+            private const string Folder = "";
+            public const string CustomerComplaint = Folder + "CustomerComplaints.rpt";
+            public const string CustomerComplaintsList = Folder + "CustomerComplaints_List.rpt";
+            public const string CustomerComplaintsListWithoutPrice = Folder + "CustomerComplaints_List_WP.rpt";
+            public const string CAPA = Folder + "CAPA.rpt";
+            public const string CAPAReport = Folder + "CAPAReport.rpt";
+            public const string CreditNote = Folder + "QMS_CreditNote.rpt";
+            public const string NonCompliance = Folder + "NC.rpt";
+            public const string SupplierEvaluation = Folder + "SupplierEvaluation.rpt";
+            public const string SupplierReEvaluation = Folder + "SupplierReEvalution.rpt";
+            public const string CustomerComplaintsGraph = Folder + "Customer_Complaints_Graph.rpt";
+            public const string CustomerComplaintsItemGroupwiseGraph = Folder + "Customer_Complaints_ItemGroupwise_Graph.rpt";
+            public const string ClaimsStatisticsGraph = Folder + "Claims_Statistics_Graph.rpt";
+            public const string QMSDocumentDistributionList = Folder + "QMSDocument_DistributionList.rpt";
+        }
     }
 }

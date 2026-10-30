@@ -547,6 +547,16 @@ builder.Services.AddScoped<DataAccessLibrary.Interface.Common.IEntityAttachmentD
 builder.Services.AddScoped<Impulse.Services.Common.IEntityAttachmentService, Impulse.Services.Common.EntityAttachmentService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Common.IEntityNoteDataAccess, DataAccessLibrary.DAC.Common.EntityNoteDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Common.IEntityNoteService, Impulse.Services.Common.EntityNoteService>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.QMS.ICustomerComplaintDataAccess, DataAccessLibrary.DAC.QMS.CustomerComplaintDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.QMS.ICalibrationDataAccess, DataAccessLibrary.DAC.QMS.CalibrationDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.QMS.IQMSDocumentTypeDataAccess, DataAccessLibrary.DAC.QMS.QMSDocumentTypeDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.QMS.IQMSDocumentDataAccess, DataAccessLibrary.DAC.QMS.QMSDocumentDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.QMS.IQMSMeetingDataAccess, DataAccessLibrary.DAC.QMS.QMSMeetingDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.QMS.ITrackBackDataAccess, DataAccessLibrary.DAC.QMS.TrackBackDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.QMS.ISupplierEvaluationDataAccess, DataAccessLibrary.DAC.QMS.SupplierEvaluationDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.QMS.ISupplierReEvaluationDataAccess, DataAccessLibrary.DAC.QMS.SupplierReEvaluationDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.QMS.IQMSReasonDataAccess, DataAccessLibrary.DAC.QMS.QMSReasonDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.QMS.IQMSDocumentExDataAccess, DataAccessLibrary.DAC.QMS.QMSDocumentExDataAccess>();
 
 var app = builder.Build();
 

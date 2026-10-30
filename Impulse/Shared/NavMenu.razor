@@ -143,7 +143,7 @@
                             <i class="fas fa-funnel-dollar me-2 text-success"></i> Leads & Pipeline
                         </SecureNavLink>
                         <SecureNavLink class="nav-link" href="/office/customer-360" OptionId="OfficeLeads" Module="IntraOffice">
-                            <i class="fas fa-users me-2 text-primary"></i> Customer 360° Hub
+                            <i class="fas fa-users me-2 text-primary"></i> Customer 360Â° Hub
                         </SecureNavLink>
                         <SecureNavLink class="nav-link" href="/office/chat" OptionId="OfficeChat" Module="IntraOffice">
                             <i class="fas fa-comments me-2 text-info"></i> Group Discussions
@@ -866,6 +866,88 @@
                     </div>
                 </div>
             }
+
+        <div class="nav-item">
+            <div class="nav-section-header @(!PermissionService.HasModuleAccess("QMS") ? "disabled-nav-header text-muted" : "")"
+                 style="@(!PermissionService.HasModuleAccess("QMS") ? "opacity: 0.45; cursor: not-allowed;" : "")"
+                 @onclick="NavigateQMS"
+                 title="@(!PermissionService.HasModuleAccess("QMS") ? "Module Access Denied" : "")">
+                <i class="fas fa-award me-2" style="color: #088395;"></i>
+                <span>QMS</span>
+                @if (PermissionService.HasModuleAccess("QMS"))
+                {
+                    <i class="fas fa-chevron-down ms-auto @(isQMSExpanded ? "rotated" : "")"></i>
+                }
+                else
+                {
+                    <i class="fas fa-lock ms-auto text-secondary" style="font-size: 0.72rem;"></i>
+                }
+            </div>
+            @if (isQMSExpanded)
+            {
+                <div class="nav-sub-section">
+                    <div class="nav-sub-links">
+                        <SecureNavLink class="nav-link" href="/qms" Module="QMS" Match="NavLinkMatch.All">
+                            <i class="fas fa-award me-2" style="color: #088395;"></i> QMS Hub
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/qms/command-center" OptionId="QMSCustomerComplaints" Module="QMS">
+                            <i class="fas fa-clipboard-check me-2"></i> QMS Command Center
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/qms/calibrations" OptionId="AccCalibrations" Module="QMS">
+                            <i class="fas fa-wrench me-2" style="color: #d97706;"></i> Calibrations
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/qms/document-types" OptionId="QMSDocumentTypes" Module="QMS">
+                            <i class="fas fa-tags me-2" style="color: #6366f1;"></i> Document Types
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/qms/documents" OptionId="QMSDocuments" Module="QMS">
+                            <i class="fas fa-folder-open me-2" style="color: #0d9488;"></i> Document Control
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/qms/meetings" OptionId="QMSMeetings" Module="QMS">
+                            <i class="fas fa-users-rectangle me-2" style="color: #ec4899;"></i> Quality Meetings
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/qms/track-back" OptionId="QMSTrackBackItems" Module="QMS">
+                            <i class="fas fa-route me-2" style="color: #8b5cf6;"></i> Item Traceability
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/qms/supplier-evaluations" OptionId="QMSInitialEvaluation" Module="QMS">
+                            <i class="fas fa-user-check me-2" style="color: #0284c7;"></i> Supplier Evaluations
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/qms/supplier-reevaluations" OptionId="QMSSupplierReEvaluationList" Module="QMS">
+                            <i class="fas fa-tasks me-2" style="color: #0d9488;"></i> Supplier Re-Evaluations
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/qms/reasons" OptionId="QMSReasons" Module="QMS">
+                            <i class="fas fa-question-circle me-2" style="color: #f59e0b;"></i> QMS Reasons
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" OptionId="ReasonwiseGraph" Module="QMS" @onclick='() => ReportManager.RequestReport("ReasonwiseGraph")'>
+                            <i class="fas fa-chart-pie me-2" style="color: #6366f1;"></i> Reasonwise Graph
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" OptionId="GroupwiseGraph" Module="QMS" @onclick='() => ReportManager.RequestReport("GroupwiseGraph")'>
+                            <i class="fas fa-chart-bar me-2" style="color: #10b981;"></i> Groupwise Graph
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" OptionId="ClaimsStatistics" Module="QMS" @onclick='() => ReportManager.RequestReport("ClaimsStatistics")'>
+                            <i class="fas fa-chart-line me-2" style="color: #ef4444;"></i> Claims Statistics
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/qms/standards" OptionId="QMSStandards" Module="QMS">
+                            <i class="fas fa-book-bookmark me-2" style="color: #6366f1;"></i> Standards
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/qms/manuals" OptionId="QMSManuals" Module="QMS">
+                            <i class="fas fa-book me-2" style="color: #0d9488;"></i> Manuals
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/qms/procedures" OptionId="QMSProcedures" Module="QMS">
+                            <i class="fas fa-tasks me-2" style="color: #0284c7;"></i> Procedures
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/qms/work-instructions" OptionId="QMSWorkInstructions" Module="QMS">
+                            <i class="fas fa-file-lines me-2" style="color: #8b5cf6;"></i> Work Instructions
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/qms/technical-files" OptionId="QMSTechnicalFiles" Module="QMS">
+                            <i class="fas fa-file-shield me-2" style="color: #d97706;"></i> Technical Files
+                        </SecureNavLink>
+                        <SecureNavLink class="nav-link" href="/qms/lean-management" OptionId="QMSLeanManagement" Module="QMS">
+                            <i class="fas fa-chart-line me-2" style="color: #10b981;"></i> Lean Management
+                        </SecureNavLink>
+                    </div>
+                </div>
+            }
+        </div>
         </div>
 
         <div class="nav-item mt-auto">
@@ -907,6 +989,7 @@
     private bool isSystem_Reports_Expanded = false;
     private bool isStockExpanded = false;
     private bool isProductionExpanded = false;
+    private bool isQMSExpanded = false;
     private bool isCompanyExpanded = false;
     private bool isDashboardsExpanded = false;
     private bool isIntraOfficeExpanded = false;
@@ -1018,6 +1101,13 @@
         NavigationManager.NavigateTo("/stock");
     }
 
+
+    private void NavigateQMS()
+    {
+        if (!PermissionService.HasModuleAccess("QMS")) return;
+        isQMSExpanded = !isQMSExpanded;
+        NavigationManager.NavigateTo("/qms");
+    }
     private void NavigateProduction()
     {
         if (!PermissionService.HasModuleAccess("Production")) return;
@@ -1032,7 +1122,7 @@
         NavigationManager.NavigateTo("/company");
     }
 
-    // Sub-section toggles (no navigation — these expand nested sub-groups)
+    // Sub-section toggles (no navigation â€” these expand nested sub-groups)
     private void ToggleAccountSetup() => isAccountSetupExpanded = !isAccountSetupExpanded;
     private void ToggleVouchers()     => isVouchersExpanded     = !isVouchersExpanded;
     private void ToggleBanks()        => isBankSetupExpanded    = !isBankSetupExpanded;

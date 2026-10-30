@@ -451,7 +451,47 @@
             </div>
         }
 
-        <!-- 8. Setups -->
+        <!-- 8. Quality Management (QMS) -->
+        @if (PermissionService.HasModuleAccess("QMS"))
+        {
+            <a href="/qms" class="module-card qms">
+                <div class="module-card-icon">
+                    <i class="fas fa-award"></i>
+                </div>
+                <div class="module-card-body">
+                    <h2 class="module-card-title">Quality Management (QMS)</h2>
+                    <p class="module-card-desc">Complaints, document control, supplier evaluations &amp; audits</p>
+                    <div class="module-card-metrics">
+                        <span class="metric-item"><i class="fas fa-clipboard-check me-1 text-info"></i> Quality Hub</span>
+                        <span class="metric-separator">•</span>
+                        <span class="metric-item text-muted">Audits &amp; Compliance</span>
+                    </div>
+                </div>
+                <div class="module-card-arrow">
+                    <i class="fas fa-arrow-right"></i>
+                </div>
+            </a>
+        }
+        else
+        {
+            <div class="module-card qms text-muted" style="opacity: 0.45; cursor: not-allowed; filter: grayscale(75%);" title="Module Access Denied">
+                <div class="module-card-icon">
+                    <i class="fas fa-award"></i>
+                </div>
+                <div class="module-card-body">
+                    <h2 class="module-card-title text-muted">Quality Management (QMS)</h2>
+                    <p class="module-card-desc">Complaints, document control, supplier evaluations &amp; audits</p>
+                    <div class="module-card-metrics">
+                        <span class="metric-item text-muted"><i class="fas fa-lock me-1"></i> Access Restricted</span>
+                    </div>
+                </div>
+                <div class="module-card-arrow">
+                    <i class="fas fa-lock text-secondary"></i>
+                </div>
+            </div>
+        }
+
+        <!-- 9. Setups -->
         @if (PermissionService.HasModuleAccess("Setup"))
         {
             <a href="/setup" class="module-card setups">
@@ -847,6 +887,7 @@
     .module-card.export::before     { background: #d97706; }
     .module-card.stock::before      { background: #7c3aed; }
     .module-card.production::before { background: #dc2626; }
+    .module-card.qms::before        { background: #088395; }
     .module-card.setups::before     { background: #475569; }
 
     .module-card.dashboards:hover { box-shadow: 0 10px 24px rgba(13, 71, 161, 0.14); }
@@ -856,6 +897,7 @@
     .module-card.export:hover     { box-shadow: 0 10px 24px rgba(217, 119, 6, 0.14); }
     .module-card.stock:hover      { box-shadow: 0 10px 24px rgba(124, 58, 237, 0.14); }
     .module-card.production:hover { box-shadow: 0 10px 24px rgba(220, 38, 38, 0.14); }
+    .module-card.qms:hover          { box-shadow: 0 10px 24px rgba(8, 131, 149, 0.14); }
     .module-card.setups:hover     { box-shadow: 0 10px 24px rgba(71, 85, 105, 0.14); }
 
     /* Module Icon Bubbles */
@@ -877,6 +919,7 @@
     .export     .module-card-icon { background: #fffbeb; color: #b45309; }
     .stock      .module-card-icon { background: #faf5ff; color: #6b21a8; }
     .production .module-card-icon { background: #fef2f2; color: #b91c1c; }
+    .qms        .module-card-icon { background: #ecfeff; color: #088395; }
     .setups     .module-card-icon { background: #f8fafc; color: #475569; }
 
     .module-card-body {

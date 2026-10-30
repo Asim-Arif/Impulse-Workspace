@@ -328,6 +328,57 @@
                     StateHasChanged();*/
                 }
                 break;
+            case "reasonwisegraph":
+                res = await rangeModal.Show("Reasonwise Graph");
+                if (res.Success)
+                {
+                    string strDateRange = $"'{res.DateFrom:dd-MMM-yyyy} to {res.DateTo:dd-MMM-yyyy}'";
+                    req = new ReportRequest
+                    {
+                        ReportName = ReportNames.QMS.CustomerComplaintsGraph,
+                        SelectionFormula = $"{{CustomerComplaints.DT}} >= #{res.DateFrom:yyyy-MM-dd}# AND {{CustomerComplaints.DT}} <= #{res.DateTo:yyyy-MM-dd}#",
+                        FormulaValues = new Dictionary<string, object>
+                        {
+                            { "DateRange", strDateRange }
+                        }
+                    };
+                    await ReportService.PrintReportAsync(req);
+                }
+                break;
+            case "groupwisegraph":
+                res = await rangeModal.Show("Groupwise Graph");
+                if (res.Success)
+                {
+                    string strDateRange = $"'{res.DateFrom:dd-MMM-yyyy} to {res.DateTo:dd-MMM-yyyy}'";
+                    req = new ReportRequest
+                    {
+                        ReportName = ReportNames.QMS.CustomerComplaintsItemGroupwiseGraph,
+                        SelectionFormula = $"{{CustomerComplaints.DT}} >= #{res.DateFrom:yyyy-MM-dd}# AND {{CustomerComplaints.DT}} <= #{res.DateTo:yyyy-MM-dd}#",
+                        FormulaValues = new Dictionary<string, object>
+                        {
+                            { "DateRange", strDateRange }
+                        }
+                    };
+                    await ReportService.PrintReportAsync(req);
+                }
+                break;
+            case "claimsstatistics":
+                res = await rangeModal.Show("Claims Statistics");
+                if (res.Success)
+                {
+                    string strDateRange = $"'{res.DateFrom:dd-MMM-yyyy} to {res.DateTo:dd-MMM-yyyy}'";
+                    req = new ReportRequest
+                    {
+                        ReportName = ReportNames.QMS.ClaimsStatisticsGraph,
+                        SelectionFormula = $"{{VClaims_Statistics.DT}} >= #{res.DateFrom:yyyy-MM-dd}# AND {{VClaims_Statistics.DT}} <= #{res.DateTo:yyyy-MM-dd}#",
+                        FormulaValues = new Dictionary<string, object>
+                        {
+                            { "DateRange", strDateRange }
+                        }
+                    };
+                    await ReportService.PrintReportAsync(req);
+                }
+                break;
             case "tax-reports":
 
                 AccountHeads = await DB.GetListAsync<GenericDropDownModel>("'{ ' + AccNo + ' } ' + AccTitle AS DropDownValue_Description,AccNo AS DropDownValue_ID", "VAccounts_Parent");

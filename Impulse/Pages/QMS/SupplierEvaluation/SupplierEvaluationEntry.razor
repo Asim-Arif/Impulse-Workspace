@@ -1,0 +1,455 @@
+@page "/qms/supplier-evaluations/new"
+@page "/qms/supplier-evaluations/edit/{AccNo}"
+@attribute [Authorize]
+
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.QMS
+@using Impulse.Components.Common
+
+<PageTitle>@(isEditMode ? "Edit Supplier Evaluation" : "New Supplier Evaluation") - QMS</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-3">
+
+            <!-- ── Top Header & Actions ── -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center pb-2 mb-3 border-bottom gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 42px; height: 42px;">
+                        <i class="fas fa-user-check fa-lg"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark-emphasis">
+                            @(isEditMode ? "Edit Supplier Evaluation" : "New Supplier Evaluation")
+                        </h5>
+                        <small class="text-muted">
+                            @(string.IsNullOrWhiteSpace(model.AccTitle) ? "Assess supplier capacity, quality systems and compliance" : $"[{model.AccNo}] {model.AccTitle}")
+                        </small>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="NavigateBack">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+
+                    <!-- Attachment Modal Trigger -->
+                    <button type="button"
+                            class="btn btn-outline-info btn-sm position-relative"
+                            @onclick="OpenAttachmentModal"
+                            disabled="@(string.IsNullOrWhiteSpace(model.AccNo))"
+                            title="Manage file attachments">
+                        <i class="fas fa-paperclip me-1"></i> Attachments
+                        @if (attachmentCount > 0)
+                        {
+                            <span class="badge bg-danger ms-1">@attachmentCount</span>
+                        }
+                    </button>
+
+                    @if (isEditMode)
+                    {
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="PrintCurrentEvaluation" title="Print Evaluation">
+                            <i class="fas fa-print me-1"></i> Print
+                        </button>
+                    }
+
+                    <button type="button"
+                            class="btn btn-primary btn-sm px-3"
+                            @onclick="SaveEvaluationAsync"
+                            disabled="@(isSaving || string.IsNullOrWhiteSpace(model.AccNo))">
+                        <i class="fas @(isSaving ? "fa-spinner fa-spin" : "fa-save") me-1"></i> Save Evaluation
+                    </button>
+                </div>
+            </div>
+
+            @if (isLoading)
+            {
+                <div class="text-center py-5 text-muted">
+                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                    Loading supplier evaluation...
+                </div>
+            }
+            else
+            {
+                <!-- ── Top Selection Row: Maker / Vendor & Evaluation Date ── -->
+                <div class="card border rounded-3 p-3 bg-white shadow-none mb-3" style="position: relative !important; z-index: 9999 !important;">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary fw-semibold small mb-1">
+                                <i class="fas fa-store me-1 text-primary"></i> Select Maker / Vendor <span class="text-danger">*</span>
+                            </label>
+                            <BlazoredTypeahead SearchMethod="SearchSuppliers"
+                                               EnableDropDown="true"
+                                               Data="suppliers"
+                                               TValue="SupplierDropdownDto"
+                                               TItem="SupplierDropdownDto"
+                                               Value="selectedSupplier"
+                                               ValueChanged="@((SupplierDropdownDto? sup) => OnSupplierSelected(sup))"
+                                               ValueExpression="@(() => selectedSupplier)"
+                                               Disabled="@(isEditMode && !string.IsNullOrWhiteSpace(AccNo))"
+                                               Placeholder="Select Maker or Vendor..."
+                                               MaximumSuggestions="1000">
+                                <SelectedTemplate Context="sup">
+                                    @sup.DisplayText
+                                </SelectedTemplate>
+                                <ResultTemplate Context="sup">
+                                    <div>
+                                        <span class="badge @(sup.Vender == 1 ? "bg-info-subtle text-info border border-info-subtle" : "bg-secondary-subtle text-secondary border") me-1 font-monospace">
+                                            @(sup.Vender == 1 ? "Vendor" : "Maker")
+                                        </span>
+                                        <span class="fw-bold text-dark font-monospace">[@sup.AccNo]</span>
+                                        <span class="ms-1 text-secondary">@sup.AccTitle</span>
+                                    </div>
+                                </ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label text-secondary fw-semibold small mb-1">
+                                <i class="fas fa-calendar-alt me-1 text-primary"></i> Evaluation Date <span class="text-danger">*</span>
+                            </label>
+                            <input type="date"
+                                   class="form-control form-control-sm"
+                                   value="@(model.EntryDT?.ToString("yyyy-MM-dd"))"
+                                   @onchange="OnDateChanged" />
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label text-secondary fw-semibold small mb-1">
+                                <i class="fas fa-clock me-1 text-primary"></i> Time for Approval
+                            </label>
+                            <select class="form-select form-select-sm" @bind="model.TimeApproval">
+                                <option value="">&lt;Select Period&gt;</option>
+                                <option value="1 Year">1 Year</option>
+                                <option value="2 Year">2 Year</option>
+                                <option value="3 Year">3 Year</option>
+                                <option value="Forever">Forever</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3" style="position: relative !important; z-index: 1 !important;">
+
+                    <!-- ── Column 1: Capacity & Operational Profile ── -->
+                    <div class="col-lg-6">
+                        <div class="card border rounded-3 p-3 bg-white shadow-none h-100">
+                            <h6 class="fw-bold text-dark mb-3 small text-uppercase border-bottom pb-2">
+                                <i class="fas fa-industry text-primary me-1"></i> 1. Capacity &amp; Operational Profile
+                            </h6>
+
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-4">
+                                    <label class="form-label text-secondary fw-semibold small mb-1">No. of Employees</label>
+                                    <input type="text" class="form-control form-control-sm" @bind="model.EmpNo" placeholder="e.g. 25" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label text-secondary fw-semibold small mb-1">No. of Machines</label>
+                                    <input type="text" class="form-control form-control-sm" @bind="model.MachineNo" placeholder="e.g. 10" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label text-secondary fw-semibold small mb-1">No. of Tools</label>
+                                    <input type="text" class="form-control form-control-sm" @bind="model.ToolNo" placeholder="e.g. 50" />
+                                </div>
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="form-label text-secondary fw-semibold small mb-1">Product Line</label>
+                                <input type="text" class="form-control form-control-sm" @bind="model.ProductLine" placeholder="e.g. Scissors, Forceps, Retractors..." />
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="form-label text-secondary fw-semibold small mb-1">Core Competencies</label>
+                                <input type="text" class="form-control form-control-sm" @bind="model.CoreCompetencies" placeholder="e.g. Forging, Milling, Grinding, Heat Treatment..." />
+                            </div>
+
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-6">
+                                    <label class="form-label text-secondary fw-semibold small mb-1">Monthly Capacity</label>
+                                    <input type="text" class="form-control form-control-sm" @bind="model.Capacity" placeholder="e.g. 10,000 pcs / month" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-secondary fw-semibold small mb-1">Major Customers</label>
+                                    <input type="text" class="form-control form-control-sm" @bind="model.MajorCustomers" placeholder="Key client references..." />
+                                </div>
+                            </div>
+
+                            <div class="mb-0">
+                                <label class="form-label text-secondary fw-semibold small mb-1">Capacity / Machinery Remarks</label>
+                                <input type="text" class="form-control form-control-sm" @bind="model.Remarks1" placeholder="Machinery condition or capacity remarks..." />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── Column 2: Quality Systems & Technical Checklist ── -->
+                    <div class="col-lg-6">
+                        <div class="card border rounded-3 p-3 bg-white shadow-none h-100">
+                            <h6 class="fw-bold text-dark mb-3 small text-uppercase border-bottom pb-2">
+                                <i class="fas fa-clipboard-check text-primary me-1"></i> 2. Quality &amp; Facility Checklist
+                            </h6>
+
+                            <div class="row g-2 mb-3">
+                                <div class="col-sm-6">
+                                    <div class="form-check form-switch p-2 border rounded bg-light-subtle">
+                                        <input class="form-check-input ms-0 me-2" type="checkbox" id="chkGenerator" @bind="model.Generator" />
+                                        <label class="form-check-label small fw-semibold" for="chkGenerator">Generator Backup</label>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="form-check form-switch p-2 border rounded bg-light-subtle">
+                                        <input class="form-check-input ms-0 me-2" type="checkbox" id="chkUPS" @bind="model.UPS" />
+                                        <label class="form-check-label small fw-semibold" for="chkUPS">UPS System</label>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="form-check form-switch p-2 border rounded bg-light-subtle">
+                                        <input class="form-check-input ms-0 me-2" type="checkbox" id="chkClean" @bind="model.Cleaniness" />
+                                        <label class="form-check-label small fw-semibold" for="chkClean">Cleanliness &amp; 5S</label>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="form-check form-switch p-2 border rounded bg-light-subtle">
+                                        <input class="form-check-input ms-0 me-2" type="checkbox" id="chkSampling" @bind="model.SamplingHandling" />
+                                        <label class="form-check-label small fw-semibold" for="chkSampling">Sampling Handling</label>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="form-check form-switch p-2 border rounded bg-light-subtle">
+                                        <input class="form-check-input ms-0 me-2" type="checkbox" id="chkRecMaintain" @bind="model.InspRecMaintain" />
+                                        <label class="form-check-label small fw-semibold" for="chkRecMaintain">Inspection Records Maintained</label>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="form-check form-switch p-2 border rounded bg-light-subtle">
+                                        <input class="form-check-input ms-0 me-2" type="checkbox" id="chkDrawing" @bind="model.DrawingComprehension" />
+                                        <label class="form-check-label small fw-semibold" for="chkDrawing">T/Drawing Comprehension</label>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="form-check form-switch p-2 border rounded bg-light-subtle">
+                                        <input class="form-check-input ms-0 me-2" type="checkbox" id="chkCalibration" @bind="model.CalibrationSystem" />
+                                        <label class="form-check-label small fw-semibold" for="chkCalibration">Calibration System</label>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <div class="form-check form-switch p-2 border rounded bg-light-subtle">
+                                        <input class="form-check-input ms-0 me-2" type="checkbox" id="chkTracebility" @bind="model.TracebilityControl" />
+                                        <label class="form-check-label small fw-semibold" for="chkTracebility">Traceability &amp; Identification</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-0">
+                                <label class="form-label text-secondary fw-semibold small mb-1">Checklist Remarks</label>
+                                <input type="text" class="form-control form-control-sm" @bind="model.Remarks2" placeholder="Specific checklist observations..." />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── Column 3: Vendor-Specific Requirements (Vendor Only) ── -->
+                    <div class="col-lg-6">
+                        <div class="card border rounded-3 p-3 bg-white shadow-none h-100">
+                            <h6 class="fw-bold text-dark mb-3 small text-uppercase border-bottom pb-2">
+                                <i class="fas fa-shield-alt text-primary me-1"></i> 3. Additional Requirements (Raw Material Vendors)
+                            </h6>
+
+                            <div class="row g-2 mb-3">
+                                <div class="col-sm-4">
+                                    <div class="form-check form-switch p-2 border rounded bg-light-subtle">
+                                        <input class="form-check-input ms-0 me-2" type="checkbox" id="chkISO" @bind="model.ISO9000" />
+                                        <label class="form-check-label small fw-semibold" for="chkISO">ISO 9000 / QMS Certified</label>
+                                    </div>
+                                </div>
+                                <div class="col-sm-4">
+                                    <div class="form-check form-switch p-2 border rounded bg-light-subtle">
+                                        <input class="form-check-input ms-0 me-2" type="checkbox" id="chkComplaint" @bind="model.CustComplaintHanding" />
+                                        <label class="form-check-label small fw-semibold" for="chkComplaint">Complaint Handling System</label>
+                                    </div>
+                                </div>
+                                <div class="col-sm-4">
+                                    <div class="form-check form-switch p-2 border rounded bg-light-subtle">
+                                        <input class="form-check-input ms-0 me-2" type="checkbox" id="chkStaffTrain" @bind="model.StaffTrainingSystem" />
+                                        <label class="form-check-label small fw-semibold" for="chkStaffTrain">Staff Training System</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Overall Assessment Scores -->
+                            <div class="row g-3 mt-1">
+                                <div class="col-md-6">
+                                    <label class="form-label text-secondary fw-semibold small mb-2 d-block">
+                                        Marketing Reputation <span class="text-danger">*</span>
+                                    </label>
+                                    <div class="btn-group w-100" role="group">
+                                        <button type="button"
+                                                class="btn btn-sm @(model.MarketingReputation == 0 ? "btn-danger" : "btn-outline-danger")"
+                                                @onclick="@(() => model.MarketingReputation = 0)">
+                                            <i class="fas fa-times-circle me-1"></i> Poor
+                                        </button>
+                                        <button type="button"
+                                                class="btn btn-sm @(model.MarketingReputation == 1 ? "btn-warning" : "btn-outline-warning")"
+                                                @onclick="@(() => model.MarketingReputation = 1)">
+                                            <i class="fas fa-minus-circle me-1"></i> Avg
+                                        </button>
+                                        <button type="button"
+                                                class="btn btn-sm @(model.MarketingReputation == 2 ? "btn-success" : "btn-outline-success")"
+                                                @onclick="@(() => model.MarketingReputation = 2)">
+                                            <i class="fas fa-check-circle me-1"></i> Good
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label text-secondary fw-semibold small mb-2 d-block">
+                                        Technical Capability <span class="text-danger">*</span>
+                                    </label>
+                                    <div class="btn-group w-100" role="group">
+                                        <button type="button"
+                                                class="btn btn-sm @(model.TechnicalCapability == 0 ? "btn-danger" : "btn-outline-danger")"
+                                                @onclick="@(() => model.TechnicalCapability = 0)">
+                                            <i class="fas fa-times-circle me-1"></i> Poor
+                                        </button>
+                                        <button type="button"
+                                                class="btn btn-sm @(model.TechnicalCapability == 1 ? "btn-warning" : "btn-outline-warning")"
+                                                @onclick="@(() => model.TechnicalCapability = 1)">
+                                            <i class="fas fa-minus-circle me-1"></i> Avg
+                                        </button>
+                                        <button type="button"
+                                                class="btn btn-sm @(model.TechnicalCapability == 2 ? "btn-success" : "btn-outline-success")"
+                                                @onclick="@(() => model.TechnicalCapability = 2)">
+                                            <i class="fas fa-check-circle me-1"></i> Good
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── Column 4: Remarks & Approvals / Sign-Off ── -->
+                    <div class="col-lg-6">
+                        <div class="card border rounded-3 p-3 bg-white shadow-none h-100">
+                            <h6 class="fw-bold text-dark mb-3 small text-uppercase border-bottom pb-2">
+                                <i class="fas fa-file-signature text-primary me-1"></i> 4. Evaluation Notes &amp; Sign-Off
+                            </h6>
+
+                            <div class="mb-3">
+                                <label class="form-label text-secondary fw-semibold small mb-1">General Evaluation Remarks</label>
+                                <textarea class="form-control form-control-sm"
+                                          rows="3"
+                                          @bind="model.Remarks"
+                                          placeholder="Overall evaluation observations, conditions, and recommendations..."></textarea>
+                            </div>
+
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <label class="form-label text-secondary fw-semibold small mb-1">Prepared By</label>
+                                    <input type="text" class="form-control form-control-sm" @bind="model.PreparedBy" placeholder="Officer name..." />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label text-secondary fw-semibold small mb-1">Evaluated By</label>
+                                    <input type="text" class="form-control form-control-sm" @bind="model.EvaluatedBy" placeholder="Quality Lead name..." />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label text-secondary fw-semibold small mb-1">Approved By</label>
+                                    <input type="text" class="form-control form-control-sm" @bind="model.ApprovedBy" placeholder="Manager / Director..." />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            }
+
+        </div>
+    </div>
+</div>
+
+<!-- ── Entity Attachment Modal ── -->
+<AttachmentModal @ref="attachmentModalRef" />
+
+<style>
+    .blazored-typeahead {
+        height: 35px !important;
+        min-height: 35px !important;
+        font-size: 0.875rem !important;
+        border: 1px solid #ced4da !important;
+        border-radius: 0.375rem !important;
+        background-color: #fff !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        align-items: center !important;
+        position: relative !important;
+    }
+    .blazored-typeahead:focus-within {
+        border-color: #86b7fe !important;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+    }
+    .blazored-typeahead__controls {
+        height: 33px !important;
+        min-height: 33px !important;
+        width: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        background: transparent !important;
+    }
+    .blazored-typeahead__input {
+        height: 31px !important;
+        min-height: 31px !important;
+        padding: 0 0.5rem !important;
+        background: transparent !important;
+        box-sizing: border-box !important;
+        font-size: 0.875rem !important;
+    }
+    .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+        background: transparent !important;
+    }
+    .blazored-typeahead__input-mask {
+        height: 31px !important;
+        line-height: 31px !important;
+        display: block !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        background: transparent !important;
+    }
+    .blazored-typeahead__results {
+        position: absolute !important;
+        top: 100% !important;
+        bottom: auto !important;
+        left: 0 !important;
+        right: auto !important;
+        width: 100% !important;
+        max-height: 280px !important;
+        overflow-y: auto !important;
+        margin-top: 2px !important;
+        z-index: 10050 !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+        border: 1px solid #ced4da !important;
+        border-radius: 6px !important;
+        background: #ffffff !important;
+    }
+    .blazored-typeahead__down-arrow path {
+        fill: #6c757d !important;
+    }
+    .blazored-typeahead__input-icon:hover .blazored-typeahead__down-arrow path {
+        fill: #212529 !important;
+    }
+    input.form-control-sm, select.form-select-sm, .input-group-text, .btn-sm {
+        height: 35px !important;
+    }
+</style>
+

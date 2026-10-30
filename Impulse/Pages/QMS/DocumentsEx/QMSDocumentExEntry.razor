@@ -1,0 +1,318 @@
+@page "/qms/documents-ex/entry/{Category}"
+@page "/qms/documents-ex/entry/{Category}/{EntryId:int}"
+@attribute [Authorize]
+
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.QMS
+@using Impulse.Components.Common
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-3">
+
+            <!-- ── Top Action & Title Header ── -->
+            <div class="d-flex flex-wrap align-items-center justify-content-between pb-2 mb-3 border-bottom gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-4 text-primary"><i class="@CategoryIcon"></i></span>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark">
+                            @(IsNew ? $"New {CategoryTitle} Document" : $"Edit {CategoryTitle}: {model.DocumentNumber}")
+                        </h5>
+                        <small class="text-secondary">
+                            QMS Controlled Documents Master / @CategoryTitle
+                        </small>
+                    </div>
+                    <span class="badge bg-primary-subtle text-primary border px-2 ms-2">@CategoryTitle</span>
+                </div>
+
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" @onclick="NavigateBack">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+
+                    @if (!IsNew)
+                    {
+                        <button type="button" class="btn btn-outline-secondary btn-sm px-3" @onclick="OpenAttachments">
+                            <i class="fas fa-paperclip me-1"></i> Attachments
+                        </button>
+
+                        <button type="button" class="btn btn-outline-primary btn-sm px-3" @onclick="PrintDistributionList">
+                            <i class="fas fa-print me-1"></i> Print Dist. List
+                        </button>
+                    }
+
+                    <button type="button" class="btn btn-primary btn-sm px-4 shadow-sm" @onclick="SaveDocumentAsync" disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-save me-1"></i>
+                            <span>Save Document</span>
+                        }
+                    </button>
+                </div>
+            </div>
+
+            @if (isLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-secondary">Loading Document details...</p>
+                </div>
+            }
+            else
+            {
+                <EditForm Model="@model" OnValidSubmit="SaveDocumentAsync">
+                    <DataAnnotationsValidator />
+
+                    <!-- ── Master Document Information ── -->
+                    <div class="card border rounded-3 p-3 mb-3 bg-light-subtle shadow-none">
+                        <h6 class="fw-bold text-dark mb-3">
+                            <i class="fas fa-info-circle text-primary me-2"></i>Document Details
+                        </h6>
+
+                        <div class="row g-3">
+                            <!-- Document Number -->
+                            <div class="col-md-3">
+                                <label class="form-label text-secondary fw-semibold small mb-1">
+                                    Document Number <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group input-group-sm">
+                                    <InputText class="form-control form-control-sm" @bind-Value="model.DocumentNumber" placeholder="e.g. DOC-0001" />
+                                    @if (IsNew)
+                                    {
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="GenerateDocNumber" title="Auto Generate Number">
+                                            <i class="fas fa-magic"></i>
+                                        </button>
+                                    }
+                                </div>
+                                <ValidationMessage For="@(() => model.DocumentNumber)" class="text-danger small" />
+                            </div>
+
+                            <!-- Document Title / Name -->
+                            <div class="col-md-5">
+                                <label class="form-label text-secondary fw-semibold small mb-1">
+                                    Document Title / Name <span class="text-danger">*</span>
+                                </label>
+                                <InputText class="form-control form-control-sm" @bind-Value="model.DocumentName" placeholder="Enter full document title..." />
+                                <ValidationMessage For="@(() => model.DocumentName)" class="text-danger small" />
+                            </div>
+
+                            <!-- Revision -->
+                            <div class="col-md-2">
+                                <label class="form-label text-secondary fw-semibold small mb-1">Revision</label>
+                                <InputText class="form-control form-control-sm" @bind-Value="model.Revision" placeholder="e.g. 00, 01" />
+                            </div>
+
+                            <!-- Issue Date -->
+                            <div class="col-md-2">
+                                <label class="form-label text-secondary fw-semibold small mb-1">Issue Date</label>
+                                <input type="date" class="form-control form-control-sm" @bind="model.IssueDT" />
+                            </div>
+
+                            <!-- Document Type (Filtered by Master Category) -->
+                            <div class="col-md-4">
+                                <label class="form-label text-secondary fw-semibold small mb-1">Document Type</label>
+                                <select class="form-select form-select-sm" @bind="model.DocumentType">
+                                    <option value="">-- Select Type --</option>
+                                    @foreach (var type in availableDocumentTypes)
+                                    {
+                                        <option value="@type">@type</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <!-- Initiator Employee Lookup -->
+                            <div class="col-md-5" style="position: relative !important; z-index: 1000 !important;">
+                                <label class="form-label text-secondary fw-semibold small mb-1">
+                                    Initiator / Owner Employee
+                                </label>
+                                <BlazoredTypeahead SearchMethod="SearchEmployees"
+                                                  TItem="EmployeeDropdownDto"
+                                                  TValue="EmployeeDropdownDto"
+                                                  Value="selectedInitiator"
+                                                  ValueChanged="@((EmployeeDropdownDto? emp) => OnInitiatorSelected(emp))"
+                                                  ValueExpression="@(() => selectedInitiator)"
+                                                  Placeholder="Search initiator by ID or Name..."
+                                                  MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="emp">
+                                        @if (!string.IsNullOrWhiteSpace(emp?.EmpID))
+                                        {
+                                            <text>[@emp.EmpID] </text>
+                                        }
+                                        @emp?.Name (@emp?.DeptName)
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="emp">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span><strong>[@emp.EmpID]</strong> @emp.Name</span>
+                                            <small class="text-muted">@emp.DeptName - @emp.Designation</small>
+                                        </div>
+                                    </ResultTemplate>
+                                    <NotFoundTemplate Context="notFoundContext">
+                                        <div class="p-2 text-muted small">No employees found.</div>
+                                    </NotFoundTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+
+                            <!-- Document Scope / Internal Flag -->
+                            <div class="col-md-3 d-flex align-items-center pt-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="internalSwitch" @bind="model.Internal" />
+                                    <label class="form-check-label text-secondary fw-semibold small" for="internalSwitch">
+                                        @(model.Internal ? "Internal Document" : "External Document")
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── Distribution List Section ── -->
+                    <div class="card border rounded-3 p-3 bg-light-subtle shadow-none">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h6 class="fw-bold text-dark mb-0">
+                                <i class="fas fa-users-rectangle text-primary me-2"></i>Document Distribution List
+                            </h6>
+                            <span class="badge bg-secondary-subtle text-secondary border">
+                                @distributionList.Count(d => !d.IsDeleted) Recipient(s)
+                            </span>
+                        </div>
+                        <p class="text-secondary small mb-3">
+                            Add employees authorized to receive and review controlled copies of this document.
+                        </p>
+
+                        <!-- Add Employee to Distribution Bar -->
+                        <div class="row g-2 align-items-end mb-3 p-2 bg-white rounded border" style="position: relative !important; z-index: 999 !important;">
+                            <div class="col-md-9">
+                                <label class="form-label text-secondary fw-semibold small mb-1">
+                                    Select Employee to Add to Distribution List
+                                </label>
+                                <BlazoredTypeahead SearchMethod="SearchEmployees"
+                                                  TItem="EmployeeDropdownDto"
+                                                  TValue="EmployeeDropdownDto"
+                                                  Value="selectedDistEmployee"
+                                                  ValueChanged="@((EmployeeDropdownDto? emp) => selectedDistEmployee = emp)"
+                                                  ValueExpression="@(() => selectedDistEmployee)"
+                                                  Placeholder="Search employee by ID, Name or Designation..."
+                                                  MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="emp">
+                                        @if (!string.IsNullOrWhiteSpace(emp?.EmpID))
+                                        {
+                                            <text>[@emp.EmpID] </text>
+                                        }
+                                        @emp?.Name (@emp?.DeptName - @emp?.Designation)
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="emp">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span><strong>[@emp.EmpID]</strong> @emp.Name</span>
+                                            <small class="text-muted">@emp.DeptName - @emp.Designation</small>
+                                        </div>
+                                    </ResultTemplate>
+                                    <NotFoundTemplate Context="notFoundContext">
+                                        <div class="p-2 text-muted small">No employees found.</div>
+                                    </NotFoundTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+                            <div class="col-md-3">
+                                <button type="button"
+                                        class="btn btn-outline-primary btn-sm w-100"
+                                        @onclick="AddEmployeeToDistribution"
+                                        disabled="@(selectedDistEmployee == null)">
+                                    <i class="fas fa-plus me-1"></i> Add to List
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Distribution List Table -->
+                        <div class="card border rounded-3 overflow-hidden shadow-none bg-white">
+                            @if (!distributionList.Any(d => !d.IsDeleted))
+                            {
+                                <div class="text-center py-4 text-muted">
+                                    <i class="fas fa-users-slash fs-3 mb-2 opacity-50"></i>
+                                    <p class="small mb-0">No employees assigned to distribution list yet.</p>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="table-responsive" style="max-height: 40vh;">
+                                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                                        <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                            <tr>
+                                                <th style="width: 50px;" class="text-center">S. #</th>
+                                                <th style="width: 120px;">Emp ID</th>
+                                                <th>Employee Name</th>
+                                                <th style="width: 200px;">Department</th>
+                                                <th style="width: 200px;">Designation</th>
+                                                <th style="width: 80px;" class="text-center">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @{ int distSerial = 1; }
+                                            @foreach (var dist in distributionList.Where(d => !d.IsDeleted))
+                                            {
+                                                <tr>
+                                                    <td class="text-center text-muted small">@(distSerial++)</td>
+                                                    <td class="fw-bold text-dark">@dist.EmpID</td>
+                                                    <td class="fw-semibold">@dist.Name</td>
+                                                    <td class="text-secondary small">@dist.DeptName</td>
+                                                    <td class="text-secondary small">@dist.Designation</td>
+                                                    <td class="text-center">
+                                                        <button type="button"
+                                                                class="btn btn-outline-danger btn-xs"
+                                                                @onclick="() => RemoveEmployeeFromDistribution(dist)"
+                                                                title="Remove from Distribution">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                </EditForm>
+            }
+
+        </div>
+    </div>
+</div>
+
+<!-- ── Entity Attachment Modal ── -->
+<AttachmentModal @ref="attachmentModalRef" />
+
+<style>
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    input.form-control-sm, .form-select-sm, .input-group-text, .btn-sm:not(.btn-xs) {
+        height: 35px !important;
+    }
+    .blazored-typeahead {
+        height: 35px !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .blazored-typeahead__controls {
+        height: 35px !important;
+    }
+    .blazored-typeahead__input {
+        height: 33px !important;
+        font-size: 0.88rem !important;
+    }
+    .blazored-typeahead__results {
+        position: absolute !important;
+        top: 100% !important;
+        bottom: auto !important;
+        left: 0 !important;
+        width: 100% !important;
+        margin-top: 2px !important;
+        z-index: 10050 !important;
+    }
+</style>

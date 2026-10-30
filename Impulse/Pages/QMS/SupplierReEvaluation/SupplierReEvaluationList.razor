@@ -1,0 +1,372 @@
+@page "/qms/supplier-reevaluations"
+@page "/qms/supplier-reevaluation"
+@page "/qms/supplier-reevaluation-list"
+@attribute [Authorize]
+
+@using BlazorContextMenu
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.QMS
+@using Impulse.Components.Common
+
+<PageTitle>Supplier Re-Evaluations - QMS</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-3">
+
+            <!-- ── Top Header & Actions ── -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center pb-2 mb-3 border-bottom gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 42px; height: 42px;">
+                        <i class="fas fa-tasks fa-lg"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark-emphasis">Supplier &amp; Maker Re-Evaluations</h5>
+                        <small class="text-muted">Periodic quality, performance delivery &amp; environmental compliance reviews</small>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="NavigateToHub">
+                        <i class="fas fa-arrow-left me-1"></i> QMS Hub
+                    </button>
+
+                    <button type="button" class="btn btn-primary btn-sm" @onclick="CreateNewReEvaluation">
+                        <i class="fas fa-plus-circle me-1"></i> New Re-Evaluation
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-outline-primary btn-sm"
+                            id="optionsBarMenuBtn"
+                            @onclick="ShowOptionsMenu"
+                            title="Reports &amp; Options">
+                        <i class="fas fa-print me-1"></i> Options <i class="fas fa-caret-down ms-1"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Filter & Search Bar ── -->
+            <div class="row g-2 mb-3 align-items-end" style="position: relative !important; z-index: 9999 !important;">
+                <!-- Date Range Preset -->
+                <div class="col-md-2 col-sm-6">
+                    <label class="form-label text-secondary fw-semibold small mb-1">Date Preset</label>
+                    <select class="form-select form-select-sm" value="@selectedRangePreset" @onchange="OnRangePresetChanged">
+                        <option value="0">Today</option>
+                        <option value="1">Last 15 Days</option>
+                        <option value="2">Last 30 Days</option>
+                        <option value="3">Last 60 Days</option>
+                        <option value="4">Last 90 Days</option>
+                        <option value="5">Last 180 Days</option>
+                        <option value="6">Custom Range</option>
+                    </select>
+                </div>
+
+                <!-- Date From -->
+                <div class="col-md-2 col-sm-6">
+                    <label class="form-label text-secondary fw-semibold small mb-1">From Date</label>
+                    <input type="date"
+                           class="form-control form-control-sm"
+                           value="@(filter.DateFrom?.ToString("yyyy-MM-dd"))"
+                           disabled="@(selectedRangePreset != 6)"
+                           @onchange="@((ChangeEventArgs e) => OnDateChanged(e, true))" />
+                </div>
+
+                <!-- Date To -->
+                <div class="col-md-2 col-sm-6">
+                    <label class="form-label text-secondary fw-semibold small mb-1">To Date</label>
+                    <input type="date"
+                           class="form-control form-control-sm"
+                           value="@(filter.DateTo?.ToString("yyyy-MM-dd"))"
+                           disabled="@(selectedRangePreset != 6)"
+                           @onchange="@((ChangeEventArgs e) => OnDateChanged(e, false))" />
+                </div>
+
+                <!-- Supplier / Maker Typeahead -->
+                <div class="col-md-3 col-sm-6">
+                    <label class="form-label text-secondary fw-semibold small mb-1">Supplier / Maker</label>
+                    <BlazoredTypeahead SearchMethod="SearchSuppliers"
+                                       EnableDropDown="true"
+                                       Data="suppliers"
+                                       TValue="SupplierDropdownDto"
+                                       TItem="SupplierDropdownDto"
+                                       Value="selectedSupplier"
+                                       ValueChanged="@((SupplierDropdownDto? sup) => OnSupplierFilterChanged(sup))"
+                                       ValueExpression="@(() => selectedSupplier)"
+                                       Placeholder="All Suppliers &amp; Makers..."
+                                       MaximumSuggestions="1000">
+                        <SelectedTemplate Context="sup">
+                            @sup.DisplayText
+                        </SelectedTemplate>
+                        <ResultTemplate Context="sup">
+                            <div>
+                                <span class="badge @(sup.Vender == 1 ? "bg-info-subtle text-info border border-info-subtle" : "bg-secondary-subtle text-secondary border") me-1 font-monospace">
+                                    @(sup.Vender == 1 ? "Vendor" : "Maker")
+                                </span>
+                                <span class="fw-bold text-dark font-monospace">[@sup.AccNo]</span>
+                                <span class="ms-1 text-secondary">@sup.AccTitle</span>
+                            </div>
+                        </ResultTemplate>
+                    </BlazoredTypeahead>
+                </div>
+
+                <!-- Quick Search -->
+                <div class="col-md-2 col-sm-8">
+                    <label class="form-label text-secondary fw-semibold small mb-1">Quick Search</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text"
+                               class="form-control"
+                               placeholder="Search reviewer, acc..."
+                               @bind="filter.SearchText"
+                               @bind:event="oninput"
+                               @onkeydown="HandleSearchKeyDown" />
+                        @if (!string.IsNullOrWhiteSpace(filter.SearchText))
+                        {
+                            <button class="btn btn-outline-secondary" type="button" @onclick="ClearSearch">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                <!-- Refresh Button -->
+                <div class="col-auto">
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm"
+                            @onclick="RefreshDataAsync"
+                            disabled="@isLoading"
+                            title="Refresh list">
+                        <i class="fas fa-sync-alt @(isLoading ? "fa-spin" : "")"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Grid Table Container ── -->
+            <div class="table-responsive border rounded-3" style="max-height: 65vh; position: relative !important; z-index: 1 !important;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th style="width: 45px;" class="text-center">#</th>
+                            <th style="width: 140px;">Supplier Code</th>
+                            <th>Supplier / Maker Name</th>
+                            <th style="width: 110px;">Review Date</th>
+                            <th style="width: 120px;" class="text-center">Score</th>
+                            <th style="width: 110px;" class="text-center">Rating</th>
+                            <th>Reviewed By</th>
+                            <th>Approved By</th>
+                            <th style="width: 75px;" class="text-center">Files</th>
+                            <th style="width: 60px;" class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (isLoading)
+                        {
+                            <tr>
+                                <td colspan="10" class="text-center py-5 text-muted">
+                                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                                    Loading supplier re-evaluations...
+                                </td>
+                            </tr>
+                        }
+                        else if (!reEvaluations.Any())
+                        {
+                            <tr>
+                                <td colspan="10" class="text-center py-5 text-muted">
+                                    <i class="fas fa-clipboard-check fa-2x mb-2 d-block text-secondary opacity-50"></i>
+                                    No re-evaluations found matching the selected filters.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            for (int i = 0; i < reEvaluations.Count; i++)
+                            {
+                                var item = reEvaluations[i];
+                                int rowNum = i + 1;
+                                <ContextMenuTrigger MenuId="rowContextMenu" Data="@item" WrapperTag="tr" class="clickable-row">
+                                    <td class="text-center text-muted small">@rowNum</td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border font-monospace fw-semibold">
+                                            @item.AccNo
+                                        </span>
+                                    </td>
+                                    <td class="fw-semibold text-dark">
+                                        @item.AccTitle
+                                    </td>
+                                    <td class="text-nowrap text-secondary small">
+                                        @(item.ReviewDT?.ToString("dd-MMM-yyyy") ?? "-")
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="fw-bold text-dark font-monospace">@item.TotalScore</span>
+                                        <small class="text-muted">/ @item.MaxScore</small>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge @item.ScoreBadgeClass">
+                                            @item.ScorePercentage.ToString("F0")%
+                                        </span>
+                                    </td>
+                                    <td class="small text-secondary">
+                                        @(string.IsNullOrWhiteSpace(item.ReviewBy) ? "-" : item.ReviewBy)
+                                    </td>
+                                    <td class="small text-secondary">
+                                        @(string.IsNullOrWhiteSpace(item.ApprovedBy) ? "-" : item.ApprovedBy)
+                                    </td>
+                                    <td class="text-center" @onclick:stopPropagation="true">
+                                        <button type="button"
+                                                class="btn btn-outline-secondary btn-xs position-relative"
+                                                @onclick="@(() => OpenAttachments(item))"
+                                                title="View &amp; Upload Attachments">
+                                            <i class="fas fa-paperclip me-1"></i>
+                                            @item.AttachmentCount
+                                        </button>
+                                    </td>
+                                    <td class="text-center" @onclick:stopPropagation="true">
+                                        <button type="button"
+                                                class="btn btn-outline-primary btn-xs"
+                                                @onclick="@(() => EditReEvaluation(item.EntryID))"
+                                                title="Edit Re-Evaluation">
+                                            <i class="fas fa-pencil-alt"></i>
+                                        </button>
+                                    </td>
+                                </ContextMenuTrigger>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Footer Status Bar -->
+            <div class="d-flex justify-content-between align-items-center mt-2 px-1 text-muted small">
+                <span>Showing <strong>@reEvaluations.Count</strong> record(s)</span>
+                <span><i class="fas fa-info-circle me-1"></i> Right-click any row for quick actions</span>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ── Row Context Menu ── -->
+<ContextMenu Id="rowContextMenu" Template="Win11Style">
+    <Item class="win11-menu-item" OnClick="@((ItemClickEventArgs e) => { var item = e.Data as SupplierReEvaluationListItemDto; if (item != null) EditReEvaluation(item.EntryID); })">
+        <i class="fas fa-pencil-alt fa-fw win11-icon text-primary"></i> Edit Re-Evaluation
+    </Item>
+    <Item class="win11-menu-item" OnClick="@((ItemClickEventArgs e) => { var item = e.Data as SupplierReEvaluationListItemDto; if (item != null) OpenAttachments(item); })">
+        <i class="fas fa-paperclip fa-fw win11-icon text-info"></i> Attachments
+    </Item>
+    <div class="win11-divider"></div>
+    <Item class="win11-menu-item" OnClick="@((ItemClickEventArgs e) => { var item = e.Data as SupplierReEvaluationListItemDto; if (item != null) PrintReEvaluation(item.EntryID); })">
+        <i class="fas fa-print fa-fw win11-icon text-secondary"></i> Print Evaluation Slip
+    </Item>
+</ContextMenu>
+
+<!-- ── Options Bar Context Menu ── -->
+<ContextMenu Id="optionsBarMenu" Template="Win11Style">
+    <div class="win11-section-header">Re-Evaluation Reports</div>
+    <Item class="win11-menu-item" OnClick="PrintReEvaluationList">
+        <i class="fas fa-print fa-fw win11-icon text-primary"></i> Print Re-Evaluation List
+    </Item>
+</ContextMenu>
+
+<!-- ── Attachment Modal ── -->
+<AttachmentModal @ref="attachmentModalRef" />
+
+<style>
+    #optionsBarMenu, #rowContextMenu, .blazor-context-menu {
+        z-index: 100000 !important;
+    }
+    .clickable-row:hover {
+        background-color: rgba(13, 110, 253, 0.05) !important;
+        cursor: pointer;
+    }
+    .btn-xs {
+        padding: 0.15rem 0.45rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    .win11-context-menu-container, .blazor-context-menu {
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+    }
+    .blazored-typeahead {
+        height: 35px !important;
+        min-height: 35px !important;
+        font-size: 0.875rem !important;
+        border: 1px solid #ced4da !important;
+        border-radius: 0.375rem !important;
+        background-color: #fff !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        align-items: center !important;
+        position: relative !important;
+    }
+    .blazored-typeahead:focus-within {
+        border-color: #86b7fe !important;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+    }
+    .blazored-typeahead__controls {
+        height: 33px !important;
+        min-height: 33px !important;
+        width: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        background: transparent !important;
+    }
+    .blazored-typeahead__input {
+        height: 31px !important;
+        min-height: 31px !important;
+        padding: 0 0.5rem !important;
+        background: transparent !important;
+        box-sizing: border-box !important;
+        font-size: 0.875rem !important;
+    }
+    .blazored-typeahead__input-mask-wrapper {
+        height: 33px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+        background: transparent !important;
+    }
+    .blazored-typeahead__input-mask {
+        height: 31px !important;
+        line-height: 31px !important;
+        display: block !important;
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        background: transparent !important;
+    }
+    .blazored-typeahead__results {
+        position: absolute !important;
+        top: 100% !important;
+        bottom: auto !important;
+        left: 0 !important;
+        right: auto !important;
+        width: 100% !important;
+        max-height: 280px !important;
+        overflow-y: auto !important;
+        margin-top: 2px !important;
+        z-index: 10050 !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+        border: 1px solid #ced4da !important;
+        border-radius: 6px !important;
+        background: #ffffff !important;
+    }
+    .blazored-typeahead__down-arrow path {
+        fill: #6c757d !important;
+    }
+    .blazored-typeahead__input-icon:hover .blazored-typeahead__down-arrow path {
+        fill: #212529 !important;
+    }
+    input.form-control-sm, select.form-select-sm, .input-group-text, .btn-sm {
+        height: 35px !important;
+    }
+</style>

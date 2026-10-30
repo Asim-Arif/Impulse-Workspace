@@ -1,0 +1,228 @@
+@page "/qms/audit/new"
+@page "/qms/audit/{Id:int}"
+@namespace Impulse.Pages.QMS.Audits
+@using DataAccessLibrary.Models.QMS
+@using Impulse.Components.Common
+
+<PageTitle>@(IsEditMode ? $"Edit Audit #{model.ComplaintNo}" : "New Audit") - Impulse ERP</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-3">
+
+            <!-- ── Header Bar ── -->
+            <div class="d-flex align-items-end justify-content-between pb-2 mb-3 border-bottom">
+                <div>
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="fas fa-clipboard-check me-2 text-warning"></i>
+                        @(IsEditMode ? $"Audit: {model.ComplaintNo}" : "Add Internal / External Audit")
+                    </h5>
+                    <small class="text-secondary">
+                        @(IsEditMode ? $"Ref ID: #{Id} | Type: {(model.InternalAudit == true ? "Internal Audit" : "External Audit")}" : "Record QMS internal audit findings, external ISO audits, or surveillance visits")
+                    </small>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Cancel" title="Back to list">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                    <button type="button" class="btn btn-outline-success btn-sm" @onclick="() => SaveAudit(true)" disabled="@isSaving" title="Save & create another">
+                        <i class="fas fa-plus-circle me-1"></i> Save &amp; New
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" @onclick="() => SaveAudit(false)" disabled="@isSaving" title="Save & return">
+                        <i class="fas fa-check me-1"></i> Save &amp; Close
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" @onclick="Cancel" title="Discard changes">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── MD3 Navigation Tabs ── -->
+            <ul class="nav nav-tabs mb-3" style="font-size: 0.9rem;">
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(activeTab == "details" ? "active fw-bold text-primary" : "text-secondary")"
+                            @onclick='() => SetActiveTab("details")'>
+                        <i class="fas fa-clipboard-check me-2 text-warning"></i> Audit Details
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(activeTab == "attachments" ? "active fw-bold text-primary" : "text-secondary")"
+                            @onclick='() => SetActiveTab("attachments")'>
+                        <i class="fas fa-paperclip me-2 text-primary"></i> Attachments &amp; Documents
+                        @if (IsEditMode && attachmentCount > 0)
+                        {
+                            <span class="badge bg-success-subtle text-success rounded-pill ms-2">@attachmentCount</span>
+                        }
+                    </button>
+                </li>
+            </ul>
+
+            <!-- ── TAB 1: AUDIT DETAILS ── -->
+            @if (activeTab == "details")
+            {
+                @if (isLoading)
+                {
+                    <div class="d-flex align-items-center justify-content-center py-5">
+                        <div class="spinner-border text-warning me-2" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <span class="text-secondary fw-semibold">Loading audit details...</span>
+                    </div>
+                }
+                else
+                {
+                    <!-- Master Details Card -->
+                    <div class="card border rounded-3 mb-3 bg-light-subtle">
+                        <div class="card-body p-3">
+                            <h6 class="fw-bold text-secondary mb-3 pb-1 border-bottom" style="font-size: 0.85rem; text-transform: uppercase;">
+                                <i class="fas fa-info-circle me-1 text-warning"></i> Audit Information
+                            </h6>
+
+                            <!-- Row 1: Audit Type, Audit #, Date, Next/Target Date -->
+                            <div class="row g-2 mb-3 align-items-end">
+                                <div class="col-md-3">
+                                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Audit Type</label>
+                                    <div class="d-flex align-items-center gap-3 pt-1">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="auditTypeRadio" id="internalAudit"
+                                                   checked="@(model.InternalAudit == true)"
+                                                   @onchange="@(() => SetAuditType(true))" />
+                                            <label class="form-check-label fw-semibold text-dark" for="internalAudit" style="font-size: 0.88rem;">
+                                                <i class="fas fa-building me-1 text-primary"></i> Internal
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="auditTypeRadio" id="externalAudit"
+                                                   checked="@(model.InternalAudit == false)"
+                                                   @onchange="@(() => SetAuditType(false))" />
+                                            <label class="form-check-label fw-semibold text-dark" for="externalAudit" style="font-size: 0.88rem;">
+                                                <i class="fas fa-globe me-1 text-success"></i> External
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">
+                                        Audit # <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="text" class="form-control form-control-sm font-monospace fw-bold text-warning-emphasis bg-white"
+                                           @bind="model.ComplaintNo" readonly />
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">
+                                        Audit Date <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="date" class="form-control form-control-sm"
+                                           value="@model.DT?.ToString("yyyy-MM-dd")"
+                                           @onchange="OnAuditDateChanged" />
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">
+                                        @(model.InternalAudit == true ? "Target Date" : "Next Audit Date")
+                                    </label>
+                                    <input type="date" class="form-control form-control-sm"
+                                           value="@model.DTNextAudit?.ToString("yyyy-MM-dd")"
+                                           @onchange="OnNextAuditDateChanged" />
+                                </div>
+                            </div>
+
+                            <!-- Row 2: Reason for Audit / Auditor & Scope -->
+                            <div class="row g-2 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">
+                                        @(model.InternalAudit == true ? "Reason for Audit" : "Auditor / Firm")
+                                    </label>
+                                    <input type="text" class="form-control form-control-sm"
+                                           @bind="model.ComplaintBy"
+                                           placeholder="@(model.InternalAudit == true ? "e.g., Annual internal audit schedule, customer complaint follow-up" : "e.g., SGS, TUV, DNV, Client Representative")" />
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">Scope</label>
+                                    <input type="text" class="form-control form-control-sm"
+                                           @bind="model.Reason"
+                                           placeholder="e.g., ISO 9001:2015 clauses 7-8, Production, Packing, Store" />
+                                </div>
+                            </div>
+
+                            <!-- Row 3: Team / Attendees -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">
+                                    <i class="fas fa-users me-1 text-primary"></i> Team / Attendees
+                                </label>
+                                <textarea class="form-control form-control-sm" rows="3"
+                                          @bind="model.Description"
+                                          placeholder="Lead auditor, audit team members, and auditee representatives..."></textarea>
+                            </div>
+
+                            <!-- Row 4: Findings / Observations -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">
+                                    <i class="fas fa-search me-1 text-info"></i> Findings / Observations / Non-Conformances
+                                </label>
+                                <textarea class="form-control form-control-sm" rows="4"
+                                          @bind="model.Findings"
+                                          placeholder="Detailed audit observations, positive practices, non-conformities found..."></textarea>
+                            </div>
+
+                            <!-- Row 5: Actions / Recommendations -->
+                            <div class="mb-1">
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.8rem;">
+                                    <i class="fas fa-tasks me-1 text-success"></i> Actions / Recommendations / Corrective Measures
+                                </label>
+                                <textarea class="form-control form-control-sm" rows="4"
+                                          @bind="model.ActionRequested"
+                                          placeholder="Corrective action plan, recommendations for improvement, NC assignments..."></textarea>
+                            </div>
+
+                        </div>
+                    </div>
+                }
+            }
+
+            <!-- ── TAB 2: ATTACHMENTS & DOCUMENTS ── -->
+            @if (activeTab == "attachments")
+            {
+                @if (!IsEditMode)
+                {
+                    <div class="alert alert-info py-4 text-center rounded-3 border-0 shadow-sm" style="background: rgba(13, 202, 240, 0.1);">
+                        <i class="fas fa-cloud-arrow-up fa-3x text-info mb-3"></i>
+                        <h6 class="fw-bold text-info-emphasis mb-1">Attachments available after saving</h6>
+                        <p class="text-secondary mb-3" style="max-width: 500px; margin: 0 auto;">
+                            Please save the audit first. Once saved, you can upload audit reports, checklists, non-conformance reports, certificates, and objective evidence.
+                        </p>
+                        <button type="button" class="btn btn-primary btn-sm px-4" @onclick="() => SaveAudit(false)">
+                            <i class="fas fa-save me-1"></i> Save Audit Now
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <div class="card border rounded-3 p-3 bg-white">
+                        <EntityAttachmentManager EntityType="CustomerComplaint"
+                                                 EntityId="@Id.ToString()"
+                                                 EntityDisplayName="@model.ComplaintNo"
+                                                 OnCountChanged="HandleAttachmentCountChanged" />
+                    </div>
+                }
+            }
+
+        </div>
+    </div>
+</div>
+
+<style>
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    input.form-control-sm, select.form-select-sm, .input-group-text, .btn-sm:not(.btn-xs) {
+        height: 35px !important;
+    }
+</style>
+

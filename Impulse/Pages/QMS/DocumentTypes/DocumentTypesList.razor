@@ -1,0 +1,234 @@
+@page "/qms/document-types"
+@using DataAccessLibrary.Models.QMS
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body p-3">
+
+            <!-- ── Top Action & Title Header ── -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-4 text-primary"><i class="fas fa-tags"></i></span>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark">QMS Document Types</h5>
+                        <small class="text-secondary">
+                            Document Control / Master Categories &amp; Classifications
+                        </small>
+                    </div>
+                    <span class="badge bg-primary-subtle text-primary border px-2 ms-2">@documentTypes.Count Types</span>
+                </div>
+
+                <div>
+                    <NavLink href="/qms" class="btn btn-outline-secondary btn-sm px-3" title="Back to QMS Hub">
+                        <i class="fas fa-arrow-left me-1"></i> QMS Hub
+                    </NavLink>
+                </div>
+            </div>
+
+            <!-- ── Quick Add & Search Bar ── -->
+            <div class="card border rounded-3 p-3 mb-3 bg-light-subtle shadow-none">
+                <div class="row g-2 align-items-end">
+                    <!-- Quick Add Section -->
+                    <div class="col-md-7">
+                        <label class="form-label text-secondary fw-semibold small mb-1">
+                            <i class="fas fa-plus-circle text-primary me-1"></i> Add New Document Type
+                        </label>
+                        <div class="input-group input-group-sm">
+                            <input type="text"
+                                   class="form-control form-control-sm"
+                                   placeholder="e.g. 15- Risk Management SOPs..."
+                                   @bind="newDocumentTypeName"
+                                   @bind:event="oninput"
+                                   @onkeyup="HandleNewTypeKeyUp"
+                                   disabled="@isAdding" />
+                            <button type="button"
+                                    class="btn btn-primary btn-sm px-3"
+                                    @onclick="AddDocumentType"
+                                    disabled="@(isAdding || string.IsNullOrWhiteSpace(newDocumentTypeName))">
+                                @if (isAdding)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                    <span>Adding...</span>
+                                }
+                                else
+                                {
+                                    <i class="fas fa-plus me-1"></i>
+                                    <span>Add Type</span>
+                                }
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search Filter -->
+                    <div class="col-md-4">
+                        <label class="form-label text-secondary fw-semibold small mb-1">
+                            <i class="fas fa-search text-muted me-1"></i> Search Existing Types
+                        </label>
+                        <input type="text"
+                               class="form-control form-control-sm"
+                               placeholder="Type to filter..."
+                               @bind="searchTerm"
+                               @bind:event="oninput"
+                               @onkeyup="HandleSearchKeyUp" />
+                    </div>
+
+                    <div class="col-md-1">
+                        <button type="button" class="btn btn-outline-secondary btn-sm w-100" @onclick="LoadDocumentTypesAsync" title="Refresh">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Data Table ── -->
+            <div class="card border rounded-3 overflow-hidden shadow-none">
+                @if (isLoading)
+                {
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2 text-secondary">Loading Document Types...</p>
+                    </div>
+                }
+                else if (documentTypes.Count == 0)
+                {
+                    <div class="text-center py-5 text-muted">
+                        <i class="fas fa-tags fs-1 mb-3 text-secondary opacity-50"></i>
+                        <h6>No Document Types Found</h6>
+                        <p class="small mb-3">Add your first document type above.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive" style="max-height: 65vh;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                <tr>
+                                    <th style="width: 60px;" class="text-center">S. #</th>
+                                    <th>Document Type Name</th>
+                                    <th style="width: 200px;" class="text-center">Associated Documents</th>
+                                    <th style="width: 140px;" class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{ int serial = 1; }
+                                @foreach (var item in documentTypes)
+                                {
+                                    <tr>
+                                        <td class="text-center text-muted small">@(serial++)</td>
+                                        <td>
+                                            @if (item.IsEditing)
+                                            {
+                                                <div class="input-group input-group-sm">
+                                                    <input type="text"
+                                                           class="form-control form-control-sm"
+                                                           @bind="item.EditBuffer"
+                                                           @bind:event="oninput"
+                                                           @onkeyup="@(async e => await HandleEditKeyUp(e, item))"
+                                                           autofocus />
+                                                    <button type="button"
+                                                            class="btn btn-success btn-xs px-2"
+                                                            @onclick="@(async () => await SaveEdit(item))"
+                                                            disabled="@isSavingEdit"
+                                                            title="Save (Enter)">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                    <button type="button"
+                                                            class="btn btn-secondary btn-xs px-2"
+                                                            @onclick="() => CancelEdit(item)"
+                                                            title="Cancel (Esc)">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <span class="fw-semibold text-dark">@item.DocumentType</span>
+                                            }
+                                        </td>
+                                        <td class="text-center">
+                                            @if (item.UsageCount > 0)
+                                            {
+                                                <span class="badge bg-info-subtle text-info border px-2">
+                                                    <i class="fas fa-file-alt me-1"></i>@item.UsageCount Document(s)
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-light text-secondary border px-2">
+                                                    None
+                                                </span>
+                                            }
+                                        </td>
+                                        <td class="text-end">
+                                            @if (!item.IsEditing)
+                                            {
+                                                <div class="d-inline-flex gap-1">
+                                                    <button type="button"
+                                                            class="btn btn-outline-primary btn-xs"
+                                                            @onclick="() => StartEdit(item)"
+                                                            title="Rename Document Type">
+                                                        <i class="fas fa-pencil-alt"></i>
+                                                    </button>
+                                                    <button type="button"
+                                                            class="btn btn-outline-danger btn-xs"
+                                                            @onclick="() => ConfirmDelete(item)"
+                                                            title="@(item.UsageCount > 0 ? $"Cannot delete ({item.UsageCount} documents assigned)" : "Delete Document Type")">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ── Delete Confirmation Modal ── -->
+@if (showDeleteConfirmModal && itemToDelete != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0, 0, 0, 0.5); z-index: 1050;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header py-2 px-3 border-bottom bg-danger-subtle text-danger">
+                    <h6 class="modal-title fw-bold mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Confirm Deletion
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="CloseDeleteModal"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <p class="mb-2">Are you sure you want to permanently delete this Document Type?</p>
+                    <div class="p-2 bg-light rounded border fw-bold text-dark">
+                        @itemToDelete.DocumentType
+                    </div>
+                    <small class="text-muted d-block mt-2">This action cannot be undone.</small>
+                </div>
+                <div class="modal-footer py-2 px-3 border-top">
+                    <button type="button" class="btn btn-secondary btn-sm px-3" @onclick="CloseDeleteModal">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-danger btn-sm px-3" @onclick="ExecuteDelete">
+                        <i class="fas fa-trash me-1"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    input.form-control-sm, .input-group-text, .btn-sm:not(.btn-xs) {
+        height: 35px !important;
+    }
+</style>
