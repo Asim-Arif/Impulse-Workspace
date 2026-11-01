@@ -1,0 +1,133 @@
+@page "/fixedassets/profile"
+@page "/fixedassets/profile/{EntryId:int}"
+@page "/fixed-assets/new"
+@page "/fixed-assets/asset/{EntryId:int}"
+@attribute [Authorize]
+
+@using DataAccessLibrary.Models.ViewModels.FixedAssets
+@using Impulse.Pages.FixedAssets.Tabs
+
+<PageTitle>@(isNew ? "New Fixed Asset" : $"Asset - {model.AssetId}") - Impulse</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <!-- ── Top Header ── -->
+            <div class="d-flex align-items-end justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-cubes text-primary fs-4"></i>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark-emphasis">@(isNew ? "New Fixed Asset Entry" : $"Edit Asset Profile - {model.AssetId}")</h5>
+                        <small class="text-secondary">Acquisition details, depreciation parameters, tracking history and specifications</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge @(model.InActive ? "bg-danger" : "bg-success") px-3 py-2 rounded-pill">
+                        <i class="fas @(model.InActive ? "fa-ban" : "fa-check") me-1"></i>
+                        @(model.InActive ? "Inactive" : "Active")
+                    </span>
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" @onclick="Cancel" disabled="@isBusy">
+                        <i class="fas fa-arrow-left me-1"></i> Back to List
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Primary Identification Fields ── -->
+            <div class="row g-2 mb-3 align-items-end">
+                <div class="col-md-5">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Master Asset / Category <span class="text-danger">*</span></label>
+                    <select class="form-select form-select-sm" value="@model.MasterAssetRefId" @onchange="OnMasterCategoryChanged" disabled="@isBusy">
+                        <option value="">-- Select Master Asset --</option>
+                        @foreach (var m in lookup.Masters)
+                        {
+                            <option value="@m.Id">@m.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Old Asset Code</label>
+                    <input type="text" class="form-control form-control-sm" @bind="model.OldCode" disabled="@isBusy" placeholder="Legacy code" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Date Acquired <span class="text-danger">*</span></label>
+                    <input type="date" class="form-control form-control-sm" value="@(model.AcquiredDate?.ToString("yyyy-MM-dd") ?? "")" @onchange="OnAcquiredDateChanged" disabled="@isBusy" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Asset ID <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control form-control-sm fw-bold font-monospace text-primary" @bind="model.AssetId" disabled="@isBusy" placeholder="e.g. FA-0001" />
+                </div>
+                <div class="col-md-9">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Asset Description / Title <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control form-control-sm" @bind="model.Description" disabled="@isBusy" placeholder="Asset name or full description..." />
+                </div>
+            </div>
+
+            <!-- ── Navigation Tabs ── -->
+            <ul class="nav nav-pills mb-3 p-1 rounded-3 bg-light border gap-1" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link btn-sm py-1 px-3 fw-bold @(activeTab == "general" ? "active" : "")" type="button" @onclick='() => activeTab = "general"'>
+                        <i class="fas fa-info-circle me-1"></i> General Info
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link btn-sm py-1 px-3 fw-bold @(activeTab == "depreciation" ? "active" : "")" type="button" @onclick='() => activeTab = "depreciation"'>
+                        <i class="fas fa-calculator me-1"></i> Depreciation
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link btn-sm py-1 px-3 fw-bold @(activeTab == "picture" ? "active" : "")" type="button" @onclick='() => activeTab = "picture"'>
+                        <i class="fas fa-image me-1"></i> Asset Picture
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link btn-sm py-1 px-3 fw-bold @(activeTab == "repair" ? "active" : "")" type="button" @onclick='() => activeTab = "repair"'>
+                        <i class="fas fa-tools me-1"></i> Repair Log
+                    </button>
+                </li>
+            </ul>
+
+            <!-- ── Tab Body Content ── -->
+            <div class="mb-4">
+                @if (activeTab == "general")
+                {
+                    <GeneralInfoTab Model="model" Lookup="lookup" IsDisabled="isBusy" />
+                }
+                else if (activeTab == "depreciation")
+                {
+                    <DepreciationTab Model="model" Lookup="lookup" IsDisabled="isBusy" />
+                }
+                else if (activeTab == "picture")
+                {
+                    <AssetPictureTab Model="model" IsDisabled="isBusy" />
+                }
+                else
+                {
+                    <RepairLogTab RepairLogs="repairLogs" />
+                }
+            </div>
+
+            <!-- ── Bottom Action Footer ── -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 pt-3 border-top">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="assetInactiveSwitch" @bind="model.InActive" disabled="@isBusy">
+                    <label class="form-check-label fw-semibold text-dark-emphasis" for="assetInactiveSwitch" style="font-size:0.85rem;">Mark Inactive</label>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-primary btn-sm px-4 fw-bold" @onclick="SaveAndNewAsync" disabled="@isBusy">
+                        <i class="fas fa-plus-circle me-1"></i> Save &amp; New
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm px-4 fw-bold" @onclick="SaveAndCloseAsync" disabled="@isBusy">
+                        <i class="fas fa-check me-1"></i> Save &amp; Close
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-4 fw-bold" @onclick="Cancel" disabled="@isBusy">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+

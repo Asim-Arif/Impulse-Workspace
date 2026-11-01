@@ -133,6 +133,8 @@ namespace DataAccessLibrary.DAC.Setup
                         COALESCE(u.DashBoardMainLink, 0) AS DashBoardMainLink,
                         COALESCE(u.QMSMainLink, 0) AS QMSMainLink,
                         COALESCE(u.FixedAssetsMainLink, 0) AS FixedAssetsMainLink,
+                        COALESCE(u.BudgetingMainLink, 0) AS BudgetingMainLink,
+                        COALESCE(u.GateMainLink, 0) AS GateMainLink,
                         COALESCE(u.SamplingMainLink, 0) AS SamplingMainLink,
                         COALESCE(u.HelpMainLink, 0) AS HelpMainLink,
                         COALESCE(u.IntraOfficeMainLink, 0) AS IntraOfficeMainLink,

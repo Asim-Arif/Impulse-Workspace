@@ -1,0 +1,132 @@
+@page "/gate/pass-types"
+@page "/gate/gatepass-types"
+@attribute [Authorize]
+
+<PageTitle>Gate Pass Types Setup - Impulse</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body">
+            <!-- Header -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-4 text-primary"><i class="fas fa-tags"></i></span>
+                    <div>
+                        <h4 class="mb-0 fw-bold" style="color: #1a237e;">Gate Pass Types &amp; Categories</h4>
+                        <small class="text-muted">Configure categories used to classify inward &amp; outward gate passes</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@IsLoading">
+                        <i class="fas fa-sync-alt @(IsLoading ? "fa-spin" : "") me-1"></i> Refresh
+                    </button>
+                    <a href="/gate" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-arrow-left me-1"></i> Gate Hub
+                    </a>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <!-- Entry / Edit Form -->
+                <div class="col-md-5">
+                    <div class="card border-0 bg-light p-3" style="border-radius: 8px;">
+                        <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">
+                            <i class="fas @(Model.EntryId == 0 ? "fa-plus-circle" : "fa-pencil-alt") me-1 text-primary"></i>
+                            @(Model.EntryId == 0 ? "Add New Gate Pass Type" : $"Edit Type #{Model.EntryId}")
+                        </h6>
+
+                        <div class="mb-3">
+                            <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Gate Pass Type Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-sm fw-semibold" placeholder="e.g. Repair Slip, Warranty Return, Delivery" @bind="Model.GatePassType" />
+                        </div>
+
+                        <div class="form-check mb-3" style="font-size: 0.88rem;">
+                            <input class="form-check-input" type="checkbox" id="passTypeActive" @bind="Model.Active" />
+                            <label class="form-check-label fw-semibold" for="passTypeActive">Active for Selection</label>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-primary" @onclick="SaveAsync" disabled="@IsSaving">
+                                <i class="fas fa-check me-1"></i> @(IsSaving ? "Saving..." : "Save Type")
+                            </button>
+                            @if (Model.EntryId > 0)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="NewOption">
+                                    <i class="fas fa-times me-1"></i> Cancel
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- List Table -->
+                <div class="col-md-7">
+                    <div class="card border-0 bg-light p-3" style="border-radius: 8px;">
+                        <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2 d-flex justify-content-between align-items-center">
+                            <span><i class="fas fa-list me-1 text-primary"></i> Configured Gate Pass Types</span>
+                            <span class="badge bg-secondary">@Types.Count Type(s)</span>
+                        </h6>
+
+                        <div class="table-responsive bg-white border rounded">
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                                <thead class="table-light text-secondary" style="font-size: 0.78rem; text-transform: uppercase;">
+                                    <tr>
+                                        <th style="width: 40px;" class="text-center">#</th>
+                                        <th>Gate Pass Type</th>
+                                        <th class="text-center">Status</th>
+                                        <th class="text-end" style="width: 140px;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (IsLoading)
+                                    {
+                                        <tr>
+                                            <td colspan="4" class="text-center py-3 text-muted">
+                                                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                                                Loading pass types...
+                                            </td>
+                                        </tr>
+                                    }
+                                    else if (Types.Count == 0)
+                                    {
+                                        <tr>
+                                            <td colspan="4" class="text-center py-3 text-muted">
+                                                No gate pass types defined yet.
+                                            </td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        var idx = 0;
+                                        @foreach (var t in Types)
+                                        {
+                                            idx++;
+                                            <tr>
+                                                <td class="text-center text-muted">@idx</td>
+                                                <td class="fw-semibold">@t.GatePassType</td>
+                                                <td class="text-center">
+                                                    <span class="badge @(t.Active ? "bg-success-subtle text-success" : "bg-secondary-subtle text-secondary")">
+                                                        @(t.Active ? "Active" : "Inactive")
+                                                    </span>
+                                                </td>
+                                                <td class="text-end">
+                                                    <button type="button" class="btn btn-outline-secondary btn-sm me-1" title="Edit" @onclick="() => Edit(t)">
+                                                        <i class="fas fa-pencil-alt"></i>
+                                                    </button>
+                                                    <button type="button" class="btn @(t.Active ? "btn-outline-warning" : "btn-outline-success") btn-sm" title="@(t.Active ? "Deactivate" : "Activate")" @onclick="() => ToggleActiveAsync(t)">
+                                                        <i class="fas @(t.Active ? "fa-ban" : "fa-check")"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+

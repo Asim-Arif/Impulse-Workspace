@@ -117,6 +117,7 @@ namespace Impulse.Services.Accounts
                         BankAccNo = dto.PaymentAccNo,
                         BankID = bankIdVal,
                         ChequeNo = dto.ChequeNo,
+                        ChqBookNo = dto.ChqBookNo,
                         chequeType = dto.ChequeType ?? "Open",
                         ChequeDate = dto.ChequeDate,
 

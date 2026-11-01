@@ -1,0 +1,273 @@
+@page "/gate/in/list"
+@page "/gate/inward"
+@attribute [Authorize]
+
+@using BlazorContextMenu
+@using Impulse.Shared.Components
+
+<PageTitle>Gate Inward Passes - Impulse</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body">
+            <!-- Header Section -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-4 text-primary"><i class="fas fa-file-import"></i></span>
+                    <div>
+                        <h4 class="mb-0 fw-bold" style="color: #1a237e;">Gate Inward Register</h4>
+                        <small class="text-muted">Manage inward material passes, returns &amp; vendor deliveries</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="RefreshAsync" disabled="@IsLoading">
+                        <i class="fas fa-sync-alt @(IsLoading ? "fa-spin" : "") me-1"></i> Refresh
+                    </button>
+                    <a href="/gate/in/entry" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus-circle me-1"></i> New Gate In
+                    </a>
+                    <ContextMenuTrigger MenuId="optionsBarMenu" MouseButtonTrigger="MouseButtonTrigger.Left">
+                        <button class="btn btn-sm btn-outline-dark">
+                            <i class="fas fa-ellipsis-v me-1"></i> Options
+                        </button>
+                    </ContextMenuTrigger>
+                    <a href="/gate" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-arrow-left me-1"></i> Gate Hub
+                    </a>
+                </div>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="row g-2 mb-3">
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-2 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted" style="font-size: 0.75rem;">Total Passes</span>
+                            <div class="fw-bold fs-5 text-dark">@Entries.Count</div>
+                        </div>
+                        <i class="fas fa-list text-primary fs-4 opacity-50"></i>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-2 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted" style="font-size: 0.75rem;">Finance Approved</span>
+                            <div class="fw-bold fs-5 text-success">@Entries.Count(x => x.IsFinanceApproved)</div>
+                        </div>
+                        <i class="fas fa-check-circle text-success fs-4 opacity-50"></i>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-2 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted" style="font-size: 0.75rem;">Pending Approval</span>
+                            <div class="fw-bold fs-5 text-warning">@Entries.Count(x => !x.IsFinanceApproved)</div>
+                        </div>
+                        <i class="fas fa-clock text-warning fs-4 opacity-50"></i>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-2 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted" style="font-size: 0.75rem;">Returnable Items</span>
+                            <div class="fw-bold fs-5 text-info">@Entries.Count(x => x.HasReturnableItems)</div>
+                        </div>
+                        <i class="fas fa-rotate-left text-info fs-4 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter Controls -->
+            <div class="card border-0 bg-light p-2 mb-3" style="border-radius: 8px;">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Department</label>
+                        <select class="form-select form-select-sm" value="@Filter.DepartmentId" @onchange="DepartmentChangedAsync">
+                            <option value="">&lt;All Departments&gt;</option>
+                            @foreach (var dept in DepartmentOptions)
+                            {
+                                <option value="@dept.Id">@dept.Text</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Pass Type</label>
+                        <select class="form-select form-select-sm" value="@TypeSelectValue" @onchange="TypeChangedAsync">
+                            <option value="@GateInPassTypes.All">&lt;All Types&gt;</option>
+                            <option value="@GateInPassTypes.Foc">FOC</option>
+                            <option value="@GateInPassTypes.ExportSale">Export Sales</option>
+                            <option value="@GateInPassTypes.Sales">Sales</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Gatepass Category</label>
+                        <select class="form-select form-select-sm" value="@Filter.GatePassTypeName" @onchange="GatePassTypeNameChangedAsync">
+                            <option value="<All Gatepass Types>">&lt;All Categories&gt;</option>
+                            @foreach (var type in GatePassTypeOptions)
+                            {
+                                <option value="@type.Text">@type.Text</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Date Range</label>
+                        <select class="form-select form-select-sm" value="@Filter.RangeKey" @onchange="RangeChangedAsync">
+                            <option value="@GateInRangeKeys.Last15Days">Last 15 Days</option>
+                            <option value="@GateInRangeKeys.Last30Days">Last 30 Days</option>
+                            <option value="@GateInRangeKeys.Last60Days">Last 60 Days</option>
+                            <option value="@GateInRangeKeys.Last90Days">Last 90 Days</option>
+                            <option value="@GateInRangeKeys.Last180Days">Last 180 Days</option>
+                            <option value="@GateInRangeKeys.Custom">Custom Dates</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">From - To</label>
+                        <div class="d-flex gap-1">
+                            <input type="date" class="form-control form-control-sm" @bind="Filter.FromDate" disabled="@(!IsCustomRange)" @bind:after="RefreshAsync" />
+                            <input type="date" class="form-control form-control-sm" @bind="Filter.ToDate" disabled="@(!IsCustomRange)" @bind:after="RefreshAsync" />
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Vendor</label>
+                        <select class="form-select form-select-sm" value="@Filter.VendorName" @onchange="VendorChangedAsync">
+                            <option value="<All Vendors>">&lt;All Vendors&gt;</option>
+                            @foreach (var vend in VendorFilterOptions)
+                            {
+                                <option value="@vend.Text">@vend.Text</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Table Container -->
+            <div class="table-responsive border rounded" style="max-height: 60vh; overflow-y: auto;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th style="width: 40px;" class="text-center">#</th>
+                            <th>Date &amp; Time</th>
+                            <th>Gate Pass #</th>
+                            <th>Category</th>
+                            <th>Person</th>
+                            <th>Vehicle #</th>
+                            <th>Description</th>
+                            <th>Vendor</th>
+                            <th class="text-center">Returnable</th>
+                            <th class="text-center">Status</th>
+                            <th>Received Date</th>
+                            <th class="text-center" style="width: 120px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="12" class="text-center py-4 text-muted">
+                                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                                    Loading gate inward passes...
+                                </td>
+                            </tr>
+                        }
+                        else if (Entries.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="12" class="text-center py-4 text-muted">
+                                    <i class="fas fa-inbox fa-2x mb-2 d-block opacity-25"></i>
+                                    No gate inward records found for the selected criteria.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            var s = 0;
+                            @foreach (var item in Entries)
+                            {
+                                s++;
+                                var isSel = SelectedEntryId == item.EntryId;
+                                <ContextMenuTrigger MenuId="rowContextMenu"
+                                                    WrapperTag="tr"
+                                                    Data="item"
+                                                    class="@(isSel ? "table-primary" : "")"
+                                                    @onclick="() => SelectRow(item.EntryId)"
+                                                    @ondblclick="() => EditEntry(item.EntryId)">
+                                    <td class="text-center text-muted">@s</td>
+                                    <td>@(item.DateTime?.ToString("dd-MMM-yyyy hh:mm tt") ?? "")</td>
+                                    <td class="fw-bold text-primary">@item.GatePassNo</td>
+                                    <td>@item.GatePassTypeName</td>
+                                    <td>@item.PersonName</td>
+                                    <td><span class="badge bg-light text-dark border">@item.VehicleNo</span></td>
+                                    <td class="text-truncate" style="max-width: 200px;" title="@item.Description">@item.Description</td>
+                                    <td>@item.VendorName</td>
+                                    <td class="text-center">
+                                        @if (item.HasReturnableItems)
+                                        {
+                                            <span class="badge bg-info-subtle text-info"><i class="fas fa-check me-1"></i>Yes</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        @if (item.HasReturnableItems)
+                                        {
+                                            <span class="badge @(item.IsReceived ? "bg-success-subtle text-success" : "bg-warning-subtle text-warning")">
+                                                @(item.IsReceived ? "Received" : "Issued")
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge @(item.IsFinanceApproved ? "bg-success-subtle text-success" : "bg-secondary-subtle text-secondary")">
+                                                @(item.IsFinanceApproved ? "Approved" : "Pending")
+                                            </span>
+                                        }
+                                    </td>
+                                    <td>@(item.ReceivedDate?.ToString("dd-MMM-yyyy") ?? "-")</td>
+                                    <td class="text-center" @onclick:stopPropagation>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-secondary btn-sm" title="Edit" @onclick="() => EditEntry(item.EntryId)" disabled="@item.IsReceived">
+                                                <i class="fas fa-pencil-alt"></i>
+                                            </button>
+                                            @if (item.HasReturnableItems && !item.IsReceived)
+                                            {
+                                                <button class="btn btn-outline-primary btn-sm" title="Receive Items" @onclick="() => ReceiveEntry(item.EntryId)">
+                                                    <i class="fas fa-box-open"></i>
+                                                </button>
+                                            }
+                                            <button class="btn btn-outline-secondary btn-sm" title="Print Slip" @onclick="() => PrintSlipAsync(item.EntryId)">
+                                                <i class="fas fa-print"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </ContextMenuTrigger>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Row Context Menu -->
+<ContextMenu Id="rowContextMenu" Template="Win11Style">
+    <Item OnClick="OnContextEdit"><i class="fas fa-pencil-alt win11-icon text-primary me-2"></i> Edit Pass</Item>
+    <Item OnClick="OnContextReceive"><i class="fas fa-box-open win11-icon text-success me-2"></i> Receive Returnable</Item>
+    <Item OnClick="OnContextPrintSlip"><i class="fas fa-file-invoice win11-icon text-secondary me-2"></i> Print Pass Slip</Item>
+    <Item OnClick="OnContextApproveFinance"><i class="fas fa-check-double win11-icon text-success me-2"></i> Finance Approval</Item>
+</ContextMenu>
+
+<!-- Options Bar Menu -->
+<ContextMenu Id="optionsBarMenu" Template="Win11Style">
+    <Item OnClick="RefreshAsync"><i class="fas fa-sync-alt win11-icon text-primary me-2"></i> Refresh List</Item>
+    <Item OnClick="NewEntry"><i class="fas fa-plus-circle win11-icon text-success me-2"></i> New Gate In Pass</Item>
+    <Item OnClick="PrintListAsync"><i class="fas fa-print win11-icon text-dark me-2"></i> Print Inward List</Item>
+    <Item OnClick="NavigateGatePassTypes"><i class="fas fa-tags win11-icon text-info me-2"></i> Manage Pass Types</Item>
+</ContextMenu>
+
+<style>
+    .win11-menu-item { font-size: 0.84rem; padding: 6px 12px; }
+    .win11-icon { width: 16px; text-align: center; }
+</style>
+

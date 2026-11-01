@@ -32,6 +32,8 @@ namespace DataAccessLibrary.Models.Setup
         public bool DashBoardMainLink { get; set; }
         public bool QMSMainLink { get; set; }
         public bool FixedAssetsMainLink { get; set; }
+        public bool BudgetingMainLink { get; set; }
+        public bool GateMainLink { get; set; }
         public bool SamplingMainLink { get; set; }
         public bool HelpMainLink { get; set; }
         public bool IntraOfficeMainLink { get; set; }

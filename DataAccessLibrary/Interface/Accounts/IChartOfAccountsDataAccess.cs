@@ -14,6 +14,7 @@ namespace DataAccessLibrary.Interface.Accounts
         
         Task DeleteAccountAsync(string AccNo);
         Task UpdateAccountStatusAsync(string AccNo,Boolean bActive);
+        Task UpdateBudgetFlagsAsync(string accNo, bool budgetAccount, bool budgetAccountGlance);
 
         Task<List<CashFlowHeadsModel>> GetCashFlowHeads();
         Task UpdateCashFlowHeads(ChartOfAccountsModel newaccount, string AccNo, long CFHFS_RefID = 0, int itype = 0);

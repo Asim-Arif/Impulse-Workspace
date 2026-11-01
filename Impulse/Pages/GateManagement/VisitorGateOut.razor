@@ -1,0 +1,163 @@
+@page "/gate/visitors/gate-out"
+@page "/gate/visitors/out/{EntryId:int}"
+@attribute [Authorize]
+
+<PageTitle>Visitor Checkout - Impulse</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body">
+            <!-- Header -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-4 text-danger"><i class="fas fa-arrow-right-from-bracket"></i></span>
+                    <div>
+                        <h4 class="mb-0 fw-bold" style="color: #1a237e;">Visitor Checkout &amp; Departure</h4>
+                        <small class="text-muted">Verify badge, record departure timestamp &amp; complete visit log</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="Cancel">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                    @if (Model.EntryId > 0 && !Model.IsAlreadyOut)
+                    {
+                        <button type="button" class="btn btn-sm btn-danger" @onclick="SaveAsync" disabled="@IsSaving">
+                            <i class="fas fa-door-open me-1"></i> @(IsSaving ? "Checking out..." : "Confirm Gate Out")
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <!-- Quick Scanner Box if no EntryId loaded -->
+            @if (Model.EntryId == 0)
+            {
+                <div class="card border-0 bg-light p-4 text-center my-4" style="max-width: 600px; margin: 0 auto; border-radius: 12px;">
+                    <i class="fas fa-qrcode fa-3x text-primary mb-3"></i>
+                    <h5 class="fw-bold">Scan Visitor Badge or Enter Code</h5>
+                    <p class="text-muted" style="font-size: 0.88rem;">Scan the QR code on the visitor pass or type the badge number / visit code below</p>
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control form-control-lg text-center fw-bold" placeholder="e.g. CARD-000123 or VST-000123" @bind="SearchQuery" @onkeyup="OnSearchKeyUp" />
+                        <button class="btn btn-primary px-4" @onclick="SearchVisitorAsync">
+                            <i class="fas fa-search me-1"></i> Locate
+                        </button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                @if (IsLoading)
+                {
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2 text-muted">Loading visitor checkout details...</p>
+                    </div>
+                }
+                else
+                {
+                    <!-- Summary Badges -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-4 col-sm-6">
+                            <div class="p-2 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="text-muted" style="font-size: 0.75rem;">Recorded Gate In</span>
+                                    <div class="fw-bold fs-6 text-primary">@Model.DateTime.ToString("dd-MMM-yyyy hh:mm tt")</div>
+                                </div>
+                                <i class="fas fa-door-open text-primary fs-4 opacity-50"></i>
+                            </div>
+                        </div>
+                        <div class="col-md-4 col-sm-6">
+                            <div class="p-2 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="text-muted" style="font-size: 0.75rem;">Total Stay Duration</span>
+                                    <div class="fw-bold fs-6 text-dark">@StayDurationText</div>
+                                </div>
+                                <i class="fas fa-stopwatch text-dark fs-4 opacity-50"></i>
+                            </div>
+                        </div>
+                        <div class="col-md-4 col-sm-6">
+                            <div class="p-2 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="text-muted" style="font-size: 0.75rem;">Status</span>
+                                    <div class="fw-bold fs-6 @(Model.IsAlreadyOut ? "text-success" : "text-warning")">
+                                        @(Model.IsAlreadyOut ? "Already Checked Out" : "Present on Premises")
+                                    </div>
+                                </div>
+                                <i class="fas @(Model.IsAlreadyOut ? "fa-check-circle text-success" : "fa-clock text-warning") fs-4 opacity-50"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Details Card -->
+                    <div class="card border-0 bg-light p-3 mb-3" style="border-radius: 8px;">
+                        <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">
+                            <i class="fas fa-user-check me-1 text-primary"></i> Visitor Details
+                        </h6>
+                        <div class="row g-2">
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1 text-muted" style="font-size: 0.75rem;">Visitor Name</label>
+                                <input class="form-control form-control-sm fw-bold" value="@Model.VisitorName" readonly />
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1 text-muted" style="font-size: 0.75rem;">Company</label>
+                                <input class="form-control form-control-sm" value="@Model.CompanyName" readonly />
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1 text-muted" style="font-size: 0.75rem;">CNIC / Identification</label>
+                                <input class="form-control form-control-sm" value="@Model.CnicNo" readonly />
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1 text-muted" style="font-size: 0.75rem;">Mobile #</label>
+                                <input class="form-control form-control-sm" value="@Model.MobileNo" readonly />
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1 text-muted" style="font-size: 0.75rem;">Concerned Host</label>
+                                <input class="form-control form-control-sm" value="@Model.ConcernedPerson" readonly />
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1 text-muted" style="font-size: 0.75rem;">Vendor</label>
+                                <input class="form-control form-control-sm" value="@Model.VendorName" readonly />
+                            </div>
+                            <div class="col-md-6 col-sm-12">
+                                <label class="form-label mb-1 text-muted" style="font-size: 0.75rem;">Purpose</label>
+                                <input class="form-control form-control-sm" value="@Model.Purpose" readonly />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Checkout Action Card -->
+                    <div class="card border-0 bg-light p-3 mb-3" style="border-radius: 8px;">
+                        <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">
+                            <i class="fas fa-barcode me-1 text-primary"></i> Verification &amp; Departure
+                        </h6>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Departure Date &amp; Time</label>
+                                <input type="datetime-local" class="form-control form-control-sm" value="@TimeOutInputValue" @onchange="OnTimeOutChanged" disabled="@Model.IsAlreadyOut" />
+                            </div>
+                            <div class="col-md-5 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Scan / Confirm Card No. or QR Code</label>
+                                <input type="text" class="form-control form-control-sm fw-bold text-primary" @bind="Model.VerificationInput" placeholder="Scan or type badge card no." disabled="@Model.IsAlreadyOut" />
+                            </div>
+                            <div class="col-md-3 col-sm-12 text-end">
+                                @if (!Model.IsAlreadyOut)
+                                {
+                                    <button class="btn btn-sm btn-danger w-100" @onclick="SaveAsync" disabled="@IsSaving">
+                                        <i class="fas fa-door-open me-1"></i> Checkout Visitor
+                                    </button>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-success py-2 w-100">
+                                        <i class="fas fa-check-circle me-1"></i> Checked Out by @Model.OutVerifiedBy
+                                    </span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+

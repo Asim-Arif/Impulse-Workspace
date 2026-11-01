@@ -303,6 +303,24 @@ namespace Impulse.Pages.Accounts
                     NotificationServiceManager.ShowWarning("Error", "Please enter Notes.");
                     return;
                 }
+                if (SelectedBankAccount == null)
+                {
+                    NotificationServiceManager.ShowWarning("Validation", "Please select a Bank Account.");
+                    return;
+                }
+                if (string.IsNullOrWhiteSpace(voucherViewModel.ChequeDetails?.ChequeNo))
+                {
+                    NotificationServiceManager.ShowWarning("Validation", "Please enter a Cheque Number.");
+                    return;
+                }
+                var chqVal = await VoucherService.ValidateChequeAsync(SelectedBankAccount.AccNo, voucherViewModel.ChequeDetails.ChequeNo);
+                if (!chqVal.IsValid)
+                {
+                    NotificationServiceManager.ShowWarning("Cheque Validation", chqVal.ErrorMessage ?? "Invalid Cheque Number.");
+                    return;
+                }
+                voucherViewModel.ChequeDetails.ChqBookNo = chqVal.ChqBookNo;
+
                 decimal dTotalDebit = 0;
                 decimal dTotalCredit = 0;
 
@@ -461,14 +479,19 @@ namespace Impulse.Pages.Accounts
                 ChequeInfo info = await VoucherService.GetNewChequeNumbersByBankAccount(selectedBankAccount.AccNo);
 
                 // Update the VoucherViewModel fields directly
-                if (info != null)
+                if (info != null && !string.IsNullOrWhiteSpace(info.ChqNo))
                 {
                     voucherViewModel.ChequeDetails.ChqBookNo = info.ChqBookNo;
                     voucherViewModel.ChequeDetails.ChequeNo = info.ChqNo;
                 }
+                else
+                {
+                    voucherViewModel.ChequeDetails.ChqBookNo = 0;
+                    voucherViewModel.ChequeDetails.ChequeNo = string.Empty;
+                    NotificationServiceManager.ShowWarning("No Cheques", $"No available unissued cheques found for {selectedBankAccount.AccTitle}.");
+                }
                 UpdateBankNarration();
                 
-
                 voucherViewModel.ChequeDetails.BankID = selectedBankAccount.BankID;
                 voucherViewModel.ChequeDetails.BankAccNo = selectedBankAccount.AccNo;
                 voucherViewModel.ChequeDetails.CDate = voucherViewModel.DT;
@@ -476,6 +499,37 @@ namespace Impulse.Pages.Accounts
                 decimal balance = await VoucherService.GetBalance(selectedBankAccount.AccNo, voucherViewModel.DT);
                 strBankBalance = balance.ToString("N2");
                 StateHasChanged();
+            }
+            else
+            {
+                voucherViewModel.ChequeDetails.ChqBookNo = 0;
+                voucherViewModel.ChequeDetails.ChequeNo = string.Empty;
+                voucherViewModel.ChequeDetails.BankID = 0;
+                voucherViewModel.ChequeDetails.BankAccNo = string.Empty;
+                strBankBalance = string.Empty;
+                UpdateBankNarration();
+                StateHasChanged();
+            }
+        }
+
+        private async Task OnChequeNoChanged()
+        {
+            var chqNo = voucherViewModel.ChequeDetails?.ChequeNo?.Trim();
+            if (SelectedBankAccount == null || string.IsNullOrWhiteSpace(chqNo))
+            {
+                return;
+            }
+
+            var validation = await VoucherService.ValidateChequeAsync(SelectedBankAccount.AccNo, chqNo);
+            if (validation.IsValid)
+            {
+                voucherViewModel.ChequeDetails.ChqBookNo = validation.ChqBookNo;
+                UpdateBankNarration();
+            }
+            else
+            {
+                voucherViewModel.ChequeDetails.ChqBookNo = 0;
+                NotificationServiceManager.ShowWarning("Cheque Validation", validation.ErrorMessage ?? "Invalid Cheque Number.");
             }
         }
         private async Task<IEnumerable<GenericDropDownModel>> SearchChequeTypes(string searchText)

@@ -1,0 +1,109 @@
+@page "/gate/visitors/pass/{EntryId:int}"
+@attribute [Authorize]
+
+<PageTitle>Visitor Pass Badge - Impulse</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body">
+            <!-- Header -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom d-print-none">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-4 text-primary"><i class="fas fa-id-badge"></i></span>
+                    <div>
+                        <h4 class="mb-0 fw-bold" style="color: #1a237e;">Visitor Security Pass</h4>
+                        <small class="text-muted">Printable security badge with scan verification</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="Back">
+                        <i class="fas fa-arrow-left me-1"></i> Visitor List
+                    </button>
+                    <button class="btn btn-sm btn-primary" @onclick="PrintBrowser">
+                        <i class="fas fa-print me-1"></i> Print Badge
+                    </button>
+                </div>
+            </div>
+
+            @if (IsLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted">Preparing security pass badge...</p>
+                </div>
+            }
+            else if (Pass == null)
+            {
+                <div class="alert alert-danger">Visitor entry not found.</div>
+            }
+            else
+            {
+                <!-- Printable Badge Card -->
+                <div class="mx-auto my-3 p-4 bg-white border border-2 rounded shadow-sm print-area" style="max-width: 520px; border-color: #1a237e !important;">
+                    <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+                        <div>
+                            <h5 class="fw-bold mb-0 text-primary" style="letter-spacing: 1px;">IMPULSE VISITOR PASS</h5>
+                            <small class="text-muted text-uppercase" style="font-size: 0.72rem;">Security &amp; Gate Control</small>
+                        </div>
+                        <span class="badge bg-danger px-3 py-2 fs-6">VISITOR</span>
+                    </div>
+
+                    <div class="row g-3 align-items-center">
+                        <div class="col-7">
+                            <table class="table table-sm table-borderless mb-0" style="font-size: 0.85rem;">
+                                <tbody>
+                                    <tr>
+                                        <td class="text-muted py-1" style="width: 80px;">Name:</td>
+                                        <td class="fw-bold py-1">@Pass.VisitorName</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted py-1">Company:</td>
+                                        <td class="py-1">@Pass.CompanyName</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted py-1">Host:</td>
+                                        <td class="fw-semibold py-1">@Pass.ConcernedPerson</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted py-1">Card #:</td>
+                                        <td class="fw-bold text-primary py-1">@Pass.CardNo</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted py-1">Pass Code:</td>
+                                        <td class="py-1 font-monospace">@Pass.VisitCode</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted py-1">In Time:</td>
+                                        <td class="py-1 text-muted" style="font-size: 0.78rem;">@Pass.EntryTime.ToString("dd-MMM-yyyy hh:mm tt")</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="col-5 text-center">
+                            @if (!string.IsNullOrWhiteSpace(Pass.QrSvgDataUrl))
+                            {
+                                <img src="@Pass.QrSvgDataUrl" alt="QR" class="img-fluid border rounded p-1 mb-2" style="max-width: 140px;" />
+                            }
+                            <div class="text-muted" style="font-size: 0.7rem;">Scan at checkout</div>
+                        </div>
+                    </div>
+
+                    <div class="border-top pt-2 mt-3 text-center text-muted" style="font-size: 0.72rem;">
+                        Please return this badge to security when exiting the premises.
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    @@media print {
+        body * { visibility: hidden; }
+        .print-area, .print-area * { visibility: visible; }
+        .print-area { position: absolute; left: 0; top: 0; width: 100%; max-width: 100%; border: none !important; box-shadow: none !important; }
+        .d-print-none { display: none !important; }
+    }
+</style>
+

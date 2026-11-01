@@ -1,0 +1,215 @@
+@page "/gate/in/entry"
+@page "/gate/in/entry/{EntryId:int}"
+@attribute [Authorize]
+
+<PageTitle>@(IsEditMode ? "Edit Gate In Pass" : "New Gate In Pass") - Impulse</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body">
+            <!-- Header -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-4 text-primary"><i class="fas fa-file-import"></i></span>
+                    <div>
+                        <h4 class="mb-0 fw-bold" style="color: #1a237e;">@(IsEditMode ? $"Edit Gate In Pass #{Model.GatePassNo}" : "Create New Gate In Pass")</h4>
+                        <small class="text-muted">Record inward item movement, department returnables &amp; pass specifics</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="Cancel">
+                        <i class="fas fa-arrow-left me-1"></i> Back to List
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary" @onclick="SaveAsync" disabled="@IsSaving">
+                        <i class="fas fa-check me-1"></i> @(IsSaving ? "Saving..." : "Save Gate Pass")
+                    </button>
+                </div>
+            </div>
+
+            @if (IsLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted">Loading form details...</p>
+                </div>
+            }
+            else
+            {
+                <EditForm Model="Model">
+                    <DataAnnotationsValidator />
+
+                    <!-- Form Header Section -->
+                    <div class="card border-0 bg-light p-3 mb-3" style="border-radius: 8px;">
+                        <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">
+                            <i class="fas fa-info-circle me-1 text-primary"></i> Pass General Information
+                        </h6>
+                        <div class="row g-2">
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Department <span class="text-danger">*</span></label>
+                                <select class="form-select form-select-sm" value="@Model.DepartmentId" @onchange="DepartmentChangedAsync">
+                                    <option value="">Select department</option>
+                                    @foreach (var dept in DepartmentOptions)
+                                    {
+                                        <option value="@dept.Id">@dept.Text</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Concerned Employee</label>
+                                <select class="form-select form-select-sm" value="@Model.EmployeeId" @onchange="EmployeeChanged">
+                                    <option value="">Select active employee</option>
+                                    @foreach (var emp in EmployeeOptions)
+                                    {
+                                        <option value="@emp.Id">@emp.Text</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Date &amp; Time</label>
+                                <input type="datetime-local" class="form-control form-control-sm" value="@DateTimeInputValue" @onchange="DateTimeChangedAsync" />
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Gate Pass # <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control form-control-sm fw-bold text-primary" @bind="Model.GatePassNo" />
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Gate Pass Category</label>
+                                <select class="form-select form-select-sm" @bind="Model.GatePassTypeName">
+                                    <option value="">Select category</option>
+                                    @foreach (var type in GatePassTypeOptions)
+                                    {
+                                        <option value="@type.Text">@type.Text</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Person / Carrier</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Model.PersonName" placeholder="Carrier or driver name" />
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Vehicle Number</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Model.VehicleNo" placeholder="Vehicle reg. no." />
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Vendor</label>
+                                <select class="form-select form-select-sm" value="@Model.VendorId" @onchange="VendorChanged">
+                                    <option value="0">&lt;None / Cash&gt;</option>
+                                    @foreach (var v in VendorOptions)
+                                    {
+                                        <option value="@v.Id">@v.Text</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Pass Remarks / Description</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Model.Description" placeholder="General description or reason" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Line Items Section -->
+                    <div class="card border-0 bg-light p-3 mb-3" style="border-radius: 8px;">
+                        <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2 d-flex justify-content-between align-items-center">
+                            <span><i class="fas fa-boxes-stacked me-1 text-primary"></i> Pass Line Items</span>
+                            <span class="badge bg-secondary">@Model.Details.Count Line(s)</span>
+                        </h6>
+
+                        <!-- Line Composer -->
+                        <div class="row g-2 align-items-end mb-3 p-2 bg-white rounded border">
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Item Detail / Name</label>
+                                <input type="text" class="form-control form-control-sm" @bind="NewDetail.Detail" placeholder="Description of material" />
+                            </div>
+                            <div class="col-md-1 col-sm-3">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Unit</label>
+                                <input type="text" class="form-control form-control-sm" @bind="NewDetail.Unit" placeholder="PCS/KG" />
+                            </div>
+                            <div class="col-md-2 col-sm-3">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Quantity</label>
+                                <input type="number" step="any" class="form-control form-control-sm" @bind="NewDetail.Qty" />
+                            </div>
+                            <div class="col-md-2 col-sm-3">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Rate</label>
+                                <input type="number" step="any" class="form-control form-control-sm" @bind="NewDetail.Rate" />
+                            </div>
+                            <div class="col-md-2 col-sm-4">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Returnable Type</label>
+                                <select class="form-select form-select-sm" @bind="NewDetail.ReturnType">
+                                    <option value="@GateReturnTypes.NonReturnable">Non-Returnable</option>
+                                    <option value="@GateReturnTypes.Returnable">Returnable</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2 col-sm-5">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Expected Return Date</label>
+                                <input type="date" class="form-control form-control-sm" @bind="NewDetail.ReturnDate" disabled="@(!NewDetail.IsReturnable)" />
+                            </div>
+                            <div class="col-12 text-end">
+                                <button type="button" class="btn btn-sm btn-outline-success" @onclick="AddDetail">
+                                    <i class="fas fa-plus me-1"></i> Add Item Line
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Lines Grid -->
+                        <div class="table-responsive bg-white border rounded">
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                                <thead class="table-light text-secondary" style="font-size: 0.78rem; text-transform: uppercase;">
+                                    <tr>
+                                        <th style="width: 40px;" class="text-center">#</th>
+                                        <th>Material / Item Detail</th>
+                                        <th>Unit</th>
+                                        <th class="text-end">Qty</th>
+                                        <th class="text-end">Rate</th>
+                                        <th class="text-end">Amount</th>
+                                        <th class="text-center">Type</th>
+                                        <th>Return Date</th>
+                                        <th class="text-center" style="width: 50px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (Model.Details.Count == 0)
+                                    {
+                                        <tr>
+                                            <td colspan="9" class="text-center py-3 text-muted">
+                                                No items added to this gate pass yet. Use the composer above to add lines.
+                                            </td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        var idx = 0;
+                                        @foreach (var d in Model.Details)
+                                        {
+                                            idx++;
+                                            var cur = d;
+                                            <tr>
+                                                <td class="text-center text-muted">@idx</td>
+                                                <td class="fw-semibold">@cur.Detail</td>
+                                                <td>@cur.Unit</td>
+                                                <td class="text-end fw-bold">@cur.Qty.ToString("0.##")</td>
+                                                <td class="text-end">@cur.Rate.ToString("0.##")</td>
+                                                <td class="text-end fw-bold">@cur.Amount.ToString("0.##")</td>
+                                                <td class="text-center">
+                                                    <span class="badge @(cur.IsReturnable ? "bg-warning-subtle text-warning" : "bg-light text-secondary border")">
+                                                        @cur.ReturnType
+                                                    </span>
+                                                </td>
+                                                <td>@(cur.ReturnDate?.ToString("dd-MMM-yyyy") ?? "-")</td>
+                                                <td class="text-center">
+                                                    <button type="button" class="btn btn-sm btn-link text-danger p-0" title="Remove" @onclick="() => RemoveDetail(cur)">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </EditForm>
+            }
+        </div>
+    </div>
+</div>
+

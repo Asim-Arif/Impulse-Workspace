@@ -1,0 +1,147 @@
+@page "/gate"
+@page "/gatemanagement"
+@attribute [Authorize]
+
+@using Impulse.Shared.Components
+
+<PageTitle>Gate Management - Impulse</PageTitle>
+
+<div class="dashboard-shell">
+    <div class="dashboard-hero">
+        <div class="dashboard-icon-wrap">
+            <i class="fas fa-door-open"></i>
+        </div>
+        <div>
+            <h1 class="dashboard-title">Gate Management</h1>
+            <p class="dashboard-subtitle">Inward/outward passes, material movement, visitor logs &amp; vehicle management</p>
+        </div>
+    </div>
+
+    <div class="dashboard-modules">
+        <SecureDashCard Href="/gate/in/list" OptionId="GateInwardList" Module="GateManagement">
+            <i class="fas fa-file-import"></i>
+            <span>Gate Inward Passes</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/gate/in/entry" OptionId="GateInwardEntry" Module="GateManagement">
+            <i class="fas fa-plus-circle"></i>
+            <span>New Gate In Entry</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/gate/material-inward" OptionId="GateMaterialInward" Module="GateManagement">
+            <i class="fas fa-truck-ramp-box"></i>
+            <span>Material Inward</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/gate/material-outward" OptionId="GateMaterialOutward" Module="GateManagement">
+            <i class="fas fa-truck-arrow-right"></i>
+            <span>Material Outward</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/gate/visitors" OptionId="GateVisitors" Module="GateManagement">
+            <i class="fas fa-id-badge"></i>
+            <span>Visitor Management</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/gate/visitors/entry" OptionId="GateVisitorEntry" Module="GateManagement">
+            <i class="fas fa-user-plus"></i>
+            <span>New Visitor Entry</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/gate/visitors/gate-out" OptionId="GateVisitorCheckout" Module="GateManagement">
+            <i class="fas fa-sign-out-alt"></i>
+            <span>Visitor Checkout</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/gate/vehicles" OptionId="GateVehicles" Module="GateManagement">
+            <i class="fas fa-truck-moving"></i>
+            <span>Vehicle Entry Log</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/gate/dashboard" OptionId="GateDashboard" Module="GateManagement">
+            <i class="fas fa-chart-pie"></i>
+            <span>Gate Dashboard</span>
+        </SecureDashCard>
+        <SecureDashCard Href="/gate/pass-types" OptionId="GatePassTypes" Module="GateManagement">
+            <i class="fas fa-tags"></i>
+            <span>Gate Pass Types</span>
+        </SecureDashCard>
+    </div>
+</div>
+
+<style>
+    .dashboard-shell {
+        padding: 2rem;
+        max-width: 1100px;
+    }
+
+    .dashboard-hero {
+        display: flex;
+        align-items: center;
+        gap: 1.25rem;
+        margin-bottom: 2.5rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 2px solid #e0e2ec;
+    }
+
+    .dashboard-icon-wrap {
+        width: 64px;
+        height: 64px;
+        border-radius: 18px;
+        background: #d3e3fd;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.75rem;
+        color: #041e49;
+        flex-shrink: 0;
+    }
+
+    .dashboard-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1b1b1f;
+        margin: 0;
+        line-height: 1.2;
+    }
+
+    .dashboard-subtitle {
+        color: #44474f;
+        margin: 0.25rem 0 0;
+        font-size: 0.95rem;
+    }
+
+    .dashboard-modules {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+        gap: 1rem;
+    }
+
+    .dash-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        padding: 1.5rem 1rem;
+        background: #ffffff;
+        border: 1px solid #e0e2ec;
+        border-radius: 16px;
+        text-decoration: none;
+        color: #1b1b1f;
+        font-weight: 500;
+        font-size: 0.875rem;
+        text-align: center;
+        transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+        cursor: pointer;
+    }
+
+    .dash-card i {
+        font-size: 1.75rem;
+        color: #4a90e2;
+    }
+
+    .dash-card:hover {
+        background: #f0f4ff;
+        box-shadow: 0 4px 16px rgba(74, 144, 226, 0.12);
+        transform: translateY(-2px);
+        color: #041e49;
+    }
+
+    .dash-card:hover i {
+        color: #041e49;
+    }
+</style>
+

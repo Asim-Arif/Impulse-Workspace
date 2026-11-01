@@ -50,6 +50,8 @@ namespace DataAccessLibrary.DAC.Setup
                         COALESCE(u.DashBoardMainLink, 0) AS DashBoardMainLink,
                         COALESCE(u.QMSMainLink, 0) AS QMSMainLink,
                         COALESCE(u.FixedAssetsMainLink, 0) AS FixedAssetsMainLink,
+                        COALESCE(u.BudgetingMainLink, 0) AS BudgetingMainLink,
+                        COALESCE(u.GateMainLink, 0) AS GateMainLink,
                         COALESCE(u.SamplingMainLink, 0) AS SamplingMainLink,
                         COALESCE(u.HelpMainLink, 0) AS HelpMainLink,
                         COALESCE(u.IntraOfficeMainLink, 0) AS IntraOfficeMainLink,
@@ -146,6 +148,8 @@ namespace DataAccessLibrary.DAC.Setup
                         COALESCE(u.DashBoardMainLink, 0) AS DashBoardMainLink,
                         COALESCE(u.QMSMainLink, 0) AS QMSMainLink,
                         COALESCE(u.FixedAssetsMainLink, 0) AS FixedAssetsMainLink,
+                        COALESCE(u.BudgetingMainLink, 0) AS BudgetingMainLink,
+                        COALESCE(u.GateMainLink, 0) AS GateMainLink,
                         COALESCE(u.SamplingMainLink, 0) AS SamplingMainLink,
                         COALESCE(u.HelpMainLink, 0) AS HelpMainLink,
                         COALESCE(u.IntraOfficeMainLink, 0) AS IntraOfficeMainLink,
@@ -233,14 +237,14 @@ namespace DataAccessLibrary.DAC.Setup
                     INSERT INTO Users (
                         UserName, Password, FullUserName, EmpID, InActive,
                         UserManagement, ChangePassword,
-                        CompanyMainLink, FinancialMainLink, PayrollMainLink, ExportMainLink, StockMainLink, ProductionMainLink, DashBoardMainLink, QMSMainLink, FixedAssetsMainLink, SamplingMainLink, HelpMainLink, IntraOfficeMainLink, SetupMainLink, OpenCommandCenter,
+                        CompanyMainLink, FinancialMainLink, PayrollMainLink, ExportMainLink, StockMainLink, ProductionMainLink, DashBoardMainLink, QMSMainLink, FixedAssetsMainLink, BudgetingMainLink, GateMainLink, SamplingMainLink, HelpMainLink, IntraOfficeMainLink, SetupMainLink, OpenCommandCenter,
                         RestrictedItemProfile, GeneralInfoItemProfile, ProcessesItemProfile, WeightItemProfile, PriceItemProfile, ReferencesItemProfile, PictureItemProfile, RMItemProfile, ShipInfoItemProfile, RestrictCompanyCatalogEditing,
                         AuthorizeVouchers, AuthorizeIssuance, PostMakerBill, ChangeRateonIssuance, ChangeRateMakerAssign, MakerBill_EditRate, HideRateMakerAssign, AddEditCustomerComplaint, EditFollowUp, CloseCAPA,
                         BackupData, RestoreData, HicoVisible, AddProdPlan, ShowTips, Show_Customer_Order_No
                     ) VALUES (
                         @UserName, @Password, @FullUserName, @EmpID, @InActive,
                         @UserManagement, @ChangePassword,
-                        @CompanyMainLink, @FinancialMainLink, @PayrollMainLink, @ExportMainLink, @StockMainLink, @ProductionMainLink, @DashBoardMainLink, @QMSMainLink, @FixedAssetsMainLink, @SamplingMainLink, @HelpMainLink, @IntraOfficeMainLink, @SetupMainLink, @OpenCommandCenter,
+                        @CompanyMainLink, @FinancialMainLink, @PayrollMainLink, @ExportMainLink, @StockMainLink, @ProductionMainLink, @DashBoardMainLink, @QMSMainLink, @FixedAssetsMainLink, @BudgetingMainLink, @GateMainLink, @SamplingMainLink, @HelpMainLink, @IntraOfficeMainLink, @SetupMainLink, @OpenCommandCenter,
                         @RestrictedItemProfile, @GeneralInfoItemProfile, @ProcessesItemProfile, @WeightItemProfile, @PriceItemProfile, @ReferencesItemProfile, @PictureItemProfile, @RMItemProfile, @ShipInfoItemProfile, @RestrictCompanyCatalogEditing,
                         @AuthorizeVouchers, @AuthorizeIssuance, @PostMakerBill, @ChangeRateonIssuance, @ChangeRateMakerAssign, @MakerBill_EditRate, @HideRateMakerAssign, @AddEditCustomerComplaint, @EditFollowUp, @CloseCAPA,
                         @BackupData, @RestoreData, @HicoVisible, @AddProdPlan, @ShowTips, @Show_Customer_Order_No
@@ -278,6 +282,8 @@ namespace DataAccessLibrary.DAC.Setup
                         DashBoardMainLink = @DashBoardMainLink,
                         QMSMainLink = @QMSMainLink,
                         FixedAssetsMainLink = @FixedAssetsMainLink,
+                        BudgetingMainLink = @BudgetingMainLink,
+                        GateMainLink = @GateMainLink,
                         SamplingMainLink = @SamplingMainLink,
                         HelpMainLink = @HelpMainLink,
                         IntraOfficeMainLink = @IntraOfficeMainLink,

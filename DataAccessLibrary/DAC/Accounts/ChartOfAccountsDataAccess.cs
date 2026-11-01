@@ -62,8 +62,10 @@ namespace DataAccessLibrary.DAC.Accounts
                         A.Parent        AS AccType,
                         ISNULL(G.GroupName, '') AS ReportingGroup,
                         ISNULL(AG.AccGroup_RefID, 0) AS AccGroup_RefID,
-                        'No'          AS Budget,
-                        'No'          AS Budget_G,
+                        ISNULL(A.BudgetAccount, 0) AS BudgetAccount,
+                        ISNULL(A.BudgetAccount_Glance, 0) AS BudgetAccount_Glance,
+                        CASE WHEN ISNULL(A.BudgetAccount, 0) = 1 THEN 'Yes' ELSE 'No' END AS Budget,
+                        CASE WHEN ISNULL(A.BudgetAccount_Glance, 0) = 1 THEN 'Yes' ELSE 'No' END AS Budget_G,
                         0             AS Taxpercentage,
                         A.Active,
                         A.Type          AS HeadTypeNo,
@@ -161,9 +163,9 @@ namespace DataAccessLibrary.DAC.Accounts
 
                     string sql = @"
                     INSERT INTO Accounts 
-                    (AccNo, AccTitle, SubAccOf, Type, openbal, opendate, Balance, Parent, Active, UserName, ComputerName) 
+                    (AccNo, AccTitle, SubAccOf, Type, openbal, opendate, Balance, Parent, Active, BudgetAccount, BudgetAccount_Glance, UserName, ComputerName) 
                     VALUES 
-                    (@AccNo, @AccTitle, @SubAccOf, @HeadTypeNo, @OpenBal, @OpenDate, @Balance, @Parent, @Active, @UserName, @machineIP)";
+                    (@AccNo, @AccTitle, @SubAccOf, @HeadTypeNo, @OpenBal, @OpenDate, @Balance, @Parent, @Active, @BudgetAccount, @BudgetAccountGlance, @UserName, @machineIP)";
 
                     var parameters = new
                     {
@@ -176,6 +178,8 @@ namespace DataAccessLibrary.DAC.Accounts
                         Balance = newaccount.Balance,
                         Active = 1,
                         Parent = newaccount.AccType,
+                        BudgetAccount = newaccount.BudgetAccount,
+                        BudgetAccountGlance = newaccount.BudgetAccount_Glance,
                         UserName = "Developer",
                         machineIP = "Developer"
                     };
@@ -199,7 +203,9 @@ namespace DataAccessLibrary.DAC.Accounts
                     SET AccTitle = @AccTitle, 
                         openbal = @OpenBal, 
                         opendate = @OpenDate,
-                        Balance = ISNULL(Balance - openbal, 0) + @OpenBal 
+                        Balance = ISNULL(Balance - openbal, 0) + @OpenBal,
+                        BudgetAccount = @BudgetAccount,
+                        BudgetAccount_Glance = @BudgetAccountGlance
                     WHERE AccNo = @AccNo";
 
                     var parameters = new
@@ -207,7 +213,9 @@ namespace DataAccessLibrary.DAC.Accounts
                         AccNo = newaccount.AccNo,
                         AccTitle = newaccount.AccTitle,
                         OpenBal = newaccount.OpeningBalance,
-                        OpenDate = newaccount.OpenDate
+                        OpenDate = newaccount.OpenDate,
+                        BudgetAccount = newaccount.BudgetAccount,
+                        BudgetAccountGlance = newaccount.BudgetAccount_Glance
                     };
                     await db.ExecuteAsync(sql, parameters);
                 }
@@ -255,6 +263,27 @@ namespace DataAccessLibrary.DAC.Accounts
                 catch (Exception ex)
                 {
                     throw new Exception("Error Updating Account: " + ex.Message);
+                }
+            }
+        }
+
+        public async Task UpdateBudgetFlagsAsync(string accNo, bool budgetAccount, bool budgetAccountGlance)
+        {
+            using (IDbConnection db = new SqlConnection(_connectionString))
+            {
+                try
+                {
+                    string sql = @"
+                    UPDATE Accounts 
+                    SET BudgetAccount = @BudgetAccount,
+                        BudgetAccount_Glance = @BudgetAccountGlance
+                    WHERE AccNo = @AccNo";
+
+                    await db.ExecuteAsync(sql, new { AccNo = accNo, BudgetAccount = budgetAccount, BudgetAccountGlance = budgetAccountGlance });
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception("Error Updating Budget Flags: " + ex.Message);
                 }
             }
         }

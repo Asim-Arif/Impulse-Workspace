@@ -1,0 +1,202 @@
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.ViewModels.FixedAssets
+
+<div class="p-3 border rounded-3 bg-white shadow-xs">
+    <div class="row g-2">
+        <div class="col-md-6">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Location</label>
+            <input type="text" class="form-control form-control-sm" @bind="Model.Location" disabled="@IsDisabled" placeholder="e.g. Workshop / Room 204" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Model No.</label>
+            <input type="text" class="form-control form-control-sm" @bind="Model.ModelNo" disabled="@IsDisabled" placeholder="Model number" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Serial No.</label>
+            <input type="text" class="form-control form-control-sm" @bind="Model.SerialNo" disabled="@IsDisabled" placeholder="Serial number" />
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Manufacturer</label>
+            <input type="text" class="form-control form-control-sm" @bind="Model.Manufacturer" disabled="@IsDisabled" placeholder="Manufacturer name" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Employee / Custodian</label>
+            <div class="@(IsDisabled ? "disabled-typeahead-wrapper" : "")">
+                <BlazoredTypeahead SearchMethod="SearchEmployees"
+                                   EnableDropDown="true"
+                                   Data="Lookup.Employees"
+                                   TValue="FixedAssetLookupItem"
+                                   TItem="FixedAssetLookupItem"
+                                   Value="selectedEmployee"
+                                   ValueChanged="OnEmployeeChanged"
+                                   ValueExpression="@(() => selectedEmployee)"
+                                   Placeholder="Select Employee"
+                                   MaximumSuggestions="1000"
+                                   Disabled="@IsDisabled">
+                    <SelectedTemplate Context="emp">
+                        @if (emp.Id != "0")
+                        {
+                            <text>[@emp.Id] </text>
+                        }
+                        @emp.Name
+                    </SelectedTemplate>
+                    <ResultTemplate Context="emp">
+                        @if (emp.Id != "0")
+                        {
+                            <text>[@emp.Id] </text>
+                        }
+                        @emp.Name
+                    </ResultTemplate>
+                </BlazoredTypeahead>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Department</label>
+            <select class="form-select form-select-sm" @bind="Model.DepartmentId" disabled="@IsDisabled">
+                <option value="">-- Select Department --</option>
+                @foreach (var d in Lookup.Departments)
+                {
+                    <option value="@d.Id">@d.Name</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-12">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Notes & Specifications</label>
+            <textarea class="form-control form-control-sm" rows="3" @bind="Model.Notes" disabled="@IsDisabled" placeholder="Enter additional asset details or specs..."></textarea>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Vendor / Supplier Account</label>
+            <div class="@(IsDisabled ? "disabled-typeahead-wrapper" : "")">
+                <BlazoredTypeahead SearchMethod="SearchAccounts"
+                                   EnableDropDown="true"
+                                   Data="Lookup.Accounts"
+                                   TValue="FixedAssetLookupItem"
+                                   TItem="FixedAssetLookupItem"
+                                   Value="selectedVendor"
+                                   ValueChanged="OnVendorChanged"
+                                   ValueExpression="@(() => selectedVendor)"
+                                   Placeholder="Select Vendor Account"
+                                   MaximumSuggestions="1000"
+                                   Disabled="@IsDisabled">
+                    <SelectedTemplate Context="acc">
+                        @acc.Display
+                    </SelectedTemplate>
+                    <ResultTemplate Context="acc">
+                        @acc.Display
+                    </ResultTemplate>
+                </BlazoredTypeahead>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Condition Status</label>
+            <select class="form-select form-select-sm" @bind="Model.Status" disabled="@IsDisabled">
+                <option value="0">New</option>
+                <option value="1">Used</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Placed in Service Date</label>
+            <input type="date" class="form-control form-control-sm" value="@(Model.PlacedInServiceDate?.ToString("yyyy-MM-dd") ?? "")" @onchange="OnPlacedInServiceChanged" disabled="@IsDisabled" />
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Acquisition Cost</label>
+            <input type="number" step="0.01" class="form-control form-control-sm text-end fw-semibold" @bind="Model.AcquisitionCost" disabled="@IsDisabled" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Accumulated Depreciation</label>
+            <input type="number" step="0.01" class="form-control form-control-sm text-end" @bind="Model.AccumulatedDepreciation" disabled="@IsDisabled" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Current Book Value</label>
+            <input type="text" class="form-control form-control-sm text-end fw-bold bg-light" value="@((Model.AcquisitionCost - Model.AccumulatedDepreciation).ToString("N2"))" readonly />
+        </div>
+
+        <div class="col-md-6 pt-3">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="calibrationCheck" @bind="Model.RequiresCalibration" disabled="@IsDisabled">
+                <label class="form-check-label fw-semibold text-dark-emphasis" for="calibrationCheck" style="font-size:0.85rem;">Requires Periodic Calibration</label>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Calibration Frequency</label>
+            <select class="form-select form-select-sm" @bind="Model.CalibrationFrequency" disabled="@(IsDisabled || !Model.RequiresCalibration)">
+                <option value="">-- None --</option>
+                <option value="0">Monthly</option>
+                <option value="1">Yearly</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<style>
+    .disabled-typeahead-wrapper .blazored-typeahead {
+        overflow: hidden !important;
+        border-radius: 4px;
+    }
+    .blazored-typeahead {
+        height: 35px !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public FixedAssetProfileModel Model { get; set; } = null!;
+    [Parameter, EditorRequired] public FixedAssetLookupOptions Lookup { get; set; } = null!;
+    [Parameter] public bool IsDisabled { get; set; }
+
+    private FixedAssetLookupItem? selectedEmployee => Lookup.Employees.FirstOrDefault(x => x.Id == Model.EmployeeId);
+    private FixedAssetLookupItem? selectedVendor => Lookup.Accounts.FirstOrDefault(x => x.Id == Model.VendorAccountNo);
+
+    private Task<IEnumerable<FixedAssetLookupItem>> SearchEmployees(string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return Task.FromResult<IEnumerable<FixedAssetLookupItem>>(Lookup.Employees);
+
+        var query = searchText.Trim();
+        var matches = Lookup.Employees.Where(e =>
+            (e.Id != null && e.Id.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
+            (e.Name != null && e.Name.Contains(query, StringComparison.OrdinalIgnoreCase)));
+
+        return Task.FromResult(matches);
+    }
+
+    private Task<IEnumerable<FixedAssetLookupItem>> SearchAccounts(string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return Task.FromResult<IEnumerable<FixedAssetLookupItem>>(Lookup.Accounts);
+
+        var query = searchText.Trim();
+        var matches = Lookup.Accounts.Where(a =>
+            (a.Id != null && a.Id.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
+            (a.Name != null && a.Name.Contains(query, StringComparison.OrdinalIgnoreCase)));
+
+        return Task.FromResult(matches);
+    }
+
+    private void OnEmployeeChanged(FixedAssetLookupItem? val)
+    {
+        Model.EmployeeId = val?.Id ?? "";
+    }
+
+    private void OnVendorChanged(FixedAssetLookupItem? val)
+    {
+        Model.VendorAccountNo = val?.Id ?? "";
+    }
+
+    private void OnPlacedInServiceChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var dt))
+        {
+            Model.PlacedInServiceDate = dt;
+        }
+        else
+        {
+            Model.PlacedInServiceDate = null;
+        }
+    }
+}

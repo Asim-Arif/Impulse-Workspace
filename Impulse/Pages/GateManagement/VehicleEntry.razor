@@ -1,0 +1,131 @@
+@page "/gate/vehicles/entry"
+@page "/gate/vehicles/entry/{EntryId:int}"
+@attribute [Authorize]
+
+<PageTitle>@(IsEditMode ? "Edit Vehicle Entry" : "New Vehicle Entry") - Impulse</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body">
+            <!-- Header -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-4 text-primary"><i class="fas fa-truck"></i></span>
+                    <div>
+                        <h4 class="mb-0 fw-bold" style="color: #1a237e;">@(IsEditMode ? $"Edit Vehicle Record #{Model.EntryID}" : "Register Vehicle Entry")</h4>
+                        <small class="text-muted">Record driver identification, transporter specifics &amp; entry/exit timestamps</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="Cancel">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary" @onclick="SaveAsync" disabled="@IsSaving">
+                        <i class="fas fa-check me-1"></i> @(IsSaving ? "Saving..." : "Save Vehicle")
+                    </button>
+                </div>
+            </div>
+
+            @if (IsLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted">Loading vehicle data...</p>
+                </div>
+            }
+            else
+            {
+                <EditForm Model="Model">
+                    <DataAnnotationsValidator />
+
+                    <div class="card border-0 bg-light p-3 mb-3" style="border-radius: 8px;">
+                        <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">
+                            <i class="fas fa-truck-pickup me-1 text-primary"></i> Vehicle &amp; Driver Details
+                        </h6>
+                        <div class="row g-2">
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Vehicle Registration # <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control form-control-sm fw-bold text-primary" @bind="Model.VehicleNumber" placeholder="e.g. LES-12-3456" />
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Vehicle Type</label>
+                                <select class="form-select form-select-sm" @bind="Model.VehicleType">
+                                    <option value="">Select type</option>
+                                    <option value="Truck">Truck</option>
+                                    <option value="Container Trailer">Container Trailer</option>
+                                    <option value="Pickup / Mazda">Pickup / Mazda</option>
+                                    <option value="Delivery Van">Delivery Van</option>
+                                    <option value="Car">Car</option>
+                                    <option value="Motorcycle">Motorcycle</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Vehicle Category</label>
+                                <select class="form-select form-select-sm" @bind="Model.CategoryId">
+                                    <option value="">Select category</option>
+                                    @foreach (var c in Categories)
+                                    {
+                                        <option value="@c.EntryID">@c.CategoryName</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Driver Full Name</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Model.DriverName" placeholder="Driver name" />
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Driver CNIC</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Model.DriverCNIC" placeholder="CNIC number" />
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Driver Mobile #</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Model.DriverMobile" placeholder="0300-1234567" />
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Supplier / Company</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Model.SupplierCompany" placeholder="Associated company" />
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Transporter / Carrier</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Model.Transporter" placeholder="Transport company" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Purpose of Entry</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Model.Purpose" placeholder="e.g. Raw material delivery, dispatch pickup" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Timestamps & Status -->
+                    <div class="card border-0 bg-light p-3 mb-3" style="border-radius: 8px;">
+                        <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">
+                            <i class="fas fa-clock me-1 text-primary"></i> Timestamps &amp; Premises Status
+                        </h6>
+                        <div class="row g-2">
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Entry Date &amp; Time</label>
+                                <input type="datetime-local" class="form-control form-control-sm" value="@EntryTimeInputValue" @onchange="OnEntryTimeChanged" />
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Premises Status</label>
+                                <select class="form-select form-select-sm" @bind="Model.Status">
+                                    <option value="Inside">Inside Premises</option>
+                                    <option value="Closed">Closed / Exited</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Exit Date &amp; Time</label>
+                                <input type="datetime-local" class="form-control form-control-sm" value="@ExitTimeInputValue" @onchange="OnExitTimeChanged" disabled="@(Model.Status != "Closed")" />
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Security Remarks</label>
+                                <input type="text" class="form-control form-control-sm" @bind="Model.Remarks" placeholder="Gate observations" />
+                            </div>
+                        </div>
+                    </div>
+                </EditForm>
+            }
+        </div>
+    </div>
+</div>
+

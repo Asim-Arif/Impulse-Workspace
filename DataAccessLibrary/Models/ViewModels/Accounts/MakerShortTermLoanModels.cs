@@ -46,6 +46,7 @@ namespace DataAccessLibrary.Models.ViewModels.Accounts
         public string BankAccNo { get; set; } = string.Empty;
         public string BankId { get; set; } = string.Empty;
         public string ChequeNo { get; set; } = string.Empty;
+        public int ChqBookNo { get; set; }
         public string ChequeType { get; set; } = "Open";
         public DateTime ChequeDate { get; set; } = DateTime.Today;
 

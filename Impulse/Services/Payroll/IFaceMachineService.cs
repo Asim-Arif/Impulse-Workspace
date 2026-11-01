@@ -45,7 +45,7 @@ namespace Impulse.Services.Payroll
         }
 
         public async Task<(int recordsRead, int recordsProcessed, string message)> ReadAndProcessAsync(
-            string ipAddress, int machineNo, int portNo = 4370, string userName = "System", string computerName = "Unknown", bool? clearLogs = null)
+            string ipAddress, int machineNo, int portNo = 4370, string userName = "System", string computerName = "Unknown", bool? clearLogs = null, string clientKey = "Default")
         {
             int recordsRead = 0;
             int recordsProcessed = 0;
@@ -67,8 +67,8 @@ namespace Impulse.Services.Payroll
             // ── Auto-Routing: Cloud VPS (Agent) vs Local Server (Direct COM) ──
             if (_agentCoordinator.HasConnectedAgent())
             {
-                _logger.LogInformation("Routing IFace machine read via connected Biometric Sync Agent for IP {IP} (ClearLogs={Clear})", ipAddress, shouldClear);
-                var remoteResult = await _agentCoordinator.RequestPunchesAsync(ipAddress, machineNo, portNo, prefix, "Default", shouldClear);
+                _logger.LogInformation("Routing IFace machine read via connected Biometric Sync Agent for IP {IP} (ClientKey={ClientKey}, ClearLogs={Clear})", ipAddress, clientKey, shouldClear);
+                var remoteResult = await _agentCoordinator.RequestPunchesAsync(ipAddress, machineNo, portNo, prefix, clientKey, shouldClear);
                 if (!remoteResult.success)
                 {
                     return (0, 0, remoteResult.error);

@@ -52,11 +52,13 @@
                                    style="font-family: Calibri, 'Segoe UI', Tahoma, sans-serif; font-size: 10pt;">                                   
                                
                                 <tr>
-                                    <th scope="col" style="width: 15%;">Account No</th>
-                                    <th scope="col" style="width: 40%;">Account Title</th>
+                                    <th scope="col" style="width: 13%;">Account No</th>
+                                    <th scope="col" style="width: 33%;">Account Title</th>
                                     <th scope="col" style="width: 10%;" class="text-end">Opening</th>
                                     <th scope="col" style="width: 10%;" class="text-end">Balance</th>
-                                    <th scope="col" style="width: 15%;" class="text-center">Reporting Group</th>
+                                    <th scope="col" style="width: 14%;" class="text-center">Reporting Group</th>
+                                    <th scope="col" style="width: 8%;" class="text-center">Budget</th>
+                                    <th scope="col" style="width: 7%;" class="text-center">Glance</th>
                                     <th scope="col" style="width: 5%;"> </th>
                                 </tr>
 
@@ -112,6 +114,32 @@
                                             }
                                         </td>
 
+                                        <td style="width: 8%;" class="text-center" @onclick:stopPropagation="true">
+                                            @if (account.bMainhead && !account.AccType)
+                                            {
+                                                <button type="button" 
+                                                        class="btn btn-sm @(account.BudgetAccount ? "btn-success text-white" : "btn-outline-secondary") px-2 py-0 border-0"
+                                                        style="font-size: 0.76rem; border-radius: 12px; height: 24px; line-height: 22px;"
+                                                        title="Click to toggle Budget Account"
+                                                        @onclick="() => ToggleBudgetAccountAsync(account)">
+                                                    <i class="fas @(account.BudgetAccount ? "fa-check-circle" : "fa-circle-xmark") me-1"></i>
+                                                    @(account.BudgetAccount ? "Yes" : "No")
+                                                </button>
+                                            }
+                                        </td>
+                                        <td style="width: 7%;" class="text-center" @onclick:stopPropagation="true">
+                                            @if (account.bMainhead && !account.AccType)
+                                            {
+                                                <button type="button" 
+                                                        class="btn btn-sm @(account.BudgetAccount_Glance ? "btn-info text-white" : "btn-outline-secondary") px-2 py-0 border-0"
+                                                        style="font-size: 0.76rem; border-radius: 12px; height: 24px; line-height: 22px;"
+                                                        title="Click to toggle Budget at Glance"
+                                                        @onclick="() => ToggleBudgetGlanceAsync(account)">
+                                                    <i class="fas @(account.BudgetAccount_Glance ? "fa-eye" : "fa-eye-slash") me-1"></i>
+                                                    @(account.BudgetAccount_Glance ? "Yes" : "No")
+                                                </button>
+                                            }
+                                        </td>
                                         <td style="width: 5%;" class="text-center" @onclick:stopPropagation="true">
                                             <button type="button" class="btn btn-sm btn-link text-dark p-0" title="Options" @onclick="(e) => OpenRowMenu(e, account)">
                                                 <i class="fas fa-ellipsis-vertical"></i>
@@ -253,9 +281,32 @@
                             }
                                 @if (IsEdit == false) 
                             {
+                                <div class="col-md-12">
+                                    <div class="form-check form-switch mt-1">
+                                        <input class="form-check-input" @bind="CurrentAccount.AccType" @bind:after="OnChangedMasterType" type="checkbox" id="master" />
+                                        <label class="form-check-label fw-semibold" for="master">Master / Parent Account</label>
+                                    </div>
+                                </div>
+                            }
+                            @if (!CurrentAccount.AccType)
+                            {
                                 <div class="col-md-6">
-                                    <label class="form-label fw-semibold" for="opt2">Master Account</label>
-                                    <input @bind="CurrentAccount.AccType" @bind:after="OnChangedMasterType" type="checkbox" id="master" name="checkbox" value="checkbox" />
+                                    <div class="form-check form-switch mt-2">
+                                        <input class="form-check-input" type="checkbox" id="chkBudgetAccount" @bind="CurrentAccount.BudgetAccount" />
+                                        <label class="form-check-label fw-semibold" for="chkBudgetAccount">
+                                            <i class="fas fa-calculator text-primary me-1"></i> Budget Account
+                                        </label>
+                                        <div class="text-muted" style="font-size: 0.72rem;">Participate in Expense / Income Budgeting</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check form-switch mt-2">
+                                        <input class="form-check-input" type="checkbox" id="chkBudgetGlance" @bind="CurrentAccount.BudgetAccount_Glance" />
+                                        <label class="form-check-label fw-semibold" for="chkBudgetGlance">
+                                            <i class="fas fa-eye text-info me-1"></i> Budget at Glance
+                                        </label>
+                                        <div class="text-muted" style="font-size: 0.72rem;">Include in high-level executive glance summary</div>
+                                    </div>
                                 </div>
                             }
                     </div>
@@ -294,6 +345,13 @@
     </Item>
     <Item OnClick="MakeAccountActive" class="win11-menu-item">
         <i class="fas fa-toggle-off fa-fw win11-icon text-warning"></i> Make This Account InActive
+    </Item>
+    <Seperator />
+    <Item OnClick="ToggleBudgetAccountFromMenu" class="win11-menu-item">
+        <i class="fas fa-calculator fa-fw win11-icon text-primary"></i> Toggle Budget Account
+    </Item>
+    <Item OnClick="ToggleBudgetGlanceFromMenu" class="win11-menu-item">
+        <i class="fas fa-eye fa-fw win11-icon text-info"></i> Toggle Budget at Glance
     </Item>
     <Seperator />
 

@@ -64,19 +64,8 @@ namespace Impulse.Pages.Accounts.MakerShortTermLoan
         private ChartOfAccountsModel? SelectedCashAccount { get; set; }
         private ChartOfAccountsModel? SelectedOtherAccount { get; set; }
 
-        private BankAccountInfo? _selectedBankAccount;
-        private BankAccountInfo? SelectedBankAccount
-        {
-            get => _selectedBankAccount;
-            set
-            {
-                if (_selectedBankAccount != value)
-                {
-                    _selectedBankAccount = value;
-                    _ = HandleBankAccountSelectionAsync(value);
-                }
-            }
-        }
+        private BankAccountInfo? SelectedBankAccount { get; set; }
+        private int ChqBookNo { get; set; } = 0;
 
         private string ChequeNo { get; set; } = string.Empty;
         private string ChequeType { get; set; } = "Open";
@@ -175,23 +164,66 @@ namespace Impulse.Pages.Accounts.MakerShortTermLoan
         }
 
 
-        private async Task HandleBankAccountSelectionAsync(BankAccountInfo? bank)
+        private async Task OnBankAccountChanged(BankAccountInfo? bank)
         {
+            SelectedBankAccount = bank;
+            ChequeNo = string.Empty;
+            ChqBookNo = 0;
+
             if (bank != null && !string.IsNullOrWhiteSpace(bank.AccNo))
             {
                 try
                 {
                     var chequeInfo = await VoucherService.GetNewChequeNumbersByBankAccount(bank.AccNo);
-                    if (chequeInfo != null)
+                    if (chequeInfo != null && !string.IsNullOrWhiteSpace(chequeInfo.ChqNo))
                     {
-                        ChequeNo = chequeInfo.ChqNo ?? string.Empty;
+                        ChequeNo = chequeInfo.ChqNo;
+                        ChqBookNo = chequeInfo.ChqBookNo;
+                    }
+                    else
+                    {
+                        ChequeNo = string.Empty;
+                        ChqBookNo = 0;
+                        NotificationService.Notify(new NotificationMessage
+                        {
+                            Severity = NotificationSeverity.Warning,
+                            Summary = "No Cheques",
+                            Detail = $"No available unissued cheques found for {bank.Bank}."
+                        });
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error fetching cheque numbers: {ex.Message}");
+                }
             }
             else
             {
                 ChequeNo = string.Empty;
+                ChqBookNo = 0;
+            }
+            await InvokeAsync(StateHasChanged);
+        }
+
+        private async Task OnChequeNoChanged()
+        {
+            if (PaymentMode != MakerLoanPaymentMode.Bank || SelectedBankAccount == null || string.IsNullOrWhiteSpace(ChequeNo))
+                return;
+
+            var result = await VoucherService.ValidateChequeAsync(SelectedBankAccount.AccNo, ChequeNo);
+            if (result.IsValid)
+            {
+                ChqBookNo = result.ChqBookNo;
+            }
+            else
+            {
+                ChqBookNo = 0;
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Warning,
+                    Summary = "Cheque Validation",
+                    Detail = result.ErrorMessage ?? "Invalid Cheque Number."
+                });
             }
         }
 
@@ -201,7 +233,8 @@ namespace Impulse.Pages.Accounts.MakerShortTermLoan
             if (mode != MakerLoanPaymentMode.Bank)
             {
                 ChequeNo = string.Empty;
-                _selectedBankAccount = null;
+                ChqBookNo = 0;
+                SelectedBankAccount = null;
             }
         }
 
@@ -276,15 +309,40 @@ namespace Impulse.Pages.Accounts.MakerShortTermLoan
             else if (PaymentMode == MakerLoanPaymentMode.Bank)
             {
                 paymentAccNo = SelectedBankAccount?.AccNo ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(ChequeNo) && !DontPostVoucher)
+                if (!DontPostVoucher)
                 {
-                    NotificationService.Notify(new NotificationMessage
+                    if (SelectedBankAccount == null)
                     {
-                        Severity = NotificationSeverity.Warning,
-                        Summary = "Validation Warning",
-                        Detail = "Please enter a valid Cheque Number for Bank Payment."
-                    });
-                    return false;
+                        NotificationService.Notify(new NotificationMessage
+                        {
+                            Severity = NotificationSeverity.Warning,
+                            Summary = "Validation Warning",
+                            Detail = "Please select a valid Bank Account."
+                        });
+                        return false;
+                    }
+                    if (string.IsNullOrWhiteSpace(ChequeNo))
+                    {
+                        NotificationService.Notify(new NotificationMessage
+                        {
+                            Severity = NotificationSeverity.Warning,
+                            Summary = "Validation Warning",
+                            Detail = "Please enter a valid Cheque Number for Bank Payment."
+                        });
+                        return false;
+                    }
+                    var chqVal = await VoucherService.ValidateChequeAsync(SelectedBankAccount.AccNo, ChequeNo);
+                    if (!chqVal.IsValid)
+                    {
+                        NotificationService.Notify(new NotificationMessage
+                        {
+                            Severity = NotificationSeverity.Warning,
+                            Summary = "Cheque Validation",
+                            Detail = chqVal.ErrorMessage ?? "Invalid Cheque Number."
+                        });
+                        return false;
+                    }
+                    ChqBookNo = chqVal.ChqBookNo;
                 }
             }
 
@@ -319,8 +377,9 @@ namespace Impulse.Pages.Accounts.MakerShortTermLoan
                     PaymentMode = PaymentMode,
                     PaymentAccNo = paymentAccNo,
                     BankAccNo = SelectedBankAccount?.AccNo ?? string.Empty,
-                    BankId = SelectedBankAccount?.AccNo ?? string.Empty,
+                    BankId = SelectedBankAccount?.BankID.ToString() ?? "0",
                     ChequeNo = ChequeNo,
+                    ChqBookNo = ChqBookNo,
                     ChequeType = ChequeType,
                     ChequeDate = ChequeDate,
 
@@ -368,6 +427,11 @@ namespace Impulse.Pages.Accounts.MakerShortTermLoan
                 Description = string.Empty;
                 SelectedMasterPO = null;
                 ChequeNo = string.Empty;
+                ChqBookNo = 0;
+                if (PaymentMode == MakerLoanPaymentMode.Bank && SelectedBankAccount != null)
+                {
+                    await OnBankAccountChanged(SelectedBankAccount);
+                }
                 if (SelectedMaker != null)
                 {
                     PreviousBalance = await MakerLoanService.GetMakerBalanceAsync(SelectedMaker.AccNo);

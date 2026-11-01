@@ -58,6 +58,7 @@ namespace Impulse.Pages.Payroll.AdvanceShort
 
         // ── Cheque Fields (BPV) ───────────────────────────────────────────────
         private string   ChequeNo        { get; set; } = string.Empty;
+        private int      ChqBookNo       { get; set; } = 0;
         private string   ChequeType      { get; set; } = "Open";
         private DateTime ChequeDate      { get; set; } = DateTime.Today;
         private bool     IsChequeLoading { get; set; } = false;
@@ -218,15 +219,25 @@ namespace Impulse.Pages.Payroll.AdvanceShort
         private async Task OnBankAccountChanged(BankAccountInfo? bank)
         {
             SelectedBankAccount = bank;
+            ChequeNo = string.Empty;
+            ChqBookNo = 0;
+
             if (bank != null)
             {
                 IsChequeLoading = true;
                 try
                 {
                     var chequeInfo = await _voucherService.GetNewChequeNumbersByBankAccount(bank.AccNo);
-                    if (chequeInfo != null)
+                    if (chequeInfo != null && !string.IsNullOrWhiteSpace(chequeInfo.ChqNo))
                     {
-                        ChequeNo = chequeInfo.ChqNo ?? string.Empty;
+                        ChequeNo = chequeInfo.ChqNo;
+                        ChqBookNo = chequeInfo.ChqBookNo;
+                    }
+                    else
+                    {
+                        ChequeNo = string.Empty;
+                        ChqBookNo = 0;
+                        _notificationService.ShowWarning("No Cheques", $"No available unissued cheques found for {bank.Bank}.");
                     }
                 }
                 finally
@@ -237,6 +248,25 @@ namespace Impulse.Pages.Payroll.AdvanceShort
             else
             {
                 ChequeNo = string.Empty;
+                ChqBookNo = 0;
+            }
+            await InvokeAsync(StateHasChanged);
+        }
+
+        private async Task OnChequeNoChanged()
+        {
+            if (PaymentMode != AdvanceShortPaymentMode.Bank || SelectedBankAccount == null || string.IsNullOrWhiteSpace(ChequeNo))
+                return;
+
+            var result = await _voucherService.ValidateChequeAsync(SelectedBankAccount.AccNo, ChequeNo);
+            if (result.IsValid)
+            {
+                ChqBookNo = result.ChqBookNo;
+            }
+            else
+            {
+                ChqBookNo = 0;
+                _notificationService.ShowWarning("Cheque Validation", result.ErrorMessage ?? "Invalid Cheque Number.");
             }
         }
 
@@ -377,6 +407,13 @@ namespace Impulse.Pages.Payroll.AdvanceShort
                         _notificationService.ShowWarning("Validation", "Please select the Cheque Type.");
                         return;
                     }
+                    var chqVal = await _voucherService.ValidateChequeAsync(SelectedBankAccount.AccNo, ChequeNo);
+                    if (!chqVal.IsValid)
+                    {
+                        _notificationService.ShowWarning("Cheque Validation", chqVal.ErrorMessage ?? "Invalid Cheque Number.");
+                        return;
+                    }
+                    ChqBookNo    = chqVal.ChqBookNo;
                     paymentAccNo = SelectedBankAccount.AccNo;
                     bankId       = SelectedBankAccount.BankID;
                     break;
@@ -395,6 +432,7 @@ namespace Impulse.Pages.Payroll.AdvanceShort
                 IsContractor     = IsContractor,
                 BankID           = bankId,
                 ChequeNo         = ChequeNo,
+                ChqBookNo        = ChqBookNo,
                 ChequeType       = ChequeType,
                 ChequeDate       = ChequeDate
             };

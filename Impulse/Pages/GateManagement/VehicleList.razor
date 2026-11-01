@@ -1,0 +1,153 @@
+@page "/gate/vehicles"
+@attribute [Authorize]
+
+@using BlazorContextMenu
+@using Impulse.Shared.Components
+
+<PageTitle>Vehicle Management - Impulse</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body">
+            <!-- Header -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-4 text-primary"><i class="fas fa-truck-moving"></i></span>
+                    <div>
+                        <h4 class="mb-0 fw-bold" style="color: #1a237e;">Vehicle Entry Log</h4>
+                        <small class="text-muted">Track all transport trucks, guest cars, delivery vans &amp; exit records</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="RefreshAsync" disabled="@IsLoading">
+                        <i class="fas fa-sync-alt @(IsLoading ? "fa-spin" : "") me-1"></i> Refresh
+                    </button>
+                    <a href="/gate/vehicles/entry" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus-circle me-1"></i> New Vehicle
+                    </a>
+                    <a href="/gate" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-arrow-left me-1"></i> Gate Hub
+                    </a>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="card border-0 bg-light p-2 mb-3" style="border-radius: 8px;">
+                <div class="row g-2 align-items-center">
+                    <div class="col-md-5 col-sm-6">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                            <input type="text" class="form-control" placeholder="Search vehicle reg, driver, company, transporter..." @bind="Filter.SearchText" @bind:event="oninput" @bind:after="RefreshAsync" />
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6">
+                        <select class="form-select form-select-sm" value="@Filter.CategoryId" @onchange="CategoryChangedAsync">
+                            <option value="0">&lt;All Vehicle Categories&gt;</option>
+                            @foreach (var cat in Categories)
+                            {
+                                <option value="@cat.EntryID">@cat.CategoryName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <div class="form-check mt-1" style="font-size: 0.85rem;">
+                            <input class="form-check-input" type="checkbox" id="showClosedVehicles" @bind="Filter.ShowClosed" @bind:after="RefreshAsync" />
+                            <label class="form-check-label" for="showClosedVehicles">Show Exited</label>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-sm-6 text-end">
+                        <span class="badge bg-light text-secondary border">Total: @Vehicles.Count vehicle(s)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-responsive border rounded" style="max-height: 60vh; overflow-y: auto;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th style="width: 40px;" class="text-center">#</th>
+                            <th>Vehicle #</th>
+                            <th>Type</th>
+                            <th>Driver</th>
+                            <th>Supplier / Company</th>
+                            <th>Transporter</th>
+                            <th>Category</th>
+                            <th>Entry Time</th>
+                            <th>Exit Time</th>
+                            <th class="text-center">Status</th>
+                            <th class="text-center" style="width: 100px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="11" class="text-center py-4 text-muted">
+                                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                                    Loading vehicles log...
+                                </td>
+                            </tr>
+                        }
+                        else if (Vehicles.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="11" class="text-center py-4 text-muted">
+                                    <i class="fas fa-truck fa-2x mb-2 d-block opacity-25"></i>
+                                    No vehicle records found.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            var s = 0;
+                            @foreach (var row in Vehicles)
+                            {
+                                s++;
+                                var isSel = SelectedEntryId == row.EntryID;
+                                <ContextMenuTrigger MenuId="vehicleContextMenu"
+                                                    WrapperTag="tr"
+                                                    Data="row"
+                                                    class="@(isSel ? "table-primary" : "")"
+                                                    @onclick="() => SelectRow(row.EntryID)"
+                                                    @ondblclick="() => EditEntry(row.EntryID)">
+                                    <td class="text-center text-muted">@s</td>
+                                    <td><span class="badge bg-light text-primary border fw-bold fs-6">@row.VehicleNumber</span></td>
+                                    <td>@row.VehicleType</td>
+                                    <td class="fw-semibold">@row.DriverName</td>
+                                    <td>@row.SupplierCompany</td>
+                                    <td>@row.Transporter</td>
+                                    <td>@row.CategoryName</td>
+                                    <td>@row.EntryTime.ToString("dd-MMM-yyyy hh:mm tt")</td>
+                                    <td>@(row.ExitTime?.ToString("dd-MMM-yyyy hh:mm tt") ?? "-")</td>
+                                    <td class="text-center">
+                                        <span class="badge @(row.Status == "Inside" ? "bg-warning-subtle text-warning" : "bg-success-subtle text-success")">
+                                            @row.Status
+                                        </span>
+                                    </td>
+                                    <td class="text-center" @onclick:stopPropagation>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-secondary btn-sm" title="Edit" @onclick="() => EditEntry(row.EntryID)">
+                                                <i class="fas fa-pencil-alt"></i>
+                                            </button>
+                                            <button class="btn btn-outline-danger btn-sm" title="Delete" @onclick="() => DeleteAsync(row.EntryID)">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </ContextMenuTrigger>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Context Menu -->
+<ContextMenu Id="vehicleContextMenu" Template="Win11Style">
+    <Item OnClick="OnContextEdit"><i class="fas fa-pencil-alt win11-icon text-primary me-2"></i> Edit Vehicle Entry</Item>
+    <Item OnClick="OnContextDelete"><i class="fas fa-trash win11-icon text-danger me-2"></i> Delete Record</Item>
+</ContextMenu>
+

@@ -325,7 +325,9 @@ namespace Impulse.Pages.Accounts
                 SubAccOf = "",
                 SubAccTitle = "",
                 HeadType = "",
-                HeadTypeNo = ""
+                HeadTypeNo = "",
+                BudgetAccount = false,
+                BudgetAccount_Glance = false
             };
             Selectedhead = null;
             Selectedhead_sub = null;
@@ -509,7 +511,9 @@ namespace Impulse.Pages.Accounts
                     OpeningBalance = Math.Abs(SelectedAccount.OpeningBalance),
                     BalType = SelectedAccount.BalType,
                     OpenDate = SelectedAccount.OpenDate == default ? DateTime.Today : SelectedAccount.OpenDate,
-                    AccType = SelectedAccount.AccType
+                    AccType = SelectedAccount.AccType,
+                    BudgetAccount = SelectedAccount.BudgetAccount,
+                    BudgetAccount_Glance = SelectedAccount.BudgetAccount_Glance
                 };
                 
                 IsAdding = false;
@@ -625,5 +629,57 @@ namespace Impulse.Pages.Accounts
 
         }
 
+
+        private async Task ToggleBudgetAccountAsync(ChartOfAccountsModel account)
+        {
+            if (account == null || string.IsNullOrWhiteSpace(account.AccNo)) return;
+            try
+            {
+                account.BudgetAccount = !account.BudgetAccount;
+                account.Budget = account.BudgetAccount ? "Yes" : "No";
+                await iChartOfAccountsDataAccess.UpdateBudgetFlagsAsync(account.AccNo, account.BudgetAccount, account.BudgetAccount_Glance);
+                NotificationServiceManager.ShowSuccess("Budget Status Updated", $"Budget Account for [{account.AccNo}] {account.AccTitle} set to {(account.BudgetAccount ? "Yes" : "No")}.");
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                NotificationServiceManager.ShowError("Error", $"Failed to update budget status: {ex.Message}");
+            }
+        }
+
+        private async Task ToggleBudgetGlanceAsync(ChartOfAccountsModel account)
+        {
+            if (account == null || string.IsNullOrWhiteSpace(account.AccNo)) return;
+            try
+            {
+                account.BudgetAccount_Glance = !account.BudgetAccount_Glance;
+                account.Budget_G = account.BudgetAccount_Glance ? "Yes" : "No";
+                await iChartOfAccountsDataAccess.UpdateBudgetFlagsAsync(account.AccNo, account.BudgetAccount, account.BudgetAccount_Glance);
+                NotificationServiceManager.ShowSuccess("Glance Status Updated", $"Budget at Glance for [{account.AccNo}] {account.AccTitle} set to {(account.BudgetAccount_Glance ? "Yes" : "No")}.");
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                NotificationServiceManager.ShowError("Error", $"Failed to update glance status: {ex.Message}");
+            }
+        }
+
+        private async Task ToggleBudgetAccountFromMenu(ItemClickEventArgs e)
+        {
+            var account = (e.Data as ChartOfAccountsModel) ?? SelectedAccount;
+            if (account != null)
+            {
+                await ToggleBudgetAccountAsync(account);
+            }
+        }
+
+        private async Task ToggleBudgetGlanceFromMenu(ItemClickEventArgs e)
+        {
+            var account = (e.Data as ChartOfAccountsModel) ?? SelectedAccount;
+            if (account != null)
+            {
+                await ToggleBudgetGlanceAsync(account);
+            }
+        }
     }
 }

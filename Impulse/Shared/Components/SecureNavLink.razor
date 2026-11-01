@@ -80,8 +80,8 @@ else
     {
         get
         {
-            if (PermissionService.IsAdministrator) return true;
             if (!string.IsNullOrEmpty(Module) && !PermissionService.HasModuleAccess(Module)) return false;
+            if (PermissionService.IsAdministrator) return true;
             if (!string.IsNullOrEmpty(OptionId) && !PermissionService.HasOptionAccess(OptionId)) return false;
             return true;
         }

@@ -52,7 +52,10 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string? IssuedBy { get; set; }
 
         public bool IsSelected { get; set; } = true;
-        public bool IsPosted => VendIssued_RefID.HasValue && !string.IsNullOrWhiteSpace(MasterPONo);
+        public bool IsPosted => VendIssued_RefID.HasValue 
+            && !string.IsNullOrWhiteSpace(MasterPONo) 
+            && !MasterPONo.StartsWith("M-ISU", StringComparison.OrdinalIgnoreCase) 
+            && !MasterPONo.StartsWith("ISU", StringComparison.OrdinalIgnoreCase);
     }
 
     public class GenerateMakerPoRequest

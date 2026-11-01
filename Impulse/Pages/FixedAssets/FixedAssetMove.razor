@@ -1,0 +1,138 @@
+@page "/fixedassets/move"
+@page "/fixedassets/move/{AssetId}"
+@page "/fixed-assets/move"
+@page "/fixed-assets/move/{AssetId}"
+@attribute [Authorize]
+
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.ViewModels.FixedAssets
+
+<PageTitle>Move Asset Head - Impulse</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <!-- ── Top Header ── -->
+            <div class="d-flex align-items-end justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-exchange-alt text-primary fs-4"></i>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark-emphasis">Move Asset Category / Head</h5>
+                        <small class="text-secondary">Transfer an asset from one master head to another while preserving movement history</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" @onclick="Cancel" disabled="@isBusy">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Selection Row ── -->
+            <div class="row g-2 mb-3">
+                <div class="col-md-5">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Filter by Head</label>
+                    <select class="form-select form-select-sm" value="@selectedHeadId" @onchange="OnHeadFilterChanged" disabled="@isBusy">
+                        <option value="">All Categories</option>
+                        @foreach (var h in lookup.Masters)
+                        {
+                            <option value="@h.Id">@h.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-7">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Select Fixed Asset <span class="text-danger">*</span></label>
+                    <div class="@(isBusy ? "disabled-typeahead-wrapper" : "")">
+                        <BlazoredTypeahead SearchMethod="SearchAssets"
+                                           EnableDropDown="true"
+                                           Data="filteredAssets"
+                                           TValue="FixedAssetListRow"
+                                           TItem="FixedAssetListRow"
+                                           Value="selectedAsset"
+                                           ValueChanged="OnAssetSelected"
+                                           ValueExpression="@(() => selectedAsset)"
+                                           Placeholder="Search and select asset by ID or description..."
+                                           MaximumSuggestions="1000"
+                                           Disabled="@isBusy">
+                            <SelectedTemplate Context="asset">
+                                <span class="fw-bold font-monospace">[@asset.AssetId]</span> @asset.Description
+                            </SelectedTemplate>
+                            <ResultTemplate Context="asset">
+                                <span class="fw-bold font-monospace">[@asset.AssetId]</span> @asset.Description
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Comparison Cards ── -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <div class="p-3 border rounded-3 bg-light shadow-xs">
+                        <div class="text-uppercase small fw-bold text-secondary mb-2">
+                            <i class="fas fa-history me-1"></i> Current Details
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-bold text-secondary mb-0 small">Current Head</label>
+                            <input class="form-control form-control-sm bg-white" value="@model.OriginalHeadName" readonly />
+                        </div>
+                        <div>
+                            <label class="form-label fw-bold text-secondary mb-0 small">Asset Code</label>
+                            <input class="form-control form-control-sm font-monospace fw-bold text-primary bg-white" value="@model.AssetId" readonly />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="p-3 border rounded-3 bg-white shadow-xs">
+                        <div class="text-uppercase small fw-bold text-primary mb-2">
+                            <i class="fas fa-arrow-right me-1"></i> New Destination Head
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-bold text-secondary mb-0 small">New Head <span class="text-danger">*</span></label>
+                            <select class="form-select form-select-sm" @bind="model.NewHeadId" disabled="@isBusy">
+                                <option value="">-- Select New Head --</option>
+                                @foreach (var h in lookup.Masters)
+                                {
+                                    <option value="@h.Id">@h.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <small class="text-muted">The asset will be re-assigned under this category upon saving.</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Remarks ── -->
+            <div class="mb-3">
+                <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Transfer Remarks / Purpose</label>
+                <textarea class="form-control form-control-sm" rows="3" @bind="model.Remarks" maxlength="500" disabled="@isBusy" placeholder="State reason for transferring to new head..."></textarea>
+            </div>
+
+            <!-- ── Bottom Action Footer ── -->
+            <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                <button type="button" class="btn btn-primary btn-sm px-5 fw-bold" @onclick="SaveAsync" disabled="@isBusy">
+                    <i class="fas fa-check me-1"></i> Save Move
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm px-4 fw-bold" @onclick="Cancel" disabled="@isBusy">
+                    <i class="fas fa-times me-1"></i> Cancel
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    .disabled-typeahead-wrapper .blazored-typeahead {
+        overflow: hidden !important;
+        border-radius: 4px;
+    }
+    .blazored-typeahead {
+        height: 35px !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+</style>
+

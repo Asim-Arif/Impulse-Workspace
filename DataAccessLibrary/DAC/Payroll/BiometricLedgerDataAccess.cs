@@ -91,6 +91,40 @@ namespace DataAccessLibrary.DAC.Payroll
 
         // ── IFace Machines ─────────────────────────────────────────────────────────
 
+        public async Task SaveMachineAsync(BiometricMachineItem machine)
+        {
+            using (IDbConnection db = new SqlConnection(_connectionString))
+            {
+                if (machine.EntryID == 0)
+                {
+                    string sql = @"
+                        INSERT INTO AttendanceMachine (IPAddress, Description, MachineNo, MachineType, Clientkey)
+                        VALUES (@IPAddress, @Description, @MachineNo, 3, @Clientkey);";
+                    await db.ExecuteAsync(sql, machine);
+                }
+                else
+                {
+                    string sql = @"
+                        UPDATE AttendanceMachine 
+                        SET IPAddress = @IPAddress,
+                            Description = @Description,
+                            MachineNo = @MachineNo,
+                            Clientkey = @Clientkey
+                        WHERE EntryID = @EntryID;";
+                    await db.ExecuteAsync(sql, machine);
+                }
+            }
+        }
+
+        public async Task DeleteMachineAsync(int entryId)
+        {
+            using (IDbConnection db = new SqlConnection(_connectionString))
+            {
+                string sql = "DELETE FROM AttendanceMachine WHERE EntryID = @EntryID;";
+                await db.ExecuteAsync(sql, new { EntryID = entryId });
+            }
+        }
+
         public async Task<List<BiometricMachineItem>> GetIFaceMachinesAsync()
         {
             using (IDbConnection db = new SqlConnection(_connectionString))
@@ -99,7 +133,8 @@ namespace DataAccessLibrary.DAC.Payroll
                     SELECT EntryID, ISNULL(IPAddress,'') AS IPAddress, 
                            ISNULL(Description,'') AS Description,
                            ISNULL(MachineNo, 1)   AS MachineNo,
-                           ISNULL(MachineType, 3) AS MachineType
+                           ISNULL(MachineType, 3) AS MachineType,
+                           ISNULL(Clientkey, 'Default') AS Clientkey
                     FROM AttendanceMachine
                     WHERE MachineType = 3
                     ORDER BY EntryID";

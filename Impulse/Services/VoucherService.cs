@@ -48,6 +48,32 @@ namespace Impulse.Services
         { 
             return await _dataAccess.GetNewChequeNumbersByBankAccount(strAccNo);
         }
+        public async Task<ChequeValidationResult> ValidateChequeAsync(string bankAccNo, string chequeNo)
+        {
+            if (string.IsNullOrWhiteSpace(bankAccNo))
+            {
+                return ChequeValidationResult.Error("Please select a Bank Account first.");
+            }
+            if (string.IsNullOrWhiteSpace(chequeNo))
+            {
+                return ChequeValidationResult.Error("Please enter a Cheque Number.");
+            }
+
+            var cleanAccNo = bankAccNo.Trim();
+            var cleanChqNo = chequeNo.Trim();
+
+            var cheque = await _dataAccess.GetChequeDetailsByNoAsync(cleanAccNo, cleanChqNo);
+            if (cheque == null)
+            {
+                return ChequeValidationResult.Error($"Cheque No. '{cleanChqNo}' does not belong to the selected Bank Account.");
+            }
+            if (cheque.Issued)
+            {
+                return ChequeValidationResult.Error($"Cheque No. '{cleanChqNo}' has already been issued.", alreadyIssued: true);
+            }
+
+            return ChequeValidationResult.Valid(cheque.ChqBookNo, cheque.ChqNo);
+        }
         public async Task<decimal> GetBalance(string strAccNo, DateTime OnDate)
         { 
             return await _dataAccess.GetBalance(strAccNo, OnDate); 

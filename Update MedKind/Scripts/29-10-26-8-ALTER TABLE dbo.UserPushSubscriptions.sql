@@ -1,0 +1,1 @@
+ALTER TABLE dbo.UserPushSubscriptions ALTER COLUMN DeviceName VARCHAR(500) NULL;

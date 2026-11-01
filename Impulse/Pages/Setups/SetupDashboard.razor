@@ -290,6 +290,37 @@
                                     </div>
                                 }
 
+                                @if (PermissionService.HasOptionAccess("GatePassTypes"))
+                                {
+                                    <a href="/gate/pass-types" class="list-group-item list-group-item-action border rounded-3 p-3 d-flex align-items-center justify-content-between transition-hover">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="p-2 bg-light rounded-circle text-primary">
+                                                <i class="fas fa-tags fa-fw"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-dark">Gate Pass Types Setup</div>
+                                                <small class="text-secondary">Configure returnable/non-returnable categories &amp; security gate pass definitions</small>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-chevron-right text-muted"></i>
+                                    </a>
+                                }
+                                else
+                                {
+                                    <div class="list-group-item border rounded-3 p-3 d-flex align-items-center justify-content-between" style="opacity: 0.45; cursor: not-allowed; background: #f8f9fa;">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="p-2 bg-light rounded-circle text-muted">
+                                                <i class="fas fa-tags fa-fw"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-muted">Gate Pass Types Setup</div>
+                                                <small class="text-muted">Configure returnable/non-returnable categories &amp; security gate pass definitions</small>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-lock text-muted"></i>
+                                    </div>
+                                }
+
                             </div>
                         </div>
                     </div>

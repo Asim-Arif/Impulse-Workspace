@@ -205,7 +205,11 @@
                         <div class="col-md-6" style="position: relative !important; z-index: 10002 !important;">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Bank Account <span class="text-danger">*</span></label>
                             <BlazoredTypeahead SearchMethod="SearchBankAccountsAsync"
-                                               @bind-Value="SelectedBankAccount"
+                                               Value="SelectedBankAccount"
+                                               ValueChanged="OnBankAccountChanged"
+                                               ValueExpression="@(() => SelectedBankAccount)"
+                                               TValue="BankAccountInfo"
+                                               TItem="BankAccountInfo"
                                                Placeholder="Select bank account..."
                                                EnableDropDown="true"
                                                MaximumSuggestions="1000">
@@ -221,7 +225,7 @@
                                 <div class="row g-2">
                                     <div class="col-4">
                                         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Cheque No. <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control form-control-sm" @bind="ChequeNo" placeholder="e.g. 100001" style="height:35px;" />
+                                        <input type="text" class="form-control form-control-sm" @bind="ChequeNo" @bind:after="OnChequeNoChanged" placeholder="e.g. 100001" style="height:35px;" />
                                     </div>
                                     <div class="col-4">
                                         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Cheque Type</label>

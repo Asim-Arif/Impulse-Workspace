@@ -12,6 +12,7 @@ namespace Impulse.Services
         Task<List<ChartOfAccountsModel>> GetTransactionalAccounts(string? strCondition = null);
         Task<List<BankAccountInfo>> GetBankAccounts();
         Task<ChequeInfo> GetNewChequeNumbersByBankAccount(string strAccNo);
+        Task<ChequeValidationResult> ValidateChequeAsync(string bankAccNo, string chequeNo);
         Task<decimal> GetBalance(string strAccNo, DateTime OnDate);
         Task<string> GetNextVchrNo(DateTime OnDate, string VchrType);
         Task<string> GetNextVchrNo_Approval(DateTime OnDate, string VchrType);

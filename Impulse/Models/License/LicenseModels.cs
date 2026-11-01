@@ -13,7 +13,16 @@ namespace Impulse.Models.License
         Stock = 8,
         Accounts = 16,
         Export = 32,
-        All = IntraOffice | Payroll | Production | Stock | Accounts | Export
+        
+        // Add-on Modules (licensed explicitly, excluded from standard "All")
+        QMS = 64,
+        Budgeting = 128,
+        FixedAssets = 256,
+        GateManagement = 512,
+
+        // Core ERP represents the standard "All" bundle
+        CoreAll = IntraOffice | Payroll | Production | Stock | Accounts | Export,
+        All = CoreAll
     }
 
     public enum LicenseStatus
@@ -48,20 +57,42 @@ namespace Impulse.Models.License
         public DateTime? IssuedAt { get; set; }
         public string StatusMessage { get; set; } = "No license found.";
 
+        public static bool IsAddonModule(string moduleName)
+        {
+            var lower = moduleName.Trim().ToLowerInvariant().Replace(" ", "").Replace("-", "");
+            return lower switch
+            {
+                "qms" or "quality" => true,
+                "budgeting" or "budget" => true,
+                "fixedassets" => true,
+                "gate" or "gatemanagement" => true,
+                _ => false
+            };
+        }
+
+        public static bool IsAddonModule(AppModule module)
+        {
+            return module == AppModule.QMS || module == AppModule.Budgeting || module == AppModule.FixedAssets || module == AppModule.GateManagement;
+        }
+
         public bool IsModuleAllowed(AppModule module)
         {
             if (!IsLicensed) return false;
-            if (AllowedModules.Contains("All")) return true;
-            return AllowedModules.Contains(module.ToString());
+            if (AllowedModules.Contains("EnterpriseAll") || AllowedModules.Contains("Everything")) return true;
+            if (AllowedModules.Contains(module.ToString())) return true;
+            if (AllowedModules.Contains("All"))
+            {
+                return !IsAddonModule(module);
+            }
+            return false;
         }
 
         public bool IsModuleAllowed(string moduleName)
         {
             if (!IsLicensed) return false;
-            if (AllowedModules.Contains("All")) return true;
             if (string.IsNullOrWhiteSpace(moduleName)) return true;
 
-            var lower = moduleName.Trim().ToLowerInvariant();
+            var lower = moduleName.Trim().ToLowerInvariant().Replace(" ", "").Replace("-", "");
 
             // Core system areas are part of the base application and accessible in all licensed tiers
             if (lower is "setup" or "setups" or "dashboard" or "dashboards" or "company" or "favourites" or "help")
@@ -72,15 +103,37 @@ namespace Impulse.Models.License
             var normalized = lower switch
             {
                 "financial" or "accounts" => "Accounts",
+                "budgeting" or "budget" => "Budgeting",
+                "fixedassets" => "FixedAssets",
+                "gate" or "gatemanagement" => "GateManagement",
                 "payroll" or "hr" => "Payroll",
                 "stock" or "inventory" => "Stock",
                 "production" => "Production",
                 "export" => "Export",
                 "office" or "intraoffice" => "IntraOffice",
+                "qms" or "quality" => "QMS",
                 _ => moduleName.Trim()
             };
 
-            return AllowedModules.Contains(normalized) || AllowedModules.Contains(moduleName);
+            // 1. Explicitly licensed module (e.g., license contains "QMS")
+            if (AllowedModules.Contains(normalized) || AllowedModules.Contains(moduleName.Trim()))
+            {
+                return true;
+            }
+
+            // 2. Full enterprise / developer wildcard
+            if (AllowedModules.Contains("EnterpriseAll") || AllowedModules.Contains("Everything"))
+            {
+                return true;
+            }
+
+            // 3. Standard "All" covers only Core ERP modules, NOT Add-ons (like QMS)
+            if (AllowedModules.Contains("All"))
+            {
+                return !IsAddonModule(normalized);
+            }
+
+            return false;
         }
     }
 

@@ -158,6 +158,15 @@ namespace DataAccessLibrary.DAC.Accounts
                 return await db.QueryFirstOrDefaultAsync<ChequeInfo>(sql, new { @strAccNo = strAccNo });
             }
         }
+
+        public async Task<ChequeInfo?> GetChequeDetailsByNoAsync(string strAccNo, string strChqNo)
+        {
+            string sql = @"SELECT TOP 1 ChqBookNo, ChqNo, Issued FROM VChqList WHERE AccNo = @AccNo AND ChqNo = @ChqNo";
+            using (IDbConnection db = new SqlConnection(_connectionString))
+            {
+                return await db.QueryFirstOrDefaultAsync<ChequeInfo>(sql, new { AccNo = strAccNo, ChqNo = strChqNo });
+            }
+        }
         public async Task<decimal> GetBalance(string strAccNo, DateTime OnDate)
         {
             string sql = "SELECT [dbo].[GetBalance](@AccNo, @DT, @CurrentDT)";

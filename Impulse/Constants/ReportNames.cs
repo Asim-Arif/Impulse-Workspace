@@ -233,5 +233,70 @@ namespace Impulse.Constants
             public const string ClaimsStatisticsGraph = Folder + "Claims_Statistics_Graph.rpt";
             public const string QMSDocumentDistributionList = Folder + "QMSDocument_DistributionList.rpt";
         }
+
+        // Budgeting Subfolder
+        public static class Budgeting
+        {
+            private const string Folder = "";
+            public const string FinancialBudgeting_Expenses = Folder + "FinancialBudgeting_Expenses.rpt";
+            public const string FinancialBudgeting_Monthwise = Folder + "FinancialBudgeting_Monthwise.rpt";
+            public const string FinancialBudgeting_Monthwise_Revisions = Folder + "FinancialBudgeting_Monthwise_Revisions.rpt";
+            public const string Financial_Budgeting_Expenses_Report_Quarterwise = Folder + "Financial_Budgeting_Expenses_Report_Quarterwise.rpt";
+            public const string Financial_Budgeting_Report_Glance = Folder + "Financial_Budgeting_Report_Glance.rpt";
+            public const string Financial_Budgeting_Report_Quarterwise = Folder + "Financial_Budgeting_Report_Quarterwise.rpt";
+
+            // Aliases
+            public const string BudgetMonthwise = FinancialBudgeting_Monthwise;
+            public const string BudgetMonthwiseRevision = FinancialBudgeting_Monthwise_Revisions;
+            public const string BudgetExpenses = FinancialBudgeting_Expenses;
+            public const string BudgetQuarterwise = Financial_Budgeting_Report_Quarterwise;
+            public const string BudgetQuarterwiseExpenses = Financial_Budgeting_Expenses_Report_Quarterwise;
+            public const string BudgetGlance = Financial_Budgeting_Report_Glance;
+            public const string BudgetDateRange = FinancialBudgeting_Expenses;
+        }
+
+        // Fixed Assets Subfolder
+        public static class FixedAssets
+        {
+            private const string Folder = "";
+            public const string FixedAssetsReport = Folder + "FixedAssets.rpt";
+            public const string FixedAssetsRegister = Folder + "FixedAssetsRegister.rpt";
+            public const string FixedAssetsRegister_Departments = Folder + "FixedAssetsRegister_Departments.rpt";
+            public const string FixedAssetsRegister_Departments_New = Folder + "FixedAssetsRegister_Departments_New.rpt";
+            public const string FixedAssetsRegister_Depreciation = Folder + "FixedAssetsRegister_Depreciation.rpt";
+            public const string FixedAssetsRegister_Disposed = Folder + "FixedAssetsRegister_Disposed.rpt";
+            public const string FixedAssetsRegister_Fully_Depreciated_Assets = Folder + "FixedAssetsRegister_Fully_Depreciated_Assets.rpt";
+            public const string FixedAssetsRegister_Fully_Depreciated_Assets_Summary = Folder + "FixedAssetsRegister_Fully_Depreciated_Assets_Summary.rpt";
+            public const string FixedAssetsRegister_Monthwise = Folder + "FixedAssetsRegister_Monthwise.rpt";
+            public const string FixedAssetsRegister_Monthwise_Summary = Folder + "FixedAssetsRegister_Monthwise_Summary.rpt";
+            public const string FixedAssetsRegister_Summary = Folder + "FixedAssetsRegister_Summary.rpt";
+            public const string FixedAssetsRegister_WrittenOff = Folder + "FixedAssetsRegister_WrittenOff.rpt";
+            public const string FixedAssets_CalibrationList = Folder + "FixedAssets_CalibrationList.rpt";
+            public const string FixedAssets_Datewise = Folder + "FixedAssets_Datewise.rpt";
+            public const string FixedAssets_FuelSlip = Folder + "FixedAssets_FuelSlip.rpt";
+            public const string FixedAssets_RepairSlip = Folder + "FixedAssets_RepairSlip.rpt";
+
+            // Aliases
+            public const string FixedAssetsDatewise = FixedAssets_Datewise;
+            public const string FixedAssetsRepairSlip = FixedAssets_RepairSlip;
+        }
+
+        // Gate Management Subfolder
+        public static class GateManagement
+        {
+            private const string Folder = "";
+            public const string DailyGateRcv = Folder + "DailyGateRcv.rpt";
+            public const string GatePass_Return = Folder + "GatePass_Return.rpt";
+            public const string GatePass_Return_List = Folder + "GatePass_Return_List.rpt";
+            public const string GatePass_Return_Receiving = Folder + "GatePass_Return_Receiving.rpt";
+            public const string MiscGateInTemp = Folder + "MiscGateInTemp.rpt";
+            public const string MiscGateInTempList = Folder + "MiscGateInTempList.rpt";
+            public const string MiscGateOut = Folder + "MiscGateOut.rpt";
+            public const string MiscGateOutList = Folder + "MiscGateOutList.rpt";
+            public const string Sales_Gatepass = Folder + "Sales_Gatepass.rpt";
+            public const string Sales_Gatepass_Original = Folder + "Sales_Gatepass_Original.rpt";
+            public const string Visitor = Folder + "Visitor.rpt";
+            public const string VisitorGateInList = Folder + "VisitorGateInList.rpt";
+        }
     }
 }

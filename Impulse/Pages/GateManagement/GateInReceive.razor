@@ -1,0 +1,121 @@
+@page "/gate/in/receive/{EntryId:int}"
+@attribute [Authorize]
+
+<PageTitle>Receive Returnable Items - Impulse</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body">
+            <!-- Header -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-4 text-primary"><i class="fas fa-box-open"></i></span>
+                    <div>
+                        <h4 class="mb-0 fw-bold" style="color: #1a237e;">Receive Returnable Goods</h4>
+                        <small class="text-muted">Acknowledge arrival &amp; quantity receipt of temporary inward materials</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="Cancel">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                    <button type="button" class="btn btn-sm btn-success" @onclick="SaveAsync" disabled="@IsSaving">
+                        <i class="fas fa-check me-1"></i> @(IsSaving ? "Saving..." : "Confirm Receipt")
+                    </button>
+                </div>
+            </div>
+
+            @if (IsLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted">Loading receiving data...</p>
+                </div>
+            }
+            else if (Model == null)
+            {
+                <div class="alert alert-warning">Gate pass was not found or has no pending returnable items.</div>
+            }
+            else
+            {
+                <!-- Info Summary -->
+                <div class="card border-0 bg-light p-3 mb-3" style="border-radius: 8px;">
+                    <div class="row g-2">
+                        <div class="col-md-3 col-sm-6">
+                            <label class="form-label mb-1 text-muted" style="font-size: 0.75rem;">Gate Pass #</label>
+                            <div class="fw-bold fs-6 text-primary">@Model.GatePassNo</div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <label class="form-label mb-1 text-muted" style="font-size: 0.75rem;">Pass Category</label>
+                            <div class="fw-semibold">@Model.GatePassTypeName</div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <label class="form-label mb-1 text-muted" style="font-size: 0.75rem;">Carrier / Person</label>
+                            <div class="fw-semibold">@Model.PersonName</div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <label class="form-label mb-1 text-muted" style="font-size: 0.75rem;">Vendor</label>
+                            <div class="fw-semibold">@Model.VendorName</div>
+                        </div>
+                        <div class="col-md-4 col-sm-6 mt-2">
+                            <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Receiving Date</label>
+                            <input type="date" class="form-control form-control-sm" @bind="Model.ReceiveDate" />
+                        </div>
+                        <div class="col-md-8 col-sm-6 mt-2">
+                            <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Receiving Remarks</label>
+                            <input type="text" class="form-control form-control-sm" @bind="Model.Remarks" placeholder="Remarks or inspection note" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lines Table -->
+                <div class="card border-0 bg-light p-3" style="border-radius: 8px;">
+                    <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">
+                        <i class="fas fa-list-check me-1 text-primary"></i> Pending Returnable Items
+                    </h6>
+                    <div class="table-responsive bg-white border rounded">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                            <thead class="table-light text-secondary" style="font-size: 0.78rem; text-transform: uppercase;">
+                                <tr>
+                                    <th>Detail / Item Name</th>
+                                    <th>Unit</th>
+                                    <th class="text-end">Total Qty</th>
+                                    <th class="text-end">Already Received</th>
+                                    <th class="text-end">Balance Qty</th>
+                                    <th class="text-end" style="width: 150px;">Receive Qty Now</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model.Lines.Count == 0)
+                                {
+                                    <tr>
+                                        <td colspan="6" class="text-center py-3 text-muted">
+                                            No pending items left to receive on this pass.
+                                        </td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    @foreach (var line in Model.Lines)
+                                    {
+                                        <tr>
+                                            <td class="fw-semibold">@line.Detail</td>
+                                            <td>@line.Unit</td>
+                                            <td class="text-end">@line.Qty.ToString("0.##")</td>
+                                            <td class="text-end text-success">@line.AlreadyReceivedQty.ToString("0.##")</td>
+                                            <td class="text-end fw-bold text-danger">@line.BalanceQty.ToString("0.##")</td>
+                                            <td class="text-end">
+                                                <input type="number" step="any" max="@line.BalanceQty" class="form-control form-control-sm text-end fw-bold text-primary" @bind="line.ReceiveQty" />
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+

@@ -98,6 +98,12 @@ namespace Impulse.Services.Setup
             }
         }
 
+        public bool IsModuleLicensed(string moduleName)
+        {
+            if (string.IsNullOrWhiteSpace(moduleName)) return true;
+            return _licenseService.IsModuleAllowed(moduleName);
+        }
+
         public bool HasModuleAccess(string moduleName)
         {
             if (string.IsNullOrWhiteSpace(moduleName)) return true;
@@ -114,6 +120,8 @@ namespace Impulse.Services.Setup
             return moduleName.ToLowerInvariant() switch
             {
                 "financial" or "accounts" => _currentUserModel.FinancialMainLink,
+                "budgeting" or "budget" => _currentUserModel.BudgetingMainLink,
+                "gate" or "gatemanagement" => _currentUserModel.GateMainLink || _currentUserModel.StockMainLink,
                 "payroll" or "hr" => _currentUserModel.PayrollMainLink,
                 "stock" or "inventory" => _currentUserModel.StockMainLink,
                 "production" => _currentUserModel.ProductionMainLink,
@@ -121,7 +129,7 @@ namespace Impulse.Services.Setup
                 "company" => _currentUserModel.CompanyMainLink,
                 "dashboard" => _currentUserModel.DashBoardMainLink,
                 "qms" => _currentUserModel.QMSMainLink,
-                "fixedassets" => _currentUserModel.FixedAssetsMainLink,
+                "fixedassets" or "fixed-assets" => _currentUserModel.FixedAssetsMainLink,
                 "sampling" => _currentUserModel.SamplingMainLink,
                 "help" => _currentUserModel.HelpMainLink,
                 "office" or "intraoffice" => _currentUserModel.IntraOfficeMainLink,
@@ -470,6 +478,28 @@ namespace Impulse.Services.Setup
             ["PrlEditAttendance"] = new[] { "PayAttendanceMonthly" },
             ["PrlMonthlyAttendance"] = new[] { "PayAttendanceMonthly" },
 
+            // ==========================================
+            // Gate Management Aliases
+            // ==========================================
+            ["GateDashboard"] = new[] { "AWMGateDashboard" },
+            ["AWMGateDashboard"] = new[] { "GateDashboard" },
+            ["GateInwardList"] = new[] { "AWMGateIn", "GateInwardEntry", "GateInwardReceive" },
+            ["AWMGateIn"] = new[] { "GateInwardList", "GateInwardEntry", "GateInwardReceive" },
+            ["GatePassTypes"] = new[] { "AWMGatePassTypes" },
+            ["AWMGatePassTypes"] = new[] { "GatePassTypes" },
+            ["GateVisitors"] = new[] { "AWMVisitors", "GateVisitorEntry", "GateVisitorCheckout", "GateVisitorPass" },
+            ["AWMVisitors"] = new[] { "GateVisitors", "GateVisitorEntry", "GateVisitorCheckout", "GateVisitorPass" },
+            ["GateVehicles"] = new[] { "AWMVehicleManagement", "GateVehicleEntry" },
+            ["AWMVehicleManagement"] = new[] { "GateVehicles", "GateVehicleEntry" },
+
+            // ==========================================
+            // Fixed Assets Aliases
+            // ==========================================
+            ["FAHub"] = new[] { "AccFixedAssets" },
+            ["FAList"] = new[] { "AccFixedAssets" },
+            ["FANewAsset"] = new[] { "AccFixedAssets" },
+            ["AccFixedAssets"] = new[] { "FAHub", "FAList", "FANewAsset" },
+
             ["PayGatePass"] = new[] { "PrlGatePassEntries", "GatePass" },
             ["PrlGatePassEntries"] = new[] { "PayGatePass" },
 
@@ -671,8 +701,66 @@ namespace Impulse.Services.Setup
         }
 
                 private static readonly Dictionary<string, (string Module, string? OptionId)> RoutePermissions = new(StringComparer.OrdinalIgnoreCase)
-        {
-["accounts/accountgroups"] = ("Accounts", "AccExpenseGroups"),
+        {            ["fixedassets"] = ("FixedAssets", "FAHub"),
+            ["fixedassets/dashboard"] = ("FixedAssets", "FADashboard"),
+            ["fixedassets/list"] = ("FixedAssets", "FAList"),
+            ["fixedassets/profile"] = ("FixedAssets", "FANewAsset"),
+            ["fixedassets/register"] = ("FixedAssets", "FARegister"),
+            ["fixedassets/adjustment"] = ("FixedAssets", "FAAdjustment"),
+            ["fixedassets/move"] = ("FixedAssets", "FAMove"),
+            ["fixedassets/disposal"] = ("FixedAssets", "FADisposal"),
+            ["fixedassets/reports"] = ("FixedAssets", "FAReports"),
+            ["fixed-assets"] = ("FixedAssets", "FAHub"),
+            ["fixed-assets/dashboard"] = ("FixedAssets", "FADashboard"),
+            ["fixed-assets/register"] = ("FixedAssets", "FARegister"),
+            ["fixed-assets/new"] = ("FixedAssets", "FANewAsset"),
+            ["fixed-assets/adjustment"] = ("FixedAssets", "FAAdjustment"),
+            ["fixed-assets/move"] = ("FixedAssets", "FAMove"),
+            ["fixed-assets/disposal"] = ("FixedAssets", "FADisposal"),
+            ["fixed-assets/reports"] = ("FixedAssets", "FAReports"),
+            ["fixed-assets/asset"] = ("FixedAssets", "FANewAsset"),
+            ["fixed-assets-register"] = ("FixedAssets", "FARegister"),
+            ["budgeting"] = ("Budgeting", "BudHub"),
+            ["budgeting/dashboard"] = ("Budgeting", "BudDashboard"),
+            ["dashboard/budgeting"] = ("Budgeting", "BudDashboard"),
+            ["budgeting/expense/entry"] = ("Budgeting", "BudExpenseEntry"),
+            ["budgeting/expense/entry-revision"] = ("Budgeting", "BudExpenseEntry"),
+            ["budgeting/income/entry"] = ("Budgeting", "BudIncomeEntry"),
+            ["budgeting/income/entry-revision"] = ("Budgeting", "BudIncomeRevisions"),
+            ["budgeting/reports"] = ("Budgeting", "BudReports"),
+            ["budgeting/expense/reports/q1"] = ("Budgeting", "BudReports"),
+            ["budgeting/expense/reports/q2"] = ("Budgeting", "BudReports"),
+            ["budgeting/expense/reports/q3"] = ("Budgeting", "BudReports"),
+            ["budgeting/expense/reports/q4"] = ("Budgeting", "BudReports"),
+            ["budgeting/expense/reports/date-range"] = ("Budgeting", "BudReports"),
+            ["budgeting/income/reports/q1"] = ("Budgeting", "BudReports"),
+            ["budgeting/income/reports/q2"] = ("Budgeting", "BudReports"),
+            ["budgeting/income/reports/q3"] = ("Budgeting", "BudReports"),
+            ["budgeting/income/reports/q4"] = ("Budgeting", "BudReports"),
+            ["budgeting/income/reports/date-range"] = ("Budgeting", "BudReports"),
+            ["budgeting/income/budget-at-glance"] = ("Budgeting", "BudReports"),
+            ["gate"] = ("GateManagement", "GateHub"),
+            ["gatemanagement"] = ("GateManagement", "GateHub"),
+            ["gate/dashboard"] = ("GateManagement", "GateDashboard"),
+            ["gate/in/list"] = ("GateManagement", "GateInwardList"),
+            ["gate/inward"] = ("GateManagement", "GateInwardList"),
+            ["gate/in/entry"] = ("GateManagement", "GateInwardEntry"),
+            ["gate/in/receive"] = ("GateManagement", "GateInwardReceive"),
+            ["gate/material-inward"] = ("GateManagement", "GateMaterialInward"),
+            ["gate/material-inward/entry"] = ("GateManagement", "GateMaterialInwardEntry"),
+            ["gate/material-outward"] = ("GateManagement", "GateMaterialOutward"),
+            ["gate/material-outward/entry"] = ("GateManagement", "GateMaterialOutwardEntry"),
+            ["gate/visitors"] = ("GateManagement", "GateVisitors"),
+            ["gate/visitors/entry"] = ("GateManagement", "GateVisitorEntry"),
+            ["gate/visitors/gate-out"] = ("GateManagement", "GateVisitorCheckout"),
+            ["gate/visitors/out"] = ("GateManagement", "GateVisitorCheckout"),
+            ["gate/visitors/pass"] = ("GateManagement", "GateVisitorPass"),
+            ["gate/vehicles"] = ("GateManagement", "GateVehicles"),
+            ["gate/vehicles/entry"] = ("GateManagement", "GateVehicleEntry"),
+            ["gate/pass-types"] = ("GateManagement", "GatePassTypes"),
+            ["gate/gatepass-types"] = ("GateManagement", "GatePassTypes"),
+            ["gate/reports"] = ("GateManagement", "GateReports"),
+            ["accounts/accountgroups"] = ("Accounts", "AccExpenseGroups"),
             ["accounts/accountsledger"] = ("Accounts", "AccLedger"),
             ["accounts/bankbalancestatement"] = ("Accounts", "AccCashBankStatus"),
             ["accounts/banklist"] = ("Accounts", "BankList"),
@@ -951,6 +1039,9 @@ namespace Impulse.Services.Setup
                         "setup" => "Setup",
                         "office" or "intraoffice" => "IntraOffice",
                         "qms" => "QMS",
+                        "budgeting" => "Budgeting",
+                        "fixedassets" or "fixed-assets" or "fixed-assets-register" => "FixedAssets",
+                        "gate" or "gatemanagement" => "GateManagement",
                         _ => null
                     };
                 }
@@ -1226,6 +1317,47 @@ namespace Impulse.Services.Setup
                 new() { OptionID = "CmpCustomerList", OptionName = "Customer List", ModuleName = "Company" },
                 new() { OptionID = "CmpNewCustomer", OptionName = "New Customer", ModuleName = "Company" },
                 new() { OptionID = "CustomerCatalog", OptionName = "Customer Catalog", ModuleName = "Company" },
+
+                // Budgeting
+                new() { OptionID = "BudHub", OptionName = "Budgeting Hub", ModuleName = "Budgeting" },
+                new() { OptionID = "BudDashboard", OptionName = "Budgeting Analytics & Performance", ModuleName = "Budgeting" },
+                new() { OptionID = "BudExpenseEntry", OptionName = "Expense Budget Entry", ModuleName = "Budgeting" },
+                new() { OptionID = "BudIncomeEntry", OptionName = "Income Budget Entry", ModuleName = "Budgeting" },
+                new() { OptionID = "BudIncomeRevisions", OptionName = "Income Budget Revisions", ModuleName = "Budgeting" },
+                new() { OptionID = "BudReports", OptionName = "Budget Reports & Variance", ModuleName = "Budgeting" },
+
+                // Fixed Assets
+                new() { OptionID = "FAHub", OptionName = "Fixed Assets Hub", ModuleName = "FixedAssets" },
+                new() { OptionID = "FAList", OptionName = "Fixed Assets List", ModuleName = "FixedAssets" },
+                new() { OptionID = "FANewAsset", OptionName = "New Asset Profile / Entry", ModuleName = "FixedAssets" },
+                new() { OptionID = "FARegister", OptionName = "Depreciation Register", ModuleName = "FixedAssets" },
+                new() { OptionID = "FAAdjustment", OptionName = "Fixed Asset Adjustment", ModuleName = "FixedAssets" },
+                new() { OptionID = "FAMove", OptionName = "Asset Relocation & Move", ModuleName = "FixedAssets" },
+                new() { OptionID = "FADisposal", OptionName = "Asset Disposal", ModuleName = "FixedAssets" },
+                new() { OptionID = "FADashboard", OptionName = "Fixed Assets Dashboard", ModuleName = "FixedAssets" },
+                new() { OptionID = "FAReports", OptionName = "Fixed Assets Reports", ModuleName = "FixedAssets" },
+                new() { OptionID = "AccFixedAssets", OptionName = "Fixed Assets (Legacy)", ModuleName = "FixedAssets" },
+                new() { OptionID = "AccFixedAssetsChangeHeads", OptionName = "Change Heads", ModuleName = "FixedAssets" },
+                new() { OptionID = "AccFuelSlips", OptionName = "Fuel Slips", ModuleName = "FixedAssets" },
+                new() { OptionID = "AccRepairLog", OptionName = "Repair Log", ModuleName = "FixedAssets" },
+
+                // Gate Management
+                new() { OptionID = "GateHub", OptionName = "Gate Management Hub", ModuleName = "GateManagement" },
+                new() { OptionID = "GateDashboard", OptionName = "Gate Operations Dashboard", ModuleName = "GateManagement" },
+                new() { OptionID = "GateInwardList", OptionName = "Gate Inward Passes List", ModuleName = "GateManagement" },
+                new() { OptionID = "GateInwardEntry", OptionName = "Gate Inward Pass Entry", ModuleName = "GateManagement" },
+                new() { OptionID = "GateInwardReceive", OptionName = "Returnable Receiving", ModuleName = "GateManagement" },
+                new() { OptionID = "GateMaterialInward", OptionName = "Material Inward Register", ModuleName = "GateManagement" },
+                new() { OptionID = "GateMaterialInwardEntry", OptionName = "Material Inward Entry", ModuleName = "GateManagement" },
+                new() { OptionID = "GateMaterialOutward", OptionName = "Material Outward Register", ModuleName = "GateManagement" },
+                new() { OptionID = "GateMaterialOutwardEntry", OptionName = "Material Outward Entry", ModuleName = "GateManagement" },
+                new() { OptionID = "GateVisitors", OptionName = "Visitor Management Register", ModuleName = "GateManagement" },
+                new() { OptionID = "GateVisitorEntry", OptionName = "Visitor Pass Entry", ModuleName = "GateManagement" },
+                new() { OptionID = "GateVisitorCheckout", OptionName = "Visitor Gate Out Checkout", ModuleName = "GateManagement" },
+                new() { OptionID = "GateVehicles", OptionName = "Vehicle Movement Log", ModuleName = "GateManagement" },
+                new() { OptionID = "GateVehicleEntry", OptionName = "Vehicle Entry / Exit", ModuleName = "GateManagement" },
+                new() { OptionID = "GatePassTypes", OptionName = "Gate Pass Types Setup", ModuleName = "GateManagement" },
+                new() { OptionID = "GateReports", OptionName = "Gate Security Reports", ModuleName = "GateManagement" },
 
                 // Setups & System Administration
                 new() { OptionID = "SetupHub", OptionName = "Setups Hub", ModuleName = "Setup" },

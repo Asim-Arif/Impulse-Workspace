@@ -399,6 +399,24 @@ builder.Services.AddScoped<IFinancialStatementDataAccess, FinancialStatementData
 builder.Services.AddScoped<ITrailBalance_BreakupDataAccess, TrailBalance_BreakupDataAccess>();
 builder.Services.AddScoped<IChqBookDetailDataAccess, ChqBookDetailDataAccess>();
 
+// Budgeting Module Registrations
+builder.Services.AddScoped<DataAccessLibrary.Interface.Budgeting.IBudgetDataAccess, DataAccessLibrary.DAC.Budgeting.BudgetDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Budgeting.IBudgetDashboardDataAccess, DataAccessLibrary.DAC.Budgeting.BudgetDashboardDataAccess>();
+
+// Fixed Assets Module Registrations
+builder.Services.AddScoped<DataAccessLibrary.Interface.FixedAssets.IFixedAssetProfileDataAccess, DataAccessLibrary.DAC.FixedAssets.FixedAssetProfileDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.FixedAssets.IFixedAssetRegisterDataAccess, DataAccessLibrary.DAC.FixedAssets.FixedAssetRegisterDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.FixedAssets.IFixedAssetDashboardDataAccess, DataAccessLibrary.DAC.FixedAssets.FixedAssetDashboardDataAccess>();
+
+// Gate Management Module Registrations
+builder.Services.AddScoped<DataAccessLibrary.Interface.Gate.IGateInDataAccess, DataAccessLibrary.DAC.Gate.GateInDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Gate.IGatePassTypeDataAccess, DataAccessLibrary.DAC.Gate.GatePassTypeDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Gate.IMaterialInwardDataAccess, DataAccessLibrary.DAC.Gate.MaterialInwardDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Gate.IMaterialOutwardDataAccess, DataAccessLibrary.DAC.Gate.MaterialOutwardDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Gate.IMiscGateInDataAccess, DataAccessLibrary.DAC.Gate.MiscGateInDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Gate.IVehicleManagementDataAccess, DataAccessLibrary.DAC.Gate.VehicleManagementDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Gate.IGateDashboardDataAccess, DataAccessLibrary.DAC.Gate.GateDashboardDataAccess>();
+
 
 builder.Services.AddScoped<IReportManagerService, ReportManagerService>();
 

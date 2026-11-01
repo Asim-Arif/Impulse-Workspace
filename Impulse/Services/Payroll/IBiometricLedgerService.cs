@@ -12,5 +12,7 @@ namespace Impulse.Services.Payroll
         Task<List<BiometricMachineItem>> GetIFaceMachinesAsync();
         Task ExecutePrintDailyAbsentLeaveDetailAsync(DateTime date);
         Task ExecutePrintDailyAbsentLeaveSummaryAsync(DateTime date);
+        Task SaveMachineAsync(BiometricMachineItem machine);
+        Task DeleteMachineAsync(int entryId);
     }
 }

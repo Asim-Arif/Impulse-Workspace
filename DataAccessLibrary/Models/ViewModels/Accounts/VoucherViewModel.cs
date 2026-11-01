@@ -146,4 +146,19 @@ namespace DataAccessLibrary.Models.ViewModels.Accounts
         public bool Issued { get; set; }
     }
 
+    public class ChequeValidationResult
+    {
+        public bool IsValid { get; set; }
+        public int ChqBookNo { get; set; }
+        public string ChequeNo { get; set; } = string.Empty;
+        public bool AlreadyIssued { get; set; }
+        public string? ErrorMessage { get; set; }
+
+        public static ChequeValidationResult Valid(int chqBookNo, string chqNo) =>
+            new() { IsValid = true, ChqBookNo = chqBookNo, ChequeNo = chqNo };
+
+        public static ChequeValidationResult Error(string message, bool alreadyIssued = false) =>
+            new() { IsValid = false, ErrorMessage = message, AlreadyIssued = alreadyIssued };
+    }
+
 }

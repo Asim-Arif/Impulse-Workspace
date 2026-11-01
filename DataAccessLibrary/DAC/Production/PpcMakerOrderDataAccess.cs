@@ -48,7 +48,12 @@ namespace DataAccessLibrary.DAC.Production
                 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('PPC_Order_Item_Purchases') AND name = 'IssuedBy')
                 BEGIN
                     ALTER TABLE PPC_Order_Item_Purchases ADD IssuedBy NVARCHAR(100) NULL;
-                END";
+                END
+
+                -- Clean up any legacy erroneous M-ISU receipt references from MasterPONo
+                UPDATE PPC_Order_Item_Purchases 
+                SET VendIssued_RefID = NULL, MasterPONo = NULL, IssuedAt = NULL, IssuedBy = NULL 
+                WHERE MasterPONo LIKE 'M-ISU%' OR MasterPONo LIKE 'ISU%';";
                 await conn.ExecuteAsync(sql);
             }
             catch (Exception ex)
@@ -70,7 +75,7 @@ namespace DataAccessLibrary.DAC.Production
                     ISNULL(co.InternalRefNo, '') AS CustomerPoNo,
                     ISNULL(SUM(pip.PurchaseQty), 0) AS TotalPlannedPurchaseQty,
                     COUNT(pip.EntryID) AS TotalPurchaseLinesCount,
-                    COUNT(CASE WHEN pip.VendIssued_RefID IS NULL OR pip.MasterPONo IS NULL OR pip.MasterPONo = '' THEN 1 END) AS PendingPurchaseLinesCount
+                    COUNT(CASE WHEN pip.VendIssued_RefID IS NULL OR pip.MasterPONo IS NULL OR pip.MasterPONo = '' OR pip.MasterPONo LIKE 'M-ISU%' OR pip.MasterPONo LIKE 'ISU%' THEN 1 END) AS PendingPurchaseLinesCount
                 FROM FCustomerOrders co
                 LEFT JOIN ForeignCustomers fc ON co.CustCode = fc.CustCode AND co.Country = fc.Country
                 LEFT JOIN PPC_Order_Item_Purchases pip ON co.OrderNo = pip.OrderNo
@@ -93,7 +98,7 @@ namespace DataAccessLibrary.DAC.Production
                     ISNULL(co.InternalRefNo, '') AS CustomerPoNo,
                     ISNULL(SUM(pip.PurchaseQty), 0) AS TotalPlannedPurchaseQty,
                     COUNT(pip.EntryID) AS TotalPurchaseLinesCount,
-                    COUNT(CASE WHEN pip.VendIssued_RefID IS NULL OR pip.MasterPONo IS NULL OR pip.MasterPONo = '' THEN 1 END) AS PendingPurchaseLinesCount
+                    COUNT(CASE WHEN pip.VendIssued_RefID IS NULL OR pip.MasterPONo IS NULL OR pip.MasterPONo = '' OR pip.MasterPONo LIKE 'M-ISU%' OR pip.MasterPONo LIKE 'ISU%' THEN 1 END) AS PendingPurchaseLinesCount
                 FROM PPC_Order_Item_Purchases pip
                 INNER JOIN FCustomerOrders co ON pip.OrderNo = co.OrderNo
                 LEFT JOIN ForeignCustomers fc ON co.CustCode = fc.CustCode AND co.Country = fc.Country
@@ -139,7 +144,7 @@ namespace DataAccessLibrary.DAC.Production
                     ISNULL(pip.PurchaseRate, 0) AS PurchaseRate,
                     ISNULL(pip.ExcessQtyPercentage, 50) AS ExcessQtyPercentage,
                     COALESCE(pip.VendIssued_RefID, vid.RefID) AS VendIssued_RefID,
-                    COALESCE(pip.MasterPONo, vi.MasterPONo, vi.RecieptID) AS MasterPONo,
+                    COALESCE(pip.MasterPONo, vi.MasterPONo) AS MasterPONo,
                     COALESCE(pip.IssuedAt, vi.DT) AS IssuedAt,
                     COALESCE(pip.IssuedBy, vi.UserName) AS IssuedBy
                 FROM PPC_Order_Item_Purchases pip
@@ -150,9 +155,13 @@ namespace DataAccessLibrary.DAC.Production
                 OUTER APPLY (
                     SELECT TOP 1 vid_inner.RefID, vid_inner.EntryID AS DetailEntryID
                     FROM VendIssdDetail vid_inner
+                    INNER JOIN VendIssued vi_inner ON vid_inner.RefID = vi_inner.EntryID
                     WHERE vid_inner.OrderNo = pip.OrderNo 
                       AND vid_inner.ItemCode = pip.ItemID 
                       AND vid_inner.RcvProcessID = pip.ProcessID
+                      AND vi_inner.MasterPONo IS NOT NULL 
+                      AND vi_inner.MasterPONo <> ''
+                      AND vid_inner.LotNo = '0'
                     ORDER BY vid_inner.EntryID DESC
                 ) vid
                 LEFT JOIN VendIssued vi ON vid.RefID = vi.EntryID
@@ -162,7 +171,7 @@ namespace DataAccessLibrary.DAC.Production
             var list = (await conn.QueryAsync<PpcMakerPoItemRowDto>(sql, new { OrderNo = orderNo })).ToList();
 
             // Auto-heal synchronization: if any row was found issued via VendIssdDetail but missing on pip, persist it back
-            foreach (var row in list.Where(r => r.VendIssued_RefID.HasValue && r.VendIssued_RefID.Value > 0))
+            foreach (var row in list.Where(r => r.VendIssued_RefID.HasValue && r.VendIssued_RefID.Value > 0 && !string.IsNullOrWhiteSpace(r.MasterPONo) && !r.MasterPONo.StartsWith("M-ISU", StringComparison.OrdinalIgnoreCase) && !r.MasterPONo.StartsWith("ISU", StringComparison.OrdinalIgnoreCase)))
             {
                 const string healSql = @"
                     UPDATE PPC_Order_Item_Purchases

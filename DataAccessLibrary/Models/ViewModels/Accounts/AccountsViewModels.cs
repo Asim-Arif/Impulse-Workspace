@@ -20,6 +20,8 @@ namespace DataAccessLibrary.Models.ViewModels.Accounts
         public string ReportingGroup { get; set; }
         public string Budget { get; set; }
         public string Budget_G { get; set; }
+        public bool BudgetAccount { get; set; }
+        public bool BudgetAccount_Glance { get; set; }
         public int TaxPercentage { get; set; }
         public DateTime OpenDate { get; set; }
         public int BalType { get; set; }

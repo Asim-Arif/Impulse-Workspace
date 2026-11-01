@@ -261,7 +261,19 @@ namespace DataAccessLibrary.DAC.Production
         // ─────────────────────────────────────────────────────────────
         // DELETE RECEIVING
         // Mirrors mnuDeleteRcving_Click: log to deletions, delete detail, clean up orphan header
+        // Reverses PPC Stock Issuance (StockOrderAdjustments) if receiving originated from PPC
         // ─────────────────────────────────────────────────────────────
+        private class PpcStockAdjustmentReversalDto
+        {
+            public int SOA_EntryID { get; set; }
+            public string OrderNo { get; set; } = string.Empty;
+            public string ItemID { get; set; } = string.Empty;
+            public int Qty { get; set; }
+            public int Shelf_RefID { get; set; }
+            public int? RCV_ISD_RefID { get; set; }
+            public string? LotNo { get; set; }
+        }
+
         public async Task<bool> DeleteReceivingAsync(long vrdEntryId, string userName, string machineName)
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
@@ -273,6 +285,145 @@ namespace DataAccessLibrary.DAC.Production
                 p.Add("@VRD_EntryID", vrdEntryId);
                 p.Add("@UserName", userName);
                 p.Add("@MachineName", machineName);
+
+                // 0. Check if this receiving was created from StockOrderAdjustments (PPC Stock Issuance)
+                const string checkSoaSql = @"
+                    SELECT 
+                        soa.EntryID AS SOA_EntryID,
+                        soa.OrderNo,
+                        soa.ItemID,
+                        ISNULL(soad.Qty, soa.Qty) AS Qty,
+                        ISNULL(soad.Shelf_RefID, soa.Shelf_RefID) AS Shelf_RefID,
+                        soad.RCV_ISD_RefID,
+                        vrd.LotNo
+                    FROM StockOrderAdjustments soa
+                    INNER JOIN VendRcvdDetail vrd ON soa.VID_RefID = vrd.EntryID
+                    LEFT JOIN StockOrderAdjustmentsDetail soad ON soa.EntryID = soad.SOA_RefID
+                    WHERE soa.VID_RefID = @VRD_EntryID";
+
+                var soaItems = (await db.QueryAsync<PpcStockAdjustmentReversalDto>(checkSoaSql, p, tx)).ToList();
+
+                if (soaItems.Any())
+                {
+                    DateTime today = DateTime.Today;
+                    string dateStr = today.ToString("MM/dd/yy");
+                    string rcvPrefix = "RCV-" + today.ToString("yyMMdd-");
+
+                    // Get next sequential RcvNo
+                    const string rcvSeqSql = @"
+                        SELECT MAX(CAST(RIGHT(RcvNo, 3) AS INT)) 
+                        FROM RcvItemsSimple WITH (UPDLOCK, HOLDLOCK)
+                        WHERE CONVERT(CHAR(8), DT, 1) = @DateStr";
+
+                    var maxRcv = await db.ExecuteScalarAsync<int?>(rcvSeqSql, new { DateStr = dateStr }, tx);
+                    int nextSeq = (maxRcv ?? 0) + 1;
+
+                    string firstOrderNo = soaItems.First().OrderNo ?? string.Empty;
+                    string rcvNo = rcvPrefix + nextSeq.ToString("D3");
+
+                    // Insert RcvItemsSimple Header (Return into store)
+                    const string insertRcvSql = @"
+                        INSERT INTO RcvItemsSimple (RcvNo, DT, OrderNo, RcvdBy, RcvdFrom, EntryDT, UserName, ComputerName)
+                        VALUES (@RcvNo, GETDATE(), @OrderNo, 'Warehouse', 'PPC Reversal', GETDATE(), @UserName, @MachineName);";
+
+                    await db.ExecuteAsync(insertRcvSql, new
+                    {
+                        RcvNo = rcvNo,
+                        OrderNo = $"Reversed from PPC Stock Issuance (Order #{firstOrderNo})",
+                        UserName = userName,
+                        MachineName = machineName
+                    }, tx);
+
+                    foreach (var item in soaItems)
+                    {
+                        string itemId = item.ItemID;
+                        int qty = item.Qty;
+                        int shelfRefId = item.Shelf_RefID;
+                        string lotNo = item.LotNo ?? string.Empty;
+                        string orderNo = item.OrderNo ?? string.Empty;
+
+                        // 1. Get current InHand & calculate new balance
+                        double currentInHand = await db.ExecuteScalarAsync<double?>(
+                            "SELECT ISNULL(InHand, 0) FROM Items WHERE ItemID = @ItemID",
+                            new { ItemID = itemId }, tx) ?? 0;
+
+                        double newBalance = currentInHand + qty;
+
+                        // 2. Shelf location display
+                        string shelfDisplay = await db.ExecuteScalarAsync<string>(
+                            "SELECT TOP 1 ISNULL(StoreName + ' - ' + RackNo + ' (' + ShelfNo + ')', CAST(EntryID AS VARCHAR(50))) FROM VStoreShelfs WHERE EntryID = @Shelf_RefID",
+                            new { Shelf_RefID = shelfRefId }, tx) ?? shelfRefId.ToString();
+
+                        // 3. Insert ItemLedgerSimple (Compensatory positive entry)
+                        const string insertLedgerSql = @"
+                            INSERT INTO ItemLedgerSimple (ItemID, DT, Description, Qty, Balance, OrderNo, Location, Remarks)
+                            VALUES (@ItemID, GETDATE(), @Description, @Qty, @Balance, @OrderNo, @Location, '');
+                            SELECT CAST(SCOPE_IDENTITY() AS INT);";
+
+                        int ledgerRefId = await db.ExecuteScalarAsync<int>(insertLedgerSql, new
+                        {
+                            ItemID = itemId,
+                            Description = $"Stock Restored - Deleted PPC Adjustment for Order #{orderNo}",
+                            Qty = qty,
+                            Balance = newBalance,
+                            OrderNo = orderNo,
+                            Location = shelfDisplay
+                        }, tx);
+
+                        // 4. Update Items.InHand
+                        await db.ExecuteAsync(
+                            "UPDATE Items SET InHand = InHand + @Qty WHERE ItemID = @ItemID",
+                            new { Qty = qty, ItemID = itemId }, tx);
+
+                        // 5. Adjust future ItemLedgerSimple balances
+                        await db.ExecuteAsync(
+                            "UPDATE ItemLedgerSimple SET Balance = Balance + @Qty WHERE ItemID = @ItemID AND DT > GETDATE()",
+                            new { Qty = qty, ItemID = itemId }, tx);
+
+                        // 6. Insert RcvItemsSimpleDetail
+                        const string insertRisdSql = @"
+                            INSERT INTO RcvItemsSimpleDetail (RcvNo, ItemID, Qty, InHand, LedgerRefID, OrderNo, Location, Remarks, LotNo_Manual)
+                            VALUES (@RcvNo, @ItemID, @Qty, @InHand, @LedgerRefID, @OrderNo, @Location, 'PPC Stock Issuance Reversal', @LotNo);
+                            SELECT CAST(SCOPE_IDENTITY() AS INT);";
+
+                        int risdEntryId = await db.ExecuteScalarAsync<int>(insertRisdSql, new
+                        {
+                            RcvNo = rcvNo,
+                            ItemID = itemId,
+                            Qty = qty,
+                            InHand = newBalance,
+                            LedgerRefID = ledgerRefId,
+                            OrderNo = orderNo,
+                            Location = shelfDisplay,
+                            LotNo = lotNo
+                        }, tx);
+
+                        // 7. Insert RcvItemsSimpleDetail_Placement (Restores stock to the shelf)
+                        const string insertPlacementSql = @"
+                            INSERT INTO RcvItemsSimpleDetail_Placement (RISD_RefID, Shelf_RefID, RcvdQty, Remarks)
+                            VALUES (@RISD_RefID, @Shelf_RefID, @RcvdQty, 'Restored to shelf from PPC reversal');";
+
+                        await db.ExecuteAsync(insertPlacementSql, new
+                        {
+                            RISD_RefID = risdEntryId,
+                            Shelf_RefID = shelfRefId,
+                            RcvdQty = qty
+                        }, tx);
+                    }
+
+                    // 8. Delete StockOrderAdjustmentsDetail & StockOrderAdjustments (Reopens PPC Planning)
+                    await db.ExecuteAsync(
+                        "DELETE FROM StockOrderAdjustmentsDetail WHERE SOA_RefID IN (SELECT EntryID FROM StockOrderAdjustments WHERE VID_RefID = @VRD_EntryID)",
+                        p, tx);
+
+                    await db.ExecuteAsync(
+                        "DELETE FROM StockOrderAdjustments WHERE VID_RefID = @VRD_EntryID",
+                        p, tx);
+                }
+
+                // Get LotNo for clean-up if isolated
+                string? deletedLotNo = await db.ExecuteScalarAsync<string>(
+                    "SELECT LotNo FROM VendRcvdDetail WHERE EntryID = @VRD_EntryID", p, tx);
 
                 // 1. Log to deletions archive
                 await db.ExecuteAsync(@"
@@ -294,6 +445,17 @@ namespace DataAccessLibrary.DAC.Production
                 await db.ExecuteAsync(
                     "DELETE FROM VendReceived WHERE EntryID NOT IN (SELECT RefID FROM VendRcvdDetail)",
                     transaction: tx);
+
+                // 4. Clean up Lots_List if this lot has no other receivings or issuances
+                if (!string.IsNullOrWhiteSpace(deletedLotNo) && deletedLotNo != "0")
+                {
+                    await db.ExecuteAsync(@"
+                        IF NOT EXISTS (SELECT 1 FROM VendRcvdDetail WHERE LotNo = @LotNo)
+                           AND NOT EXISTS (SELECT 1 FROM VendIssdDetail WHERE LotNo = @LotNo)
+                        BEGIN
+                            DELETE FROM Lots_List WHERE LotNo = @LotNo;
+                        END", new { LotNo = deletedLotNo }, tx);
+                }
 
                 tx.Commit();
                 return true;

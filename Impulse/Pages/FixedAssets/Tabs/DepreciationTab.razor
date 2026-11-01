@@ -1,0 +1,145 @@
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.ViewModels.FixedAssets
+
+<div class="p-3 border rounded-3 bg-white shadow-xs">
+    <div class="row g-2">
+        <div class="col-md-6">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Accumulated Depreciation Account</label>
+            <div class="@(IsDisabled ? "disabled-typeahead-wrapper" : "")">
+                <BlazoredTypeahead SearchMethod="SearchAccounts"
+                                   EnableDropDown="true"
+                                   Data="Lookup.Accounts"
+                                   TValue="FixedAssetLookupItem"
+                                   TItem="FixedAssetLookupItem"
+                                   Value="selectedAccumAccount"
+                                   ValueChanged="OnAccumulatedAccountChanged"
+                                   ValueExpression="@(() => selectedAccumAccount)"
+                                   Placeholder="Select Accumulated Dep'n Account"
+                                   MaximumSuggestions="1000"
+                                   Disabled="@IsDisabled">
+                    <SelectedTemplate Context="acc">
+                        @acc.Display
+                    </SelectedTemplate>
+                    <ResultTemplate Context="acc">
+                        @acc.Display
+                    </ResultTemplate>
+                </BlazoredTypeahead>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Depreciation Expense Account</label>
+            <div class="@(IsDisabled ? "disabled-typeahead-wrapper" : "")">
+                <BlazoredTypeahead SearchMethod="SearchAccounts"
+                                   EnableDropDown="true"
+                                   Data="Lookup.Accounts"
+                                   TValue="FixedAssetLookupItem"
+                                   TItem="FixedAssetLookupItem"
+                                   Value="selectedDepAccount"
+                                   ValueChanged="OnDepreciationAccountChanged"
+                                   ValueExpression="@(() => selectedDepAccount)"
+                                   Placeholder="Select Depreciation Expense Account"
+                                   MaximumSuggestions="1000"
+                                   Disabled="@IsDisabled">
+                    <SelectedTemplate Context="acc">
+                        @acc.Display
+                    </SelectedTemplate>
+                    <ResultTemplate Context="acc">
+                        @acc.Display
+                    </ResultTemplate>
+                </BlazoredTypeahead>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Depreciation Method</label>
+            <select class="form-select form-select-sm" @bind="Model.DepreciationMethodId" disabled="@IsDisabled">
+                <option value="">-- Select Method --</option>
+                <option value="0">Straight Line Method</option>
+                <option value="1">Reducing Balance Method</option>
+            </select>
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Convention</label>
+            <input type="text" class="form-control form-control-sm" list="asset-conventions-list" @bind="Model.Convention" disabled="@IsDisabled" placeholder="e.g. Full Month" />
+            <datalist id="asset-conventions-list">
+                @foreach (var c in Lookup.Conventions)
+                {
+                    <option value="@c"></option>
+                }
+            </datalist>
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Dep'n Rate %</label>
+            <input type="number" step="0.01" class="form-control form-control-sm text-end fw-semibold" @bind="Model.DepreciationRate" disabled="@IsDisabled" />
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Begin Month</label>
+            <input type="date" class="form-control form-control-sm" value="@(Model.DepreciationBeginMonth?.ToString("yyyy-MM-dd") ?? "")" @onchange="OnBeginMonthChanged" disabled="@IsDisabled" />
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Useful Life (Years)</label>
+            <input type="number" class="form-control form-control-sm text-end" @bind="Model.LifeInYears" disabled="@IsDisabled" />
+        </div>
+    </div>
+</div>
+
+<style>
+    .disabled-typeahead-wrapper .blazored-typeahead {
+        overflow: hidden !important;
+        border-radius: 4px;
+    }
+    .blazored-typeahead {
+        height: 35px !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public FixedAssetProfileModel Model { get; set; } = null!;
+    [Parameter, EditorRequired] public FixedAssetLookupOptions Lookup { get; set; } = null!;
+    [Parameter] public bool IsDisabled { get; set; }
+
+    private FixedAssetLookupItem? selectedAccumAccount => Lookup.Accounts.FirstOrDefault(x => x.Id == Model.AccumulatedAccountNo);
+    private FixedAssetLookupItem? selectedDepAccount => Lookup.Accounts.FirstOrDefault(x => x.Id == Model.DepreciationAccountNo);
+
+    private Task<IEnumerable<FixedAssetLookupItem>> SearchAccounts(string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return Task.FromResult<IEnumerable<FixedAssetLookupItem>>(Lookup.Accounts);
+
+        var query = searchText.Trim();
+        var matches = Lookup.Accounts.Where(a =>
+            (a.Id != null && a.Id.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
+            (a.Name != null && a.Name.Contains(query, StringComparison.OrdinalIgnoreCase)));
+
+        return Task.FromResult(matches);
+    }
+
+    private void OnAccumulatedAccountChanged(FixedAssetLookupItem? val)
+    {
+        Model.AccumulatedAccountNo = val?.Id ?? "";
+    }
+
+    private void OnDepreciationAccountChanged(FixedAssetLookupItem? val)
+    {
+        Model.DepreciationAccountNo = val?.Id ?? "";
+    }
+
+    private void OnBeginMonthChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var dt))
+        {
+            Model.DepreciationBeginMonth = dt;
+        }
+        else
+        {
+            Model.DepreciationBeginMonth = null;
+        }
+    }
+}

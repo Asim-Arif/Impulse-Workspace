@@ -126,33 +126,28 @@ namespace Impulse.Pages.Accounts
             IsLoading = true;
             try
             {
-                var strcond ="";
+                var strcond = "";
+                var conditions = new List<string>();
 
-                strcond = " AND ( ";
+                if (IsBPV) conditions.Add("LEFT(VchrNo, 3) = 'BPV'");
+                if (IsCPV) conditions.Add("LEFT(VchrNo, 3) = 'CPV'");
+                if (IsCRV) conditions.Add("LEFT(VchrNo, 3) = 'CRV'");
+                if (IsBRV) conditions.Add("LEFT(VchrNo, 3) = 'BRV'");
+                if (IsJournal) conditions.Add("LEFT(VchrNo, 3) NOT IN ('BPV', 'CPV', 'CRV', 'BRV')");
 
-                if (IsJournal ==true) 
+                if (IsJournal && IsBPV && IsCPV && IsCRV && IsBRV)
                 {
-                    strcond = strcond + " LEFT(VchrNo,2)='JV' OR";
+                    // All types selected - no additional voucher filter needed
+                    strcond = "";
                 }
-                if (IsBPV == true) 
+                else if (conditions.Any())
                 {
-                    strcond = strcond + " LEFT(VchrNo,3)='BPV' OR";
+                    strcond = $" AND ({string.Join(" OR ", conditions)})";
                 }
-                if (IsCPV == true)
+                else
                 {
-                    strcond = strcond + " LEFT(VchrNo,3)='CPV' OR";
+                    strcond = " AND 1 = 0";
                 }
-                if (IsCRV == true)
-                {
-                    strcond = strcond + " LEFT(VchrNo,3)='CRV' OR";
-                }
-                if (IsBRV == true)
-                {
-                   strcond = strcond + " LEFT(VchrNo,3)='BRV' OR";
-                }
-
-                strcond = strcond.Substring(0, strcond.Length - 3);
-                strcond = strcond + " ) ";
 
                 LedgerDatafromDB.Clear();
                 LedgerGroups = null;
@@ -397,16 +392,26 @@ namespace Impulse.Pages.Accounts
         {
             try
             {
-                var types = new List<string>();
-                if (IsJournal) { types.Add("'JV'"); }
-                if (IsBPV) { types.Add("'BP'"); types.Add("'BPV'"); }
-                if (IsCPV) { types.Add("'CP'"); types.Add("'CPV'"); }
-                if (IsCRV) { types.Add("'CR'"); types.Add("'CRV'"); }
-                if (IsBRV) { types.Add("'BR'"); types.Add("'BRV'"); }
+                var crFilters = new List<string>();
+                if (IsBPV) crFilters.Add("left({VLedger.VchrNo}, 3) = 'BPV' or left({VLedger.VchrNo}, 2) = 'BP'");
+                if (IsCPV) crFilters.Add("left({VLedger.VchrNo}, 3) = 'CPV' or left({VLedger.VchrNo}, 2) = 'CP'");
+                if (IsCRV) crFilters.Add("left({VLedger.VchrNo}, 3) = 'CRV' or left({VLedger.VchrNo}, 2) = 'CR'");
+                if (IsBRV) crFilters.Add("left({VLedger.VchrNo}, 3) = 'BRV' or left({VLedger.VchrNo}, 2) = 'BR'");
+                if (IsJournal) crFilters.Add("not (left({VLedger.VchrNo}, 3) in ['BPV', 'CPV', 'CRV', 'BRV'] or left({VLedger.VchrNo}, 2) in ['BP', 'CP', 'CR', 'BR'])");
 
-                string typeFilter = types.Any()
-                    ? $" AND (left({{VLedger.VchrNo}}, 2) in [{string.Join(", ", types)}] or left({{VLedger.VchrNo}}, 3) in [{string.Join(", ", types)}])"
-                    : "";
+                string typeFilter = "";
+                if (IsJournal && IsBPV && IsCPV && IsCRV && IsBRV)
+                {
+                    typeFilter = ""; // All selected, no filter needed
+                }
+                else if (crFilters.Any())
+                {
+                    typeFilter = $" AND ({string.Join(" or ", crFilters)})";
+                }
+                else
+                {
+                    typeFilter = " AND 1=0";
+                }
                 string sel = $"{{VLedger.VDate}} >= #{CurrentAccount.DTFrom:yyyy-MM-dd}# AND {{VLedger.VDate}} <= #{CurrentAccount.DTTo:yyyy-MM-dd}#{typeFilter}";
 
                 var request = new ReportRequest

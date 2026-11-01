@@ -17,7 +17,7 @@ namespace Impulse.Services.Payroll
         /// Returns a summary message describing how many records were processed.
         /// </summary>
         Task<(int recordsRead, int recordsProcessed, string message)> ReadAndProcessAsync(
-            string ipAddress, int machineNo, int portNo = 4370, string userName = "System", string computerName = "Unknown", bool? clearLogs = null);
+            string ipAddress, int machineNo, int portNo = 4370, string userName = "System", string computerName = "Unknown", bool? clearLogs = null, string clientKey = "Default");
 
         /// <summary>
         /// Returns true if an office Sync Agent is currently connected to the server.

@@ -1,0 +1,128 @@
+@page "/fixedassets/disposal"
+@page "/fixedassets/disposal/{AssetId}"
+@page "/fixed-assets/disposal"
+@page "/fixed-assets/disposal/{AssetId}"
+@attribute [Authorize]
+
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.ViewModels.FixedAssets
+
+<PageTitle>Write-Off / Asset Disposal - Impulse</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <!-- ── Top Header ── -->
+            <div class="d-flex align-items-end justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-trash-alt text-primary fs-4"></i>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark-emphasis">Asset Disposal &amp; Write-Off</h5>
+                        <small class="text-secondary">Record asset retirements, scrap write-offs, sales proceeds and gain / loss calculations</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge @(model.GainLoss >= 0 ? "bg-warning-subtle text-warning-emphasis border border-warning-subtle" : "bg-danger-subtle text-danger border border-danger-subtle") px-3 py-2 rounded-pill">
+                        Gain / Loss: <strong>@model.GainLoss.ToString("N2")</strong>
+                    </span>
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" @onclick="Cancel" disabled="@isBusy">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Action Type Radios ── -->
+            <div class="d-flex gap-4 mb-3 p-2 border rounded-3 bg-light">
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="disposalTypeRadio" id="radioWriteOff" value="0" checked="@(model.DisposalType == "0")" @onchange='() => model.DisposalType = "0"' disabled="@isBusy">
+                    <label class="form-check-label fw-bold text-dark-emphasis" for="radioWriteOff">
+                        <i class="fas fa-file-excel text-danger me-1"></i> Write-Off (Scrap / Lost / Obsolete)
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="disposalTypeRadio" id="radioDisposed" value="1" checked="@(model.DisposalType == "1")" @onchange='() => model.DisposalType = "1"' disabled="@isBusy">
+                    <label class="form-check-label fw-bold text-dark-emphasis" for="radioDisposed">
+                        <i class="fas fa-dollar-sign text-success me-1"></i> Disposed-Off (Sold / Auctioned)
+                    </label>
+                </div>
+            </div>
+
+            <!-- ── Form Fields ── -->
+            <div class="row g-2 mb-3">
+                <div class="col-12">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Select Asset <span class="text-danger">*</span></label>
+                    <div class="@(isBusy ? "disabled-typeahead-wrapper" : "")">
+                        <BlazoredTypeahead SearchMethod="SearchAssets"
+                                           EnableDropDown="true"
+                                           Data="assetList"
+                                           TValue="FixedAssetListRow"
+                                           TItem="FixedAssetListRow"
+                                           Value="selectedAsset"
+                                           ValueChanged="OnAssetSelected"
+                                           ValueExpression="@(() => selectedAsset)"
+                                           Placeholder="Search and select asset by ID or description..."
+                                           MaximumSuggestions="1000"
+                                           Disabled="@isBusy">
+                            <SelectedTemplate Context="asset">
+                                <span class="fw-bold font-monospace">[@asset.AssetId]</span> @asset.Description
+                            </SelectedTemplate>
+                            <ResultTemplate Context="asset">
+                                <span class="fw-bold font-monospace">[@asset.AssetId]</span> @asset.Description
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Disposal Date <span class="text-danger">*</span></label>
+                    <input type="date" class="form-control form-control-sm" value="@model.DisposalDate.ToString("yyyy-MM-dd")" @onchange="OnDisposalDateChanged" disabled="@isBusy" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Written Down Value (WDV)</label>
+                    <input type="text" class="form-control form-control-sm text-end bg-light fw-semibold" value="@model.Wdv.ToString("N2")" readonly />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Sale Price</label>
+                    <input type="number" step="0.01" class="form-control form-control-sm text-end fw-semibold text-success" @bind="model.SalePrice" disabled="@isBusy" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Net Gain / Loss</label>
+                    <input type="text" class="form-control form-control-sm text-end fw-bold bg-light @(model.GainLoss >= 0 ? "text-primary" : "text-danger")" value="@model.GainLoss.ToString("N2")" readonly />
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Disposal Remarks / Justification <span class="text-danger">*</span></label>
+                    <textarea class="form-control form-control-sm" rows="4" @bind="model.Remarks" maxlength="1000" disabled="@isBusy" placeholder="State reason, buyer info or auction reference..."></textarea>
+                </div>
+            </div>
+
+            <!-- ── Bottom Action Footer ── -->
+            <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                <button type="button" class="btn btn-outline-primary btn-sm px-4 fw-bold" @onclick="SaveAndNewAsync" disabled="@isBusy">
+                    <i class="fas fa-plus-circle me-1"></i> Save &amp; New
+                </button>
+                <button type="button" class="btn btn-primary btn-sm px-4 fw-bold" @onclick="SaveAndCloseAsync" disabled="@isBusy">
+                    <i class="fas fa-check me-1"></i> Save &amp; Close
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm px-4 fw-bold" @onclick="Cancel" disabled="@isBusy">
+                    <i class="fas fa-times me-1"></i> Cancel
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    .disabled-typeahead-wrapper .blazored-typeahead {
+        overflow: hidden !important;
+        border-radius: 4px;
+    }
+    .blazored-typeahead {
+        height: 35px !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+</style>
+

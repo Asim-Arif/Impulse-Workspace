@@ -1,0 +1,311 @@
+@page "/fixedassets/register"
+@page "/fixed-assets-register"
+@attribute [Authorize]
+
+@using BlazorContextMenu
+@using DataAccessLibrary.Models.ViewModels.FixedAssets
+
+<PageTitle>Depreciation Register - Impulse</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <!-- ── Top Header ── -->
+            <div class="d-flex align-items-end justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-calculator text-primary fs-4"></i>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark-emphasis">Fixed Assets Depreciation Register</h5>
+                        <small class="text-secondary">Depreciation schedules, monthly amortization calculations, additions and balance sheets</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <a class="btn btn-outline-primary btn-sm px-3" href="/fixedassets/dashboard">
+                        <i class="fas fa-chart-pie me-1"></i> Dashboard
+                    </a>
+                    <a class="btn btn-outline-secondary btn-sm px-3" href="/fixedassets/list">
+                        <i class="fas fa-list me-1"></i> Asset List
+                    </a>
+                    @if (isSaved)
+                    {
+                        <button type="button" class="btn btn-danger btn-sm px-4 fw-bold shadow-sm" @onclick="() => showDeleteConfirmModal = true" disabled="@isBusy">
+                            <i class="fas fa-trash-alt me-1"></i> Delete Run
+                        </button>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-success btn-sm px-4 fw-bold shadow-sm" @onclick="HandleSaveRegisterAsync" disabled="@(isBusy || filteredRows.Count == 0)">
+                            <i class="fas fa-save me-1"></i> Save Register Run
+                        </button>
+                    }
+                    <button type="button" class="btn btn-primary btn-sm px-3" @onclick="OpenReportsMenu">
+                        <i class="fas fa-print me-1"></i> Reports
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Date and Filter Bar ── -->
+            <div class="row g-2 mb-3 align-items-end" style="position: relative !important; z-index: 9999 !important;">
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Date From</label>
+                    <input type="date" class="form-control form-control-sm text-center fw-semibold" value="@dateFrom.ToString("yyyy-MM-dd")" @onchange="HandleFromDateChanged" disabled="@isBusy" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Date To</label>
+                    <input type="date" class="form-control form-control-sm text-center fw-semibold" value="@dateTo.ToString("yyyy-MM-dd")" @onchange="HandleToDateChanged" disabled="@isBusy" />
+                </div>
+                @if (options.Periods.Count > 0)
+                {
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Period Presets</label>
+                        <select class="form-select form-select-sm" value="@selectedPeriodText" @onchange="HandlePeriodSelected" disabled="@isBusy">
+                            <option value="">-- Custom Dates --</option>
+                            @foreach (var p in options.Periods)
+                            {
+                                <option value="@p.DisplayText">@p.DisplayText</option>
+                            }
+                        </select>
+                    </div>
+                }
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Category</label>
+                    <select class="form-select form-select-sm" value="@selectedCategory" @onchange="HandleCategoryFilterChanged" disabled="@isBusy">
+                        <option value="">All Categories</option>
+                        @foreach (var c in options.Categories)
+                        {
+                            <option value="@c.Name">@c.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Department</label>
+                    <select class="form-select form-select-sm" value="@selectedDeptId" @onchange="HandleDeptFilterChanged" disabled="@isBusy">
+                        <option value="">All Departments</option>
+                        @foreach (var d in options.Departments)
+                        {
+                            <option value="@d.Id">@d.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-auto d-flex align-items-center gap-2 pb-1">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="newAssetsOnlyCheck" checked="@newAssetsOnly" @onchange="HandleNewAssetsOnlyChanged">
+                        <label class="form-check-label text-dark-emphasis fw-semibold" for="newAssetsOnlyCheck" style="font-size:0.85rem;">New Only</label>
+                    </div>
+                </div>
+                <div class="col d-flex align-items-end justify-content-end gap-2 pb-1">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="RefreshDataAsync" title="Recalculate / Refresh">
+                        <i class="fas fa-sync-alt @(isBusy ? "fa-spin" : "")"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search and Status Bar -->
+            <div class="row g-2 mb-3 align-items-center">
+                <div class="col-md-4">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white"><i class="fas fa-search text-secondary"></i></span>
+                        <input type="text" class="form-control" placeholder="Search by asset code, description or department..." @bind="searchText" @bind:event="oninput" />
+                    </div>
+                </div>
+                <div class="col text-end">
+                    @if (isSaved)
+                    {
+                        <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill">
+                            <i class="fas fa-check-double me-1"></i> Depreciation Run Saved in Database
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-3 py-2 rounded-pill">
+                            <i class="fas fa-exclamation-circle me-1"></i> Preview Run (Not Yet Saved)
+                        </span>
+                    }
+                </div>
+            </div>
+
+            <!-- ── Grid View ── -->
+            <div class="card border border-light-subtle rounded-3 overflow-hidden shadow-xs" style="position: relative !important; z-index: 1 !important;">
+                @if (isBusy)
+                {
+                    <div class="p-4 text-center text-muted">
+                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                        Calculating depreciation register...
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive" style="max-height: calc(100vh - 350px); min-height: 380px; overflow-y: auto;">
+                        <table class="table table-hover table-sm align-middle mb-0 text-nowrap" style="font-size: 0.84rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.74rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                <tr>
+                                    <th class="ps-3" style="width: 85px;">Asset</th>
+                                    <th class="text-center" style="width: 95px;">Date</th>
+                                    <th>Particulars</th>
+                                    <th>Location</th>
+                                    <th class="text-end">Cost</th>
+                                    <th class="text-end">B. Val</th>
+                                    <th class="text-center">Dis. DT</th>
+                                    <th class="text-end">Dis. Val</th>
+                                    <th class="text-end">Op. Bal</th>
+                                    <th class="text-end">Acc. Yr</th>
+                                    <th class="text-end">Acc. Bal</th>
+                                    <th class="text-end">WDV</th>
+                                    <th class="text-end">Rate</th>
+                                    <th>Dept</th>
+                                    <th>Head</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (filteredRows.Count == 0)
+                                {
+                                    <tr>
+                                        <td colspan="15" class="text-center text-muted py-5">
+                                            <i class="fas fa-inbox fa-2x mb-2 d-block text-secondary opacity-50"></i>
+                                            No register records found for selected filters.
+                                        </td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    @foreach (var row in pagedRows)
+                                    {
+                                        <tr class="@(row.Disposed ? "table-light text-muted" : "")">
+                                            <td class="ps-3 fw-bold font-monospace text-primary">@row.AssetId</td>
+                                            <td class="text-center">@row.AcquiredDateText</td>
+                                            <td class="fw-semibold text-truncate" style="max-width: 260px;" title="@row.Particulars">@row.Particulars</td>
+                                            <td class="small">@row.Location</td>
+                                            <td class="text-end fw-semibold">@row.Cost.ToString("N0")</td>
+                                            <td class="text-end text-muted">@row.BookValue.ToString("N0")</td>
+                                            <td class="text-center small">@row.DisposalDateText</td>
+                                            <td class="text-end text-muted">@row.DisposedValue.ToString("N0")</td>
+                                            <td class="text-end text-muted">@row.OpeningBalance.ToString("N0")</td>
+                                            <td class="text-end fw-semibold text-primary">@row.AccountingYear.ToString("N0")</td>
+                                            <td class="text-end text-muted">@row.AccumulatedBalance.ToString("N0")</td>
+                                            <td class="text-end fw-bold text-dark">@row.WrittenDownValue.ToString("N0")</td>
+                                            <td class="text-end font-monospace">@row.Rate.ToString("0.##")%</td>
+                                            <td class="small text-truncate" style="max-width: 140px;">@row.DeptName</td>
+                                            <td class="small text-truncate" style="max-width: 140px;">@row.MasterDescription</td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                            <tfoot class="table-light fw-bold text-dark border-top" style="position: sticky; bottom: 0; z-index: 2; box-shadow: 0 -1px 0 #dee2e6; font-size: 0.84rem;">
+                                <tr>
+                                    <td colspan="4" class="ps-3 text-uppercase">Totals (@filteredRows.Count Assets)</td>
+                                    <td class="text-end text-success">@totalCost.ToString("N0")</td>
+                                    <td class="text-end">@totalBookValue.ToString("N0")</td>
+                                    <td></td>
+                                    <td class="text-end">@totalDisposedValue.ToString("N0")</td>
+                                    <td class="text-end">@totalOpeningBalance.ToString("N0")</td>
+                                    <td class="text-end text-primary">@totalAccountingYear.ToString("N0")</td>
+                                    <td class="text-end">@totalAccumulatedBalance.ToString("N0")</td>
+                                    <td class="text-end text-dark">@totalWrittenDownValue.ToString("N0")</td>
+                                    <td colspan="3"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <!-- ── Pager ── -->
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 border-top bg-light px-3 py-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <select class="form-select form-select-sm" style="width: 110px;" value="@pageSize" @onchange="HandlePageSizeChanged">
+                                <option value="50">50 / page</option>
+                                <option value="100">100 / page</option>
+                                <option value="250">250 / page</option>
+                                <option value="0">All</option>
+                            </select>
+                            <span class="small text-secondary">
+                                Showing @pagerStart–@pagerEnd of <strong>@filteredRows.Count</strong>
+                            </span>
+                        </div>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-secondary" type="button" disabled="@(currentPage <= 1)" @onclick="() => GoToPage(1)"><i class="fas fa-angle-double-left"></i></button>
+                            <button class="btn btn-outline-secondary" type="button" disabled="@(currentPage <= 1)" @onclick="() => GoToPage(currentPage - 1)"><i class="fas fa-angle-left"></i></button>
+                            <span class="btn btn-light disabled px-3">Page <strong>@currentPage</strong> / @totalPages</span>
+                            <button class="btn btn-outline-secondary" type="button" disabled="@(currentPage >= totalPages)" @onclick="() => GoToPage(currentPage + 1)"><i class="fas fa-angle-right"></i></button>
+                            <button class="btn btn-outline-secondary" type="button" disabled="@(currentPage >= totalPages)" @onclick="() => GoToPage(totalPages)"><i class="fas fa-angle-double-right"></i></button>
+                        </div>
+                    </div>
+                }
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ── BlazorContextMenu: Register Reports Menu ── -->
+<ContextMenu Id="registerReportsMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <div class="win11-section-header">Register Reports</div>
+    <Item class="win11-menu-item" OnClick='@(() => PrintRegisterReport("FixedAssetsRegister.rpt"))'>
+        <i class="fas fa-book fa-fw win11-icon text-primary"></i> Fixed Asset Register
+    </Item>
+    <Item class="win11-menu-item" OnClick='@(() => PrintRegisterReport("FixedAssetsRegister_Departments.rpt"))'>
+        <i class="fas fa-building fa-fw win11-icon text-info"></i> Register by Department
+    </Item>
+    <Item class="win11-menu-item" OnClick='@(() => PrintRegisterReport("FixedAssetsRegister_Summary.rpt"))'>
+        <i class="fas fa-chart-pie fa-fw win11-icon"></i> Register Summary
+    </Item>
+    <div class="win11-divider"></div>
+    <div class="win11-section-header">Periodic Breakdowns</div>
+    <Item class="win11-menu-item" OnClick='@(() => PrintRegisterReport("FixedAssetsRegister_Monthwise.rpt"))'>
+        <i class="fas fa-calendar-alt fa-fw win11-icon"></i> Monthwise Register
+    </Item>
+    <Item class="win11-menu-item" OnClick='@(() => PrintRegisterReport("FixedAssetsRegister_Monthwise_Summary.rpt"))'>
+        <i class="fas fa-calendar-check fa-fw win11-icon"></i> Monthwise Summary
+    </Item>
+    <div class="win11-divider"></div>
+    <div class="win11-section-header">Status Sub-Registers</div>
+    <Item class="win11-menu-item" OnClick='@(() => PrintRegisterReport("FixedAssetsRegister_Disposed.rpt"))'>
+        <i class="fas fa-archive fa-fw win11-icon text-warning"></i> Disposed Assets Register
+    </Item>
+    <Item class="win11-menu-item" OnClick='@(() => PrintRegisterReport("FixedAssetsRegister_WrittenOff.rpt"))'>
+        <i class="fas fa-file-excel fa-fw win11-icon text-danger"></i> Written Off Assets Register
+    </Item>
+    <Item class="win11-menu-item" OnClick='@(() => PrintRegisterReport("FixedAssetsRegister_Fully_Depreciated_Assets.rpt"))'>
+        <i class="fas fa-check-circle fa-fw win11-icon text-success"></i> Fully Depreciated Assets
+    </Item>
+    <Item class="win11-menu-item" OnClick='@(() => PrintRegisterReport("Operating_Fixed_Assets.rpt"))'>
+        <i class="fas fa-cogs fa-fw win11-icon"></i> Operating Fixed Assets
+    </Item>
+</ContextMenu>
+
+<!-- ── Delete Confirm Modal ── -->
+@if (showDeleteConfirmModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);" @onclick:stopPropagation="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0 rounded-3">
+                <div class="modal-header bg-danger text-white py-2">
+                    <h6 class="modal-title fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>Confirm Delete Register Run</h6>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showDeleteConfirmModal = false"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <p class="mb-2">Are you sure you want to delete the depreciation register run for period:</p>
+                    <div class="p-3 bg-light rounded border text-center">
+                        <strong class="fs-6 text-danger">@dateFrom.ToString("dd-MMM-yyyy") to @dateTo.ToString("dd-MMM-yyyy")</strong>
+                    </div>
+                    <small class="text-muted d-block mt-2">Saved depreciation entries and associated voucher records for this run will be deleted.</small>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" @onclick="() => showDeleteConfirmModal = false">Cancel</button>
+                    <button type="button" class="btn btn-danger btn-sm px-4" @onclick="HandleDeleteRegisterAsync" disabled="@isBusy">Confirm Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .win11-menu-item {
+        font-size: 0.85rem !important;
+        padding: 6px 12px !important;
+    }
+    .win11-menu-container {
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+    }
+</style>
+

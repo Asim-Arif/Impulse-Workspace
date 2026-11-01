@@ -175,16 +175,51 @@ namespace Impulse.Pages.Production.ProcessGroups
             GroupForEdit = null;
         }
 
+        public async Task PrintProcessGroupReport(int entryId)
+        {
+            try
+            {
+                await ReportNavigationService.PrintReportAsync(new ReportRequest
+                {
+                    ReportName = "ProcessGroups.rpt",
+                    SelectionFormula = $"{{ProcessGroups.EntryID}}={entryId}"
+                });
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Print Failed",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+            }
+        }
+
         public async Task PrintSelectedGroupReport()
         {
             if (SelectedGroup == null) return;
 
-            await ReportNavigationService.PrintReportAsync(new ReportRequest
+            try
             {
-                ReportName = "ItemProcessGroups.rpt",
-                SelectionFormula = $"{{ProcessGroups.EntryID}} = {SelectedGroup.EntryID}",
-                Parameters = new Dictionary<string, object>()
-            });
+                await ReportNavigationService.PrintReportAsync(new ReportRequest
+                {
+                    ReportName = "ItemProcessGroups.rpt",
+                    SelectionFormula = $"{{ProcessGroups.EntryID}} = {SelectedGroup.EntryID}",
+                    Parameters = new Dictionary<string, object>()
+                });
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Print Failed",
+                    Detail = ex.Message,
+                    Duration = 4000
+                });
+            }
         }
 
         public void PromptCascadeUpdate(ProcessGroupListItem g)
@@ -335,6 +370,16 @@ namespace Impulse.Pages.Production.ProcessGroups
             if (ContextRowItem != null)
             {
                 await OpenCopyModal(ContextRowItem);
+            }
+        }
+
+        public async Task ContextPrintGroup(ItemClickEventArgs args)
+        {
+            ResolveRowItem(args);
+            if (ContextRowItem != null)
+            {
+                SelectedGroup = ContextRowItem;
+                await PrintProcessGroupReport(ContextRowItem.EntryID);
             }
         }
 

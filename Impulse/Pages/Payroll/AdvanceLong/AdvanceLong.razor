@@ -289,7 +289,7 @@
                                     Cheque No. <span class="text-danger">*</span>
                                 </label>
                                 <div class="position-relative">
-                                    <input type="text" class="form-control form-control-sm" @bind="ChequeNo" placeholder="e.g. 1000001" style="height:35px; padding-right: @(IsChequeLoading ? "30px" : "12px");" />
+                                    <input type="text" class="form-control form-control-sm" @bind="ChequeNo" @bind:after="OnChequeNoChanged" placeholder="e.g. 1000001" style="height:35px; padding-right: @(IsChequeLoading ? "30px" : "12px");" />
                                     @if (IsChequeLoading)
                                     {
                                         <span class="position-absolute top-50 end-0 translate-middle-y me-2">

@@ -1,0 +1,482 @@
+@page "/fixedassets/list"
+@page "/fixed-assets"
+@attribute [Authorize]
+
+@using BlazorContextMenu
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.ViewModels.FixedAssets
+
+<PageTitle>Fixed Assets List - Impulse</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <!-- ── Top Header ── -->
+            <div class="d-flex align-items-end justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-cubes text-primary fs-4"></i>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark-emphasis">Fixed Assets</h5>
+                        <small class="text-secondary">Master asset register, acquisition records, lifecycle and category management</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <a class="btn btn-outline-primary btn-sm px-3" href="/fixedassets/dashboard">
+                        <i class="fas fa-chart-pie me-1"></i> Dashboard
+                    </a>
+                    <a class="btn btn-outline-dark btn-sm px-3" href="/fixedassets/register">
+                        <i class="fas fa-calculator me-1"></i> Asset Register
+                    </a>
+                    <button type="button" class="btn btn-primary btn-sm px-3" @onclick="OpenNewAsset">
+                        <i class="fas fa-plus-circle me-1"></i> New Asset
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" @onclick="OpenOptionsBarMenu">
+                        <i class="fas fa-ellipsis-v me-1"></i> Options
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Summary Metrics ── -->
+            <div class="row g-2 mb-3">
+                <div class="col-6 col-md-2">
+                    <div class="p-2 border rounded-3 bg-white text-center shadow-xs">
+                        <small class="text-secondary d-block fw-semibold" style="font-size: 0.72rem; text-transform: uppercase;">Total Assets</small>
+                        <span class="fs-6 fw-bold text-primary">@rows.Count</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-2">
+                    <div class="p-2 border rounded-3 bg-white text-center shadow-xs">
+                        <small class="text-secondary d-block fw-semibold" style="font-size: 0.72rem; text-transform: uppercase;">Total Cost</small>
+                        <span class="fs-6 fw-bold text-success">@rows.Sum(x => x.Cost).ToString("N0")</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-2">
+                    <div class="p-2 border rounded-3 bg-white text-center shadow-xs">
+                        <small class="text-secondary d-block fw-semibold" style="font-size: 0.72rem; text-transform: uppercase;">Acc. Dep.</small>
+                        <span class="fs-6 fw-bold text-warning">@rows.Sum(x => x.AccumulatedDepreciation).ToString("N0")</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-2">
+                    <div class="p-2 border rounded-3 bg-white text-center shadow-xs">
+                        <small class="text-secondary d-block fw-semibold" style="font-size: 0.72rem; text-transform: uppercase;">Active</small>
+                        <span class="fs-6 fw-bold text-info">@rows.Count(x => !x.InActive && !x.Disposed)</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-2">
+                    <div class="p-2 border rounded-3 bg-white text-center shadow-xs">
+                        <small class="text-secondary d-block fw-semibold" style="font-size: 0.72rem; text-transform: uppercase;">Disposed</small>
+                        <span class="fs-6 fw-bold text-secondary">@rows.Count(x => x.Disposed && x.DisposedType == 1)</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-2">
+                    <div class="p-2 border rounded-3 bg-white text-center shadow-xs">
+                        <small class="text-secondary d-block fw-semibold" style="font-size: 0.72rem; text-transform: uppercase;">Written Off</small>
+                        <span class="fs-6 fw-bold text-danger">@rows.Count(x => x.Disposed && x.DisposedType == 0)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Filters Row ── -->
+            <div class="row g-2 mb-3 align-items-end" style="position: relative !important; z-index: 9999 !important;">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Category</label>
+                    <select class="form-select form-select-sm" value="@selectedMasterId" @onchange="HandleCategoryChanged">
+                        <option value="">All Categories</option>
+                        @foreach (var c in lookup.Masters)
+                        {
+                            <option value="@c.Id">@c.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;"><i class="fas fa-search me-1"></i>Search</label>
+                    <input type="text" class="form-control form-control-sm" placeholder="Search by Asset ID, Description, Old Code, Location..." @bind="searchText" @bind:event="oninput" @onkeydown="HandleSearchKeyDown" />
+                </div>
+                <div class="col-auto d-flex align-items-center gap-3 pb-1">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="showInactiveAssetsCheck" checked="@includeInactive" @onchange="ToggleInactiveFilter">
+                        <label class="form-check-label text-dark-emphasis fw-semibold" for="showInactiveAssetsCheck" style="font-size:0.85rem;">Show Inactive</label>
+                    </div>
+                </div>
+                <div class="col d-flex align-items-end justify-content-end gap-2 pb-1">
+                    <button type="button" class="btn btn-outline-primary btn-sm px-3" @onclick="OpenAddCategoryModal" title="Add New Category">
+                        <i class="fas fa-folder-plus me-1"></i> New Category
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="LoadAsync" title="Refresh">
+                        <i class="fas fa-sync-alt @(isBusy ? "fa-spin" : "")"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="PrintListAsync" title="Print Asset List">
+                        <i class="fas fa-print me-1"></i> Print
+                    </button>
+                </div>
+            </div>
+
+            <!-- Selected Asset Badge -->
+            @if (selectedRow != null)
+            {
+                <div class="mb-3 d-flex align-items-center gap-2">
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill">
+                        Selected: <strong>@selectedRow.AssetId</strong> - @selectedRow.Description
+                    </span>
+                    <button type="button" class="btn btn-outline-primary btn-xs py-0 px-2" style="font-size: 0.8rem;" @onclick="() => OpenAsset(selectedRow.EntryId)">
+                        <i class="fas fa-edit me-1"></i> Edit
+                    </button>
+                </div>
+            }
+
+            <!-- ── Grid View ── -->
+            <div class="card border border-light-subtle rounded-3 overflow-hidden shadow-xs" style="position: relative !important; z-index: 1 !important;">
+                @if (isBusy)
+                {
+                    <div class="p-4 text-center text-muted">
+                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                        Loading fixed assets...
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive" style="max-height: calc(100vh - 330px); min-height: 350px; overflow-y: auto;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                <tr>
+                                    <th class="ps-3" style="width: 100px;">Asset ID</th>
+                                    <th>Description</th>
+                                    <th>Category</th>
+                                    <th>Old Code</th>
+                                    <th>Location</th>
+                                    <th>Date</th>
+                                    <th class="text-end">Cost</th>
+                                    <th class="text-end">Acc. Dep.</th>
+                                    <th class="text-center">Auto</th>
+                                    <th>Vchr No.</th>
+                                    <th class="text-center">G.P Status</th>
+                                    <th class="text-center">R.N Status</th>
+                                    <th class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (rows.Count == 0)
+                                {
+                                    <tr>
+                                        <td colspan="13" class="text-center text-muted py-5">
+                                            <i class="fas fa-inbox fa-2x mb-2 d-block text-secondary opacity-50"></i>
+                                            No fixed assets found.
+                                        </td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    @foreach (var row in pagedRows)
+                                    {
+                                        bool isSelected = selectedRow?.EntryId == row.EntryId;
+                                        <ContextMenuTrigger MenuId="rowContextMenu" Data="@row" WrapperTag="tr"
+                                                            class="@($"clickable-row {(isSelected ? "table-primary" : "")} {(row.AutoEntry ? "bg-light-subtle" : "")}")"
+                                                            style="cursor: pointer; transition: background 0.15s ease;"
+                                                            @onclick="() => SelectRow(row)"
+                                                            @ondblclick="() => OpenAsset(row.EntryId)">
+                                            <td class="ps-3 fw-bold text-primary font-monospace">@row.AssetId</td>
+                                            <td class="fw-semibold">@row.Description</td>
+                                            <td>
+                                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-semibold px-2 py-1">
+                                                    @(string.IsNullOrWhiteSpace(row.Category) ? "Uncategorized" : row.Category)
+                                                </span>
+                                            </td>
+                                            <td class="text-secondary font-monospace small">@row.OldCode</td>
+                                            <td><i class="fas fa-map-marker-alt text-secondary me-1"></i>@row.Location</td>
+                                            <td>@(row.AcquiredDate?.ToString("dd-MMM-yyyy") ?? "-")</td>
+                                            <td class="text-end fw-semibold">@row.Cost.ToString("N0")</td>
+                                            <td class="text-end text-muted">@row.AccumulatedDepreciation.ToString("N0")</td>
+                                            <td class="text-center">
+                                                <span class="badge rounded-pill @(row.AutoEntry ? "bg-info text-dark" : "bg-light text-muted border")">
+                                                    @(row.AutoEntry ? "Yes" : "No")
+                                                </span>
+                                            </td>
+                                            <td><span class="small font-monospace">@(string.IsNullOrWhiteSpace(row.VoucherNo) ? "—" : row.VoucherNo)</span></td>
+                                            <td class="text-center">
+                                                <span class="badge rounded-pill @GetGatePassBadgeClass(row.GatePassStatus)">
+                                                    @(string.IsNullOrWhiteSpace(row.GatePassStatus) ? "Available" : row.GatePassStatus)
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge rounded-pill @GetReceiptNoteBadgeClass(row.ReceiptNoteStatus)">
+                                                    @(string.IsNullOrWhiteSpace(row.ReceiptNoteStatus) ? "Not Received" : row.ReceiptNoteStatus)
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                @if (row.InActive)
+                                                {
+                                                    <span class="badge rounded-pill bg-danger-subtle text-danger border border-danger-subtle">
+                                                        <i class="fas fa-times-circle me-1"></i> Inactive
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle">
+                                                        <i class="fas fa-check-circle me-1"></i> Active
+                                                    </span>
+                                                }
+                                            </td>
+                                        </ContextMenuTrigger>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- ── Pager Controls ── -->
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 border-top bg-light px-3 py-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <select class="form-select form-select-sm" style="width: 110px;" value="@pageSize" @onchange="HandlePageSizeChanged">
+                                <option value="25">25 / page</option>
+                                <option value="50">50 / page</option>
+                                <option value="100">100 / page</option>
+                                <option value="0">All</option>
+                            </select>
+                            <span class="small text-secondary">
+                                @if (rows.Count > 0)
+                                {
+                                    <text>Showing @pagerStart–@pagerEnd of <strong>@rows.Count</strong></text>
+                                }
+                                else
+                                {
+                                    <text>0 records</text>
+                                }
+                            </span>
+                        </div>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-secondary" type="button" title="First" disabled="@(currentPage <= 1)" @onclick="() => GoToPage(1)"><i class="fas fa-angle-double-left"></i></button>
+                            <button class="btn btn-outline-secondary" type="button" title="Previous" disabled="@(currentPage <= 1)" @onclick="() => GoToPage(currentPage - 1)"><i class="fas fa-angle-left"></i></button>
+                            <span class="btn btn-light disabled px-3">Page <strong>@currentPage</strong> / @totalPages</span>
+                            <button class="btn btn-outline-secondary" type="button" title="Next" disabled="@(currentPage >= totalPages)" @onclick="() => GoToPage(currentPage + 1)"><i class="fas fa-angle-right"></i></button>
+                            <button class="btn btn-outline-secondary" type="button" title="Last" disabled="@(currentPage >= totalPages)" @onclick="() => GoToPage(totalPages)"><i class="fas fa-angle-double-right"></i></button>
+                        </div>
+                    </div>
+                }
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ── BlazorContextMenu: Row Context Menu ── -->
+<ContextMenu Id="rowContextMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    @if (context.Data is FixedAssetListRow target)
+    {
+        <div class="win11-section-header">Asset: @target.AssetId</div>
+        <Item class="win11-menu-item" OnClick="@(() => OpenAsset(target.EntryId))">
+            <i class="fas fa-edit fa-fw win11-icon text-primary"></i> Edit Asset Profile
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => OpenAdjustment(target.AssetId))">
+            <i class="fas fa-sliders-h fa-fw win11-icon text-info"></i> Asset Adjustment
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => OpenMove(target.AssetId))">
+            <i class="fas fa-exchange-alt fa-fw win11-icon text-secondary"></i> Move Asset
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => OpenDisposal(target.AssetId))">
+            <i class="fas fa-trash-alt fa-fw win11-icon text-warning"></i> Dispose / Write-Off Asset
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => CopyAsset(target.EntryId))">
+            <i class="fas fa-copy fa-fw win11-icon"></i> Copy Asset
+        </Item>
+        <div class="win11-divider"></div>
+        <Item class="win11-menu-item" OnClick="@(() => OpenActiveStatusModal(target))">
+            @if (target.InActive)
+            {
+                <span><i class="fas fa-check-circle fa-fw win11-icon text-success"></i> Make Asset Active</span>
+            }
+            else
+            {
+                <span><i class="fas fa-ban fa-fw win11-icon text-danger"></i> Make Asset Inactive</span>
+            }
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => OpenDeleteModal(target))">
+            <span class="text-danger"><i class="fas fa-times-circle fa-fw win11-icon text-danger"></i> Delete Asset</span>
+        </Item>
+        <div class="win11-divider"></div>
+        <Item class="win11-menu-item" OnClick="@(() => PrintReceiptSlip(target.AssetId))">
+            <i class="fas fa-receipt fa-fw win11-icon"></i> Print Receipt Note
+        </Item>
+    }
+</ContextMenu>
+
+<!-- ── BlazorContextMenu: Top Options Menu ── -->
+<ContextMenu Id="optionsBarMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <div class="win11-section-header">Fixed Assets Actions</div>
+    <Item class="win11-menu-item" OnClick="@OpenNewAsset">
+        <i class="fas fa-plus-circle fa-fw win11-icon text-primary"></i> Add New Asset
+    </Item>
+    <Item class="win11-menu-item" OnClick="@OpenAddCategoryModal">
+        <i class="fas fa-folder-plus fa-fw win11-icon text-info"></i> Add New Category
+    </Item>
+    <Item class="win11-menu-item" OnClick="@OpenRegister">
+        <i class="fas fa-calculator fa-fw win11-icon"></i> Depreciation Register
+    </Item>
+    <Item class="win11-menu-item" OnClick="@LoadAsync">
+        <i class="fas fa-sync-alt fa-fw win11-icon"></i> Refresh List
+    </Item>
+    <div class="win11-divider"></div>
+    <div class="win11-section-header">Reports & Exports</div>
+    <Item class="win11-menu-item" OnClick="@PrintListAsync">
+        <i class="fas fa-print fa-fw win11-icon"></i> Print Asset List
+    </Item>
+    <Item class="win11-menu-item" OnClick="@PrintRegisterReportAsync">
+        <i class="fas fa-book fa-fw win11-icon"></i> Print Fixed Asset Register
+    </Item>
+    <Item class="win11-menu-item" OnClick="@OpenDatewiseReportModal">
+        <i class="fas fa-calendar-alt fa-fw win11-icon"></i> Print Date-Wise List
+    </Item>
+    <Item class="win11-menu-item" OnClick='@(() => PrintReportByName("FixedAssetsRegister_Summary.rpt"))'>
+        <i class="fas fa-chart-bar fa-fw win11-icon"></i> Register Summary
+    </Item>
+    <Item class="win11-menu-item" OnClick='@(() => PrintReportByName("FixedAssetsRegister_Monthwise.rpt"))'>
+        <i class="fas fa-calendar-check fa-fw win11-icon"></i> Monthwise Register
+    </Item>
+    <Item class="win11-menu-item" OnClick='@(() => PrintReportByName("FixedAssetsRegister_Monthwise_Summary.rpt"))'>
+        <i class="fas fa-calendar-week fa-fw win11-icon"></i> Monthwise Summary
+    </Item>
+    <Item class="win11-menu-item" OnClick='@(() => PrintReportByName("Operating_Fixed_Assets.rpt"))'>
+        <i class="fas fa-pie-chart fa-fw win11-icon"></i> Operating Fixed Assets
+    </Item>
+</ContextMenu>
+
+<!-- ── Modal: Add Category ── -->
+@if (showCategoryModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);" @onclick:stopPropagation="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0 rounded-3">
+                <div class="modal-header bg-primary text-white py-2">
+                    <h6 class="modal-title fw-bold"><i class="fas fa-folder-plus me-2"></i>Add New Asset Category</h6>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showCategoryModal = false"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">Category Name / Description <span class="text-danger">*</span></label>
+                        <input class="form-control form-control-sm" @bind="newCategoryName" placeholder="e.g. Plant & Machinery, Office Equipment, Vehicles" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">Depreciation Rate (%)</label>
+                        <input type="number" step="0.01" class="form-control form-control-sm" @bind="newCategoryRate" placeholder="e.g. 10.00" />
+                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" @onclick="() => showCategoryModal = false">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm px-4" @onclick="SaveCategoryAsync" disabled="@(string.IsNullOrWhiteSpace(newCategoryName) || isBusy)">Save Category</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ── Modal: Delete Asset Confirmation ── -->
+@if (showDeleteModal && modalTarget != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);" @onclick:stopPropagation="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0 rounded-3">
+                <div class="modal-header bg-danger text-white py-2">
+                    <h6 class="modal-title fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>Confirm Delete Asset</h6>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showDeleteModal = false"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <p class="mb-2">Are you sure you want to permanently delete this Fixed Asset?</p>
+                    <div class="p-3 bg-light rounded border">
+                        <div><strong>Asset ID:</strong> <span class="text-primary font-monospace">@modalTarget.AssetId</span></div>
+                        <div><strong>Description:</strong> @modalTarget.Description</div>
+                        <div><strong>Cost:</strong> @modalTarget.Cost.ToString("N0")</div>
+                    </div>
+                    <small class="text-muted d-block mt-2">All adjustment, move, and disposal histories linked with this asset will be affected.</small>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" @onclick="() => showDeleteModal = false">Cancel</button>
+                    <button type="button" class="btn btn-danger btn-sm px-4" @onclick="ConfirmDeleteAsync" disabled="@isBusy">Delete Asset</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ── Modal: Toggle Active / Inactive Status ── -->
+@if (showActiveModal && modalTarget != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);" @onclick:stopPropagation="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0 rounded-3">
+                <div class="modal-header @(modalTarget.InActive ? "bg-success" : "bg-warning") text-white py-2">
+                    <h6 class="modal-title fw-bold">
+                        <i class="fas @(modalTarget.InActive ? "fa-check-circle" : "fa-ban") me-2"></i>
+                        @(modalTarget.InActive ? "Make Asset Active" : "Make Asset Inactive")
+                    </h6>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showActiveModal = false"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <div class="mb-2 text-muted small">Asset: <strong class="text-dark">@modalTarget.AssetId - @modalTarget.Description</strong></div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">Effective Date</label>
+                        <input type="date" class="form-control form-control-sm" @bind="statusEffectiveDate" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">Reason / Remarks <span class="text-danger">*</span></label>
+                        <textarea class="form-control form-control-sm" rows="3" @bind="statusRemarks" placeholder="Enter reason for status change..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" @onclick="() => showActiveModal = false">Cancel</button>
+                    <button type="button" class="btn @(modalTarget.InActive ? "btn-success" : "btn-warning") btn-sm px-4" @onclick="ConfirmActiveStatusAsync" disabled="@(string.IsNullOrWhiteSpace(statusRemarks) || isBusy)">Apply Status</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ── Modal: Date-wise Report ── -->
+@if (showDateReportModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);" @onclick:stopPropagation="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0 rounded-3">
+                <div class="modal-header bg-dark text-white py-2">
+                    <h6 class="modal-title fw-bold"><i class="fas fa-calendar-alt me-2"></i>Fixed Asset List (Date Wise)</h6>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showDateReportModal = false"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold small">From Date</label>
+                            <input type="date" class="form-control form-control-sm" @bind="reportFromDate" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold small">To Date</label>
+                            <input type="date" class="form-control form-control-sm" @bind="reportToDate" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" @onclick="() => showDateReportModal = false">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm px-4" @onclick="PrintDatewiseReportAsync"><i class="fas fa-print me-1"></i>Print Report</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .win11-menu-item {
+        font-size: 0.85rem !important;
+        padding: 6px 12px !important;
+    }
+    .win11-menu-container {
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+    }
+    .clickable-row:hover {
+        background-color: rgba(13, 110, 253, 0.05) !important;
+    }
+    .btn-xs {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+</style>
+

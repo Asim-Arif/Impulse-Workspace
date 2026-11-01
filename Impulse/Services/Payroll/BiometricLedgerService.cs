@@ -29,5 +29,11 @@ namespace Impulse.Services.Payroll
 
         public Task ExecutePrintDailyAbsentLeaveSummaryAsync(DateTime date)
             => _dac.ExecutePrintDailyAbsentLeaveSummaryAsync(date);
+
+        public Task SaveMachineAsync(BiometricMachineItem machine)
+            => _dac.SaveMachineAsync(machine);
+
+        public Task DeleteMachineAsync(int entryId)
+            => _dac.DeleteMachineAsync(entryId);
     }
 }

@@ -110,8 +110,9 @@ namespace DataAccessLibrary.Models.ViewModels.Payroll
         public string Description { get; set; } = string.Empty;
         public int    MachineNo   { get; set; }
         public int    MachineType { get; set; }
+        public string Clientkey   { get; set; } = "Default";
 
-        public string DisplayText => $"{Description} ({IPAddress})";
+        public string DisplayText => $"{Description} ({IPAddress}){(string.IsNullOrWhiteSpace(Clientkey) || Clientkey.Equals("Default", StringComparison.OrdinalIgnoreCase) ? "" : $" [{Clientkey}]")}";
     }
 
     /// <summary>

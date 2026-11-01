@@ -161,9 +161,9 @@
                                 </div>
                             </div>
 
-                            <!-- Modules Status -->
+                            <!-- Core Modules Status -->
                             <div class="mb-3">
-                                <div class="small fw-bold text-secondary mb-2 text-uppercase" style="letter-spacing: 0.5px; font-size: 0.72rem;">Authorized ERP Modules</div>
+                                <div class="small fw-bold text-secondary mb-2 text-uppercase" style="letter-spacing: 0.5px; font-size: 0.72rem;">Core ERP Modules</div>
                                 <div class="d-flex flex-wrap gap-2">
                                     @foreach (var mod in new[] { "Accounts", "Payroll", "Stock", "Production", "Export", "IntraOffice" })
                                     {
@@ -171,6 +171,26 @@
                                         <span class="badge @(allowed ? "bg-success text-white" : "bg-secondary text-white opacity-50") px-2 py-1 d-inline-flex align-items-center gap-1" style="font-size: 0.76rem; font-weight: 500;">
                                             <i class="fas @(allowed ? "fa-check" : "fa-lock")" style="font-size: 0.68rem;"></i>
                                             @mod
+                                        </span>
+                                    }
+                                </div>
+                            </div>
+
+                            <!-- Add-on Modules Status -->
+                            <div class="mb-3">
+                                <div class="small fw-bold text-secondary mb-2 text-uppercase" style="letter-spacing: 0.5px; font-size: 0.72rem;">Add-on Modules (Purchased Separately)</div>
+                                <div class="d-flex flex-wrap gap-2">
+                                    @foreach (var mod in new (string Key, string Label)[] {
+                                        ("Budgeting", "Budgeting"),
+                                        ("FixedAssets", "Fixed Assets"),
+                                        ("GateManagement", "Gate Management"),
+                                        ("QMS", "QMS")
+                                    })
+                                    {
+                                        var allowed = LicenseService.IsModuleAllowed(mod.Key);
+                                        <span class="badge @(allowed ? "bg-primary text-white" : "bg-secondary text-white opacity-50") px-2 py-1 d-inline-flex align-items-center gap-1" style="font-size: 0.76rem; font-weight: 500;">
+                                            <i class="fas @(allowed ? "fa-check" : "fa-lock")" style="font-size: 0.68rem;"></i>
+                                            @mod.Label
                                         </span>
                                     }
                                 </div>

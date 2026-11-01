@@ -31,5 +31,8 @@ namespace DataAccessLibrary.Interface.Payroll
         /// Calls SP_PrintDailyAbsentLeaveSummary to prepare the staging table for the absent/leave summary report.
         /// </summary>
         Task ExecutePrintDailyAbsentLeaveSummaryAsync(DateTime date);
+
+        Task SaveMachineAsync(BiometricMachineItem machine);
+        Task DeleteMachineAsync(int entryId);
     }
 }

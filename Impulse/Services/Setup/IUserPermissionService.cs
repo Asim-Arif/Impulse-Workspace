@@ -12,6 +12,7 @@ namespace Impulse.Services.Setup
         string CurrentUserName { get; }
         bool ShowCustomerOrderNo { get; }
         bool HasModuleAccess(string moduleName);
+        bool IsModuleLicensed(string moduleName);
         bool HasOptionAccess(string optionId);
         bool IsRouteAuthorized(string relativePath);
         Task<List<MenuOptionModel>> GetMenuOptionsByModuleAsync(string moduleName);

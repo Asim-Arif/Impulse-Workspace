@@ -175,7 +175,7 @@ namespace Impulse.Pages.Payroll.BiometricLedger
                 if (clientIp == "::1") clientIp = "127.0.0.1";
 
                 var (recordsRead, recordsProcessed, message) =
-                    await IFaceMachineService.ReadAndProcessAsync(machine.IPAddress, machine.MachineNo, 4370, userName, clientIp);
+                    await IFaceMachineService.ReadAndProcessAsync(machine.IPAddress, machine.MachineNo, 4370, userName, clientIp, null, machine.Clientkey);
 
                 if (recordsProcessed > 0)
                 {
@@ -233,6 +233,80 @@ namespace Impulse.Pages.Payroll.BiometricLedger
         }
 
 
+
+        // ── Machine Management Modal ──────────────────────────────────────
+        private bool ShowMachineModal = false;
+        private BiometricMachineItem CurrentMachine = new();
+        private bool IsEditingMachine = false;
+
+        private void OpenMachineConfigModal()
+        {
+            CurrentMachine = new BiometricMachineItem { MachineNo = 1, Clientkey = "Default" };
+            IsEditingMachine = false;
+            ShowMachineModal = true;
+        }
+
+        private void EditMachine(BiometricMachineItem machine)
+        {
+            CurrentMachine = new BiometricMachineItem
+            {
+                EntryID = machine.EntryID,
+                IPAddress = machine.IPAddress,
+                Description = machine.Description,
+                MachineNo = machine.MachineNo,
+                MachineType = machine.MachineType,
+                Clientkey = machine.Clientkey
+            };
+            IsEditingMachine = true;
+            ShowMachineModal = true;
+        }
+
+        private void CloseMachineModal()
+        {
+            ShowMachineModal = false;
+        }
+
+        private async Task SaveMachineAsync()
+        {
+            if (string.IsNullOrWhiteSpace(CurrentMachine.IPAddress))
+            {
+                NotificationService.ShowWarning("Validation", "IP Address is required.");
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(CurrentMachine.Clientkey))
+            {
+                CurrentMachine.Clientkey = "Default";
+            }
+
+            try
+            {
+                await BiometricLedgerService.SaveMachineAsync(CurrentMachine);
+                IFaceMachines = await BiometricLedgerService.GetIFaceMachinesAsync();
+                ShowMachineModal = false;
+                NotificationService.ShowSuccess("Success", "Attendance Machine configuration saved.");
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                NotificationService.ShowError("Save Error", ex.Message);
+            }
+        }
+
+        private async Task DeleteMachineAsync(int entryId)
+        {
+            try
+            {
+                await BiometricLedgerService.DeleteMachineAsync(entryId);
+                IFaceMachines = await BiometricLedgerService.GetIFaceMachinesAsync();
+                if (SelectedMachineId == entryId) SelectedMachineId = 0;
+                NotificationService.ShowSuccess("Deleted", "Machine removed.");
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                NotificationService.ShowError("Delete Error", ex.Message);
+            }
+        }
 
         // ── Navigation ────────────────────────────────────────────────────
         private void NavigateBack()

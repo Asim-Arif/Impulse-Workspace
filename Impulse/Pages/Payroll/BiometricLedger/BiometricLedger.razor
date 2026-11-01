@@ -156,9 +156,7 @@
     </div>
 
     <!-- ── IFace Machine Panel ────────────────────────────────────────────── -->
-    @if (IFaceMachines.Any())
-    {
-        <div class="card border-0 shadow-sm mb-3" style="background: rgba(255,255,255,0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+    <div class="card border-0 shadow-sm mb-3" style="background: rgba(255,255,255,0.85); backdrop-filter: blur(10px); border-radius: 12px;">
             <div class="card-body py-3 px-4">
                 <div class="d-flex align-items-center gap-3 flex-wrap">
                     <i class="fas fa-microchip text-primary" style="font-size:1.1rem;"></i>
@@ -185,6 +183,12 @@
                         }
                     </button>
 
+                    <button type="button" class="btn btn-outline-secondary btn-sm shadow-sm"
+                            style="height:35px;" @onclick="OpenMachineConfigModal"
+                            title="Configure Attendance Machines & Client Keys">
+                        <i class="fas fa-cog me-1"></i><span>Configure</span>
+                    </button>
+
                     @if (IFaceMachineService.IsAgentConnected())
                     {
                         <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-2" title="Connected to Office Sync Agent">
@@ -194,7 +198,6 @@
                 </div>
             </div>
         </div>
-    }
 
     <!-- ── Attendance Grid Card ──────────────────────────────────────────── -->
     <div class="card border-0 shadow-sm" style="background: rgba(255,255,255,0.85); backdrop-filter: blur(10px); border-radius: 12px;">
@@ -369,3 +372,97 @@
         <i class="fas fa-calendar-check win11-icon me-2 text-primary"></i> Print Daily Attendance
     </Item>
 </ContextMenu>
+
+    <!-- ── Attendance Machine Configuration Modal ── -->
+    @if (ShowMachineModal)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 10050;">
+            <div class="modal-dialog modal-dialog-centered" style="max-width: 650px;">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 14px; overflow: hidden; background: #ffffff;">
+                    <div class="modal-header border-0 pb-0 pt-3 px-4 d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="d-inline-flex p-2 rounded-circle bg-primary-subtle text-primary">
+                                <i class="fas fa-microchip"></i>
+                            </span>
+                            <h5 class="modal-title fw-bold text-dark mb-0">Attendance Machine Setup</h5>
+                        </div>
+                        <button type="button" class="btn-close shadow-none" @onclick="CloseMachineModal"></button>
+                    </div>
+                    <div class="modal-body px-4 py-3">
+                        <!-- Machine Input Form -->
+                        <div class="card border bg-light p-3 mb-3 rounded-3">
+                            <h6 class="fw-bold text-secondary mb-3" style="font-size: 0.85rem;">
+                                @(IsEditingMachine ? "Edit Machine Settings" : "Add New Machine")
+                            </h6>
+                            <div class="row g-2">
+                                <div class="col-sm-6">
+                                    <label class="form-label small fw-semibold text-secondary mb-1">Description / Location</label>
+                                    <input type="text" class="form-control form-control-sm" placeholder="e.g. Main Gate, HR Dept" @bind="CurrentMachine.Description" />
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="form-label small fw-semibold text-secondary mb-1">IP Address</label>
+                                    <input type="text" class="form-control form-control-sm" placeholder="e.g. 192.168.10.201" @bind="CurrentMachine.IPAddress" />
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="form-label small fw-semibold text-secondary mb-1">Machine No</label>
+                                    <input type="number" class="form-control form-control-sm" @bind="CurrentMachine.MachineNo" />
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="form-label small fw-semibold text-secondary mb-1">
+                                        Client Key <span class="badge bg-info-subtle text-info py-0 px-1" style="font-size: 0.65rem;">Sync Agent</span>
+                                    </label>
+                                    <input type="text" class="form-control form-control-sm" placeholder="e.g. Default, Office1" @bind="CurrentMachine.Clientkey" />
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-end gap-2 mt-3">
+                                @if (IsEditingMachine)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary px-3" @onclick="OpenMachineConfigModal">Cancel Edit</button>
+                                }
+                                <button type="button" class="btn btn-sm btn-primary px-3 shadow-sm" @onclick="SaveMachineAsync">
+                                    <i class="fas fa-save me-1"></i>@(IsEditingMachine ? "Update Machine" : "Save Machine")
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Existing Machines List -->
+                        <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.82rem;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.74rem; text-transform: uppercase;">
+                                    <tr>
+                                        <th>Description</th>
+                                        <th>IP Address</th>
+                                        <th class="text-center">No</th>
+                                        <th>Client Key</th>
+                                        <th class="text-end">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var m in IFaceMachines)
+                                    {
+                                        <tr>
+                                            <td class="fw-semibold text-dark">@m.Description</td>
+                                            <td><code>@m.IPAddress</code></td>
+                                            <td class="text-center">@m.MachineNo</td>
+                                            <td><span class="badge bg-secondary-subtle text-secondary">@m.Clientkey</span></td>
+                                            <td class="text-end">
+                                                <button type="button" class="btn btn-sm btn-link text-primary p-0 me-2" title="Edit" @onclick="() => EditMachine(m)">
+                                                    <i class="fas fa-pencil-alt"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-link text-danger p-0" title="Delete" @onclick="() => DeleteMachineAsync(m.EntryID)">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0 px-4 pb-3">
+                        <button type="button" class="btn btn-sm btn-outline-secondary px-3" @onclick="CloseMachineModal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }

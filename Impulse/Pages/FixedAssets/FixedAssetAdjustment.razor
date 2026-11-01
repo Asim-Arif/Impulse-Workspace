@@ -1,0 +1,126 @@
+@page "/fixedassets/adjustment"
+@page "/fixedassets/adjustment/{AssetId}"
+@page "/fixed-assets/adjustment"
+@page "/fixed-assets/adjustment/{AssetId}"
+@attribute [Authorize]
+
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.ViewModels.FixedAssets
+
+<PageTitle>Asset Cost Adjustment - Impulse</PageTitle>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body pt-3">
+
+            <!-- ── Top Header ── -->
+            <div class="d-flex align-items-end justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-sliders-h text-primary fs-4"></i>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark-emphasis">Asset Cost Adjustment</h5>
+                        <small class="text-secondary">Record capitalization cost additions or deductions with audit remarks</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill">
+                        Total Cost: <strong>@model.TotalCost.ToString("N2")</strong>
+                    </span>
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" @onclick="Cancel" disabled="@isBusy">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Form Fields ── -->
+            <div class="row g-2 mb-3">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Adjustment Date <span class="text-danger">*</span></label>
+                    <input type="date" class="form-control form-control-sm" value="@model.AdjustmentDate.ToString("yyyy-MM-dd")" @onchange="OnAdjustmentDateChanged" disabled="@isBusy" />
+                </div>
+                <div class="col-md-3 ms-auto">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Capitalization Date</label>
+                    <input type="text" class="form-control form-control-sm bg-light" value="@(model.CapitalizationDate?.ToString("dd-MMM-yyyy") ?? "-")" readonly />
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Select Asset <span class="text-danger">*</span></label>
+                    <div class="@(isBusy ? "disabled-typeahead-wrapper" : "")">
+                        <BlazoredTypeahead SearchMethod="SearchAssets"
+                                           EnableDropDown="true"
+                                           Data="assetList"
+                                           TValue="FixedAssetListRow"
+                                           TItem="FixedAssetListRow"
+                                           Value="selectedAsset"
+                                           ValueChanged="OnAssetSelected"
+                                           ValueExpression="@(() => selectedAsset)"
+                                           Placeholder="Search and select asset by ID or description..."
+                                           MaximumSuggestions="1000"
+                                           Disabled="@isBusy">
+                            <SelectedTemplate Context="asset">
+                                <span class="fw-bold font-monospace">[@asset.AssetId]</span> @asset.Description
+                            </SelectedTemplate>
+                            <ResultTemplate Context="asset">
+                                <span class="fw-bold font-monospace">[@asset.AssetId]</span> @asset.Description
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Acquisition Cost</label>
+                    <input type="text" class="form-control form-control-sm text-end bg-light" value="@model.AcquisitionCost.ToString("N2")" readonly />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Previous Adjustment</label>
+                    <input type="text" class="form-control form-control-sm text-end bg-light" value="@model.PreviousAdjustment.ToString("N2")" readonly />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Adjustment Amount <span class="text-danger">*</span></label>
+                    <input type="number" step="0.01" class="form-control form-control-sm text-end fw-semibold text-primary" @bind="model.AdjustmentAmount" disabled="@isBusy" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">New Total Cost</label>
+                    <input type="text" class="form-control form-control-sm text-end fw-bold bg-light" value="@model.TotalCost.ToString("N2")" readonly />
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Adjustment Remarks / Justification <span class="text-danger">*</span></label>
+                    <textarea class="form-control form-control-sm" rows="4" @bind="model.Remarks" maxlength="500" disabled="@isBusy" placeholder="State reason for cost adjustment..."></textarea>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">PDF Reference / Attachment Path</label>
+                    <input type="text" class="form-control form-control-sm" @bind="model.PdfPath" disabled="@isBusy" placeholder="Optional document reference or filepath..." />
+                </div>
+            </div>
+
+            <!-- ── Bottom Action Footer ── -->
+            <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                <button type="button" class="btn btn-outline-primary btn-sm px-4 fw-bold" @onclick="SaveAndNewAsync" disabled="@isBusy">
+                    <i class="fas fa-plus-circle me-1"></i> Save &amp; New
+                </button>
+                <button type="button" class="btn btn-primary btn-sm px-4 fw-bold" @onclick="SaveAndCloseAsync" disabled="@isBusy">
+                    <i class="fas fa-check me-1"></i> Save &amp; Close
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm px-4 fw-bold" @onclick="Cancel" disabled="@isBusy">
+                    <i class="fas fa-times me-1"></i> Cancel
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    .disabled-typeahead-wrapper .blazored-typeahead {
+        overflow: hidden !important;
+        border-radius: 4px;
+    }
+    .blazored-typeahead {
+        height: 35px !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+</style>
+

@@ -93,7 +93,7 @@ namespace DataAccessLibrary.DAC.Stock
                     pip.OrderQty,
                     pip.StockQty AS PlannedStockQty,
                     ISNULL(soa.AlreadyAdjusted, 0) AS AlreadyAdjustedQty,
-                    ISNULL(i.InHand, 0) AS AvailableInHandQty
+                    ISNULL(stock.InHandQty, 0) AS AvailableInHandQty
                 FROM PPC_Order_Item_Planning pip
                 LEFT JOIN Items i ON pip.ItemID = i.ItemID
                 OUTER APPLY (
@@ -101,6 +101,11 @@ namespace DataAccessLibrary.DAC.Stock
                     FROM StockOrderAdjustments 
                     WHERE OrderNo = pip.OrderNo AND ItemID = pip.ItemID
                 ) soa
+                OUTER APPLY (
+                    SELECT SUM(NetQty) AS InHandQty
+                    FROM VItemsWithLotWiseStock
+                    WHERE ItemID = pip.ItemID AND NetQty > 0
+                ) stock
                 WHERE pip.OrderNo = @OrderNo AND pip.StockQty > 0
                 ORDER BY pip.EntryID";
 
