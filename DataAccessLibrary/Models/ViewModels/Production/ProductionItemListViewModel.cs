@@ -44,6 +44,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public int SNo { get; set; }
         public bool IsEditingRemarks { get; set; }
         public string EditingRemarksValue { get; set; } = string.Empty;
+        public bool IsSelected { get; set; }
     }
 
     public class ProductionItemListFilters

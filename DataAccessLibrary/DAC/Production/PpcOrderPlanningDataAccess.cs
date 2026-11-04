@@ -42,7 +42,13 @@ namespace DataAccessLibrary.DAC.Production
                         ISNULL(v_counts.TotalItems, ISNULL(oi_counts.TotalItems, 0)) AS TotalItems,
                         ISNULL(pip_counts.PlannedItems, 0) AS PlannedItems,
                         ISNULL(oi_counts.TotalOrderQty, 0) AS TotalOrderQty,
-                        CASE WHEN pm.Status = 'Planned' THEN 1 ELSE 0 END AS IsPlanned,
+                        CASE 
+                            WHEN pm.Status = 'Planned' 
+                             AND ISNULL(oi_counts.TotalOrderQty, 0) <= ISNULL(pip_counts.TotalPlannedQty, 0)
+                             AND ISNULL(pip_counts.PlannedItems, 0) >= ISNULL(v_counts.TotalItems, ISNULL(oi_counts.TotalItems, 0))
+                            THEN 1 
+                            ELSE 0 
+                        END AS IsPlanned,
                         pm.PlannedBy,
                         pm.PlannedAt
                     FROM FCustomerOrders o
@@ -54,7 +60,7 @@ namespace DataAccessLibrary.DAC.Production
                         WHERE v.OrderNo = o.OrderNo
                     ) v_counts
                     OUTER APPLY (
-                        SELECT COUNT(DISTINCT ItemID) AS PlannedItems
+                        SELECT COUNT(DISTINCT ItemID) AS PlannedItems, SUM(OrderQty) AS TotalPlannedQty
                         FROM PPC_Order_Item_Planning pip
                         WHERE pip.OrderNo = o.OrderNo
                     ) pip_counts
@@ -145,7 +151,7 @@ namespace DataAccessLibrary.DAC.Production
 
                 // 1. Fetch saved item planning if previously saved
                 const string savedPlanningSql = @"
-                    SELECT ItemID, StockQty, ISNULL(SFStockQty, 0) AS SFStockQty, TotalPurchaseQty, ProductionQty
+                    SELECT ItemID, OrderQty, StockQty, ISNULL(SFStockQty, 0) AS SFStockQty, TotalPurchaseQty, ProductionQty
                     FROM PPC_Order_Item_Planning
                     WHERE OrderNo = @OrderNo";
                 var savedPlanning = (await db.QueryAsync(savedPlanningSql, new { OrderNo = orderNo })).ToList();
@@ -273,12 +279,24 @@ namespace DataAccessLibrary.DAC.Production
                     // Restore saved planning values if available (only for authorized items)
                     if (item.Authorized && savedPlanMap.TryGetValue(item.CompItemID, out var plan))
                     {
+                        var planOrderQty = (int)plan.OrderQty;
+                        item.PreviouslyPlannedOrderQty = planOrderQty;
                         item.StockQty = (int)plan.StockQty;
-                        item.IsSavedPlan = true;
-                        item.IsPlanned = true;
+
+                        if (item.OrderQty > planOrderQty)
+                        {
+                            item.IsSavedPlan = false;
+                            item.IsPlanned = true;
+                        }
+                        else
+                        {
+                            item.IsSavedPlan = true;
+                            item.IsPlanned = true;
+                        }
                     }
                     else
                     {
+                        item.PreviouslyPlannedOrderQty = 0;
                         item.StockQty = 0;
                         item.IsSavedPlan = false;
                         item.IsPlanned = false;
@@ -291,7 +309,17 @@ namespace DataAccessLibrary.DAC.Production
                         foreach (var sa in itemSavedSf)
                         {
                             int sooRefId = (int)sa.SOO_RefID;
+                            int allocQty = (int)sa.AllocatedQty;
                             var matchingLot = item.AvailableSFLots.FirstOrDefault(l => l.EntryID == sooRefId);
+                            int effectiveAvailable = matchingLot != null 
+                                ? (matchingLot.AvailableQty + allocQty) 
+                                : allocQty;
+
+                            if (matchingLot != null)
+                            {
+                                matchingLot.AvailableQty = effectiveAvailable;
+                            }
+
                             item.SFStockAllocations.Add(new PpcItemSFAllocationDto
                             {
                                 EntryID = (int)sa.EntryID,
@@ -302,8 +330,8 @@ namespace DataAccessLibrary.DAC.Production
                                 BatchNo = (string)sa.BatchNo,
                                 Shelf_RefID = (int)sa.Shelf_RefID,
                                 StoreLocation = (string)sa.StoreLocation,
-                                AvailableQty = matchingLot?.AvailableQty ?? (int)sa.AllocatedQty,
-                                AllocatedQty = (int)sa.AllocatedQty
+                                AvailableQty = effectiveAvailable,
+                                AllocatedQty = allocQty
                             });
                         }
                     }
@@ -361,7 +389,7 @@ namespace DataAccessLibrary.DAC.Production
                                 var savedSched = savedSchedules.FirstOrDefault(s => (string)s.ItemID == item.CompItemID && (string)s.Hub_Name == hubName);
                                 if (savedSched != null)
                                 {
-                                    sched.PlannedQty = (int)savedSched.PlannedQty;
+                                    sched.PlannedQty = item.HasDeltaQty ? item.ProductionQty : (int)savedSched.PlannedQty;
                                     sched.StartDate = (DateTime)savedSched.StartDate;
                                     sched.EndDate = (DateTime)savedSched.EndDate;
                                 }
@@ -372,13 +400,13 @@ namespace DataAccessLibrary.DAC.Production
                                 .Where(s => s.GroupID == item.GroupID && s.Hub_Name == hubName)
                                 .ToList();
 
-                    item.HubSchedules.Add(sched);
+                            item.HubSchedules.Add(sched);
                         }
                     }
                 }
 
-                // Header is fully planned only if the order is authorized and all items are authorized & planned
-                header.IsPlanned = header.Authorized && items.Any() && items.All(i => i.Authorized && i.IsPlanned);
+                // Header is fully planned only if the order is authorized and all items are authorized & planned (without unallocated delta qty)
+                header.IsPlanned = header.Authorized && items.Any() && items.All(i => i.Authorized && i.IsPlanned && !i.HasDeltaQty);
 
                 return header;
             }
@@ -454,7 +482,7 @@ namespace DataAccessLibrary.DAC.Production
 
                 // Filter to only items that were actually planned
                 var plannedItems = request.Items
-                    .Where(i => i.Authorized && i.IsPlanned)
+                    .Where(i => i.Authorized && (i.IsPlanned || i.HasDeltaQty))
                     .ToList();
 
                 int totalAuthorizedCount = request.Items.Count(i => i.Authorized);

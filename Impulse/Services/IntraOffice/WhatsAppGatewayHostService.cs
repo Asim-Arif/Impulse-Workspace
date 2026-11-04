@@ -54,8 +54,9 @@ namespace Impulse.Services.IntraOffice
         {
             try
             {
-                using var client = new HttpClient();
-                client.Timeout = TimeSpan.FromSeconds(3);
+                using var handler = new HttpClientHandler { UseProxy = false };
+                using var client = new HttpClient(handler);
+                client.Timeout = TimeSpan.FromSeconds(6);
                 var response = await client.GetAsync("http://127.0.0.1:3001/status");
                 return response.IsSuccessStatusCode;
             }

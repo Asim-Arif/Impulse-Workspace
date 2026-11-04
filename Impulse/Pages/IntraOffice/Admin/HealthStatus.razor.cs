@@ -56,7 +56,8 @@ namespace Impulse.Pages.IntraOffice.Admin
                 // Check WhatsApp Service
                 try
                 {
-                    using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+                    using var handler = new HttpClientHandler { UseProxy = false };
+                    using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(6) };
                     var res = await http.GetAsync("http://127.0.0.1:3001/status");
                     if (res.IsSuccessStatusCode)
                     {

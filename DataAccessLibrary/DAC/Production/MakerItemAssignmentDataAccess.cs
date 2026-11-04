@@ -87,8 +87,8 @@ namespace DataAccessLibrary.DAC.Production
         public async Task<List<UnassignedItemModel>> GetUnassignedItemsAsync(long vendId, int processId, string? custCode = null)
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
-            bool hasCust = await HasCustCodeColumnAsync(db);
-            string custFilter = hasCust && !string.IsNullOrWhiteSpace(custCode)
+            bool isCustWise = await HasCustomerWiseRatesSupportAsync();
+            string custFilter = isCustWise && !string.IsNullOrWhiteSpace(custCode)
                 ? " AND CustCode = @CustCode"
                 : "";
 
@@ -105,27 +105,56 @@ namespace DataAccessLibrary.DAC.Production
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
             bool hasCust = await HasCustCodeColumnAsync(db);
+            bool isCustWise = await HasCustomerWiseRatesSupportAsync();
             string custSelect = hasCust ? "v.CustCode," : "CAST(NULL AS varchar(50)) AS CustCode,";
-            string custFilter = hasCust && !string.IsNullOrWhiteSpace(custCode)
-                ? " AND v.CustCode = @CustCode"
-                : "";
 
-            string sql = $@"SELECT CAST(v.EntryID AS bigint) AS EntryID, 
-                                  CAST(v.VendID AS bigint) AS VendID, 
-                                  v.ProcessID, 
-                                  v.ItemID, 
-                                  v.ItemName, 
-                                  ISNULL(v.Description, '') AS Description, 
-                                  CAST(ISNULL(v.Rate, 0) AS decimal(18, 4)) AS Rate, 
-                                  ISNULL(v.AssignedUnit, '') AS AssignedUnit, 
-                                  ISNULL(v.Remarks, '') AS Remarks, 
-                                  ISNULL(i.MakerDescription, '') AS MakerDescription,
-                                  {custSelect}
-                                  CAST(v.EntryID AS bigint) AS SortEntryID
-                           FROM VMakerAssItems v
-                           LEFT OUTER JOIN Items i ON v.ItemID = i.ItemID
-                           WHERE v.VendID = @VendId AND v.ProcessID = @ProcessId{custFilter}
-                           ORDER BY v.ItemName";
+            string sql;
+            if (isCustWise && !string.IsNullOrWhiteSpace(custCode))
+            {
+                sql = $@"SELECT CAST(v.EntryID AS bigint) AS EntryID, 
+                                CAST(v.VendID AS bigint) AS VendID, 
+                                v.ProcessID, 
+                                v.ItemID, 
+                                v.ItemName, 
+                                ISNULL(v.Description, '') AS Description, 
+                                CAST(ISNULL(v.Rate, 0) AS decimal(18, 4)) AS Rate, 
+                                ISNULL(v.AssignedUnit, '') AS AssignedUnit, 
+                                ISNULL(v.Remarks, '') AS Remarks, 
+                                ISNULL(i.MakerDescription, '') AS MakerDescription,
+                                {custSelect}
+                                CAST(v.EntryID AS bigint) AS SortEntryID
+                         FROM VMakerAssItems v
+                         LEFT OUTER JOIN Items i ON v.ItemID = i.ItemID
+                         WHERE v.VendID = @VendId AND v.ProcessID = @ProcessId AND v.CustCode = @CustCode
+                         ORDER BY v.ItemName";
+            }
+            else
+            {
+                // When CustomerWise rates is disabled or no customer filter is applied,
+                // deduplicate items so each ItemID appears only once, prioritizing the active/highest rate and latest entry.
+                sql = $@"WITH RankedAssignedItems AS (
+                            SELECT CAST(v.EntryID AS bigint) AS EntryID, 
+                                   CAST(v.VendID AS bigint) AS VendID, 
+                                   v.ProcessID, 
+                                   v.ItemID, 
+                                   v.ItemName, 
+                                   ISNULL(v.Description, '') AS Description, 
+                                   CAST(ISNULL(v.Rate, 0) AS decimal(18, 4)) AS Rate, 
+                                   ISNULL(v.AssignedUnit, '') AS AssignedUnit, 
+                                   ISNULL(v.Remarks, '') AS Remarks, 
+                                   ISNULL(i.MakerDescription, '') AS MakerDescription,
+                                   {custSelect}
+                                   CAST(v.EntryID AS bigint) AS SortEntryID,
+                                   ROW_NUMBER() OVER (PARTITION BY v.ItemID ORDER BY v.Rate DESC, v.EntryID DESC) as rn
+                            FROM VMakerAssItems v
+                            LEFT OUTER JOIN Items i ON v.ItemID = i.ItemID
+                            WHERE v.VendID = @VendId AND v.ProcessID = @ProcessId
+                         )
+                         SELECT EntryID, VendID, ProcessID, ItemID, ItemName, Description, Rate, AssignedUnit, Remarks, MakerDescription, CustCode, SortEntryID
+                         FROM RankedAssignedItems
+                         WHERE rn = 1
+                         ORDER BY ItemName";
+            }
 
             return (await db.QueryAsync<AssignedMakerItemModel>(sql, new { VendId = vendId, ProcessId = processId, CustCode = custCode })).ToList();
         }
@@ -133,7 +162,7 @@ namespace DataAccessLibrary.DAC.Production
         public async Task AssignItemAsync(long vendId, int processId, string itemId, decimal rate, string? custCode = null)
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
-            bool hasCust = await HasCustCodeColumnAsync(db);
+            bool isCustWise = await HasCustomerWiseRatesSupportAsync();
             
             // Execute SP_VendAssItem stored procedure matching legacy form
             var parameters = new DynamicParameters();
@@ -141,7 +170,7 @@ namespace DataAccessLibrary.DAC.Production
             parameters.Add("@ItemID", itemId);
             parameters.Add("@ProcessID", processId);
             parameters.Add("@Rate", rate);
-            if (hasCust && !string.IsNullOrWhiteSpace(custCode))
+            if (isCustWise && !string.IsNullOrWhiteSpace(custCode))
             {
                 parameters.Add("@CustCode", custCode);
             }

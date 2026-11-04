@@ -149,31 +149,37 @@
                 </div>
             </div>
 
-            <!-- ── Filter Row 3: Checkboxes ─────────────────────────────── -->
-            <div class="d-flex flex-wrap align-items-center gap-3 mb-3 py-2 px-3 rounded" style="background:rgba(21,101,192,0.05);border:1px solid rgba(21,101,192,0.12);">
-                <div class="form-check form-check-inline mb-0">
-                    <input class="form-check-input" type="checkbox" id="chkIssuance" @bind="Filters.ShowIssuance" />
-                    <label class="form-check-label" for="chkIssuance" style="font-size:0.83rem;">Issuance</label>
+            <!-- ── Filter Row 3: Checkboxes & Actions ───────────────────── -->
+            <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 py-2 px-3 rounded" style="background:rgba(21,101,192,0.05);border:1px solid rgba(21,101,192,0.12);">
+                <div class="d-flex flex-wrap align-items-center gap-3">
+                    <div class="form-check form-check-inline mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkLotsOnly" @bind="Filters.ShowLotsOnly" />
+                        <label class="form-check-label" for="chkLotsOnly" style="font-size:0.83rem;">Lots Only</label>
+                    </div>
+                    <div class="form-check form-check-inline mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkNotYetStarted" @bind="Filters.ShowNotYetStarted" />
+                        <label class="form-check-label" for="chkNotYetStarted" style="font-size:0.83rem;">Not Yet Started</label>
+                    </div>
+                    <div class="form-check form-check-inline mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkRegular" @bind="Filters.ShowRegularLots" />
+                        <label class="form-check-label text-danger fw-semibold" for="chkRegular" style="font-size:0.83rem;">Regular Lots</label>
+                    </div>
+                    <div class="form-check form-check-inline mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkRepair" @bind="Filters.ShowRepairLots" />
+                        <label class="form-check-label text-danger fw-semibold" for="chkRepair" style="font-size:0.83rem;">Repair Lots</label>
+                    </div>
                 </div>
-                <div class="form-check form-check-inline mb-0">
-                    <input class="form-check-input" type="checkbox" id="chkReceiving" @bind="Filters.ShowReceiving" />
-                    <label class="form-check-label" for="chkReceiving" style="font-size:0.83rem;">Receiving</label>
-                </div>
-                <div class="form-check form-check-inline mb-0">
-                    <input class="form-check-input" type="checkbox" id="chkLotsOnly" @bind="Filters.ShowLotsOnly" />
-                    <label class="form-check-label" for="chkLotsOnly" style="font-size:0.83rem;">Lots Only</label>
-                </div>
-                <div class="form-check form-check-inline mb-0">
-                    <input class="form-check-input" type="checkbox" id="chkNotYetStarted" @bind="Filters.ShowNotYetStarted" />
-                    <label class="form-check-label" for="chkNotYetStarted" style="font-size:0.83rem;">Not Yet Started</label>
-                </div>
-                <div class="form-check form-check-inline mb-0">
-                    <input class="form-check-input" type="checkbox" id="chkRegular" @bind="Filters.ShowRegularLots" />
-                    <label class="form-check-label text-danger fw-semibold" for="chkRegular" style="font-size:0.83rem;">Regular Lots</label>
-                </div>
-                <div class="form-check form-check-inline mb-0">
-                    <input class="form-check-input" type="checkbox" id="chkRepair" @bind="Filters.ShowRepairLots" />
-                    <label class="form-check-label text-danger fw-semibold" for="chkRepair" style="font-size:0.83rem;">Repair Lots</label>
+                <div class="d-flex align-items-center gap-2">
+                    @if (SelectedCount > 0)
+                    {
+                        <span class="badge bg-primary text-white" style="font-size:0.75rem;">@SelectedCount selected</span>
+                    }
+                    <button type="button" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center" style="height:28px !important; font-size:0.78rem; padding: 2px 10px;" @onclick="@(() => SelectAll())">
+                        <i class="fas fa-check-square me-1"></i> Select All
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center" style="height:28px !important; font-size:0.78rem; padding: 2px 10px;" @onclick="@(() => ClearAll())">
+                        <i class="fas fa-square me-1"></i> Clear All
+                    </button>
                 </div>
             </div>
 
@@ -191,6 +197,12 @@
                     <table class="table table-hover table-sm align-middle mb-0" style="font-size:0.88rem;">
                         <thead class="table-light text-secondary sticky-top" style="font-size:0.78rem;text-transform:uppercase;z-index:2;box-shadow:0 1px 0 #dee2e6;">
                             <tr>
+                                <th style="width:36px;" class="text-center px-1">
+                                    <input type="checkbox" class="form-check-input"
+                                           checked="@AreAllSelected"
+                                           @onchange="ToggleSelectAll"
+                                           title="Select All / Clear All" />
+                                </th>
                                 <th class="px-2">#</th>
                                 <th>Start</th>
                                 <th>Lot #</th>
@@ -212,7 +224,7 @@
                             @if (Items.Count == 0)
                             {
                                 <tr>
-                                    <td colspan="15" class="text-center py-5 text-muted">
+                                    <td colspan="16" class="text-center py-5 text-muted">
                                         <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
                                         No records found. Adjust filters and click Refresh.
                                     </td>
@@ -222,9 +234,12 @@
                             {
                                 <Virtualize Items="@Items" Context="item" ItemSize="38" SpacerElement="tr">
                                     @{
-                                        var rowClass = item.EntryType == 1 ? "table-warning" : "";
+                                        var rowClass = item.IsSelected ? "table-active" : (item.EntryType == 1 ? "table-warning" : "");
                                     }
                                     <ContextMenuTrigger MenuId="rowContextMenu" WrapperTag="tr" CssClass="@rowClass" Data="@item">
+                                        <td class="text-center px-1" style="width:36px;">
+                                            <input type="checkbox" class="form-check-input" @bind="item.IsSelected" @onclick:stopPropagation />
+                                        </td>
                                         <td class="px-2 text-muted" style="white-space:nowrap;">@item.SNo</td>
                                         <td style="white-space:nowrap;">@(item.StartDT?.ToString("dd-MMM-yyyy") ?? "")</td>
                                         <td style="white-space:nowrap;font-weight:600;color:#1565C0;">@item.LotNo</td>
@@ -285,8 +300,7 @@
 <!-- ── Options Bar Context Menu ─────────────────────────────────────────── -->
 <ContextMenu Id="optionsBarMenu" Template="Win11Style">
     <Item OnClick="@PrintListAsync"><i class="fas fa-print text-primary me-2 win11-icon"></i> Print</Item>
-    <Item OnClick="@PrintHubwiseAsync"><i class="fas fa-sitemap text-info me-2 win11-icon"></i> Hubwise</Item>
-    <Item OnClick="@PrintWithValueAsync"><i class="fas fa-file-invoice-dollar text-success me-2 win11-icon"></i> Print (Value)</Item>
+    <Item OnClick="@PrintSelectedAsync"><i class="fas fa-print text-success me-2 win11-icon"></i> Print (Selected)</Item>
 </ContextMenu>
 
 <!-- ── Row Right-Click Context Menu ──────────────────────────────────────── -->

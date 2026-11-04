@@ -42,6 +42,13 @@ namespace DataAccessLibrary.DAC.Production
             return _hasCustCodeColumn.Value;
         }
 
+        private async Task<bool> IsCustomerWiseRatesEnabledAsync(IDbConnection conn)
+        {
+            bool colExists = await HasCustCodeColumnAsync(conn);
+            bool configEnabled = bool.TryParse(_config["AppSettings:EnableCustomerWiseMakerRates"], out bool enabled) && enabled;
+            return colExists && configEnabled;
+        }
+
         public async Task<List<ProcessPOLookupModel>> GetProcessesAsync()
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
@@ -319,10 +326,11 @@ namespace DataAccessLibrary.DAC.Production
                     }
 
                     // Insert or update VendAssItems
+                    bool isCustWiseForLot = await IsCustomerWiseRatesEnabledAsync(db);
                     bool hasCustCodeCol = await HasCustCodeColumnAsync(db);
-                    string effCustCode = !string.IsNullOrWhiteSpace(line.CustCode) ? line.CustCode : "Stock";
+                    string effCustCode = isCustWiseForLot && !string.IsNullOrWhiteSpace(line.CustCode) ? line.CustCode : "Stock";
 
-                    string checkAssSql = hasCustCodeCol
+                    string checkAssSql = isCustWiseForLot && !string.IsNullOrWhiteSpace(line.CustCode)
                         ? @"SELECT COUNT(*) FROM VendAssItems 
                             WHERE VendID = @VendID AND ProcessID = @ProcessID AND ItemID = @ItemID 
                               AND (CustCode = @CustCode OR CustCode = 'Stock' OR CustCode IS NULL OR CustCode = '')"
@@ -474,9 +482,9 @@ namespace DataAccessLibrary.DAC.Production
             }
 
             // 2. Fetch rate from VendAssItems for selected maker, process & item
-            bool hasCustCol = await HasCustCodeColumnAsync(db);
+            bool isCustWise = await IsCustomerWiseRatesEnabledAsync(db);
             string rateSql;
-            if (hasCustCol && !string.IsNullOrWhiteSpace(custCode))
+            if (isCustWise && !string.IsNullOrWhiteSpace(custCode))
             {
                 rateSql = @"
                     SELECT TOP 1 ISNULL(Rate, 0)
@@ -490,7 +498,7 @@ namespace DataAccessLibrary.DAC.Production
                         WHEN CustCode = @CustCode THEN 1 
                         WHEN CustCode = 'Stock' THEN 2 
                         ELSE 3 
-                      END";
+                      END, Rate DESC";
             }
             else
             {
@@ -499,7 +507,8 @@ namespace DataAccessLibrary.DAC.Production
                     FROM VendAssItems
                     WHERE VendID = @VendId
                       AND ProcessID = @ProcessId
-                      AND ItemID = @ItemId";
+                      AND ItemID = @ItemId
+                    ORDER BY Rate DESC";
             }
 
             decimal? rate = await db.ExecuteScalarAsync<decimal?>(rateSql, new

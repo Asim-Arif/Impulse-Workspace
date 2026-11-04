@@ -41,7 +41,7 @@
                                 <span>Update Plan &amp; Dispatch</span>
                             </button>
                         }
-                        else if (OrderHeader.IsPartiallyPlanned)
+                        else if (OrderHeader.IsPartiallyPlanned || OrderHeader.HasDeltaItems)
                         {
                             <button type="button" class="btn btn-sm btn-success fw-bold px-4" @onclick="SavePlanAsync" disabled="@(!CanSavePlan)">
                                 <i class="fas fa-paper-plane me-1"></i>
@@ -146,12 +146,19 @@
                         </div>
                     </div>
                 }
-                else if (OrderHeader.IsPartiallyPlanned)
+                else if (OrderHeader.IsPartiallyPlanned || OrderHeader.HasDeltaItems)
                 {
                     <div class="alert alert-warning d-flex align-items-center justify-content-between py-2 px-3 mb-3 border-warning shadow-sm" style="font-size: 0.88rem; border-radius: 8px;">
                         <div>
                             <i class="fas fa-exclamation-triangle text-warning-emphasis me-2"></i>
-                            <strong>Partially Planned Order:</strong> @OrderHeader.PlannedItemsCount of @OrderHeader.Items.Count items have been planned. Complete planning for newly added/authorized items below and click <strong>Save Delta Plan &amp; Dispatch</strong>.
+                            @if (OrderHeader.HasDeltaItems)
+                            {
+                                <strong>Delta Planning Required:</strong><span> One or more articles have increased/amended order quantities. Complete planning below and click <strong>Save Delta Plan &amp; Dispatch</strong>.</span>
+                            }
+                            else
+                            {
+                                <strong>Partially Planned Order:</strong><span> @OrderHeader.PlannedItemsCount of @OrderHeader.Items.Count items have been planned. Complete planning for newly added/authorized items below and click <strong>Save Delta Plan &amp; Dispatch</strong>.</span>
+                            }
                         </div>
                     </div>
                 }
@@ -233,6 +240,12 @@
                                     <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle px-2 py-1">
                                         <strong>Order Qty:</strong> @item.OrderQty.ToString("N0") pcs
                                     </span>
+                                    @if (item.HasDeltaQty)
+                                    {
+                                        <span class="badge bg-warning text-dark border border-warning px-2 py-1 shadow-sm" title="Order quantity was increased from @item.PreviouslyPlannedOrderQty.ToString("N0") to @item.OrderQty.ToString("N0") pcs. Delta quantity requires planning.">
+                                            <i class="fas fa-plus-circle me-1 text-danger"></i> Delta: +@item.DeltaQty.ToString("N0") pcs (Prev Planned: @item.PreviouslyPlannedOrderQty.ToString("N0"))
+                                        </span>
+                                    }
                                     <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle px-2 py-1">
                                         <i class="fas fa-warehouse me-1 text-primary"></i> Finish Stock: @item.AvailableInHandStock.ToString("N0") pcs
                                     </span>
@@ -288,7 +301,7 @@
                                                        max="@item.AvailableInHandStock"
                                                        @bind="item.StockQty"
                                                        @bind:event="oninput"
-                                                       disabled="@(IsSaving || !item.Authorized || item.IsSavedPlan || item.Purchases.Any(p => p.IsIssued))" />
+                                                       disabled="@(IsSaving || !item.Authorized || ((item.IsSavedPlan || item.Purchases.Any(p => p.IsIssued)) && !item.HasDeltaQty))" />
                                                 <span class="input-group-text bg-white text-muted">pcs</span>
                                             </div>
                                             @if (item.StockQty > item.AvailableInHandStock)
@@ -316,7 +329,7 @@
                                                         <strong class="text-info" style="font-size: 0.92rem;">@item.SFStockQty.ToString("N0") pcs</strong>
                                                         <small class="text-muted ms-1" style="font-size: 0.74rem;">(@item.SFStockAllocations.Count(a => a.AllocatedQty > 0) lot(s))</small>
                                                     </div>
-                                                    @if (item.IsSavedPlan || item.Purchases.Any(p => p.IsIssued))
+                                                    @if ((item.IsSavedPlan || item.Purchases.Any(p => p.IsIssued)) && !item.HasDeltaQty)
                                                     {
                                                         @if (item.SFStockQty > 0)
                                                         {
@@ -385,7 +398,7 @@
                                             </div>
                                             <button type="button" class="btn btn-sm btn-outline-success fw-bold py-0 px-2" style="font-size: 0.8rem;"
                                                     @onclick="async () => await AddPurchaseSplit(item)"
-                                                    disabled="@(IsSaving || !item.Authorized || item.IsSavedPlan || item.Purchases.Any(p => p.IsIssued))">
+                                                    disabled="@(IsSaving || !item.Authorized || ((item.IsSavedPlan || item.Purchases.Any(p => p.IsIssued)) && !item.HasDeltaQty))">
                                                 <i class="fas fa-plus me-1"></i> Add Purchase Split
                                             </button>
                                         </div>
@@ -591,7 +604,7 @@
                                     <span>Update Plan &amp; Dispatch</span>
                                 </button>
                             }
-                            else if (OrderHeader.IsPartiallyPlanned)
+                            else if (OrderHeader.IsPartiallyPlanned || OrderHeader.HasDeltaItems)
                             {
                                 <button type="button" class="btn btn-success fw-bold px-4 shadow-sm" @onclick="SavePlanAsync" disabled="@(!CanSavePlan)">
                                     <i class="fas fa-paper-plane me-1"></i>
@@ -678,10 +691,10 @@
                                                max="@alloc.AvailableQty"
                                                @bind="alloc.AllocatedQty"
                                                @bind:event="oninput"
-                                               disabled="@(ActiveSfItem.IsSavedPlan || ActiveSfItem.Purchases.Any(p => p.IsIssued))" />
+                                               disabled="@(((ActiveSfItem.IsSavedPlan || ActiveSfItem.Purchases.Any(p => p.IsIssued)) && !ActiveSfItem.HasDeltaQty))" />
                                     </td>
                                     <td class="text-center text-nowrap">
-                                        @if (!ActiveSfItem.IsSavedPlan && !ActiveSfItem.Purchases.Any(p => p.IsIssued))
+                                        @if (!((ActiveSfItem.IsSavedPlan || ActiveSfItem.Purchases.Any(p => p.IsIssued)) && !ActiveSfItem.HasDeltaQty))
                                         {
                                             @if (alloc.AllocatedQty > 0)
                                             {
@@ -721,7 +734,7 @@
             <!-- Footer: AttachmentModal Style -->
             <div class="modal-footer border-top py-2 px-3 bg-light d-flex justify-content-between align-items-center" style="flex-shrink: 0;">
                 <div class="small text-muted">
-                    @if (ActiveSfItem.IsSavedPlan || ActiveSfItem.Purchases.Any(p => p.IsIssued))
+                    @if ((ActiveSfItem.IsSavedPlan || ActiveSfItem.Purchases.Any(p => p.IsIssued)) && !ActiveSfItem.HasDeltaQty)
                     {
                         <span class="text-warning-emphasis"><i class="fas fa-lock me-1"></i> This item is already planned. Modifications are locked.</span>
                     }
@@ -730,7 +743,7 @@
                     <button type="button" class="btn btn-secondary btn-sm px-3" @onclick="CloseSfModal">
                         <i class="fas fa-times me-1"></i> Close
                     </button>
-                    @if (!ActiveSfItem.IsSavedPlan && !ActiveSfItem.Purchases.Any(p => p.IsIssued))
+                    @if (!((ActiveSfItem.IsSavedPlan || ActiveSfItem.Purchases.Any(p => p.IsIssued)) && !ActiveSfItem.HasDeltaQty))
                     {
                         <button type="button" class="btn btn-primary btn-sm px-4 fw-bold" @onclick="CloseSfModal">
                             <i class="fas fa-check me-1"></i> Apply &amp; Close

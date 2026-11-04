@@ -68,6 +68,28 @@ namespace Impulse.Pages.Dashboards.ProductionPlanning
         public LookupItemString? SelectedArticle { get; set; }
         public string? FilterOrderNo { get; set; }
         public string? SelectedStageFilter { get; set; }
+        public DateTime? RunningLotsFromDate { get; set; }
+        public DateTime? RunningLotsToDate { get; set; }
+        public string RunningLotsTypeFilter { get; set; } = "All"; // "All", "Regular", "Rework"
+
+        public void SetRunningLotsTypeFilter(string filter)
+        {
+            RunningLotsTypeFilter = filter;
+        }
+
+        public void ClearRunningLotsFilters()
+        {
+            RunningLotsFromDate = null;
+            RunningLotsToDate = null;
+            RunningLotsTypeFilter = "All";
+            SelectedStageFilter = null;
+        }
+
+        public bool HasActiveRunningLotsFilters =>
+            RunningLotsFromDate.HasValue ||
+            RunningLotsToDate.HasValue ||
+            RunningLotsTypeFilter != "All" ||
+            !string.IsNullOrWhiteSpace(SelectedStageFilter);
 
         public ProductionPlanningDashboardData? DashboardData { get; set; }
         public bool IsLoading { get; set; } = false;
@@ -355,12 +377,25 @@ namespace Impulse.Pages.Dashboards.ProductionPlanning
 
         public IEnumerable<RunningLotItem> GetFilteredRunningLots()
         {
-            if (DashboardData == null) return Enumerable.Empty<RunningLotItem>();
-            if (string.IsNullOrWhiteSpace(SelectedStageFilter))
-                return DashboardData.RunningLots;
+            if (DashboardData?.RunningLots == null) return Enumerable.Empty<RunningLotItem>();
 
-            return DashboardData.RunningLots.Where(x =>
-                string.Equals(x.Description, SelectedStageFilter, StringComparison.OrdinalIgnoreCase));
+            var query = DashboardData.RunningLots.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(SelectedStageFilter))
+                query = query.Where(x => string.Equals(x.Description, SelectedStageFilter, StringComparison.OrdinalIgnoreCase));
+
+            if (string.Equals(RunningLotsTypeFilter, "Regular", StringComparison.OrdinalIgnoreCase))
+                query = query.Where(x => !x.IsRework);
+            else if (string.Equals(RunningLotsTypeFilter, "Rework", StringComparison.OrdinalIgnoreCase))
+                query = query.Where(x => x.IsRework);
+
+            if (RunningLotsFromDate.HasValue)
+                query = query.Where(x => (x.DT ?? x.R2InDT).HasValue && (x.DT ?? x.R2InDT)!.Value.Date >= RunningLotsFromDate.Value.Date);
+
+            if (RunningLotsToDate.HasValue)
+                query = query.Where(x => (x.DT ?? x.R2InDT).HasValue && (x.DT ?? x.R2InDT)!.Value.Date <= RunningLotsToDate.Value.Date);
+
+            return query;
         }
 
         public async Task OpenCrossDemandModal(long rmid, string materialCode)

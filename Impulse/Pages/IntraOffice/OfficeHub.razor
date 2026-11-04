@@ -1299,8 +1299,9 @@
     {
         try
         {
-            using var http = new HttpClient();
-            http.Timeout = TimeSpan.FromSeconds(2);
+            using var handler = new HttpClientHandler { UseProxy = false };
+            using var http = new HttpClient(handler);
+            http.Timeout = TimeSpan.FromSeconds(8);
             var response = await http.GetAsync("http://127.0.0.1:3001/qr");
             if (response.IsSuccessStatusCode)
             {
@@ -1309,6 +1310,7 @@
                 
                 string? parsedStatus = null;
                 string? parsedQr = null;
+                string? parsedError = null;
 
                 if (doc.RootElement.TryGetProperty("status", out var statusEl))
                 {
@@ -1318,10 +1320,14 @@
                 {
                     parsedQr = qrEl.GetString();
                 }
+                if (doc.RootElement.TryGetProperty("error", out var errEl) && errEl.ValueKind != System.Text.Json.JsonValueKind.Null)
+                {
+                    parsedError = errEl.GetString();
+                }
 
                 whatsAppStatus = parsedStatus ?? "INITIALIZING";
                 whatsAppQrUrl = parsedQr;
-                whatsAppErrorMessage = "";
+                whatsAppErrorMessage = !string.IsNullOrWhiteSpace(parsedError) ? parsedError : "";
                 await InvokeAsync(StateHasChanged);
             }
             else
@@ -1330,6 +1336,12 @@
                 whatsAppErrorMessage = $"HTTP {(int)response.StatusCode}";
                 await InvokeAsync(StateHasChanged);
             }
+        }
+        catch (TaskCanceledException)
+        {
+            whatsAppStatus = "INITIALIZING";
+            whatsAppErrorMessage = "Microservice starting up, awaiting response...";
+            await InvokeAsync(StateHasChanged);
         }
         catch (Exception ex)
         {

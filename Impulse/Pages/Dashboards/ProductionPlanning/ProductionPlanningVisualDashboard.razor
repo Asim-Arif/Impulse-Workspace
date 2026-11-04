@@ -753,41 +753,126 @@
                         <!-- TAB 1: Running Lots in Production (WIP) -->
                         @if (ActiveMatrixTab == 1)
                         {
+                            var lots = GetFilteredRunningLots().ToList();
+                            var regularCount = DashboardData?.RunningLots.Count(x => !x.IsRework) ?? 0;
+                            var reworkCount = DashboardData?.RunningLots.Count(x => x.IsRework) ?? 0;
+
+                            <!-- Filter Bar: Type Filter & Date Range (Dedicated to Running Lots) -->
+                            <div class="px-3 py-2 bg-light border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2" style="font-size: 0.82rem;">
+                                <!-- Type Filter Segmented Buttons -->
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-secondary fw-semibold small"><i class="fas fa-filter text-muted me-1"></i>Type:</span>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button type="button" 
+                                                class="btn @(RunningLotsTypeFilter == "All" ? "btn-dark fw-bold" : "btn-outline-secondary") py-0 px-2" 
+                                                style="font-size: 0.78rem;" 
+                                                @onclick='() => SetRunningLotsTypeFilter("All")'>
+                                            All (@(DashboardData?.RunningLots.Count ?? 0))
+                                        </button>
+                                        <button type="button" 
+                                                class="btn @(RunningLotsTypeFilter == "Regular" ? "btn-primary fw-bold" : "btn-outline-primary") py-0 px-2" 
+                                                style="font-size: 0.78rem;" 
+                                                @onclick='() => SetRunningLotsTypeFilter("Regular")'>
+                                            <i class="fas fa-cog me-1"></i>Regular (@regularCount)
+                                        </button>
+                                        <button type="button" 
+                                                class="btn @(RunningLotsTypeFilter == "Rework" ? "btn-warning text-dark fw-bold" : "btn-outline-warning text-dark") py-0 px-2" 
+                                                style="font-size: 0.78rem;" 
+                                                @onclick='() => SetRunningLotsTypeFilter("Rework")'>
+                                            <i class="fas fa-tools me-1 text-danger"></i>Rework (@reworkCount)
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Date Range Filter -->
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <span class="text-secondary fw-semibold small"><i class="fas fa-calendar-alt text-muted me-1"></i>Date:</span>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <input type="date" 
+                                               class="form-control form-control-sm py-0 px-1" 
+                                               style="font-size: 0.78rem; width: 125px; height: 26px !important;" 
+                                               @bind="RunningLotsFromDate" 
+                                               title="From Date" />
+                                        <span class="text-muted small">to</span>
+                                        <input type="date" 
+                                               class="form-control form-control-sm py-0 px-1" 
+                                               style="font-size: 0.78rem; width: 125px; height: 26px !important;" 
+                                               @bind="RunningLotsToDate" 
+                                               title="To Date" />
+                                    </div>
+
+                                    @if (HasActiveRunningLotsFilters)
+                                    {
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-danger py-0 px-2 d-flex align-items-center" 
+                                                style="font-size: 0.75rem; height: 26px;" 
+                                                @onclick="ClearRunningLotsFilters" 
+                                                title="Clear Filters">
+                                            <i class="fas fa-times me-1"></i>Clear
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+
                             <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
                                 <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.86rem;">
                                     <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
                                         <tr>
                                             <th>Lot #</th>
+                                            <th>Type</th>
                                             <th>Current Operation / Stage</th>
                                             <th class="text-end">Lot Qty</th>
                                             <th>Internal Ref</th>
                                             <th>Customer</th>
-                                            <th>R2-In Date</th>
+                                            <th>Date</th>
                                             <th>Origin Type</th>
                                             <th class="text-center">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @{
-                                            var lots = GetFilteredRunningLots().ToList();
-                                        }
                                         @if (!lots.Any())
                                         {
                                             <tr>
-                                                <td colspan="8" class="text-center py-4 text-muted small">No active running lots found matching the filter.</td>
+                                                <td colspan="9" class="text-center py-4 text-muted small">No active running lots found matching the filter / date range.</td>
                                             </tr>
                                         }
                                         else
                                         {
                                             @foreach (var lot in lots)
                                             {
-                                                <ContextMenuTrigger MenuId="lotContextMenu" Data="lot" WrapperTag="tr">
-                                                    <td class="fw-bold text-primary">@lot.LotNo</td>
+                                                <ContextMenuTrigger MenuId="lotContextMenu" Data="lot" WrapperTag="tr"
+                                                                    class="@(lot.IsRework ? "table-warning border-start border-3 border-warning" : "border-start border-3 border-primary")">
+                                                    <td>
+                                                        @if (lot.IsRework)
+                                                        {
+                                                            <span class="fw-bold text-danger d-inline-flex align-items-center">
+                                                                <i class="fas fa-tools me-1 text-danger small"></i>@lot.LotNo
+                                                            </span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="fw-bold text-primary">@lot.LotNo</span>
+                                                        }
+                                                    </td>
+                                                    <td>
+                                                        @if (lot.IsRework)
+                                                        {
+                                                            <span class="badge bg-warning text-dark border border-warning px-2 py-0" style="font-size: 0.73rem;">
+                                                                <i class="fas fa-tools me-1 text-danger"></i>Rework
+                                                            </span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0" style="font-size: 0.73rem;">
+                                                                <i class="fas fa-cog me-1"></i>Regular
+                                                            </span>
+                                                        }
+                                                    </td>
                                                     <td><span class="badge bg-secondary">@lot.Description</span></td>
                                                     <td class="text-end fw-bold">@lot.Qty.ToString("N0")</td>
                                                     <td>@(string.IsNullOrEmpty(lot.InternalRefNo) ? "-" : lot.InternalRefNo)</td>
                                                     <td><span class="badge bg-light text-dark border">@lot.CustCode</span></td>
-                                                    <td>@(lot.R2InDT?.ToString("dd-MMM-yyyy") ?? "-")</td>
+                                                    <td>@((lot.DT ?? lot.R2InDT)?.ToString("dd-MMM-yyyy") ?? "-")</td>
                                                     <td>
                                                         @if (lot.OriginType == "Semi")
                                                         {
@@ -812,7 +897,7 @@
                                     </tbody>
                                     <tfoot class="table-light fw-bold sticky-bottom" style="box-shadow: 0 -1px 0 #dee2e6;">
                                         <tr>
-                                            <td colspan="2" class="ps-3">Total Active WIP</td>
+                                            <td colspan="3" class="ps-3">Total Active WIP</td>
                                             <td class="text-end text-success">@lots.Sum(x => x.Qty).ToString("N0")</td>
                                             <td colspan="5"></td>
                                         </tr>

@@ -112,7 +112,7 @@ namespace DataAccessLibrary.DAC.Production
                 WHERE VendID = @VendId
                   AND ItemID = @ItemId
                   AND (ProcessID = @ReturnProcessId OR ProcessID = @ProcessId)
-                ORDER BY CASE WHEN ProcessID = @ReturnProcessId THEN 1 ELSE 2 END";
+                ORDER BY CASE WHEN ProcessID = @ReturnProcessId THEN 1 ELSE 2 END, Rate DESC";
 
             decimal? rate = await db.ExecuteScalarAsync<decimal?>(rateSql, new
             {

@@ -114,11 +114,18 @@ namespace DataAccessLibrary.DAC.Production
                 if (!f.ShowRegularLots)
                     sb.Append(" AND ReWorkLot = 1");
 
-                // Lots Only toggle (EntryType=0 means lot, EntryType=1 means not-yet-started order item)
-                if (!f.ShowLotsOnly)
-                    sb.Append(" AND EntryType <> 0");
-                if (!f.ShowNotYetStarted)
-                    sb.Append(" AND EntryType <> 1");
+                // Lots Only vs Not Yet Started logic (EntryType=0 means lot, EntryType=1 means not-yet-started order item)
+                if (f.ShowLotsOnly && f.ShowNotYetStarted)
+                {
+                    sb.Append(" AND ((EntryType <> 0 AND ISNULL(DispatchQty, 0) < OrderQty) OR EntryType <> 1)");
+                }
+                else
+                {
+                    if (!f.ShowLotsOnly)
+                        sb.Append(" AND (EntryType <> 0 AND ISNULL(DispatchQty, 0) < OrderQty)");
+                    if (!f.ShowNotYetStarted)
+                        sb.Append(" AND EntryType <> 1");
+                }
 
                 // Hub
                 if (!string.IsNullOrEmpty(f.Hub) && f.Hub != "0")

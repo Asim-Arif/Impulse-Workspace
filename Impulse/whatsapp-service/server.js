@@ -2,6 +2,7 @@ const express = require('express');
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const cors = require('cors');
+const fs = require('fs');
 
 const app = express();
 app.use(cors());
@@ -13,62 +14,102 @@ process.on('uncaughtException', (err) => {
     process.exit(1);
 });
 
+// Locate browser executable dynamically across typical Windows/Server locations
+function getBrowserExecutablePath() {
+    const candidates = [
+        'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+        'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+        process.env.PUPPETEER_EXECUTABLE_PATH
+    ].filter(Boolean);
+
+    for (const p of candidates) {
+        if (fs.existsSync(p)) {
+            console.log(`Using browser at: ${p}`);
+            return p;
+        }
+    }
+    console.log('No specific browser path found, falling back to Puppeteer default Chromium.');
+    return undefined;
+}
+
+const browserExe = getBrowserExecutablePath();
+const puppeteerConfig = {
+    headless: true,
+    args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-gpu',
+        '--disable-dev-shm-usage',
+        '--no-first-run',
+        '--no-zygote'
+    ]
+};
+if (browserExe) {
+    puppeteerConfig.executablePath = browserExe;
+}
+
 const client = new Client({
     authStrategy: new LocalAuth(),
-    puppeteer: {
-        headless: true,
-        executablePath: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-    }
+    puppeteer: puppeteerConfig
 });
 
 let qrCodeDataUrl = null;
 let connectionStatus = 'INITIALIZING'; // INITIALIZING, QR_READY, CONNECTED, DISCONNECTED
+let lastErrorMessage = '';
 
 client.on('qr', async (qr) => {
     console.log('QR code received, generating data URL...');
-    qrCodeDataUrl = await qrcode.toDataURL(qr);
-    connectionStatus = 'QR_READY';
+    try {
+        qrCodeDataUrl = await qrcode.toDataURL(qr);
+        connectionStatus = 'QR_READY';
+        lastErrorMessage = '';
+    } catch (qrErr) {
+        console.error('Error generating QR Data URL:', qrErr);
+    }
 });
 
 client.on('ready', () => {
     console.log('WhatsApp Client is ready!');
     qrCodeDataUrl = null;
     connectionStatus = 'CONNECTED';
+    lastErrorMessage = '';
 });
 
 client.on('authenticated', () => {
     console.log('WhatsApp Authenticated!');
     connectionStatus = 'CONNECTED';
+    lastErrorMessage = '';
 });
 
 client.on('auth_failure', msg => {
     console.error('WhatsApp Authentication failure', msg);
     connectionStatus = 'DISCONNECTED';
+    lastErrorMessage = typeof msg === 'string' ? msg : 'Authentication failed';
 });
 
 client.on('disconnected', (reason) => {
     console.log('WhatsApp Client was disconnected', reason);
     qrCodeDataUrl = null;
     connectionStatus = 'DISCONNECTED';
+    lastErrorMessage = reason || 'Client disconnected';
     
     // Exit process so the auto-restart loop can wipe the corrupted session and cleanly restart
     console.log("Exiting process to allow clean restart...");
     setTimeout(() => process.exit(1), 1000);
 });
 
-client.initialize();
-
 // API Endpoints
 app.get('/status', (req, res) => {
-    res.json({ status: connectionStatus });
+    res.json({ status: connectionStatus, error: lastErrorMessage });
 });
 
 app.get('/qr', (req, res) => {
     if (connectionStatus === 'QR_READY' && qrCodeDataUrl) {
-        res.json({ qr: qrCodeDataUrl, status: connectionStatus });
+        res.json({ qr: qrCodeDataUrl, status: connectionStatus, error: lastErrorMessage });
     } else {
-        res.json({ qr: null, status: connectionStatus });
+        res.json({ qr: null, status: connectionStatus, error: lastErrorMessage });
     }
 });
 
@@ -114,7 +155,6 @@ app.post('/send', async (req, res) => {
         // Then send attachments if any
         console.log(`Checking attachments for ${phoneNumber}... Length: ${attachments ? attachments.length : 0}`);
         if (attachments && Array.isArray(attachments)) {
-            const fs = require('fs');
             for (const filePath of attachments) {
                 try {
                     console.log(`Attempting to send attachment: ${filePath}`);
@@ -124,7 +164,7 @@ app.post('/send', async (req, res) => {
                         console.log(`Sending webm as audio/mp4 bypass: ${filePath}`);
                         const base64 = fs.readFileSync(filePath, { encoding: 'base64' });
                         const media = new MessageMedia('audio/mp4', base64, filePath.split(/[\\/]/).pop());
-                        await client.sendMessage(chatId, media); // Without sendAudioAsVoice to avoid ffmpeg crash, but it sends as playable audio
+                        await client.sendMessage(chatId, media);
                     }
                     else if (isAudio) {
                         const media = MessageMedia.fromFilePath(filePath);
@@ -149,6 +189,15 @@ app.post('/send', async (req, res) => {
 });
 
 const PORT = 3001;
+// Listen immediately so health checks and status endpoints are reachable right away
 app.listen(PORT, () => {
     console.log(`WhatsApp Microservice running on port ${PORT}`);
+    
+    // Initialize WhatsApp client in the background after Express is active
+    console.log('Initializing WhatsApp Client...');
+    client.initialize().catch(err => {
+        console.error('Failed to initialize WhatsApp client:', err);
+        connectionStatus = 'DISCONNECTED';
+        lastErrorMessage = err.message || 'Initialization failed';
+    });
 });

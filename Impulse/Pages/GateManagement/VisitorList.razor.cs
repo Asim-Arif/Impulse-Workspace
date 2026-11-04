@@ -121,15 +121,10 @@ public partial class VisitorList : ComponentBase
     {
         try
         {
-            var parameters = new Dictionary<string, object>
-            {
-                { "@EntryID", entryId }
-            };
-
             var request = new ReportRequest
             {
                 ReportName = ReportNames.GateManagement.Visitor,
-                Parameters = parameters
+                SelectionFormula = $"{{Designations.EntryID}} = {entryId}"
             };
 
             await ReportNavigation.PrintReportAsync(request);

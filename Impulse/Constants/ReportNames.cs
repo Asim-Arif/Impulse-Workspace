@@ -152,6 +152,7 @@ namespace Impulse.Constants
             public const string ProdOrderBalanceQty = Folder + "rptProductionOrderBalanceQty.rpt";
             public const string ProdOrderMarkingPlan = Folder + "rptProductionOrderWranglerMarkingPlan.rpt";
             public const string ProdOrderWValue = Folder + "rptProductionOrderWValue.rpt";
+            public const string ProdOrderPackingWithKits = Folder + "rptProductionOrderWValue_Set_Items.rpt";
             public const string ProdOrderRM = Folder + "ProductionOrder_RM.rpt";
             public const string ProdOrderPacking = Folder + "ProductionOrder_Packing.rpt";
             public const string ProdOrderStatus = Folder + "rptProductionOrder_Status.rpt";

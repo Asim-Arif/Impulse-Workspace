@@ -121,12 +121,13 @@ namespace DataAccessLibrary.DAC.Dashboard
             // 3. Running Lots
             string runningLotsSql = @"
                 SELECT T1.LotNo, T1.Description, T1.Qty, T1.OrderNo, ISNULL(T1.InternalRefNo, T1.OrderNo) AS InternalRefNo,
-                       FCustomerOrders.CustCode, VLotWithR2InDate.DT AS R2InDT,
+                       FCustomerOrders.CustCode, T1.DT, VLotWithR2InDate.DT AS R2InDT,
                        CASE WHEN ISNULL(TSOOI.VID_RefID, 0) > 0 THEN 'Semi' ELSE '' END AS OriginType,
-                       T1.IssuanceEntryID, T1.RcvEntryID, T1.ProcessID
+                       T1.IssuanceEntryID, T1.RcvEntryID, T1.ProcessID,
+                       CASE WHEN ISNULL(T1.ReWorkLot, 0) = 1 OR ISNULL(LL.Lot_Type, 0) = 5 THEN 1 ELSE 0 END AS IsRework
                 FROM (
                     SELECT ItemCode, LotNo, OrderNo, Description, InternalRefNo, IssQty - RcvdQty AS Qty, ProcessID,
-                           EntryID AS IssuanceEntryID, 0 AS RcvEntryID
+                           EntryID AS IssuanceEntryID, 0 AS RcvEntryID, ISNULL(ReWorkLot, 0) AS ReWorkLot, DT
                     FROM VVendIssdDetail_ForRunningLots WITH (NOLOCK)
                     WHERE ItemCode = @ItemCode AND LotNo <> '0' AND IssQty - RcvdQty > 0
                       AND EntryID NOT IN (SELECT Issue_RefID FROM VendRcvdDetail WHERE Issue_RefID IS NOT NULL)";
@@ -138,7 +139,7 @@ namespace DataAccessLibrary.DAC.Dashboard
                     UNION ALL
                     SELECT ItemCode, LotNo, OrderNo, Description, InternalRefNo,
                            RcvdQty - IssQty - ISNULL(Wastage,0) - ISNULL(ReWorkQty,0) AS Qty, ProcessID,
-                           0 AS IssuanceEntryID, EntryID AS RcvEntryID
+                           0 AS IssuanceEntryID, EntryID AS RcvEntryID, ISNULL(ReWorkLot, 0) AS ReWorkLot, DT
                     FROM VVendRcvdDetail_Simple WITH (NOLOCK)
                     WHERE ItemCode = @ItemCode AND LotNo <> '0'
                       AND RcvdQty - IssQty - ISNULL(Wastage,0) - ISNULL(ReWorkQty,0) > 0
@@ -150,6 +151,7 @@ namespace DataAccessLibrary.DAC.Dashboard
 
             runningLotsSql += @") T1
                 LEFT OUTER JOIN VLotWithR2InDate ON T1.LotNo = VLotWithR2InDate.LotNo
+                LEFT OUTER JOIN Lots_List LL ON T1.LotNo = LL.LotNo
                 LEFT OUTER JOIN VLotWithFirstProcessOfIssuance ON T1.LotNo = VLotWithFirstProcessOfIssuance.LotNo
                 LEFT OUTER JOIN (SELECT VID_RefID FROM StockOrderOpening_Issuance GROUP BY VID_RefID) TSOOI ON VLotWithFirstProcessOfIssuance.EntryID = TSOOI.VID_RefID
                 LEFT OUTER JOIN FCustomerOrders ON T1.OrderNo = FCustomerOrders.OrderNo

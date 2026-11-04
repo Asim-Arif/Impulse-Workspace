@@ -32,9 +32,10 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string Currency { get; set; } = string.Empty;
         public bool Authorized { get; set; }
         public bool IsPlanned { get; set; }
-        public bool IsPartiallyPlanned => !IsPlanned && Items.Any(i => i.IsPlanned);
-        public bool HasUnplannedItems => Items.Any(i => !i.IsPlanned || !i.Authorized);
-        public int PlannedItemsCount => Items.Count(i => i.IsPlanned);
+        public bool HasDeltaItems => Items.Any(i => i.HasDeltaQty);
+        public bool IsPartiallyPlanned => !IsPlanned && (Items.Any(i => i.IsPlanned) || HasDeltaItems);
+        public bool HasUnplannedItems => Items.Any(i => (!i.IsPlanned && !i.HasDeltaQty) || !i.Authorized || i.HasDeltaQty);
+        public int PlannedItemsCount => Items.Count(i => i.IsPlanned && !i.HasDeltaQty);
         public string? PlannedBy { get; set; }
         public DateTime? PlannedAt { get; set; }
         public string? Notes { get; set; }
@@ -50,10 +51,13 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public bool Authorized { get; set; } = true;
         public int AuthorizedQty { get; set; }
         public bool IsSavedPlan { get; set; } = false;
+        public int PreviouslyPlannedOrderQty { get; set; } = 0;
+        public bool HasDeltaQty => Authorized && OrderQty > PreviouslyPlannedOrderQty && PreviouslyPlannedOrderQty > 0;
+        public int DeltaQty => Math.Max(0, OrderQty - PreviouslyPlannedOrderQty);
         private bool _isPlanned;
         public bool IsPlanned
         {
-            get => _isPlanned || IsSavedPlan || StockQty > 0 || SFStockQty > 0 || Purchases.Any(p => p.PurchaseQty > 0 && p.ProcessID > 0);
+            get => _isPlanned || IsSavedPlan || StockQty > 0 || SFStockQty > 0 || Purchases.Any(p => p.PurchaseQty > 0 && p.ProcessID > 0) || PreviouslyPlannedOrderQty > 0;
             set => _isPlanned = value;
         }
         public int AvailableInHandStock { get; set; }

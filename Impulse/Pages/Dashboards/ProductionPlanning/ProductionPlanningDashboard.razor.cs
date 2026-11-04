@@ -36,6 +36,48 @@ namespace Impulse.Pages.Dashboards.ProductionPlanning
         public int InventoryTab { get; set; } = 0;
         public int DetailsTab { get; set; } = 0;
 
+        // Running Lots dedicated filters
+        public DateTime? RunningLotsFromDate { get; set; }
+        public DateTime? RunningLotsToDate { get; set; }
+        public string RunningLotsTypeFilter { get; set; } = "All"; // "All", "Regular", "Rework"
+
+        public IEnumerable<RunningLotItem> GetFilteredRunningLots()
+        {
+            if (DashboardData?.RunningLots == null) return Enumerable.Empty<RunningLotItem>();
+
+            var query = DashboardData.RunningLots.AsEnumerable();
+
+            if (string.Equals(RunningLotsTypeFilter, "Regular", StringComparison.OrdinalIgnoreCase))
+                query = query.Where(x => !x.IsRework);
+            else if (string.Equals(RunningLotsTypeFilter, "Rework", StringComparison.OrdinalIgnoreCase))
+                query = query.Where(x => x.IsRework);
+
+            if (RunningLotsFromDate.HasValue)
+                query = query.Where(x => (x.DT ?? x.R2InDT).HasValue && (x.DT ?? x.R2InDT)!.Value.Date >= RunningLotsFromDate.Value.Date);
+
+            if (RunningLotsToDate.HasValue)
+                query = query.Where(x => (x.DT ?? x.R2InDT).HasValue && (x.DT ?? x.R2InDT)!.Value.Date <= RunningLotsToDate.Value.Date);
+
+            return query;
+        }
+
+        public void SetRunningLotsTypeFilter(string filter)
+        {
+            RunningLotsTypeFilter = filter;
+        }
+
+        public void ClearRunningLotsFilters()
+        {
+            RunningLotsFromDate = null;
+            RunningLotsToDate = null;
+            RunningLotsTypeFilter = "All";
+        }
+
+        public bool HasActiveRunningLotsFilters =>
+            RunningLotsFromDate.HasValue ||
+            RunningLotsToDate.HasValue ||
+            RunningLotsTypeFilter != "All";
+
         public bool ShowCrossDemandModal { get; set; } = false;
         public string ActiveForgingCode { get; set; } = string.Empty;
         public List<ForgingCrossDemandItem> CrossDemandItems { get; set; } = new();
@@ -63,6 +105,7 @@ namespace Impulse.Pages.Dashboards.ProductionPlanning
             DashboardData = null;
             FilterOrderNo = null;
             SelectedCountry = "<Comp>";
+            ClearRunningLotsFilters();
             await Task.CompletedTask;
         }
 

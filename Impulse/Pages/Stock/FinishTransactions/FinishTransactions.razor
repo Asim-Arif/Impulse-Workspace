@@ -122,23 +122,24 @@
                 <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
                     <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
                         <tr>
-                            <th style="width: 5%; padding-left: 1rem; text-align: center;">S#</th>
-                            <th style="width: 12%;">Entry #</th>
-                            <th style="width: 9%;">Date</th>
-                            <th style="width: 12%;">Rcvd / Issd By</th>
-                            <th style="width: 12%;">Rcvd / Issd From</th>
-                            <th style="width: 10%;">Order No</th>
-                            <th style="width: 10%;">Item Code</th>
-                            <th style="width: 15%;">Item Name</th>
+                            <th style="width: 4%; padding-left: 1rem; text-align: center;">S#</th>
+                            <th style="width: 11%;">Entry #</th>
+                            <th style="width: 8%;">Date</th>
+                            <th style="width: 11%;">Rcvd / Issd By</th>
+                            <th style="width: 11%;">Rcvd / Issd From</th>
+                            <th style="width: 9%;">Order No</th>
+                            <th style="width: 9%;">Item Code</th>
+                            <th style="width: 14%;">Item Name</th>
                             <th style="width: 7%; text-align: center;">Qty</th>
                             <th style="width: 8%;">Location</th>
+                            <th style="width: 8%;">Lot #</th>
                         </tr>
                     </thead>
                     <tbody>
                         @if (IsLoading)
                         {
                             <tr>
-                                <td colspan="10" class="text-center py-4">
+                                <td colspan="11" class="text-center py-4">
                                     <span class="spinner-border spinner-border-sm me-2 text-primary"></span> Loading transactions...
                                 </td>
                             </tr>
@@ -146,7 +147,7 @@
                         else if (!Transactions.Any())
                         {
                             <tr>
-                                <td colspan="10" class="text-center py-4 text-muted">
+                                <td colspan="11" class="text-center py-4 text-muted">
                                     No transactions found matching the selected filter criteria.
                                 </td>
                             </tr>
@@ -178,6 +179,7 @@
                                         @item.SignedQty.ToString("N0")
                                     </td>
                                     <td><small>@item.Location</small></td>
+                                    <td><small>@item.LotNo_Manual</small></td>
                                 </ContextMenuTrigger>
                             }
                         }
@@ -190,6 +192,7 @@
                                 <td class="text-center @(Transactions.Sum(x => x.SignedQty) >= 0 ? "text-success" : "text-danger")" style="font-size: 0.95rem;">
                                     @Transactions.Sum(x => x.SignedQty).ToString("N0")
                                 </td>
+                                <td></td>
                                 <td></td>
                             </tr>
                         </tfoot>

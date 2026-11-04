@@ -31,6 +31,7 @@ namespace Impulse.Pages.Production.PpcOrderPlanning
         public bool CanSavePlan =>
             OrderHeader != null &&
             OrderHeader.Items.Any(i => i.Authorized) &&
+            OrderHeader.Items.Any(i => i.Authorized && (i.IsPlanned || i.HasDeltaQty)) &&
             !OrderHeader.Items.Where(i => i.Authorized).Any(i => i.StockQty > i.AvailableInHandStock || i.StockQty < 0) &&
             !OrderHeader.Items.Where(i => i.Authorized).Any(i => i.SFStockAllocations.Any(a => a.AllocatedQty < 0 || a.AllocatedQty > a.AvailableQty)) &&
             !OrderHeader.Items.Where(i => i.Authorized).Any(i => i.Purchases.Any(p => p.PurchaseQty <= 0 || p.ProcessID <= 0)) &&
@@ -288,7 +289,7 @@ namespace Impulse.Pages.Production.PpcOrderPlanning
                 return;
             }
 
-            var plannedItems = authorizedItems.Where(i => i.IsPlanned).ToList();
+            var plannedItems = authorizedItems.Where(i => i.IsPlanned || i.HasDeltaQty).ToList();
             if (!plannedItems.Any())
             {
                 NotificationService.Notify(new NotificationMessage

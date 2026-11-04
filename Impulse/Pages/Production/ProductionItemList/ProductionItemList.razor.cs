@@ -129,6 +129,38 @@ namespace Impulse.Pages.Production.ProductionItemList
             // The ContextMenuTrigger handles this automatically
         }
 
+        // ── Row Selection ───────────────────────────────────────────────────
+        public bool AreAllSelected => Items.Count > 0 && Items.All(x => x.IsSelected);
+        public int SelectedCount => Items.Count(x => x.IsSelected);
+
+        public void ToggleSelectAll(ChangeEventArgs e)
+        {
+            bool selectAll = (bool)(e.Value ?? false);
+            foreach (var item in Items)
+            {
+                item.IsSelected = selectAll;
+            }
+            StateHasChanged();
+        }
+
+        public void SelectAll(ItemClickEventArgs? args = null)
+        {
+            foreach (var item in Items)
+            {
+                item.IsSelected = true;
+            }
+            StateHasChanged();
+        }
+
+        public void ClearAll(ItemClickEventArgs? args = null)
+        {
+            foreach (var item in Items)
+            {
+                item.IsSelected = false;
+            }
+            StateHasChanged();
+        }
+
         // ── Typeahead Search Methods ─────────────────────────────────────────
         public Task<IEnumerable<LookupItemString>> SearchCustomers(string searchText)
         {
@@ -246,21 +278,20 @@ namespace Impulse.Pages.Production.ProductionItemList
             });
         }
 
-        public async Task PrintHubwiseAsync(ItemClickEventArgs args)
+        public async Task PrintSelectedAsync(ItemClickEventArgs args)
         {
-            await ReportNavigationService.PrintReportAsync(new ReportRequest
+            var selected = Items.Where(i => i.IsSelected).ToList();
+            if (selected.Count == 0)
             {
-                ReportName = "ProductionItemList_Hubwise.rpt",
-                SelectionFormula = BuildCrystalSelectionFormula()
-            });
-        }
+                NotificationService.Notify(NotificationSeverity.Warning, "Print (Selected)", "Please select at least one row to print.");
+                return;
+            }
 
-        public async Task PrintWithValueAsync(ItemClickEventArgs args)
-        {
+            var formula = BuildSelectedSelectionFormula(selected);
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
-                ReportName = "ProductionItemList_With_Value.rpt",
-                SelectionFormula = BuildCrystalSelectionFormula()
+                ReportName = "ProductionItemList.rpt",
+                SelectionFormula = formula
             });
         }
 
@@ -326,10 +357,56 @@ namespace Impulse.Pages.Production.ProductionItemList
 
             if (!Filters.ShowRepairLots) parts.Add("{VRunningLots_POI.ReWorkLot} = 0");
             if (!Filters.ShowRegularLots) parts.Add("{VRunningLots_POI.ReWorkLot} = 1");
-            if (!Filters.ShowLotsOnly) parts.Add("{VRunningLots_POI.EntryType} <> 0");
-            if (!Filters.ShowNotYetStarted) parts.Add("{VRunningLots_POI.EntryType} <> 1");
+
+            if (Filters.ShowLotsOnly && Filters.ShowNotYetStarted)
+            {
+                parts.Add("(({VRunningLots_POI.EntryType} <> 0 AND (IsNull({VRunningLots_POI.DispatchQty}) OR {VRunningLots_POI.DispatchQty} < {VRunningLots_POI.OrderQty})) OR {VRunningLots_POI.EntryType} <> 1)");
+            }
+            else
+            {
+                if (!Filters.ShowLotsOnly)
+                    parts.Add("({VRunningLots_POI.EntryType} <> 0 AND (IsNull({VRunningLots_POI.DispatchQty}) OR {VRunningLots_POI.DispatchQty} < {VRunningLots_POI.OrderQty}))");
+                if (!Filters.ShowNotYetStarted)
+                    parts.Add("{VRunningLots_POI.EntryType} <> 1");
+            }
 
             return string.Join(" AND ", parts);
+        }
+
+        /// <summary>
+        /// Builds a Crystal Reports selection formula restricted exclusively to the selected/marked rows.
+        /// </summary>
+        private string BuildSelectedSelectionFormula(List<ProductionItemListItem> selected)
+        {
+            var conditions = new List<string>();
+
+            // 1. Lots (EntryType = 0) with valid LotNo
+            var lotNos = selected
+                .Where(x => !string.IsNullOrWhiteSpace(x.LotNo))
+                .Select(x => x.LotNo.Trim())
+                .Distinct()
+                .ToList();
+
+            if (lotNos.Count > 0)
+            {
+                var lotList = string.Join(", ", lotNos.Select(l => $"'{l.Replace("'", "''")}'"));
+                conditions.Add($"{{VRunningLots_POI.LotNo}} in [{lotList}]");
+            }
+
+            // 2. Not-yet-started orders (EntryType = 1) identified by OrderNo + ItemCode
+            var nonLots = selected
+                .Where(x => string.IsNullOrWhiteSpace(x.LotNo) && !string.IsNullOrWhiteSpace(x.OrderNo) && !string.IsNullOrWhiteSpace(x.ItemCode))
+                .ToList();
+
+            if (nonLots.Count > 0)
+            {
+                var orderClauses = nonLots.Select(x =>
+                    $"({{VRunningLots_POI.EntryType}} = 1 AND {{VRunningLots_POI.OrderNo}} = '{x.OrderNo.Replace("'", "''")}' AND {{VRunningLots_POI.ItemCode}} = '{x.ItemCode.Replace("'", "''")}')"
+                );
+                conditions.Add($"({string.Join(" OR ", orderClauses)})");
+            }
+
+            return conditions.Count > 0 ? string.Join(" OR ", conditions) : "1=0";
         }
     }
 }

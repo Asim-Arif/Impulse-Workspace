@@ -53,10 +53,13 @@ namespace DataAccessLibrary.Models.ViewModels.Dashboard
         public string InternalRefNo { get; set; } = string.Empty;
         public string CustCode { get; set; } = string.Empty;
         public DateTime? R2InDT { get; set; }
+        public DateTime? DT { get; set; }
         public string OriginType { get; set; } = string.Empty; // "Semi", "Pack", or ""
         public long IssuanceEntryID { get; set; }
         public long RcvEntryID { get; set; }
         public long ProcessID { get; set; }
+        public bool IsRework { get; set; }
+        public string LotTypeDisplay => IsRework ? "Rework" : "Regular";
     }
 
     public class OpenPOItem

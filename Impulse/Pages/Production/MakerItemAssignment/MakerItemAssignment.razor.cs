@@ -538,7 +538,7 @@ namespace Impulse.Pages.Production.MakerItemAssignment
                 }
 
                 // Director/Admin direct update OR only remarks changed
-                if (IsCustomerWiseRatesEnabled && ApplyToAllCustomers)
+                if (!IsCustomerWiseRatesEnabled || ApplyToAllCustomers)
                 {
                     await MakerItemAssignmentService.UpdateRateForAllCustomersAsync(
                         SelectedMaker?.VendID ?? EditingItem.VendID,
@@ -552,8 +552,8 @@ namespace Impulse.Pages.Production.MakerItemAssignment
                     NotificationService.Notify(new Radzen.NotificationMessage
                     {
                         Severity = Radzen.NotificationSeverity.Success,
-                        Summary = "Updated All Customers",
-                        Detail = $"Item [{EditingItem.ItemID}] updated across all customers.",
+                        Summary = "Updated",
+                        Detail = $"Item [{EditingItem.ItemID}] rate updated successfully.",
                         Duration = 3500
                     });
 

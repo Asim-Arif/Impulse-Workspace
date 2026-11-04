@@ -15,10 +15,12 @@ namespace DataAccessLibrary.DAC.Production
     public class PpcMakerOrderDataAccess : IPpcMakerOrderDataAccess
     {
         private readonly string _connectionString;
+        private readonly IConfiguration _config;
         private readonly ILogger<PpcMakerOrderDataAccess> _logger;
 
         public PpcMakerOrderDataAccess(IConfiguration config, ILogger<PpcMakerOrderDataAccess> logger)
         {
+            _config = config;
             _connectionString = config.GetConnectionString("DefaultConnection")
                 ?? config.GetConnectionString("SMBI_AWM")
                 ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
@@ -126,6 +128,13 @@ namespace DataAccessLibrary.DAC.Production
             return _hasCustCodeColumn.Value;
         }
 
+        private async Task<bool> IsCustomerWiseRatesEnabledAsync(IDbConnection conn)
+        {
+            bool colExists = await HasCustCodeColumnAsync(conn);
+            bool configEnabled = bool.TryParse(_config["AppSettings:EnableCustomerWiseMakerRates"], out bool enabled) && enabled;
+            return colExists && configEnabled;
+        }
+
         public async Task<List<PpcMakerPoItemRowDto>> GetPpcPurchasesForOrderAsync(string orderNo)
         {
             using var conn = CreateConnection();
@@ -188,11 +197,11 @@ namespace DataAccessLibrary.DAC.Production
             }
 
             // Populate fallback rates from VendAssItems if Rate is 0 and Maker is assigned
-            bool hasCustCodeCol = await HasCustCodeColumnAsync(conn);
+            bool isCustWiseEnabled = await IsCustomerWiseRatesEnabledAsync(conn);
             foreach (var row in list.Where(r => r.PurchaseRate == 0 && r.VendID > 0))
             {
                 string rateSql;
-                if (hasCustCodeCol && !string.IsNullOrWhiteSpace(row.CustCode))
+                if (isCustWiseEnabled && !string.IsNullOrWhiteSpace(row.CustCode))
                 {
                     rateSql = @"
                         SELECT TOP 1 Rate 
@@ -204,14 +213,15 @@ namespace DataAccessLibrary.DAC.Production
                             WHEN CustCode = @CustCode THEN 1 
                             WHEN CustCode = 'Stock' THEN 2 
                             ELSE 3 
-                          END";
+                          END, Rate DESC";
                 }
                 else
                 {
                     rateSql = @"
                         SELECT TOP 1 Rate 
                         FROM VendAssItems 
-                        WHERE VendID = @VendID AND ProcessID = @ProcessID AND ItemID = @ItemID";
+                        WHERE VendID = @VendID AND ProcessID = @ProcessID AND ItemID = @ItemID
+                        ORDER BY Rate DESC";
                 }
 
                 var defaultRate = await conn.ExecuteScalarAsync<decimal?>(rateSql, new
@@ -421,11 +431,13 @@ namespace DataAccessLibrary.DAC.Production
                         await conn.ExecuteAsync(insertAuthSql, new { UserID = request.UserId, IssID = lineEntryId }, trans);
 
                         // 4f. Auto assign item to maker if not already assigned
+                        bool isCustWiseForPo = await IsCustomerWiseRatesEnabledAsync(conn);
                         bool hasCustColForPo = await HasCustCodeColumnAsync(conn);
-                        string checkAssignedSql = hasCustColForPo && !string.IsNullOrWhiteSpace(line.CustCode)
+
+                        string checkAssignedSql = isCustWiseForPo && !string.IsNullOrWhiteSpace(line.CustCode)
                             ? @"SELECT COUNT(1) FROM VendAssItems 
                                 WHERE VendID = @VendID AND ProcessID = @ProcessID AND ItemID = @ItemID 
-                                  AND (CustCode = @CustCode OR CustCode IS NULL OR CustCode = '')"
+                                  AND (CustCode = @CustCode OR CustCode IS NULL OR CustCode = '' OR CustCode = 'Stock')"
                             : @"SELECT COUNT(1) FROM VendAssItems 
                                 WHERE VendID = @VendID AND ProcessID = @ProcessID AND ItemID = @ItemID";
 
@@ -439,7 +451,7 @@ namespace DataAccessLibrary.DAC.Production
 
                         if (countAssigned == 0)
                         {
-                            string autoAssignSql = hasCustColForPo && !string.IsNullOrWhiteSpace(line.CustCode)
+                            string autoAssignSql = hasCustColForPo
                                 ? @"INSERT INTO VendAssItems (VendID, ProcessID, ItemID, Rate, Unit, Remarks, CustCode)
                                     VALUES (@VendID, @ProcessID, @ItemID, @Rate, 'Pcs', 'Auto', @CustCode)"
                                 : @"INSERT INTO VendAssItems (VendID, ProcessID, ItemID, Rate, Unit, Remarks)
@@ -451,7 +463,7 @@ namespace DataAccessLibrary.DAC.Production
                                 line.ProcessID,
                                 ItemID = line.CompItemID,
                                 Rate = line.PurchaseRate > 0 ? line.PurchaseRate : 1m,
-                                line.CustCode
+                                CustCode = isCustWiseForPo && !string.IsNullOrWhiteSpace(line.CustCode) ? line.CustCode : "Stock"
                             }, trans);
                         }
 

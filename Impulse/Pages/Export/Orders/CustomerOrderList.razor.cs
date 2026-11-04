@@ -672,6 +672,76 @@ namespace Impulse.Pages.Export.Orders
             }
         }
 
+        private async Task PrintOrderPackingWithKits(string orderNo)
+        {
+            try
+            {
+                string rptName = ReportNames.Export.ProdOrderPackingWithKits;
+                string selectionFormula = $"{{CustOrders.OrderNo}}='{orderNo}'";
+
+                var parameters = new Dictionary<string, object>
+                {
+                    { "@OrderNo", orderNo }
+                };
+
+                string currentUserName = await GetLoggedInUserNameAsync();
+                var formulaValues = new Dictionary<string, object>
+                {
+                    { "UserName", $"'{currentUserName}'" }
+                };
+
+                var request = new ReportRequest
+                {
+                    ReportName = rptName,
+                    SelectionFormula = selectionFormula,
+                    Parameters = parameters,
+                    FormulaValues = formulaValues
+                };
+
+                await ReportNavigation.PrintReportAsync(request);
+            }
+            catch (Exception ex)
+            {
+                NotificationServiceManager.ShowError("Report Failed", ex.Message);
+            }
+        }
+
+        private async Task PrintSemiFinishStock(string orderNo)
+        {
+            try
+            {
+                var request = new ReportRequest
+                {
+                    ReportName = ReportNames.Export.SemiFinishStock,
+                    SelectionFormula = $"{{FOrderItems.OrderNo}}='{orderNo}' AND {{VItems_StockReport.SFStock}}>0"
+                };
+
+                await ReportNavigation.PrintReportAsync(request);
+            }
+            catch (Exception ex)
+            {
+                NotificationServiceManager.ShowError("Report Failed", ex.Message);
+            }
+        }
+
+        private async Task PrintFinishStock(string orderNo)
+        {
+            try
+            {
+                var request = new ReportRequest
+                {
+                    ReportName = ReportNames.Export.FinishStock,
+                    SelectionFormula = $"{{FOrderItems.OrderNo}}='{orderNo}' AND {{VItems_StockReport.InHand}}>0"
+                };
+
+                await ReportNavigation.PrintReportAsync(request);
+            }
+            catch (Exception ex)
+            {
+                NotificationServiceManager.ShowError("Report Failed", ex.Message);
+            }
+        }
+
         private async Task<string> GetLoggedInUserNameAsync()
         {
             try
