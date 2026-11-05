@@ -530,6 +530,15 @@ namespace Impulse.Pages.Production.ReceivingList
                 return;
             }
 
+            // Verify Password via Global Security Service for any user attempting deletion
+            bool isAuthorized = await SecurityService.VerifyActionAsync("DeleteProdRcv");
+
+            if (!isAuthorized)
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Unauthorized", "Incorrect password or action cancelled.");
+                return;
+            }
+
             var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
             string userName = authState.User.Identity?.Name ?? "Admin";
             var user = authState.User;
@@ -543,15 +552,6 @@ namespace Impulse.Pages.Production.ReceivingList
                 DeleteRequestReason = string.Empty;
                 ShowDeleteReasonModal = true;
                 StateHasChanged();
-                return;
-            }
-
-            // Verify Password via Global Security Service for exempt users
-            bool isAuthorized = await SecurityService.VerifyActionAsync("DeleteProdRcv");
-
-            if (!isAuthorized)
-            {
-                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Unauthorized", "Incorrect password or action cancelled.");
                 return;
             }
 

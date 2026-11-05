@@ -669,6 +669,15 @@ namespace Impulse.Pages.Production.MakerPOList
 
             if (!validTargets.Any()) return;
 
+            // Verify Password via Global Security Service for any user attempting deletion
+            bool isAuthorized = await SecurityService.VerifyActionAsync("DeleteProdIss");
+
+            if (!isAuthorized)
+            {
+                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Unauthorized", "Incorrect password or action cancelled.");
+                return;
+            }
+
             var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
             string userName = authState.User.Identity?.Name ?? "Admin";
             var user = authState.User;
@@ -681,15 +690,6 @@ namespace Impulse.Pages.Production.MakerPOList
                 DeleteRequestReason = string.Empty;
                 ShowDeleteReasonModal = true;
                 StateHasChanged();
-                return;
-            }
-
-            // Verify Password via Global Security Service for exempt users
-            bool isAuthorized = await SecurityService.VerifyActionAsync("DeleteProdIss");
-
-            if (!isAuthorized)
-            {
-                NotificationService.Notify(Radzen.NotificationSeverity.Error, "Unauthorized", "Incorrect password or action cancelled.");
                 return;
             }
 

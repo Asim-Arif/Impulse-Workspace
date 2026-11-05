@@ -219,12 +219,15 @@ namespace DataAccessLibrary.Models.ViewModels.Company
         public float? FillingPrice { get; set; }
         public double? PriceForCost { get; set; }
 
-        // ── Shipping tab ─────────────────────────────────────────────────────
+        // ── Shipping / Packing Instructions tab ──────────────────────────────
         [StringLength(1000)]
         public string? PackingInstructions { get; set; }
 
         [StringLength(255)]
         public string? PolyBag { get; set; }
+
+        [StringLength(1000)]
+        public string? TipCap { get; set; }
 
         [StringLength(1000)]
         public string? POInustructions { get; set; }
@@ -237,6 +240,7 @@ namespace DataAccessLibrary.Models.ViewModels.Company
         public float? SmallCartonH { get; set; }
         public int? SmallBoxPcs { get; set; }
         public int? MasterCartonSmallBoxes { get; set; }
+        public int? MasterCartonTotalPcs { get; set; }
 
         // ── Descriptions (finish / maker) ────────────────────────────────────
         [StringLength(1000)]

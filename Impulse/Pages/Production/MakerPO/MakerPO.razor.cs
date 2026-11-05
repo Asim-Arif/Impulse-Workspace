@@ -99,7 +99,7 @@ namespace Impulse.Pages.Production.MakerPO
         public DateTime LineReturnDT { get; set; } = DateTime.Today.AddDays(30);
         public string LineBatchNo { get; set; } = "B171";
 
-        public bool PrintSlip { get; set; } = true;
+        public bool PrintSlip { get; set; } = false;
         public bool IsLoadingIssuableOrders { get; set; } = false;
         public bool IsSaving { get; set; } = false;
         public string ActiveTab { get; set; } = "balance";

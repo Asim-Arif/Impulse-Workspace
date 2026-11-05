@@ -234,11 +234,22 @@ namespace DataAccessLibrary.DAC.Production
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
             const string sql = @"
-                IF EXISTS (SELECT 1 FROM POI_Remarks WHERE LotNo = @LotNo AND EntryType = @EntryType)
-                    UPDATE POI_Remarks SET Remarks = @Remarks WHERE LotNo = @LotNo AND EntryType = @EntryType
+                IF @EntryType = 0
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM POI_Remarks WHERE LotNo = @LotNo)
+                        UPDATE POI_Remarks SET Remarks = @Remarks, EntryType = 0 WHERE LotNo = @LotNo
+                    ELSE
+                        INSERT INTO POI_Remarks(EntryType, LotNo, OrderNo, ItemCode, Remarks)
+                        VALUES (0, @LotNo, @OrderNo, @ItemCode, @Remarks)
+                END
                 ELSE
-                    INSERT INTO POI_Remarks(EntryType, LotNo, OrderNo, ItemCode, Remarks)
-                    VALUES (@EntryType, @LotNo, @OrderNo, @ItemCode, @Remarks)";
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM POI_Remarks WHERE ItemCode = @ItemCode AND OrderNo = @OrderNo)
+                        UPDATE POI_Remarks SET Remarks = @Remarks, EntryType = 1 WHERE ItemCode = @ItemCode AND OrderNo = @OrderNo
+                    ELSE
+                        INSERT INTO POI_Remarks(EntryType, LotNo, OrderNo, ItemCode, Remarks)
+                        VALUES (1, @LotNo, @OrderNo, @ItemCode, @Remarks)
+                END";
             int rows = await db.ExecuteAsync(sql, new { LotNo = lotNo, EntryType = entryType, OrderNo = orderNo, ItemCode = itemCode, Remarks = remarks });
             return rows > 0;
         }

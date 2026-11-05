@@ -3,6 +3,7 @@ const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const cors = require('cors');
 const fs = require('fs');
+const path = require('path');
 
 const app = express();
 app.use(cors());
@@ -13,6 +14,38 @@ process.on('uncaughtException', (err) => {
     console.log('Exiting process to allow auto-recovery...');
     process.exit(1);
 });
+
+// Clean up stale Chromium profile singleton lock files and any orphaned browser instances
+function cleanStaleSessionLocks() {
+    try {
+        if (process.platform === 'win32') {
+            const { execSync } = require('child_process');
+            try {
+                // Terminate any orphaned chrome/edge processes holding this session
+                execSync('powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { ($_.Name -match \'chrome\\.exe|msedge\\.exe\') -and ($_.CommandLine -match \'wwebjs_auth\') } | Stop-Process -Force"', { stdio: 'ignore', timeout: 6000 });
+            } catch (e) {
+                // Ignore if none found or permission denied
+            }
+        }
+
+        const sessionDir = path.join(__dirname, '.wwebjs_auth', 'session');
+        const lockFiles = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
+        for (const file of lockFiles) {
+            const p = path.join(sessionDir, file);
+            if (fs.existsSync(p)) {
+                try {
+                    fs.unlinkSync(p);
+                    console.log(`Removed stale lock file: ${file}`);
+                } catch (e) {
+                    // File is actively held by a running browser
+                }
+            }
+        }
+    } catch (err) {
+        console.log('Session lock cleanup check:', err.message);
+    }
+}
+cleanStaleSessionLocks();
 
 // Locate browser executable dynamically across typical Windows/Server locations
 function getBrowserExecutablePath() {
@@ -37,13 +70,16 @@ function getBrowserExecutablePath() {
 const browserExe = getBrowserExecutablePath();
 const puppeteerConfig = {
     headless: true,
+    protocolTimeout: 300000, // 5 minutes to prevent Runtime.callFunctionOn timeouts on cloud VPS
     args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-gpu',
         '--disable-dev-shm-usage',
         '--no-first-run',
-        '--no-zygote'
+        '--no-zygote',
+        '--disable-accelerated-2d-canvas',
+        '--disable-extensions'
     ]
 };
 if (browserExe) {
@@ -199,5 +235,11 @@ app.listen(PORT, () => {
         console.error('Failed to initialize WhatsApp client:', err);
         connectionStatus = 'DISCONNECTED';
         lastErrorMessage = err.message || 'Initialization failed';
+
+        // If it's a browser lock or protocol timeout error, exit so the background host service can cleanly respawn fresh
+        if (err.message && (err.message.includes('browser is already running') || err.message.includes('protocolTimeout') || err.message.includes('timed out'))) {
+            console.log('Fatal browser startup error. Exiting process in 3s to allow clean recovery...');
+            setTimeout(() => process.exit(1), 3000);
+        }
     });
 });

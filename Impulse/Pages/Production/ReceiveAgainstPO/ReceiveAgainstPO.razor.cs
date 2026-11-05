@@ -46,7 +46,7 @@ namespace Impulse.Pages.Production.ReceiveAgainstPO
         public EmployeeLookupModel? SelectedWorker { get; set; }
         public List<EmployeeLookupModel> SelectedWorkers { get; set; } = new List<EmployeeLookupModel>();
 
-        public bool PrintSlip { get; set; } = true;
+        public bool PrintSlip { get; set; } = false;
         public bool IsSearching { get; set; } = false;
         public bool IsSaving { get; set; } = false;
 

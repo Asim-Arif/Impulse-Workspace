@@ -7294,3 +7294,25 @@ FROM            dbo.ForeignCustomers INNER JOIN
 				LEFT JOIN (SELECT OrderNo,ItemCode,SUM(InnerQty) AS Qty FROM VDispatchListDetail_Ex_Orderwise
 								GROUP BY OrderNo,ItemCode) TDispatch ON TUnion.OrderNo=TDispatch.OrderNo AND TUnion.ItemCode=TDispatch.ItemCode
 GO
+
+
+-- ============================================================================
+-- Items Table: MasterCartonTotalPcs and TipCap columns
+-- ============================================================================
+IF NOT EXISTS (
+    SELECT 1 FROM sys.columns 
+    WHERE object_id = OBJECT_ID('Items') AND name = 'MasterCartonTotalPcs'
+)
+BEGIN
+    ALTER TABLE Items ADD MasterCartonTotalPcs INT NULL;
+END
+GO
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.columns 
+    WHERE object_id = OBJECT_ID('Items') AND name = 'TipCap'
+)
+BEGIN
+    ALTER TABLE Items ADD TipCap VARCHAR(1000) NULL;
+END
+GO

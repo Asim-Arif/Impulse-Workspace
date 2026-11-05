@@ -240,18 +240,21 @@ namespace Impulse.Pages.Production.ProductionItemList
         private async Task CommitRemarksAsync(ProductionItemListItem item)
         {
             item.IsEditingRemarks = false;
+            string val = item.EditingRemarksValue?.Trim() ?? string.Empty;
 
             // If value did not change, no need to execute DB update
-            if (item.EditingRemarksValue == item.DisplayRemarks) return;
+            if (val == (item.DisplayRemarks ?? string.Empty)) return;
 
             try
             {
                 bool saved = await ItemListService.SaveRemarksAsync(
-                    item.LotNo, item.EntryType, item.OrderNo, item.ItemCode, item.EditingRemarksValue);
+                    item.LotNo, item.EntryType, item.OrderNo, item.ItemCode, val);
 
                 if (saved)
                 {
-                    item.POIRemarks = item.EditingRemarksValue;
+                    item.POIRemarks = val;
+                    item.Remarks = val;
+                    item.EditingRemarksValue = val;
                     NotificationService.Notify(NotificationSeverity.Success, "Saved", "Remarks updated.");
                 }
                 else
@@ -262,6 +265,10 @@ namespace Impulse.Pages.Production.ProductionItemList
             catch (Exception ex)
             {
                 NotificationService.Notify(NotificationSeverity.Error, "Save Error", ex.Message);
+            }
+            finally
+            {
+                StateHasChanged();
             }
         }
 

@@ -282,6 +282,8 @@ namespace DataAccessLibrary.DAC.Production
                         var planOrderQty = (int)plan.OrderQty;
                         item.PreviouslyPlannedOrderQty = planOrderQty;
                         item.StockQty = (int)plan.StockQty;
+                        // Effective available stock accounts for finish stock already allocated to this order
+                        item.AvailableInHandStock = Math.Max(item.AvailableInHandStock, item.StockQty);
 
                         if (item.OrderQty > planOrderQty)
                         {

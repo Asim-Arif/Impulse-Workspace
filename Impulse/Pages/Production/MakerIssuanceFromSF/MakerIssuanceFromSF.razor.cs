@@ -149,7 +149,7 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
         public DateTime LineReturnDT { get; set; } = DateTime.Today.AddDays(30);
         public string LineRemarks { get; set; } = string.Empty;
 
-        public bool PrintSlip { get; set; } = true;
+        public bool PrintSlip { get; set; } = false;
         public bool IsSaving { get; set; } = false;
         public string ActiveTab { get; set; } = "balance";
 

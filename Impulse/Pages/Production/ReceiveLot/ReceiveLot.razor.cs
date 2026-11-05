@@ -55,7 +55,7 @@ namespace Impulse.Pages.Production.ReceiveLot
 
         public EmployeeLookupModel? SelectedCheckedBy { get; set; }
 
-        public bool PrintSlip { get; set; } = true;
+        public bool PrintSlip { get; set; } = false;
         public bool IsSearching { get; set; } = false;
         public bool IsSaving { get; set; } = false;
 
