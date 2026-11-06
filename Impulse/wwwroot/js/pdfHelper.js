@@ -273,9 +273,9 @@ window.openReportViewer = (base64, request) => {
                 let downloadFileName = baseFileName + ext;
                 const disposition = response.headers.get('content-disposition');
                 if (disposition && disposition.indexOf('filename=') !== -1) {
-                    const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+                    const matches = disposition.match(/filename[^;=\n]*=([^;\n]*)/);
                     if (matches != null && matches[1]) {
-                        downloadFileName = matches[1].replace(/['"]/g, '');
+                        downloadFileName = matches[1].trim().replace(/['"]/g, '');
                     }
                 }
 
