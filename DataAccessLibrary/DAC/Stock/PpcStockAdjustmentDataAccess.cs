@@ -102,9 +102,10 @@ namespace DataAccessLibrary.DAC.Stock
                     WHERE OrderNo = pip.OrderNo AND ItemID = pip.ItemID
                 ) soa
                 OUTER APPLY (
-                    SELECT SUM(NetQty) AS InHandQty
-                    FROM VItemsWithLotWiseStock
-                    WHERE ItemID = pip.ItemID AND NetQty > 0
+                    SELECT SUM(CASE WHEN v.NetQty > sw.NetQty THEN sw.NetQty ELSE v.NetQty END) AS InHandQty
+                    FROM VItemsWithLotWiseStock v
+                    INNER JOIN VItemsWithShelfWiseStock sw ON v.ItemID = sw.ItemID AND v.Shelf_RefID = sw.Shelf_RefID
+                    WHERE v.ItemID = pip.ItemID AND sw.NetQty > 0 AND v.NetQty > 0
                 ) stock
                 WHERE pip.OrderNo = @OrderNo AND pip.StockQty > 0
                 ORDER BY pip.EntryID";
@@ -118,19 +119,20 @@ namespace DataAccessLibrary.DAC.Stock
             using var conn = CreateConnection();
             const string sql = @"
                 SELECT 
-                    Shelf_RefID,
-                    ISNULL(StoreName, '') AS StoreName,
-                    ISNULL(RackNo, '') AS RackNo,
-                    ISNULL(ShelfNo, '') AS ShelfNo,
-                    ISNULL(LotNo, '') AS LotNo,
-                    ISNULL(Batch_No, '') AS Batch_No,
-                    ISNULL(Mill_Certificate_No, '') AS Mill_Certificate_No,
-                    ISNULL(EntryID, 0) AS RCV_ISD_RefID,
-                    ISNULL(NetQty, 0) AS NetAvailableQty,
+                    v.Shelf_RefID,
+                    ISNULL(sw.StoreName, '') AS StoreName,
+                    ISNULL(sw.RackNo, '') AS RackNo,
+                    ISNULL(sw.ShelfNo, '') AS ShelfNo,
+                    ISNULL(v.LotNo, '') AS LotNo,
+                    ISNULL(v.Batch_No, '') AS Batch_No,
+                    ISNULL(v.Mill_Certificate_No, '') AS Mill_Certificate_No,
+                    ISNULL(v.EntryID, 0) AS RCV_ISD_RefID,
+                    CASE WHEN v.NetQty > sw.NetQty THEN sw.NetQty ELSE v.NetQty END AS NetAvailableQty,
                     0 AS AllocatedQty
-                FROM VItemsWithLotWiseStock 
-                WHERE ItemID = @ItemId AND NetQty > 0 AND ISNULL(Batch_No, '') <> '' 
-                ORDER BY Batch_No";
+                FROM VItemsWithLotWiseStock v
+                INNER JOIN VItemsWithShelfWiseStock sw ON v.ItemID = sw.ItemID AND v.Shelf_RefID = sw.Shelf_RefID
+                WHERE v.ItemID = @ItemId AND sw.NetQty > 0 AND v.NetQty > 0 AND ISNULL(v.Batch_No, '') <> '' 
+                ORDER BY v.Batch_No";
 
             return (await conn.QueryAsync<PpcStockShelfAllocationModel>(sql, new { ItemId = itemId })).ToList();
         }

@@ -25,6 +25,11 @@
                     <a href="/gate/visitors/entry" class="btn btn-sm btn-primary">
                         <i class="fas fa-user-plus me-1"></i> New Visitor
                     </a>
+                    <ContextMenuTrigger MenuId="visitorOptionsBarMenu" MouseButtonTrigger="MouseButtonTrigger.Left">
+                        <button class="btn btn-sm btn-outline-dark">
+                            <i class="fas fa-ellipsis-v me-1"></i> Options
+                        </button>
+                    </ContextMenuTrigger>
                     <a href="/gate/visitors/gate-out" class="btn btn-sm btn-outline-danger">
                         <i class="fas fa-arrow-right-from-bracket me-1"></i> Checkout Scanner
                     </a>
@@ -208,5 +213,11 @@
     <Item OnClick="OnContextPass"><i class="fas fa-id-card win11-icon text-info me-2"></i> View / Print Badge</Item>
     <Item OnClick="OnContextPrintSlip"><i class="fas fa-file-invoice win11-icon text-secondary me-2"></i> Print Slip</Item>
     <Item OnClick="OnContextGateOut"><i class="fas fa-door-open win11-icon text-danger me-2"></i> Checkout (Gate Out)</Item>
+</ContextMenu>
+
+<!-- Options Bar Menu -->
+<ContextMenu Id="visitorOptionsBarMenu" Template="Win11Style">
+    <Item OnClick="RefreshAsync"><i class="fas fa-sync-alt win11-icon text-primary me-2"></i> Refresh List</Item>
+    <Item OnClick="PrintListAsync"><i class="fas fa-print win11-icon text-dark me-2"></i> Print Visitor List</Item>
 </ContextMenu>
 

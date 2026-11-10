@@ -1,0 +1,182 @@
+@using DataAccessLibrary.Interface.Gate
+@using DataAccessLibrary.Models.ViewModels.Gate
+@using Impulse.Constants
+@using Impulse.Services
+@using Radzen
+@inject IGatePassReturnableDataAccess DataAccess
+@inject NotificationService NotificationService
+@inject IReportNavigationService ReportNavigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+@if (IsVisible && Model != null)
+{
+    <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(4px); z-index: 100050; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; font-family: 'Calibri', 'Segoe UI', sans-serif;">
+        <div class="shadow-lg border-0" style="width: 1000px; max-width: 96vw; max-height: 92vh; background: #ffffff; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden;">
+            <div class="bg-primary text-white py-2 px-3 d-flex align-items-center justify-content-between" style="flex-shrink: 0;">
+                <h6 class="modal-title fw-bold mb-0" style="font-size: 1.05rem;">
+                    <i class="fas fa-undo-alt me-2"></i>
+                    <span>Receive Returned Items</span>
+                    <span class="fw-normal opacity-90 ms-2" style="font-size: 0.95rem;">— Pass #@Model.GatePassNo</span>
+                </h6>
+                <button type="button" class="btn-close btn-close-white" aria-label="Close" @onclick="CloseAsync" disabled="@IsSaving"></button>
+            </div>
+            <div class="p-3" style="overflow-y: auto; flex-grow: 1;">
+                <div class="row g-2 mb-3 bg-light p-2 rounded border">
+                    <div class="col-md-4 col-sm-6">
+                        <span class="text-muted small">Gate Pass Date:</span>
+                        <div class="fw-semibold">@Model.DT.ToString("dd-MMM-yyyy HH:mm")</div>
+                    </div>
+                    <div class="col-md-4 col-sm-6">
+                        <span class="text-muted small">Issued To:</span>
+                        <div class="fw-semibold">@(string.IsNullOrWhiteSpace(Model.IssdTo) ? "—" : Model.IssdTo)</div>
+                    </div>
+                    <div class="col-md-4 col-sm-12">
+                        <label class="form-label mb-1 small fw-bold text-dark">
+                            Receiving Date <span class="text-danger">*</span>
+                        </label>
+                        <input type="date" class="form-control form-control-sm" @bind="Model.RcvDT" />
+                    </div>
+                </div>
+
+                <div class="table-responsive rounded border" style="max-height: 50vh; overflow-y: auto;">
+                    <table class="table table-sm table-bordered table-hover align-middle mb-0" style="font-size: 0.88rem;">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Item Detail</th>
+                                <th style="width: 80px;">Unit</th>
+                                <th style="width: 90px;" class="text-end">Issued</th>
+                                <th style="width: 90px;" class="text-end">Prev Rcvd</th>
+                                <th style="width: 90px;" class="text-end">Balance</th>
+                                <th style="width: 130px;" class="text-end text-primary">Rcvd Now</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model.Items)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold">@item.Detail</div>
+                                        @if (!string.IsNullOrWhiteSpace(item.Packing))
+                                        {
+                                            <small class="text-muted">Packing: @item.Packing</small>
+                                        }
+                                    </td>
+                                    <td>@item.Unit</td>
+                                    <td class="text-end">@item.IssuedQty</td>
+                                    <td class="text-end text-muted">@item.PreviouslyReceivedQty</td>
+                                    <td class="text-end fw-bold @(item.BalanceQty > 0 ? "text-danger" : "text-success")">
+                                        @item.BalanceQty
+                                    </td>
+                                    <td>
+                                        <input type="number" 
+                                               class="form-control form-control-sm text-end fw-bold"
+                                               step="any" 
+                                               min="0" 
+                                               max="@item.BalanceQty"
+                                               @bind="item.QtyReceivedNow" 
+                                               disabled="@(item.BalanceQty <= 0)" />
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="form-check mt-3">
+                    <input class="form-check-input" type="checkbox" id="chkPrintSlipRcv" @bind="Model.PrintSlipOnSave" />
+                    <label class="form-check-label small" for="chkPrintSlipRcv">
+                        <i class="fas fa-print me-1 text-secondary"></i> Print Receiving Slip immediately after saving
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer border-top py-2 px-3 bg-light d-flex justify-content-end gap-2" style="flex-shrink: 0;">
+                <button type="button" class="btn btn-sm btn-outline-secondary px-3" @onclick="CloseAsync" disabled="@IsSaving">
+                    <i class="fas fa-times me-1"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-sm btn-success px-3" @onclick="SaveReceivingAsync" disabled="@IsSaving">
+                    <i class="fas fa-check me-1"></i> @(IsSaving ? "Saving..." : "Save Receiving")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public GatePassReceiveModel? Model { get; set; }
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public EventCallback<bool> IsVisibleChanged { get; set; }
+    [Parameter] public EventCallback OnReceivedSuccessfully { get; set; }
+
+    private bool IsSaving { get; set; }
+
+    private async Task CloseAsync()
+    {
+        IsVisible = false;
+        await IsVisibleChanged.InvokeAsync(false);
+    }
+
+    private async Task SaveReceivingAsync()
+    {
+        if (Model == null) return;
+
+        var totalQtyRcvdNow = Model.Items.Sum(x => x.QtyReceivedNow);
+        if (totalQtyRcvdNow <= 0)
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Validation", "Please enter quantity received for at least one item.");
+            return;
+        }
+
+        foreach (var item in Model.Items)
+        {
+            if (item.QtyReceivedNow > item.BalanceQty)
+            {
+                NotificationService.Notify(NotificationSeverity.Warning, "Validation", $"Received quantity for '{item.Detail}' cannot exceed balance quantity ({item.BalanceQty}).");
+                return;
+            }
+        }
+
+        IsSaving = true;
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userName = authState.User.Identity?.Name ?? Environment.UserName;
+            var machineName = Environment.MachineName;
+
+            var rcvId = await DataAccess.SaveReceivingAsync(Model, userName, machineName);
+
+            NotificationService.Notify(
+                NotificationSeverity.Success, 
+                "Receiving Logged", 
+                $"Return receiving #{rcvId} for Gate Pass #{Model.GatePassNo} saved successfully.");
+
+            if (Model.PrintSlipOnSave)
+            {
+                try
+                {
+                    var request = new ReportRequest
+                    {
+                        ReportName = ReportNames.GateManagement.GatePass_Return_Receiving,
+                        SelectionFormula = $"{{MiscEntries_GateIn.EntryID}} = {Model.RefEntryID}"
+                    };
+                    await ReportNavigation.PrintReportAsync(request);
+                }
+                catch (Exception pEx)
+                {
+                    NotificationService.Notify(NotificationSeverity.Warning, "Print Warning", pEx.Message);
+                }
+            }
+
+            await CloseAsync();
+            await OnReceivedSuccessfully.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Receiving Failed", ex.Message);
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+}
+

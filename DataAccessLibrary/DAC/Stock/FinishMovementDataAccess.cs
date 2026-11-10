@@ -42,15 +42,23 @@ namespace DataAccessLibrary.DAC.Stock
             using (IDbConnection db = new SqlConnection(_connectionString))
             {
                 string sql = @"
-                    SELECT ISNULL(EntryID, 0) AS EntryID, ISNULL(Shelf_RefID, 0) AS Shelf_RefID, 
-                           ISNULL(LotNo, '') AS LotNo, ISNULL(Batch_No, '') AS Batch_No, 
-                           ISNULL(Mill_Certificate_No, '') AS Mill_Certificate_No,
-                           ISNULL(StoreName, '') AS StoreName, ISNULL(RackNo, '') AS RackNo, 
-                           ISNULL(ShelfNo, '') AS ShelfNo, ISNULL(NetQty, 0) AS NetQty,
-                           ISNULL(Remarks, '') AS Remarks
-                    FROM VItemsWithLotWiseStock
-                    WHERE ItemID = @ItemID AND NetQty > 0
-                    ORDER BY LotNo, Batch_No";
+                    SELECT ISNULL(v.EntryID, 0) AS EntryID, 
+                           ISNULL(v.Shelf_RefID, 0) AS Shelf_RefID, 
+                           ISNULL(v.LotNo, '') AS LotNo, 
+                           ISNULL(v.Batch_No, '') AS Batch_No, 
+                           ISNULL(v.Mill_Certificate_No, '') AS Mill_Certificate_No,
+                           ISNULL(sw.StoreName, '') AS StoreName, 
+                           ISNULL(sw.RackNo, '') AS RackNo, 
+                           ISNULL(sw.ShelfNo, '') AS ShelfNo, 
+                           CASE WHEN v.NetQty > sw.NetQty THEN sw.NetQty ELSE v.NetQty END AS NetQty,
+                           ISNULL(v.Remarks, '') AS Remarks
+                    FROM VItemsWithLotWiseStock v
+                    INNER JOIN VItemsWithShelfWiseStock sw 
+                        ON v.ItemID = sw.ItemID AND v.Shelf_RefID = sw.Shelf_RefID
+                    WHERE v.ItemID = @ItemID 
+                      AND sw.NetQty > 0 
+                      AND v.NetQty > 0
+                    ORDER BY v.LotNo, v.Batch_No";
                 var results = await db.QueryAsync<FinishFromLocationModel>(sql, new { ItemID = itemId });
                 return results.AsList();
             }

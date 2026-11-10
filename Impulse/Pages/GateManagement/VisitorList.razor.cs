@@ -135,6 +135,28 @@ public partial class VisitorList : ComponentBase
         }
     }
 
+    protected async Task PrintListAsync()
+    {
+        try
+        {
+            var request = new ReportRequest
+            {
+                ReportName = ReportNames.GateManagement.VisitorGateInList,
+                SelectionFormula = $"{{ItemIssuanceMisc.OnlyDT}} = #{Filter.FromDate:dd-MMM-yyyy}# TO #{Filter.ToDate:dd-MMM-yyyy}#",
+                FormulaValues = new Dictionary<string, object>
+                {
+                    { "DateRange", $"'{Filter.FromDate:dd-MMM-yyyy} to {Filter.ToDate:dd-MMM-yyyy}'" }
+                }
+            };
+
+            await ReportNavigation.PrintReportAsync(request);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Print Failed", ex.Message);
+        }
+    }
+
     protected void OnContextEdit(ItemClickEventArgs e)
     {
         if (e.Data is MiscGateInListRowModel row)

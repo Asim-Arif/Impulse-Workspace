@@ -410,6 +410,9 @@ builder.Services.AddScoped<DataAccessLibrary.Interface.FixedAssets.IFixedAssetDa
 
 // Gate Management Module Registrations
 builder.Services.AddScoped<DataAccessLibrary.Interface.Gate.IGateInDataAccess, DataAccessLibrary.DAC.Gate.GateInDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Gate.ICourierIssuanceDataAccess, DataAccessLibrary.DAC.Gate.CourierIssuanceDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Gate.IGatePassPermanentDataAccess, DataAccessLibrary.DAC.Gate.GatePassPermanentDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Gate.IGatePassReturnableDataAccess, DataAccessLibrary.DAC.Gate.GatePassReturnableDataAccess>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Gate.IGatePassTypeDataAccess, DataAccessLibrary.DAC.Gate.GatePassTypeDataAccess>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Gate.IMaterialInwardDataAccess, DataAccessLibrary.DAC.Gate.MaterialInwardDataAccess>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Gate.IMaterialOutwardDataAccess, DataAccessLibrary.DAC.Gate.MaterialOutwardDataAccess>();

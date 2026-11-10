@@ -1,0 +1,311 @@
+@page "/gate/courier-issuance"
+@page "/gate/courier-issuance/list"
+@attribute [Authorize]
+
+@using BlazorContextMenu
+@using Blazored.Typeahead
+@using Impulse.Shared.Components
+
+<PageTitle>Courier Issuance Register - Impulse</PageTitle>
+
+<style>
+    .blazored-typeahead { height: 35px !important; font-size: 0.85rem !important; padding-top: 0 !important; padding-bottom: 0 !important; box-sizing: border-box !important; }
+    .disabled-typeahead-wrapper .blazored-typeahead { background-color: #e9ecef !important; overflow: hidden !important; border-radius: 4px; }
+    .blazored-typeahead__input, .blazored-typeahead__controls { height: 33px !important; padding-top: 0 !important; padding-bottom: 0 !important; box-sizing: border-box !important; font-size: 0.85rem !important; }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper { height: 33px !important; display: flex !important; align-items: center !important; box-sizing: border-box !important; max-width: 100% !important; }
+    .blazored-typeahead__results { z-index: 10000 !important; }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body">
+            <!-- Header Section -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-4 text-warning"><i class="fas fa-shipping-fast"></i></span>
+                    <div>
+                        <h4 class="mb-0 fw-bold" style="color: #1a237e;">Courier Issuance Register</h4>
+                        <small class="text-muted">Track outgoing parcels, tracking numbers, vendor dispatch &amp; delivery status</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="RefreshAsync" disabled="@IsLoading">
+                        <i class="fas fa-sync-alt @(IsLoading ? "fa-spin" : "") me-1"></i> Refresh
+                    </button>
+                    <a href="/gate/courier-issuance/entry" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus-circle me-1"></i> New Courier Pass
+                    </a>
+                    <ContextMenuTrigger MenuId="courierOptionsBarMenu" MouseButtonTrigger="MouseButtonTrigger.Left">
+                        <button class="btn btn-sm btn-outline-dark">
+                            <i class="fas fa-ellipsis-v me-1"></i> Options
+                        </button>
+                    </ContextMenuTrigger>
+                    <a href="/gate" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-arrow-left me-1"></i> Gate Hub
+                    </a>
+                </div>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="row g-2 mb-3">
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-2 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted" style="font-size: 0.75rem;">Total Parcels</span>
+                            <div class="fw-bold fs-5 text-dark">@Entries.Count</div>
+                        </div>
+                        <i class="fas fa-boxes text-primary fs-4 opacity-50"></i>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-2 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted" style="font-size: 0.75rem;">With Tracking No</span>
+                            <div class="fw-bold fs-5 text-success">@Entries.Count(x => x.HasTracking)</div>
+                        </div>
+                        <i class="fas fa-barcode text-success fs-4 opacity-50"></i>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-2 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted" style="font-size: 0.75rem;">Self Paid (Company)</span>
+                            <div class="fw-bold fs-5 text-info">@Entries.Count(x => x.Self == true)</div>
+                        </div>
+                        <i class="fas fa-hand-holding-usd text-info fs-4 opacity-50"></i>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-2 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted" style="font-size: 0.75rem;">Receiver Paid</span>
+                            <div class="fw-bold fs-5 text-secondary">@Entries.Count(x => x.Paid == true)</div>
+                        </div>
+                        <i class="fas fa-receipt text-secondary fs-4 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter Controls -->
+            <div class="card border-0 bg-light p-2 mb-3" style="border-radius: 8px; position: relative !important; z-index: 9999 !important;">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Date Range</label>
+                        <select class="form-select form-select-sm" value="@Filter.RangeKey" @onchange="RangeChangedAsync">
+                            <option value="@CourierIssuanceRangeKeys.Last15Days">Last 15 Days</option>
+                            <option value="@CourierIssuanceRangeKeys.Last30Days">Last 30 Days</option>
+                            <option value="@CourierIssuanceRangeKeys.Last60Days">Last 60 Days</option>
+                            <option value="@CourierIssuanceRangeKeys.Last90Days">Last 90 Days</option>
+                            <option value="@CourierIssuanceRangeKeys.Last180Days">Last 180 Days</option>
+                            <option value="@CourierIssuanceRangeKeys.Custom">Custom Range</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">From Date</label>
+                        <input type="date" class="form-control form-control-sm"
+                               value="@Filter.FromDate.ToString("yyyy-MM-dd")"
+                               disabled="@(!IsCustomRange)"
+                               @onchange="FromDateChangedAsync" />
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">To Date</label>
+                        <input type="date" class="form-control form-control-sm"
+                               value="@Filter.ToDate.ToString("yyyy-MM-dd")"
+                               disabled="@(!IsCustomRange)"
+                               @onchange="ToDateChangedAsync" />
+                    </div>
+                    <div class="col-md-3 col-sm-6">
+                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Vendor / Recipient</label>
+                        <BlazoredTypeahead SearchMethod="SearchVendorsAsync"
+                                           TItem="CourierVendorLookupModel"
+                                           TValue="CourierVendorLookupModel"
+                                           Value="SelectedVendor"
+                                           ValueChanged="OnVendorChangedAsync"
+                                           ValueExpression="@(() => SelectedVendor)"
+                                           Placeholder="<All Vendors>"
+                                           EnableDropDown="true"
+                                           MaximumSuggestions="1000">
+                            <SelectedTemplate Context="v">
+                                @v.DisplayText
+                            </SelectedTemplate>
+                            <ResultTemplate Context="v">
+                                <strong>[@v.AccNo]</strong> <span class="ms-1">@v.AccTitle</span>
+                            </ResultTemplate>
+                            <NotFoundTemplate Context="notFoundContext">
+                                No vendor found.
+                            </NotFoundTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                    <div class="col-md-3 col-sm-12">
+                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Search</label>
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control" placeholder="Search tracking, vendor, desc..."
+                                   value="@Filter.SearchText"
+                                   @oninput="SearchInputAsync" />
+                            @if (!string.IsNullOrEmpty(Filter.SearchText))
+                            {
+                                <button class="btn btn-outline-secondary" type="button" @onclick="ClearSearchAsync">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Container -->
+            <div class="table-responsive" style="max-height: 60vh; min-height: 250px; position: relative !important; z-index: 1 !important;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th class="text-center" style="width: 40px;">#</th>
+                            <th style="min-width: 140px;">Date &amp; Time</th>
+                            <th style="min-width: 130px;">Tracking No</th>
+                            <th style="min-width: 160px;">Vendor / Consignee</th>
+                            <th style="min-width: 140px;">Concerned Person</th>
+                            <th style="min-width: 180px;">Description</th>
+                            <th style="min-width: 100px;">Weight / Dim</th>
+                            <th class="text-center" style="width: 70px;">Qty</th>
+                            <th style="min-width: 100px;">Vehicle</th>
+                            <th class="text-center" style="width: 80px;">Payment</th>
+                            <th class="text-end" style="width: 100px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="11" class="text-center py-4 text-muted">
+                                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                                    Loading courier issuance records...
+                                </td>
+                            </tr>
+                        }
+                        else if (Entries.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="11" class="text-center py-4 text-muted">
+                                    <i class="fas fa-box-open fs-3 d-block mb-2 text-secondary opacity-50"></i>
+                                    No courier records found for the selected criteria.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            var s = 0;
+                            foreach (var item in Entries)
+                            {
+                                s++;
+                                var isSel = SelectedEntryId == item.EntryID;
+                                <ContextMenuTrigger MenuId="rowContextMenu"
+                                                    WrapperTag="tr"
+                                                    Data="item"
+                                                    class="@(isSel ? "table-primary" : "")"
+                                                    @onclick="() => SelectRow(item.EntryID)"
+                                                    @ondblclick="() => EditEntry(item.EntryID)">
+                                    <td class="text-center text-muted">@s</td>
+                                    <td>
+                                        <div class="fw-semibold text-dark">@(item.DT?.ToString("dd-MMM-yyyy") ?? "")</div>
+                                        <small class="text-muted">@(item.DT?.ToString("hh:mm tt") ?? "")</small>
+                                    </td>
+                                    <td>
+                                        @if (item.HasTracking)
+                                        {
+                                            <span class="badge bg-light text-dark border font-monospace">
+                                                <i class="fas fa-barcode text-primary me-1"></i>@item.TrackingNo
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted fst-italic" style="font-size: 0.8rem;">Pending</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold text-dark">@item.VendorName</div>
+                                        @if (!string.IsNullOrWhiteSpace(item.VendorAddress))
+                                        {
+                                            <small class="text-muted text-truncate d-block" style="max-width: 200px;" title="@item.VendorAddress">
+                                                @item.VendorAddress
+                                            </small>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div>@item.ConcernedPerson</div>
+                                        @if (!string.IsNullOrWhiteSpace(item.ReceivedBy))
+                                        {
+                                            <small class="text-muted">Rcvd By: @item.ReceivedBy</small>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="text-truncate" style="max-width: 250px;" title="@item.Description">
+                                            @item.Description
+                                        </div>
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrWhiteSpace(item.Weight) || !string.IsNullOrWhiteSpace(item.Dimension))
+                                        {
+                                            <span>@item.Weight @(string.IsNullOrWhiteSpace(item.Dimension) ? "" : $"({item.Dimension})")</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">@(item.Parcel_Qty.HasValue ? item.Parcel_Qty.Value.ToString("0.##") : "-")</td>
+                                    <td>@(string.IsNullOrWhiteSpace(item.Vehicle_No) ? "-" : item.Vehicle_No)</td>
+                                    <td class="text-center">
+                                        @if (item.Self == true)
+                                        {
+                                            <span class="badge bg-info-subtle text-info border border-info-subtle">Self</span>
+                                        }
+                                        else if (item.Paid == true)
+                                        {
+                                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Paid</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button class="btn btn-outline-primary btn-sm" title="Edit Pass" @onclick="() => EditEntry(item.EntryID)">
+                                                <i class="fas fa-pencil-alt"></i>
+                                            </button>
+                                            <button class="btn btn-outline-secondary btn-sm" title="Print Slip" @onclick="() => PrintSlipAsync(item.EntryID)">
+                                                <i class="fas fa-print"></i>
+                                            </button>
+                                            <button class="btn btn-outline-danger btn-sm" title="Delete" @onclick="() => DeleteEntryAsync(item.EntryID)">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </ContextMenuTrigger>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Row Context Menu -->
+<ContextMenu Id="rowContextMenu" Template="Win11Style">
+    <Item OnClick="OnContextEdit"><i class="fas fa-pencil-alt win11-icon text-primary me-2"></i> Edit Courier Pass</Item>
+    <Item OnClick="OnContextPrintSlip"><i class="fas fa-print win11-icon text-secondary me-2"></i> Print Courier Slip</Item>
+    <Item OnClick="OnContextDelete"><i class="fas fa-trash win11-icon text-danger me-2"></i> Delete Pass</Item>
+</ContextMenu>
+
+<!-- Options Bar Menu -->
+<ContextMenu Id="courierOptionsBarMenu" Template="Win11Style">
+    <Item OnClick="RefreshAsync"><i class="fas fa-sync-alt win11-icon text-primary me-2"></i> Refresh List</Item>
+    <Item OnClick="NewEntry"><i class="fas fa-plus-circle win11-icon text-success me-2"></i> New Courier Pass</Item>
+    <Item OnClick="PrintListAsync"><i class="fas fa-print win11-icon text-dark me-2"></i> Print Courier List</Item>
+</ContextMenu>
+
+<style>
+    .win11-menu-item { font-size: 0.84rem; padding: 6px 12px; }
+    .win11-icon { width: 16px; text-align: center; }
+</style>
+

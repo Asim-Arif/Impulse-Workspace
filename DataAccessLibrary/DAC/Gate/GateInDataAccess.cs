@@ -30,53 +30,31 @@ public sealed class GateInDataAccess : IGateInDataAccess
         ArgumentNullException.ThrowIfNull(filter);
 
         const string sql = """
-            SELECT v.EntryID,
-                   v.DT,
-                   ISNULL(v.GatePassNo, '') AS GatePassNo,
-                   ISNULL(v.PersonName, '') AS PersonName,
-                   ISNULL(v.VehicleNo, '') AS VehicleNo,
-                   ISNULL(v.Description, '') AS Description,
-                   ISNULL(v.VendNameManual, '') AS VendNameManual,
-                   ISNULL(v.DeptID, '') AS DeptID,
-                   ISNULL(v.GatePassType, 0) AS GatePassType,
-                   ISNULL(m.GatePassTypeName, '') AS GatePassTypeName,
-                   ISNULL(m.GatePassType2, 0) AS GatePassType2,
-                   CAST(ISNULL(m.Approved_Finance, 0) AS bit) AS Approved_Finance,
-                   CASE WHEN EXISTS
-                        (
-                            SELECT 1
-                            FROM dbo.MiscEntries_GateInTemp_Details AS d
-                            WHERE d.MEGO_RefID = m.EntryID
-                              AND ISNULL(d.ReturnType, 'Non-Returnable') = 'Returnable'
-                        ) THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END AS HasReturnableItems,
-                   CASE WHEN EXISTS
-                        (
-                            SELECT 1
-                            FROM dbo.MiscEntries_GateInTemp_Details AS d
-                            WHERE d.MEGO_RefID = m.EntryID
-                              AND ISNULL(d.ReturnType, 'Non-Returnable') = 'Returnable'
-                        )
-                        AND NOT EXISTS
-                        (
-                            SELECT 1
-                            FROM dbo.MiscEntries_GateInTemp_Details AS d
-                            WHERE d.MEGO_RefID = m.EntryID
-                              AND ISNULL(d.ReturnType, 'Non-Returnable') = 'Returnable'
-                              AND ISNULL(d.QtyRcvd, 0) < ISNULL(d.Qty, 0)
-                        ) THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END AS IsReceived,
-                   (
-                        SELECT MAX(d.RcvdDT)
-                        FROM dbo.MiscEntries_GateInTemp_Details AS d
-                        WHERE d.MEGO_RefID = m.EntryID
-                   ) AS ReceivedDate
+            SELECT 
+                v.EntryID,
+                v.DT,
+                ISNULL(v.GatePassNo, '') AS GatePassNo,
+                ISNULL(v.PersonName, '') AS PersonName,
+                ISNULL(v.VehicleNo, '') AS VehicleNo,
+                ISNULL(v.Description, '') AS Description,
+                ISNULL(v.DeptID, '') AS DeptID,
+                ISNULL(v.DeptName, '') AS DeptName,
+                ISNULL(v.EmpID, '') AS EmpID,
+                ISNULL(v.EmpName, '') AS EmpName,
+                ISNULL(v.GatePassType, 0) AS GatePassType,
+                ISNULL(v.GatePassType2, 0) AS GatePassType2,
+                v.VM_AccNo,
+                v.Name,
+                v.VendNameManual,
+                CAST(ISNULL(v.Approved_HOD, 0) AS bit) AS Approved_HOD,
+                CAST(ISNULL(v.Approved, 0) AS bit) AS Approved,
+                CAST(ISNULL(v.Approved_Finance, 0) AS bit) AS Approved_Finance
             FROM dbo.VMiscEntries_GateInTemp AS v
-            INNER JOIN dbo.MiscEntries_GateInTemp AS m ON m.EntryID = v.EntryID
             WHERE v.OnlyDT BETWEEN @FromDate AND @ToDate
-              AND (@DeptID IS NULL OR v.DeptID = @DeptID)
-              AND (@GatePassType IS NULL OR v.GatePassType = @GatePassType)
-              AND (@GatePassTypeName IS NULL OR ISNULL(m.GatePassTypeName, '') = @GatePassTypeName)
-              AND (@VendorName IS NULL OR ISNULL(v.VendNameManual, '') = @VendorName)
-            ORDER BY v.DT;
+              AND (@DeptID IS NULL OR @DeptID = '' OR v.DeptID = @DeptID)
+              AND (@GatePassType IS NULL OR @GatePassType = 99 OR v.GatePassType = @GatePassType)
+              AND (@VM_AccNo IS NULL OR @VM_AccNo = '' OR v.VM_AccNo = @VM_AccNo)
+            ORDER BY v.DT DESC, v.EntryID DESC;
             """;
 
         var rows = new List<GateInListRowModel>();
@@ -84,132 +62,156 @@ public sealed class GateInDataAccess : IGateInDataAccess
         await connection.OpenAsync(cancellationToken);
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.Add("@FromDate", SqlDbType.DateTime).Value = filter.FromDate.Date;
-        command.Parameters.Add("@ToDate", SqlDbType.DateTime).Value = filter.ToDate.Date;
-        AddNullableFilter(command, "@DeptID", filter.DepartmentId, "<All>");
-        command.Parameters.Add("@GatePassType", SqlDbType.Int).Value = filter.GatePassType ?? (object)DBNull.Value;
-        AddNullableFilter(command, "@GatePassTypeName", filter.GatePassTypeName, "<All Gatepass Types>");
-        AddNullableFilter(command, "@VendorName", filter.VendorName, "<All Vendors>");
+        command.Parameters.Add("@ToDate", SqlDbType.DateTime).Value = filter.ToDate.Date.AddDays(1).AddTicks(-1);
+
+        var deptVal = string.IsNullOrWhiteSpace(filter.DeptID) || filter.DeptID == "<All>" ? (object)DBNull.Value : filter.DeptID.Trim();
+        command.Parameters.Add("@DeptID", SqlDbType.VarChar, 50).Value = deptVal;
+
+        var typeVal = filter.GatePassType == GateInPassTypes.All ? (object)DBNull.Value : filter.GatePassType;
+        command.Parameters.Add("@GatePassType", SqlDbType.Int).Value = typeVal;
+
+        var accVal = string.IsNullOrWhiteSpace(filter.VM_AccNo) || filter.VM_AccNo == "0" ? (object)DBNull.Value : filter.VM_AccNo.Trim();
+        command.Parameters.Add("@VM_AccNo", SqlDbType.VarChar, 50).Value = accVal;
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            rows.Add(new GateInListRowModel
+            var row = new GateInListRowModel
             {
                 EntryId = reader.GetInt32(0),
-                DateTime = reader.IsDBNull(1) ? null : reader.GetDateTime(1),
-                GatePassNo = GetString(reader, 2),
-                PersonName = GetString(reader, 3),
-                VehicleNo = GetString(reader, 4),
-                Description = GetString(reader, 5),
-                VendorName = GetString(reader, 6),
-                DepartmentId = GetString(reader, 7),
-                GatePassType = reader.GetInt32(8),
-                GatePassTypeName = GetString(reader, 9),
-                GatePassKind = reader.GetInt32(10),
-                IsFinanceApproved = reader.GetBoolean(11),
-                HasReturnableItems = reader.GetBoolean(12),
-                IsReceived = reader.GetBoolean(13),
-                ReceivedDate = reader.IsDBNull(14) ? null : reader.GetDateTime(14)
-            });
+                DT = reader.IsDBNull(1) ? null : reader.GetDateTime(1),
+                GatePassNo = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                PersonName = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                VehicleNo = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+                Description = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
+                DeptID = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+                DeptName = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+                EmpID = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
+                EmpName = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+                GatePassType = reader.IsDBNull(10) ? 0 : reader.GetInt32(10),
+                GatePassType2 = reader.IsDBNull(11) ? 0 : reader.GetInt32(11),
+                VM_AccNo = reader.IsDBNull(12) ? null : reader.GetString(12),
+                Name = reader.IsDBNull(13) ? null : reader.GetString(13),
+                VendNameManual = reader.IsDBNull(14) ? null : reader.GetString(14),
+                Approved_HOD = !reader.IsDBNull(15) && reader.GetBoolean(15),
+                Approved = !reader.IsDBNull(16) && reader.GetBoolean(16),
+                Approved_Finance = !reader.IsDBNull(17) && reader.GetBoolean(17)
+            };
+
+            if (!string.IsNullOrWhiteSpace(filter.SearchText))
+            {
+                var term = filter.SearchText.Trim();
+                var matches = (row.GatePassNo?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || (row.PersonName?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || (row.VehicleNo?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || (row.Description?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || (row.DeptName?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || (row.EmpName?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || (row.DisplayVendorName?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false);
+
+                if (!matches) continue;
+            }
+
+            rows.Add(row);
         }
 
         return rows;
     }
 
-    public async Task<GateInEntryModel?> GetGateInAsync(
-        int entryId,
-        CancellationToken cancellationToken = default)
+    public async Task<GateInEntryModel?> GetGateInAsync(int entryId, CancellationToken cancellationToken = default)
     {
-        const string headerSql = """
-            SELECT TOP (1)
-                   EntryID,
-                   DT,
-                   ISNULL(GatePassNo, '') AS GatePassNo,
-                   ISNULL(PersonName, '') AS PersonName,
-                   ISNULL(VehicleNo, '') AS VehicleNo,
-                   ISNULL(Description, '') AS Description,
-                   ISNULL(EmpID, '') AS EmpID,
-                   ISNULL(DeptID, '') AS DeptID,
-                   ISNULL(GatePassType, 0) AS GatePassType,
-                   ISNULL(GatePassType2, 0) AS GatePassType2,
-                   ISNULL(VendID, 0) AS VendID,
-                   ISNULL(EmpNameManual, '') AS EmpNameManual,
-                   ISNULL(VendNameManual, '') AS VendNameManual,
-                   CAST(ISNULL(Approved_Finance, 0) AS bit) AS Approved_Finance,
-                   ISNULL(GatePassTypeName, '') AS GatePassTypeName
-            FROM dbo.MiscEntries_GateInTemp
-            WHERE EntryID = @EntryID;
+        const string sqlMaster = """
+            SELECT 
+                m.EntryID,
+                m.DT,
+                ISNULL(m.GatePassNo, '') AS GatePassNo,
+                ISNULL(m.PersonName, '') AS PersonName,
+                ISNULL(m.VehicleNo, '') AS VehicleNo,
+                ISNULL(m.Description, '') AS Description,
+                ISNULL(m.DeptID, '') AS DeptID,
+                ISNULL(d.name, '') AS DeptName,
+                ISNULL(m.EmpID, '') AS EmpID,
+                ISNULL(emp.Name, '') AS EmpName,
+                ISNULL(m.GatePassType, 0) AS GatePassType,
+                ISNULL(m.GatePassType2, 0) AS GatePassType2,
+                ISNULL(m.VendID, 0) AS VendID,
+                m.VM_AccNo,
+                vm.AccTitle AS VendorName,
+                m.VendNameManual,
+                CAST(ISNULL(m.Approved_HOD, 0) AS bit) AS Approved_HOD,
+                CAST(ISNULL(m.Approved, 0) AS bit) AS Approved,
+                CAST(ISNULL(m.Approved_Finance, 0) AS bit) AS Approved_Finance
+            FROM dbo.MiscEntries_GateInTemp AS m
+            LEFT OUTER JOIN dbo.Departments AS d ON m.DeptID = d.deptid
+            LEFT OUTER JOIN dbo.Employees AS emp ON m.EmpID = emp.EmpID
+            LEFT OUTER JOIN dbo.VVendersAndMakers AS vm ON m.VM_AccNo = vm.AccNo
+            WHERE m.EntryID = @EntryID;
             """;
 
-        const string detailSql = """
-            SELECT EntryID,
-                   ISNULL(Detail, '') AS Detail,
-                   ISNULL(Unit, '') AS Unit,
-                   ISNULL(Qty, 0) AS Qty,
-                   ISNULL(Rate, 0) AS Rate,
-                   ISNULL(ReturnType, 'Non-Returnable') AS ReturnType,
-                   ReturnDT,
-                   ISNULL(QtyRcvd, 0) AS QtyRcvd,
-                   RcvdDT,
-                   ISNULL(RcvdBy, '') AS RcvdBy,
-                   ISNULL(RcvdRemarks, '') AS RcvdRemarks
-            FROM dbo.MiscEntries_GateInTemp_Details
-            WHERE MEGO_RefID = @EntryID
-            ORDER BY EntryID;
+        const string sqlDetails = """
+            SELECT 
+                d.EntryID,
+                ISNULL(d.MEGO_RefID, 0) AS MEGO_RefID,
+                ISNULL(d.Detail, '') AS Detail,
+                ISNULL(d.Unit, '') AS Unit,
+                CAST(ISNULL(d.Qty, 0) AS decimal(18,4)) AS Qty,
+                CAST(ISNULL(d.Rate, 0) AS decimal(18,4)) AS Rate
+            FROM dbo.MiscEntries_GateInTemp_Details AS d
+            WHERE d.MEGO_RefID = @EntryID
+            ORDER BY d.EntryID ASC;
             """;
 
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken);
 
-        GateInEntryModel? entry;
-        await using (var header = new SqlCommand(headerSql, connection))
+        GateInEntryModel? entry = null;
+        await using (var masterCmd = new SqlCommand(sqlMaster, connection))
         {
-            header.Parameters.Add("@EntryID", SqlDbType.Int).Value = entryId;
-            await using var reader = await header.ExecuteReaderAsync(cancellationToken);
-            if (!await reader.ReadAsync(cancellationToken))
+            masterCmd.Parameters.Add("@EntryID", SqlDbType.Int).Value = entryId;
+            await using var reader = await masterCmd.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken))
             {
-                return null;
+                entry = new GateInEntryModel
+                {
+                    EntryId = reader.GetInt32(0),
+                    DT = reader.IsDBNull(1) ? DateTime.Now : reader.GetDateTime(1),
+                    GatePassNo = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                    PersonName = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                    VehicleNo = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+                    Description = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
+                    DeptID = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+                    DeptName = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+                    EmpID = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
+                    EmpName = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+                    GatePassType = reader.IsDBNull(10) ? 0 : reader.GetInt32(10),
+                    GatePassType2 = reader.IsDBNull(11) ? 0 : reader.GetInt32(11),
+                    VendorId = reader.IsDBNull(12) ? 0 : reader.GetInt32(12),
+                    VM_AccNo = reader.IsDBNull(13) ? null : reader.GetString(13),
+                    VendorName = reader.IsDBNull(14) ? null : reader.GetString(14),
+                    VendNameManual = reader.IsDBNull(15) ? null : reader.GetString(15),
+                    Approved_HOD = !reader.IsDBNull(16) && reader.GetBoolean(16),
+                    Approved = !reader.IsDBNull(17) && reader.GetBoolean(17),
+                    Approved_Finance = !reader.IsDBNull(18) && reader.GetBoolean(18)
+                };
             }
-
-            entry = new GateInEntryModel
-            {
-                EntryId = reader.GetInt32(0),
-                DateTime = reader.IsDBNull(1) ? DateTime.Now : reader.GetDateTime(1),
-                GatePassNo = GetString(reader, 2),
-                PersonName = GetString(reader, 3),
-                VehicleNo = GetString(reader, 4),
-                Description = GetString(reader, 5),
-                EmployeeId = GetString(reader, 6),
-                DepartmentId = GetString(reader, 7),
-                GatePassType = reader.GetInt32(8),
-                GatePassKind = reader.GetInt32(9),
-                VendorId = reader.GetInt32(10),
-                EmployeeText = GetString(reader, 11),
-                VendorText = FirstNonBlank(GetString(reader, 12), "<Select Vendor>"),
-                IsFinanceApproved = reader.GetBoolean(13),
-                GatePassTypeName = GetString(reader, 14)
-            };
         }
 
-        await using (var details = new SqlCommand(detailSql, connection))
+        if (entry == null) return null;
+
+        await using (var detailsCmd = new SqlCommand(sqlDetails, connection))
         {
-            details.Parameters.Add("@EntryID", SqlDbType.Int).Value = entryId;
-            await using var reader = await details.ExecuteReaderAsync(cancellationToken);
+            detailsCmd.Parameters.Add("@EntryID", SqlDbType.Int).Value = entryId;
+            await using var reader = await detailsCmd.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
                 entry.Details.Add(new GateInDetailModel
                 {
                     EntryId = reader.GetInt32(0),
-                    Detail = GetString(reader, 1),
-                    Unit = GetString(reader, 2),
-                    Qty = Convert.ToDecimal(reader.GetFloat(3)),
-                    Rate = Convert.ToDecimal(reader.GetFloat(4)),
-                    ReturnType = GetString(reader, 5),
-                    ReturnDate = reader.IsDBNull(6) ? null : reader.GetDateTime(6),
-                    ReceivedQty = Convert.ToDecimal(reader.GetFloat(7)),
-                    ReceivedDate = reader.IsDBNull(8) ? null : reader.GetDateTime(8),
-                    ReceivedBy = GetString(reader, 9),
-                    ReceivedRemarks = GetString(reader, 10)
+                    MEGO_RefID = reader.GetInt32(1),
+                    Detail = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                    Unit = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                    Qty = reader.GetDecimal(4),
+                    Rate = reader.GetDecimal(5)
                 });
             }
         }
@@ -217,170 +219,88 @@ public sealed class GateInDataAccess : IGateInDataAccess
         return entry;
     }
 
-    public async Task<IReadOnlyList<GateLookupOptionModel>> GetDepartmentsAsync(
-        CancellationToken cancellationToken = default)
-    {
-        const string sql = """
-            SELECT DeptID,
-                   Name
-            FROM dbo.Departments
-            WHERE Active = 1
-            ORDER BY Name;
-            """;
-
-        return await ReadLookupAsync(sql, cancellationToken);
-    }
-
-    public async Task<IReadOnlyList<GateLookupOptionModel>> GetEmployeesAsync(
-        string departmentId,
-        CancellationToken cancellationToken = default)
-    {
-        const string sql = """
-            SELECT EmpID,
-                   '[' + EmpID + '] ' + ISNULL(Name, '') AS DisplayText
-            FROM dbo.Employees
-            WHERE Active = 1
-            ORDER BY Name;
-            """;
-
-        return await ReadLookupAsync(sql, cancellationToken);
-    }
-
-    public async Task<IReadOnlyList<GateLookupOptionModel>> GetVendorOptionsAsync(
-        CancellationToken cancellationToken = default)
-    {
-        const string sql = """
-            SELECT CONVERT(varchar(20), VendID) AS ID,
-                   ISNULL(vac.AccTitle, '') AS DisplayText
-            FROM dbo.Venders v
-            LEFT JOIN dbo.Accounts vac ON v.AccNo = vac.AccNo
-            ORDER BY vac.AccTitle;
-            """;
-
-        try
-        {
-            var options = await ReadLookupAsync(sql, cancellationToken);
-            return WithFirst(options, "<Select Vendor>", "0");
-        }
-        catch
-        {
-            var fallback = await GetVendorFilterOptionsAsync(cancellationToken);
-            return WithFirst(
-                fallback.Where(x => !string.Equals(x.Text, "<All Vendors>", StringComparison.OrdinalIgnoreCase)).ToArray(),
-                "<Select Vendor>",
-                "0");
-        }
-    }
-
-    public async Task<IReadOnlyList<GateLookupOptionModel>> GetVendorFilterOptionsAsync(
-        CancellationToken cancellationToken = default)
-    {
-        const string sql = """
-            SELECT DISTINCT m.VendNameManual,
-                   m.VendNameManual
-            FROM dbo.MiscEntries_GateInTemp AS m
-            WHERE ISNULL(m.VendNameManual, '0') <> '0'
-            ORDER BY m.VendNameManual;
-            """;
-
-        var options = await ReadLookupAsync(sql, cancellationToken);
-        return WithFirst(options, "<All Vendors>", "");
-    }
-
-    public async Task<IReadOnlyList<GateLookupOptionModel>> GetGatePassTypeOptionsAsync(
-        CancellationToken cancellationToken = default)
-    {
-        const string sql = """
-            SELECT CONVERT(varchar(20), EntryID) AS ID,
-                   GatePassType AS DisplayText
-            FROM dbo.GatePassTypes
-            WHERE ISNULL(Active, 1) = 1
-            ORDER BY GatePassType;
-            """;
-
-        var options = await ReadLookupAsync(sql, cancellationToken);
-        return WithFirst(options, "Select gate-pass type", "");
-    }
-
-    public async Task<string> GetNextGatePassNoAsync(
-        DateTime date,
-        CancellationToken cancellationToken = default)
+    public async Task<string> GetNextGatePassNoAsync(DateTime date, CancellationToken cancellationToken = default)
     {
         var prefix = $"GP-{date:MMyy}-";
         const string sql = """
-            SELECT ISNULL(MAX(CONVERT(int, RIGHT(GatePassNo, 5))), 0)
+            SELECT ISNULL(MAX(TRY_CAST(RIGHT(GatePassNo, 4) AS int)), 0) + 1
             FROM dbo.MiscEntries_GateInTemp
-            WHERE LEFT(ISNULL(GatePassNo, ''), LEN(@Prefix)) = @Prefix
-              AND LEN(ISNULL(GatePassNo, '')) >= LEN(@Prefix) + 5
-              AND ISNUMERIC(RIGHT(GatePassNo, 5)) = 1
-              AND MONTH(DT) = MONTH(@DT)
-              AND YEAR(DT) = YEAR(@DT);
+            WHERE LEFT(GatePassNo, 8) = @Prefix;
             """;
 
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken);
         await using var command = new SqlCommand(sql, connection);
-        AddVarChar(command, "@Prefix", 20, prefix);
-        command.Parameters.Add("@DT", SqlDbType.DateTime).Value = date;
-        var next = Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken)) + 1;
-        return prefix + next.ToString("D5");
+        command.Parameters.Add("@Prefix", SqlDbType.VarChar, 8).Value = prefix;
+
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        var nextSeq = result != null && result != DBNull.Value ? Convert.ToInt32(result) : 1;
+        return $"{prefix}{nextSeq:D4}";
     }
 
     public async Task<int> SaveGateInAsync(
         GateInEntryModel entry,
         string userName,
+        string machineName,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        if (string.IsNullOrWhiteSpace(entry.DepartmentId))
-        {
-            throw new InvalidOperationException("Please select department.");
-        }
-
-        if (string.IsNullOrWhiteSpace(entry.GatePassNo))
-        {
-            throw new InvalidOperationException("Please enter Gate Pass No.");
-        }
-
-        if (entry.Details.Count == 0)
-        {
-            throw new InvalidOperationException("No items added.");
-        }
 
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken);
-        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction();
 
         try
         {
-            var entryId = entry.EntryId;
+            int entryId = entry.EntryId;
+
             if (entryId == 0)
             {
-                const string insertSql = """
+                if (string.IsNullOrWhiteSpace(entry.GatePassNo))
+                {
+                    entry.GatePassNo = await GetNextGatePassNoAsync(entry.DT, cancellationToken);
+                }
+
+                const string insertMasterSql = """
                     INSERT INTO dbo.MiscEntries_GateInTemp
                     (
                         DT, GatePassNo, PersonName, VehicleNo, Description,
-                        UserName, MachineName, EmpID, GatePassType, DeptID,
-                        Approved_HOD, Approved, Approved_Finance,
-                        GatePassType2, VendID, EmpNameManual, VendNameManual, GatePassTypeName
+                        UserName, MachineName, DTEntry, EmpID, GatePassType,
+                        DeptID, GatePassType2, VendID, VendNameManual, VM_AccNo,
+                        Approved_HOD, Approved, Approved_Finance
                     )
-                    OUTPUT INSERTED.EntryID
                     VALUES
                     (
                         @DT, @GatePassNo, @PersonName, @VehicleNo, @Description,
-                        @UserName, @MachineName, @EmpID, @GatePassType, @DeptID,
-                        0, 0, 0,
-                        @GatePassType2, @VendID, @EmpNameManual, @VendNameManual, @GatePassTypeName
+                        @UserName, @MachineName, GETDATE(), @EmpID, @GatePassType,
+                        @DeptID, @GatePassType2, 0, @VendNameManual, @VM_AccNo,
+                        0, 0, 0
                     );
+                    SELECT CAST(SCOPE_IDENTITY() AS int);
                     """;
 
-                await using var insert = new SqlCommand(insertSql, connection, transaction);
-                AddSaveParameters(insert, entry, userName);
-                entryId = Convert.ToInt32(await insert.ExecuteScalarAsync(cancellationToken));
+                await using var cmd = new SqlCommand(insertMasterSql, connection, transaction);
+                cmd.Parameters.Add("@DT", SqlDbType.DateTime).Value = entry.DT;
+                cmd.Parameters.Add("@GatePassNo", SqlDbType.VarChar, 50).Value = entry.GatePassNo?.Trim() ?? string.Empty;
+                cmd.Parameters.Add("@PersonName", SqlDbType.VarChar, 255).Value = (object?)entry.PersonName?.Trim() ?? DBNull.Value;
+                cmd.Parameters.Add("@VehicleNo", SqlDbType.VarChar, 50).Value = (object?)entry.VehicleNo?.Trim() ?? DBNull.Value;
+                cmd.Parameters.Add("@Description", SqlDbType.VarChar, 255).Value = (object?)entry.Description?.Trim() ?? DBNull.Value;
+                cmd.Parameters.Add("@UserName", SqlDbType.VarChar, 50).Value = (object?)userName ?? DBNull.Value;
+                cmd.Parameters.Add("@MachineName", SqlDbType.VarChar, 50).Value = (object?)machineName ?? DBNull.Value;
+                cmd.Parameters.Add("@EmpID", SqlDbType.VarChar, 50).Value = (object?)entry.EmpID?.Trim() ?? DBNull.Value;
+                cmd.Parameters.Add("@GatePassType", SqlDbType.Int).Value = entry.GatePassType;
+                cmd.Parameters.Add("@DeptID", SqlDbType.VarChar, 50).Value = (object?)entry.DeptID?.Trim() ?? DBNull.Value;
+                cmd.Parameters.Add("@GatePassType2", SqlDbType.Int).Value = entry.GatePassType2;
+                cmd.Parameters.Add("@VendNameManual", SqlDbType.VarChar, 500).Value = (object?)entry.VendNameManual?.Trim() ?? DBNull.Value;
+                cmd.Parameters.Add("@VM_AccNo", SqlDbType.VarChar, 50).Value = (object?)entry.VM_AccNo?.Trim() ?? DBNull.Value;
+
+                var idObj = await cmd.ExecuteScalarAsync(cancellationToken);
+                entryId = Convert.ToInt32(idObj);
+                entry.EntryId = entryId;
             }
             else
             {
-                const string updateSql = """
+                const string updateMasterSql = """
                     UPDATE dbo.MiscEntries_GateInTemp
                     SET DT = @DT,
                         GatePassNo = @GatePassNo,
@@ -391,55 +311,53 @@ public sealed class GateInDataAccess : IGateInDataAccess
                         GatePassType = @GatePassType,
                         DeptID = @DeptID,
                         GatePassType2 = @GatePassType2,
-                        VendID = @VendID,
-                        EmpNameManual = @EmpNameManual,
                         VendNameManual = @VendNameManual,
-                        GatePassTypeName = @GatePassTypeName
+                        VM_AccNo = @VM_AccNo
                     WHERE EntryID = @EntryID;
+
+                    DELETE FROM dbo.MiscEntries_GateInTemp_Details WHERE MEGO_RefID = @EntryID;
                     """;
 
-                await using var update = new SqlCommand(updateSql, connection, transaction);
-                AddSaveParameters(update, entry, userName);
-                update.Parameters.Add("@EntryID", SqlDbType.Int).Value = entryId;
-                if (await update.ExecuteNonQueryAsync(cancellationToken) == 0)
-                {
-                    throw new InvalidOperationException("Gate In entry was not found.");
-                }
+                await using var cmd = new SqlCommand(updateMasterSql, connection, transaction);
+                cmd.Parameters.Add("@EntryID", SqlDbType.Int).Value = entryId;
+                cmd.Parameters.Add("@DT", SqlDbType.DateTime).Value = entry.DT;
+                cmd.Parameters.Add("@GatePassNo", SqlDbType.VarChar, 50).Value = entry.GatePassNo?.Trim() ?? string.Empty;
+                cmd.Parameters.Add("@PersonName", SqlDbType.VarChar, 255).Value = (object?)entry.PersonName?.Trim() ?? DBNull.Value;
+                cmd.Parameters.Add("@VehicleNo", SqlDbType.VarChar, 50).Value = (object?)entry.VehicleNo?.Trim() ?? DBNull.Value;
+                cmd.Parameters.Add("@Description", SqlDbType.VarChar, 255).Value = (object?)entry.Description?.Trim() ?? DBNull.Value;
+                cmd.Parameters.Add("@EmpID", SqlDbType.VarChar, 50).Value = (object?)entry.EmpID?.Trim() ?? DBNull.Value;
+                cmd.Parameters.Add("@GatePassType", SqlDbType.Int).Value = entry.GatePassType;
+                cmd.Parameters.Add("@DeptID", SqlDbType.VarChar, 50).Value = (object?)entry.DeptID?.Trim() ?? DBNull.Value;
+                cmd.Parameters.Add("@GatePassType2", SqlDbType.Int).Value = entry.GatePassType2;
+                cmd.Parameters.Add("@VendNameManual", SqlDbType.VarChar, 500).Value = (object?)entry.VendNameManual?.Trim() ?? DBNull.Value;
+                cmd.Parameters.Add("@VM_AccNo", SqlDbType.VarChar, 50).Value = (object?)entry.VM_AccNo?.Trim() ?? DBNull.Value;
 
-                await using var deleteDetails = new SqlCommand(
-                    "DELETE FROM dbo.MiscEntries_GateInTemp_Details WHERE MEGO_RefID = @EntryID;",
-                    connection,
-                    transaction);
-                deleteDetails.Parameters.Add("@EntryID", SqlDbType.Int).Value = entryId;
-                await deleteDetails.ExecuteNonQueryAsync(cancellationToken);
+                await cmd.ExecuteNonQueryAsync(cancellationToken);
             }
 
-            const string detailSql = """
-                INSERT INTO dbo.MiscEntries_GateInTemp_Details
-                    (MEGO_RefID, Detail, Unit, Qty, Rate, ReturnType, ReturnDT, QtyRcvd, RcvdDT, RcvdBy, RcvdRemarks)
-                VALUES
-                    (@MEGO_RefID, @Detail, @Unit, @Qty, @Rate, @ReturnType, @ReturnDT, @QtyRcvd, @RcvdDT, @RcvdBy, @RcvdRemarks);
-                """;
-
-            foreach (var detail in entry.Details)
+            // Insert details
+            if (entry.Details != null && entry.Details.Count > 0)
             {
-                await using var insertDetail = new SqlCommand(detailSql, connection, transaction);
-                insertDetail.Parameters.Add("@MEGO_RefID", SqlDbType.Int).Value = entryId;
-                AddVarChar(insertDetail, "@Detail", 255, ToUpper(detail.Detail));
-                AddVarChar(insertDetail, "@Unit", 50, ToUpper(detail.Unit));
-                insertDetail.Parameters.Add("@Qty", SqlDbType.Real).Value = Convert.ToSingle(detail.Qty);
-                insertDetail.Parameters.Add("@Rate", SqlDbType.Real).Value = Convert.ToSingle(detail.Rate);
-                AddVarChar(insertDetail, "@ReturnType", 20, FirstNonBlank(detail.ReturnType, GateReturnTypes.NonReturnable));
-                insertDetail.Parameters.Add("@ReturnDT", SqlDbType.DateTime).Value = detail.IsReturnable && detail.ReturnDate.HasValue
-                    ? detail.ReturnDate.Value.Date
-                    : DBNull.Value;
-                insertDetail.Parameters.Add("@QtyRcvd", SqlDbType.Real).Value = Convert.ToSingle(detail.ReceivedQty);
-                insertDetail.Parameters.Add("@RcvdDT", SqlDbType.DateTime).Value = detail.ReceivedDate.HasValue
-                    ? detail.ReceivedDate.Value.Date
-                    : DBNull.Value;
-                AddVarChar(insertDetail, "@RcvdBy", 50, detail.ReceivedBy);
-                AddVarChar(insertDetail, "@RcvdRemarks", 255, detail.ReceivedRemarks);
-                await insertDetail.ExecuteNonQueryAsync(cancellationToken);
+                const string insertDetailSql = """
+                    INSERT INTO dbo.MiscEntries_GateInTemp_Details
+                    (MEGO_RefID, Detail, Unit, Qty, Rate)
+                    VALUES
+                    (@MEGO_RefID, @Detail, @Unit, @Qty, @Rate);
+                    """;
+
+                foreach (var item in entry.Details)
+                {
+                    if (string.IsNullOrWhiteSpace(item.Detail)) continue;
+
+                    await using var dCmd = new SqlCommand(insertDetailSql, connection, transaction);
+                    dCmd.Parameters.Add("@MEGO_RefID", SqlDbType.Int).Value = entryId;
+                    dCmd.Parameters.Add("@Detail", SqlDbType.VarChar, 255).Value = item.Detail.Trim();
+                    dCmd.Parameters.Add("@Unit", SqlDbType.VarChar, 50).Value = (object?)item.Unit?.Trim() ?? DBNull.Value;
+                    dCmd.Parameters.Add("@Qty", SqlDbType.Real).Value = Convert.ToSingle(item.Qty);
+                    dCmd.Parameters.Add("@Rate", SqlDbType.Real).Value = Convert.ToSingle(item.Rate);
+
+                    await dCmd.ExecuteNonQueryAsync(cancellationToken);
+                }
             }
 
             await transaction.CommitAsync(cancellationToken);
@@ -452,244 +370,278 @@ public sealed class GateInDataAccess : IGateInDataAccess
         }
     }
 
-    public async Task<GateReceiveModel?> GetReceiveAsync(
-        int entryId,
-        CancellationToken cancellationToken = default)
+    public Task<int> SaveGateInAsync(GateInEntryModel entry, string userName, CancellationToken cancellationToken = default)
+        => SaveGateInAsync(entry, userName, Environment.MachineName, cancellationToken);
+
+    public async Task<bool> SetApprovalAsync(int entryId, string approvalColumn, bool approved, CancellationToken cancellationToken = default)
     {
-        const string headerSql = """
-            SELECT TOP (1)
-                   EntryID,
-                   ISNULL(GatePassNo, '') AS GatePassNo,
-                   ISNULL(DT, GETDATE()) AS DT,
-                   ISNULL(GatePassTypeName, '') AS GatePassTypeName,
-                   ISNULL(PersonName, '') AS PersonName,
-                   ISNULL(VendNameManual, '') AS VendNameManual
-            FROM dbo.MiscEntries_GateInTemp
-            WHERE EntryID = @EntryID;
-            """;
+        var validCols = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Approved_HOD", "Approved", "Approved_Finance" };
+        if (!validCols.Contains(approvalColumn))
+            throw new ArgumentException("Invalid approval column.", nameof(approvalColumn));
 
-        const string lineSql = """
-            SELECT EntryID,
-                   ISNULL(Detail, '') AS Detail,
-                   ISNULL(Unit, '') AS Unit,
-                   ISNULL(Qty, 0) AS Qty,
-                   ISNULL(QtyRcvd, 0) AS QtyRcvd
-            FROM dbo.MiscEntries_GateInTemp_Details
-            WHERE MEGO_RefID = @EntryID
-              AND ISNULL(ReturnType, 'Non-Returnable') = 'Returnable'
-              AND ISNULL(QtyRcvd, 0) < ISNULL(Qty, 0)
-            ORDER BY EntryID;
-            """;
-
+        var sql = $"UPDATE dbo.MiscEntries_GateInTemp SET [{approvalColumn}] = @Approved WHERE EntryID = @EntryID;";
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken);
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.Add("@EntryID", SqlDbType.Int).Value = entryId;
+        command.Parameters.Add("@Approved", SqlDbType.Bit).Value = approved;
 
-        GateReceiveModel? model;
-        await using (var header = new SqlCommand(headerSql, connection))
-        {
-            header.Parameters.Add("@EntryID", SqlDbType.Int).Value = entryId;
-            await using var reader = await header.ExecuteReaderAsync(cancellationToken);
-            if (!await reader.ReadAsync(cancellationToken))
-            {
-                return null;
-            }
-
-            model = new GateReceiveModel
-            {
-                EntryId = reader.GetInt32(0),
-                GatePassNo = GetString(reader, 1),
-                DateTime = reader.GetDateTime(2),
-                GatePassTypeName = GetString(reader, 3),
-                PersonName = GetString(reader, 4),
-                VendorName = GetString(reader, 5),
-                ReceiveDate = DateTime.Today
-            };
-        }
-
-        await using (var lines = new SqlCommand(lineSql, connection))
-        {
-            lines.Parameters.Add("@EntryID", SqlDbType.Int).Value = entryId;
-            await using var reader = await lines.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                var qty = Convert.ToDecimal(reader.GetFloat(3));
-                var already = Convert.ToDecimal(reader.GetFloat(4));
-                model.Lines.Add(new GateReceiveLineModel
-                {
-                    DetailId = reader.GetInt32(0),
-                    Detail = GetString(reader, 1),
-                    Unit = GetString(reader, 2),
-                    Qty = qty,
-                    AlreadyReceivedQty = already,
-                    BalanceQty = Math.Max(0, qty - already),
-                    ReceiveQty = Math.Max(0, qty - already)
-                });
-            }
-        }
-
-        return model;
+        var rows = await command.ExecuteNonQueryAsync(cancellationToken);
+        return rows > 0;
     }
 
-    public async Task SaveReceiveAsync(
-        GateReceiveModel model,
-        string userName,
-        CancellationToken cancellationToken = default)
+    public async Task ApproveFinanceAsync(int entryId, string userName, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(model);
-        var lines = model.Lines.Where(x => x.ReceiveQty > 0).ToArray();
-        if (lines.Length == 0)
-        {
-            throw new InvalidOperationException("Please enter received quantity.");
-        }
-
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
-        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
-
-        try
-        {
-            foreach (var line in lines)
-            {
-                const string sql = """
-                    UPDATE dbo.MiscEntries_GateInTemp_Details
-                    SET QtyRcvd = CASE
-                            WHEN ISNULL(QtyRcvd, 0) + @ReceiveQty > ISNULL(Qty, 0) THEN ISNULL(Qty, 0)
-                            ELSE ISNULL(QtyRcvd, 0) + @ReceiveQty
-                        END,
-                        RcvdDT = @RcvdDT,
-                        RcvdBy = @RcvdBy,
-                        RcvdRemarks = @RcvdRemarks
-                    WHERE EntryID = @DetailID
-                      AND MEGO_RefID = @EntryID
-                      AND ISNULL(ReturnType, 'Non-Returnable') = 'Returnable'
-                      AND ISNULL(QtyRcvd, 0) < ISNULL(Qty, 0);
-                    """;
-
-                await using var command = new SqlCommand(sql, connection, transaction);
-                command.Parameters.Add("@ReceiveQty", SqlDbType.Real).Value = Convert.ToSingle(line.ReceiveQty);
-                command.Parameters.Add("@RcvdDT", SqlDbType.DateTime).Value = model.ReceiveDate.Date;
-                AddVarChar(command, "@RcvdBy", 50, userName);
-                AddVarChar(command, "@RcvdRemarks", 255, model.Remarks);
-                command.Parameters.Add("@DetailID", SqlDbType.Int).Value = line.DetailId;
-                command.Parameters.Add("@EntryID", SqlDbType.Int).Value = model.EntryId;
-                await command.ExecuteNonQueryAsync(cancellationToken);
-            }
-
-            await transaction.CommitAsync(cancellationToken);
-        }
-        catch
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+        await SetApprovalAsync(entryId, "Approved_Finance", true, cancellationToken);
     }
 
-    public async Task ApproveFinanceAsync(
-        int entryId,
-        string userName,
-        CancellationToken cancellationToken = default)
+    public async Task<bool> DeleteGateInAsync(int entryId, CancellationToken cancellationToken = default)
     {
         const string sql = """
-            UPDATE dbo.MiscEntries_GateInTemp
-            SET Approved_Finance = 1
-            WHERE EntryID = @EntryID;
+            DELETE FROM dbo.MiscEntries_GateInTemp_Details WHERE MEGO_RefID = @EntryID;
+            DELETE FROM dbo.MiscEntries_GateInTemp WHERE EntryID = @EntryID;
             """;
 
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken);
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.Add("@EntryID", SqlDbType.Int).Value = entryId;
-        if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
-        {
-            throw new InvalidOperationException("Gate In entry was not found.");
-        }
+
+        var rows = await command.ExecuteNonQueryAsync(cancellationToken);
+        return rows > 0;
     }
 
-    private async Task<IReadOnlyList<GateLookupOptionModel>> ReadLookupAsync(
-        string sql,
-        CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<GateLookupOptionModel>> GetDepartmentsAsync(CancellationToken cancellationToken = default)
     {
+        const string sql = "SELECT deptid, name FROM dbo.Departments WHERE ISNULL(name, '') <> '' ORDER BY name;";
+        var list = new List<GateLookupOptionModel>();
+
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken);
         await using var command = new SqlCommand(sql, connection);
-        return await ReadLookupAsync(command, cancellationToken);
-    }
-
-    private static async Task<IReadOnlyList<GateLookupOptionModel>> ReadLookupAsync(
-        SqlCommand command,
-        CancellationToken cancellationToken)
-    {
-        var options = new List<GateLookupOptionModel>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
         while (await reader.ReadAsync(cancellationToken))
         {
-            options.Add(new GateLookupOptionModel
+            list.Add(new GateLookupOptionModel
             {
-                Id = Convert.ToString(reader.GetValue(0))?.Trim() ?? "",
-                Text = Convert.ToString(reader.GetValue(1))?.Trim() ?? ""
+                Id = reader.IsDBNull(0) ? string.Empty : reader.GetString(0),
+                Text = reader.IsDBNull(1) ? string.Empty : reader.GetString(1)
             });
         }
 
-        return options;
-    }
-
-    private static IReadOnlyList<GateLookupOptionModel> WithFirst(
-        IEnumerable<GateLookupOptionModel> items,
-        string firstText,
-        string firstId)
-    {
-        var list = new List<GateLookupOptionModel>
-        {
-            new() { Id = firstId, Text = firstText }
-        };
-        list.AddRange(items);
         return list;
     }
 
-    private static void AddSaveParameters(SqlCommand command, GateInEntryModel entry, string userName)
+    public async Task<IReadOnlyList<GateLookupOptionModel>> GetEmployeesAsync(string departmentId, CancellationToken cancellationToken = default)
     {
-        command.Parameters.Add("@DT", SqlDbType.DateTime).Value = entry.DateTime;
-        AddVarChar(command, "@GatePassNo", 50, entry.GatePassNo);
-        AddVarChar(command, "@PersonName", 255, entry.PersonName);
-        AddVarChar(command, "@VehicleNo", 50, entry.VehicleNo);
-        AddVarChar(command, "@Description", 255, entry.Description);
-        AddVarChar(command, "@UserName", 50, userName);
-        AddVarChar(command, "@MachineName", 50, Environment.MachineName);
-        AddVarChar(command, "@EmpID", 50, entry.EmployeeId);
-        command.Parameters.Add("@GatePassType", SqlDbType.Int).Value = entry.GatePassType;
-        AddVarChar(command, "@DeptID", 50, entry.DepartmentId);
-        command.Parameters.Add("@GatePassType2", SqlDbType.Int).Value = entry.GatePassKind;
-        command.Parameters.Add("@VendID", SqlDbType.Int).Value = entry.VendorId;
-        AddVarChar(command, "@EmpNameManual", 50, entry.EmployeeText);
-        AddVarChar(command, "@VendNameManual", 50, entry.VendorText);
-        AddVarChar(command, "@GatePassTypeName", 50, entry.GatePassTypeName);
+        var items = await SearchEmployeesAsync(string.Empty, departmentId, cancellationToken);
+        return items.Select(x => new GateLookupOptionModel { Id = x.EmpID, Text = x.DisplayText }).ToList();
     }
 
-    private static void AddNullableFilter(SqlCommand command, string name, string? value, string allPlaceholder)
+    public async Task<IReadOnlyList<GateInEmployeeLookupModel>> SearchEmployeesAsync(
+        string searchText,
+        string? deptId = null,
+        CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(value) || string.Equals(value.Trim(), allPlaceholder, StringComparison.OrdinalIgnoreCase))
+        const string sql = """
+            SELECT TOP 50 e.EmpID, e.Name, e.FName, e.Designation, e.DeptID, d.name AS DeptName
+            FROM dbo.Employees e
+            LEFT JOIN dbo.Departments d ON e.DeptID = d.deptid
+            WHERE (ISNULL(e.Active, 1) = 1)
+              AND (@DeptID IS NULL OR @DeptID = '' OR e.DeptID = @DeptID)
+              AND (
+                  @SearchText IS NULL OR @SearchText = ''
+                  OR e.EmpID LIKE '%' + @SearchText + '%'
+                  OR e.Name LIKE '%' + @SearchText + '%'
+                  OR e.FName LIKE '%' + @SearchText + '%'
+                  OR e.Designation LIKE '%' + @SearchText + '%'
+              )
+            ORDER BY e.Name;
+            """;
+
+        var list = new List<GateInEmployeeLookupModel>();
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new SqlCommand(sql, connection);
+
+        var deptVal = string.IsNullOrWhiteSpace(deptId) || deptId == "<All>" ? (object)DBNull.Value : deptId.Trim();
+        command.Parameters.Add("@DeptID", SqlDbType.VarChar, 50).Value = deptVal;
+
+        var searchVal = string.IsNullOrWhiteSpace(searchText) ? (object)DBNull.Value : searchText.Trim();
+        command.Parameters.Add("@SearchText", SqlDbType.NVarChar, 100).Value = searchVal;
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
         {
-            command.Parameters.Add(name, SqlDbType.VarChar, 100).Value = DBNull.Value;
+            list.Add(new GateInEmployeeLookupModel
+            {
+                EmpID = reader.IsDBNull(0) ? string.Empty : reader.GetString(0),
+                Name = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                FName = reader.IsDBNull(2) ? null : reader.GetString(2),
+                Designation = reader.IsDBNull(3) ? null : reader.GetString(3),
+                DeptID = reader.IsDBNull(4) ? null : reader.GetString(4),
+                DeptName = reader.IsDBNull(5) ? null : reader.GetString(5)
+            });
         }
-        else
-        {
-            command.Parameters.Add(name, SqlDbType.VarChar, 100).Value = value.Trim();
-        }
+
+        return list;
     }
 
-    private static void AddVarChar(SqlCommand command, string name, int size, string? value)
+    public async Task<GateInEmployeeLookupModel?> GetEmployeeByIdAsync(string empId, CancellationToken cancellationToken = default)
     {
-        command.Parameters.Add(name, SqlDbType.VarChar, size).Value = string.IsNullOrWhiteSpace(value)
-            ? (object)DBNull.Value
-            : value.Trim();
+        if (string.IsNullOrWhiteSpace(empId)) return null;
+
+        const string sql = """
+            SELECT TOP 1 e.EmpID, e.Name, e.FName, e.Designation, e.DeptID, d.name AS DeptName
+            FROM dbo.Employees e
+            LEFT JOIN dbo.Departments d ON e.DeptID = d.deptid
+            WHERE e.EmpID = @EmpID;
+            """;
+
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.Add("@EmpID", SqlDbType.VarChar, 50).Value = empId.Trim();
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (await reader.ReadAsync(cancellationToken))
+        {
+            return new GateInEmployeeLookupModel
+            {
+                EmpID = reader.IsDBNull(0) ? string.Empty : reader.GetString(0),
+                Name = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                FName = reader.IsDBNull(2) ? null : reader.GetString(2),
+                Designation = reader.IsDBNull(3) ? null : reader.GetString(3),
+                DeptID = reader.IsDBNull(4) ? null : reader.GetString(4),
+                DeptName = reader.IsDBNull(5) ? null : reader.GetString(5)
+            };
+        }
+
+        return null;
     }
 
-    private static string GetString(SqlDataReader reader, int ordinal) =>
-        reader.IsDBNull(ordinal) ? "" : reader.GetString(ordinal).Trim();
+    public async Task<IReadOnlyList<GateInVendorLookupModel>> SearchVendorsAsync(string searchText, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT TOP 50 AccNo, AccTitle
+            FROM dbo.VVendersAndMakers
+            WHERE (
+                @SearchText IS NULL OR @SearchText = ''
+                OR AccNo LIKE '%' + @SearchText + '%'
+                OR AccTitle LIKE '%' + @SearchText + '%'
+            )
+            ORDER BY AccTitle;
+            """;
 
-    private static string ToUpper(string? value) => value?.Trim().ToUpperInvariant() ?? "";
+        var list = new List<GateInVendorLookupModel>();
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new SqlCommand(sql, connection);
 
-    private static string FirstNonBlank(string? first, string second) =>
-        string.IsNullOrWhiteSpace(first) ? second : first.Trim();
+        var searchVal = string.IsNullOrWhiteSpace(searchText) ? (object)DBNull.Value : searchText.Trim();
+        command.Parameters.Add("@SearchText", SqlDbType.NVarChar, 100).Value = searchVal;
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            list.Add(new GateInVendorLookupModel
+            {
+                AccNo = reader.IsDBNull(0) ? string.Empty : reader.GetString(0),
+                AccTitle = reader.IsDBNull(1) ? string.Empty : reader.GetString(1)
+            });
+        }
+
+        return list;
+    }
+
+    public async Task<GateInVendorLookupModel?> GetVendorByAccNoAsync(string accNo, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(accNo)) return null;
+
+        const string sql = """
+            SELECT TOP 1 AccNo, AccTitle
+            FROM dbo.VVendersAndMakers
+            WHERE AccNo = @AccNo;
+            """;
+
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.Add("@AccNo", SqlDbType.VarChar, 50).Value = accNo.Trim();
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (await reader.ReadAsync(cancellationToken))
+        {
+            return new GateInVendorLookupModel
+            {
+                AccNo = reader.IsDBNull(0) ? string.Empty : reader.GetString(0),
+                AccTitle = reader.IsDBNull(1) ? string.Empty : reader.GetString(1)
+            };
+        }
+
+        return null;
+    }
+
+    public async Task<IReadOnlyList<GateLookupOptionModel>> GetVendorOptionsAsync(CancellationToken cancellationToken = default)
+    {
+        var vendors = await SearchVendorsAsync(string.Empty, cancellationToken);
+        return vendors.Select(v => new GateLookupOptionModel { Id = v.AccNo, Text = v.DisplayText }).ToList();
+    }
+
+    public async Task<IReadOnlyList<GateLookupOptionModel>> GetVendorFilterOptionsAsync(CancellationToken cancellationToken = default)
+    {
+        var vendors = await GetVendorOptionsAsync(cancellationToken);
+        var list = new List<GateLookupOptionModel>
+        {
+            new() { Id = "", Text = "<All Vendors>" }
+        };
+        list.AddRange(vendors);
+        return list;
+    }
+
+    public Task<IReadOnlyList<GateLookupOptionModel>> GetGatePassTypeOptionsAsync(CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<GateLookupOptionModel> list = new List<GateLookupOptionModel>
+        {
+            new() { Id = GateInPassTypes.Foc.ToString(), Text = GateInPassTypes.Caption(GateInPassTypes.Foc) },
+            new() { Id = GateInPassTypes.ExportSale.ToString(), Text = GateInPassTypes.Caption(GateInPassTypes.ExportSale) },
+            new() { Id = GateInPassTypes.Sales.ToString(), Text = GateInPassTypes.Caption(GateInPassTypes.Sales) }
+        };
+        return Task.FromResult(list);
+    }
+
+    // Compatibility methods for GateInReceive if ever invoked
+    public async Task<GateReceiveModel?> GetReceiveAsync(int entryId, CancellationToken cancellationToken = default)
+    {
+        var gateIn = await GetGateInAsync(entryId, cancellationToken);
+        if (gateIn == null) return null;
+
+        return new GateReceiveModel
+        {
+            EntryId = gateIn.EntryId,
+            GatePassNo = gateIn.GatePassNo,
+            DateTime = gateIn.DT,
+            GatePassTypeName = gateIn.GatePassTypeName,
+            PersonName = gateIn.PersonName,
+            VendorName = gateIn.VendorName ?? string.Empty,
+            ReceiveDate = DateTime.Today,
+            Lines = gateIn.Details.Select(d => new GateReceiveLineModel
+            {
+                DetailId = d.EntryId,
+                Detail = d.Detail,
+                Unit = d.Unit,
+                Qty = d.Qty,
+                AlreadyReceivedQty = d.ReceivedQty,
+                BalanceQty = d.BalanceQty,
+                ReceiveQty = d.BalanceQty
+            }).ToList()
+        };
+    }
+
+    public Task SaveReceiveAsync(GateReceiveModel model, string userName, CancellationToken cancellationToken = default)
+    {
+        // No-op or log for compatibility
+        return Task.CompletedTask;
+    }
 }
-

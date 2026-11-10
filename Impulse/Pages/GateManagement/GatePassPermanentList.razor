@@ -1,0 +1,343 @@
+@page "/gate/pass-permanent"
+@page "/gate/pass-permanent/list"
+@attribute [Authorize]
+
+@using BlazorContextMenu
+@using Blazored.Typeahead
+@using Impulse.Shared.Components
+
+<PageTitle>Gate Pass Permanent (Outward) - Impulse</PageTitle>
+
+<style>
+    .blazored-typeahead { height: 35px !important; font-size: 0.85rem !important; padding-top: 0 !important; padding-bottom: 0 !important; box-sizing: border-box !important; }
+    .disabled-typeahead-wrapper .blazored-typeahead { background-color: #e9ecef !important; overflow: hidden !important; border-radius: 4px; }
+    .blazored-typeahead__input, .blazored-typeahead__controls { height: 33px !important; padding-top: 0 !important; padding-bottom: 0 !important; box-sizing: border-box !important; font-size: 0.85rem !important; }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper { height: 33px !important; display: flex !important; align-items: center !important; box-sizing: border-box !important; max-width: 100% !important; }
+    .blazored-typeahead__results { z-index: 10000 !important; }
+
+    /* Win11 Context Menu styling */
+    .win11-section-header { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: #6c757d; padding: 4px 12px; }
+    .win11-icon { width: 16px; text-align: center; }
+    .win11-context-menu-container, .blazor-context-menu { max-height: 40vh !important; overflow-y: auto !important; }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body">
+            <!-- Header Section -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-4 text-primary"><i class="fas fa-dolly-flatbed"></i></span>
+                    <div>
+                        <h4 class="mb-0 fw-bold" style="color: #1a237e;">Gate Pass Permanent (Outward Register)</h4>
+                        <small class="text-muted">Manage permanent material outward passes, sales, FOC dispatches &amp; department approvals</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="RefreshAsync" disabled="@IsLoading">
+                        <i class="fas fa-sync-alt @(IsLoading ? "fa-spin" : "") me-1"></i> Refresh
+                    </button>
+                    <a href="/gate/pass-permanent/entry" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus-circle me-1"></i> New Permanent Pass
+                    </a>
+                    <ContextMenuTrigger MenuId="gatePassOptionsMenu" MouseButtonTrigger="MouseButtonTrigger.Left">
+                        <button class="btn btn-sm btn-outline-dark">
+                            <i class="fas fa-ellipsis-v me-1"></i> Options
+                        </button>
+                    </ContextMenuTrigger>
+                </div>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="row g-2 mb-3">
+                <div class="col-md-2 col-sm-6">
+                    <div class="p-2 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted" style="font-size: 0.75rem;">Total Passes</span>
+                            <div class="fw-bold fs-5 text-dark">@Entries.Count</div>
+                        </div>
+                        <i class="fas fa-clipboard-list text-primary fs-4 opacity-50"></i>
+                    </div>
+                </div>
+                <div class="col-md-2 col-sm-6">
+                    <div class="p-2 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted" style="font-size: 0.75rem;">FOC Passes</span>
+                            <div class="fw-bold fs-5 text-info">@Entries.Count(x => x.GatePassType == GatePassPermanentTypes.FOC)</div>
+                        </div>
+                        <i class="fas fa-gift text-info fs-4 opacity-50"></i>
+                    </div>
+                </div>
+                <div class="col-md-2 col-sm-6">
+                    <div class="p-2 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted" style="font-size: 0.75rem;">Export Sales</span>
+                            <div class="fw-bold fs-5 text-primary">@Entries.Count(x => x.GatePassType == GatePassPermanentTypes.ExportSale)</div>
+                        </div>
+                        <i class="fas fa-globe-americas text-primary fs-4 opacity-50"></i>
+                    </div>
+                </div>
+                <div class="col-md-2 col-sm-6">
+                    <div class="p-2 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted" style="font-size: 0.75rem;">Domestic Sales</span>
+                            <div class="fw-bold fs-5 text-success">@Entries.Count(x => x.GatePassType == GatePassPermanentTypes.Sale)</div>
+                        </div>
+                        <i class="fas fa-cash-register text-success fs-4 opacity-50"></i>
+                    </div>
+                </div>
+                <div class="col-md-4 col-sm-12">
+                    <div class="p-2 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted" style="font-size: 0.75rem;">Approval Status (Fully Approved)</span>
+                            <div class="fw-bold fs-5 text-success">
+                                @Entries.Count(x => x.IsFullyApproved)
+                                <span class="fs-6 text-muted fw-normal">/ @Entries.Count passes</span>
+                            </div>
+                        </div>
+                        <i class="fas fa-shield-alt text-success fs-4 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter Controls -->
+            <div class="card border-0 bg-light p-2 mb-3" style="border-radius: 8px; position: relative !important; z-index: 9999 !important;">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Date Range</label>
+                        <select class="form-select form-select-sm" value="@Filter.RangeKey" @onchange="RangeChangedAsync">
+                            <option value="@GatePassPermanentRangeKeys.Last15Days">Last 15 Days</option>
+                            <option value="@GatePassPermanentRangeKeys.Last30Days">Last 30 Days</option>
+                            <option value="@GatePassPermanentRangeKeys.Last60Days">Last 60 Days</option>
+                            <option value="@GatePassPermanentRangeKeys.Last90Days">Last 90 Days</option>
+                            <option value="@GatePassPermanentRangeKeys.Last180Days">Last 180 Days</option>
+                            <option value="@GatePassPermanentRangeKeys.Custom">Custom Range</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">From Date</label>
+                        <input type="date" class="form-control form-control-sm"
+                               value="@Filter.FromDate.ToString("yyyy-MM-dd")"
+                               disabled="@(!IsCustomRange)"
+                               @onchange="FromDateChangedAsync" />
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">To Date</label>
+                        <input type="date" class="form-control form-control-sm"
+                               value="@Filter.ToDate.ToString("yyyy-MM-dd")"
+                               disabled="@(!IsCustomRange)"
+                               @onchange="ToDateChangedAsync" />
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Department</label>
+                        <select class="form-select form-select-sm" value="@(Filter.DeptID ?? "")" @onchange="DepartmentChangedAsync">
+                            <option value="">&lt;All Departments&gt;</option>
+                            @foreach (var d in DepartmentOptions)
+                            {
+                                <option value="@d.Id">@d.Text</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Pass Type</label>
+                        <select class="form-select form-select-sm" value="@(Filter.GatePassType?.ToString() ?? "")" @onchange="TypeChangedAsync">
+                            <option value="">&lt;All Types&gt;</option>
+                            <option value="@GatePassPermanentTypes.FOC">FOC</option>
+                            <option value="@GatePassPermanentTypes.ExportSale">Export Sales</option>
+                            <option value="@GatePassPermanentTypes.Sale">Sales</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Vendor / Recipient</label>
+                        <BlazoredTypeahead SearchMethod="SearchVendorsAsync"
+                                           TItem="CourierVendorLookupModel"
+                                           TValue="CourierVendorLookupModel"
+                                           Value="SelectedVendor"
+                                           ValueChanged="OnVendorChangedAsync"
+                                           ValueExpression="@(() => SelectedVendor)"
+                                           Placeholder="<All Vendors>"
+                                           EnableDropDown="true"
+                                           MaximumSuggestions="1000">
+                            <SelectedTemplate Context="v">
+                                @v.DisplayText
+                            </SelectedTemplate>
+                            <ResultTemplate Context="v">
+                                <strong>[@v.AccNo]</strong> <span class="ms-1">@v.AccTitle</span>
+                            </ResultTemplate>
+                            <NotFoundTemplate Context="notFoundContext">
+                                No vendor found.
+                            </NotFoundTemplate>
+                        </BlazoredTypeahead>
+                    </div>
+                    <div class="col-12 mt-2">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                            <input type="text" class="form-control" placeholder="Search gate pass #, carried by, vehicle, description, recipient..."
+                                   value="@Filter.SearchText"
+                                   @oninput="SearchInputAsync" />
+                            @if (!string.IsNullOrEmpty(Filter.SearchText))
+                            {
+                                <button class="btn btn-outline-secondary" type="button" @onclick="ClearSearchAsync">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Container -->
+            <div class="table-responsive" style="max-height: 60vh; min-height: 280px; position: relative !important; z-index: 1 !important;">
+                <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                        <tr>
+                            <th class="text-center" style="width: 40px;">#</th>
+                            <th style="width: 140px;">Date &amp; Time</th>
+                            <th style="width: 130px;">Gate Pass #</th>
+                            <th style="width: 100px;">Type</th>
+                            <th>Carried By</th>
+                            <th>Vehicle #</th>
+                            <th>Vendor / Recipient</th>
+                            <th>Department</th>
+                            <th>Approvals</th>
+                            <th class="text-center" style="width: 80px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (IsLoading)
+                        {
+                            <tr>
+                                <td colspan="10" class="text-center py-5 text-muted">
+                                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                                    Loading permanent gate passes...
+                                </td>
+                            </tr>
+                        }
+                        else if (!Entries.Any())
+                        {
+                            <tr>
+                                <td colspan="10" class="text-center py-5 text-muted">
+                                    <i class="fas fa-box-open fs-2 mb-2 d-block opacity-25"></i>
+                                    No outward gate passes found for the selected filters.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            var index = 1;
+                            foreach (var row in Entries)
+                            {
+                                <ContextMenuTrigger WrapperTag="tr" MenuId="gatePassRowMenu" Data="@row" class="user-select-none" style="cursor: context-menu;">
+                                    <td class="text-center text-muted" style="font-size: 0.78rem;">@(index++)</td>
+                                    <td>
+                                        <div class="fw-semibold text-dark">@(row.DT?.ToString("dd-MMM-yyyy") ?? "-")</div>
+                                        <small class="text-muted" style="font-size: 0.75rem;">@(row.DT?.ToString("hh:mm tt") ?? "")</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-primary border font-monospace">@row.GatePassNo</span>
+                                    </td>
+                                    <td>
+                                        <span class="@row.TypeBadgeClass" style="font-size: 0.75rem;">@row.TypeCaption</span>
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold text-dark">@(!string.IsNullOrWhiteSpace(row.PersonName) ? row.PersonName : "-")</div>
+                                        @if (!string.IsNullOrWhiteSpace(row.Description))
+                                        {
+                                            <div class="text-muted text-truncate" style="font-size: 0.75rem; max-width: 220px;" title="@row.Description">
+                                                @row.Description
+                                            </div>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrWhiteSpace(row.VehicleNo))
+                                        {
+                                            <span class="badge bg-secondary font-monospace">@row.VehicleNo</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="fw-bold text-dark">@row.EffectiveVendor</div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-secondary border">@(!string.IsNullOrWhiteSpace(row.DeptID) ? row.DeptID : "-")</span>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex flex-wrap gap-1">
+                                            <span class="badge @(row.Approved_HOD ? "bg-success" : "bg-warning text-dark")" style="font-size: 0.68rem;" title="HOD Approval">
+                                                HOD: @(row.Approved_HOD ? "OK" : "Pending")
+                                            </span>
+                                            <span class="badge @(row.Approved ? "bg-success" : "bg-warning text-dark")" style="font-size: 0.68rem;" title="Admin Approval">
+                                                Admin: @(row.Approved ? "OK" : "Pending")
+                                            </span>
+                                            <span class="badge @(row.Approved_Finance ? "bg-success" : "bg-warning text-dark")" style="font-size: 0.68rem;" title="Finance Approval">
+                                                Fin: @(row.Approved_Finance ? "OK" : "Pending")
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td class="text-center" @onclick:stopPropagation>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="/gate/pass-permanent/edit/@row.EntryID" class="btn btn-outline-primary btn-sm" title="Edit Pass">
+                                                <i class="fas fa-pencil-alt"></i>
+                                            </a>
+                                            <button class="btn btn-outline-secondary btn-sm" title="Print Slip" @onclick="() => PrintSlipAsync(row)">
+                                                <i class="fas fa-print"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </ContextMenuTrigger>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Win11 Context Menu: Right-Click on Row -->
+<ContextMenu Id="gatePassRowMenu" Template="Win11Style">
+    <div class="win11-section-header">Gate Pass Actions</div>
+    <Item OnClick="OnContextEdit">
+        <i class="fas fa-pencil-alt win11-icon text-primary me-2"></i> Edit Entry
+    </Item>
+    <Item OnClick="OnContextPrintSlip">
+        <i class="fas fa-print win11-icon text-dark me-2"></i> Print Slip
+    </Item>
+    <Item OnClick="OnContextPrintDetailList">
+        <i class="fas fa-file-invoice win11-icon text-info me-2"></i> Print Detail List
+    </Item>
+    <div class="dropdown-divider my-1"></div>
+    <div class="win11-section-header">Approvals</div>
+    <Item OnClick="OnContextApproveHOD">
+        <i class="fas fa-user-check win11-icon text-primary me-2"></i> HOD Approval
+    </Item>
+    <Item OnClick="OnContextApproveAdmin">
+        <i class="fas fa-shield-alt win11-icon text-success me-2"></i> Admin Approval
+    </Item>
+    <Item OnClick="OnContextApproveFinance">
+        <i class="fas fa-coins win11-icon text-warning me-2"></i> Finance Dept. Approval
+    </Item>
+    <div class="dropdown-divider my-1"></div>
+    <Item OnClick="OnContextDelete">
+        <i class="fas fa-trash win11-icon text-danger me-2"></i> Delete Entry
+    </Item>
+</ContextMenu>
+
+<!-- Win11 Context Menu: Top Options Button -->
+<ContextMenu Id="gatePassOptionsMenu" Template="Win11Style">
+    <div class="win11-section-header">Global Options</div>
+    <Item OnClick="PrintListAsync">
+        <i class="fas fa-print win11-icon text-primary me-2"></i> Print Outward Register
+    </Item>
+    <Item OnClick="RefreshAsync">
+        <i class="fas fa-sync-alt win11-icon text-secondary me-2"></i> Refresh List
+    </Item>
+    <div class="dropdown-divider my-1"></div>
+    <Item OnClick="NavigateNewPass">
+        <i class="fas fa-plus-circle win11-icon text-success me-2"></i> New Permanent Pass
+    </Item>
+</ContextMenu>
+

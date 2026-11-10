@@ -41,10 +41,7 @@ public sealed class GateDashboardDataAccess : IGateDashboardDataAccess
         DateTime to,
         CancellationToken cancellationToken)
     {
-        var hasGateOut = await TableExistsAsync(connection, "dbo.MiscEntries_GateOut", cancellationToken);
-        var gateOutCte = BuildGateOutTrendCte(hasGateOut);
-
-        var sql = $$"""
+        const string sql = """
             WITH Days AS
             (
                 SELECT CAST(@From AS date) AS WorkDate
@@ -69,23 +66,52 @@ public sealed class GateDashboardDataAccess : IGateDashboardDataAccess
                   AND DT >= @From AND DT < @To
                 GROUP BY CAST(DT AS date)
             ),
-            GateOutData AS
+            GateOutPermData AS
             (
-                {{gateOutCte}}
+                SELECT CAST(DT AS date) AS WorkDate, COUNT(*) AS Cnt
+                FROM dbo.MiscEntries_GateOut
+                WHERE OBJECT_ID(N'dbo.MiscEntries_GateOut', N'U') IS NOT NULL
+                  AND DT >= @From AND DT < @To
+                GROUP BY CAST(DT AS date)
+            ),
+            GateOutRetData AS
+            (
+                SELECT CAST(DT AS date) AS WorkDate, COUNT(*) AS Cnt
+                FROM dbo.GatePass_Return
+                WHERE OBJECT_ID(N'dbo.GatePass_Return', N'U') IS NOT NULL
+                  AND DT >= @From AND DT < @To
+                GROUP BY CAST(DT AS date)
+            ),
+            CourierData AS
+            (
+                SELECT CAST(DT AS date) AS WorkDate, COUNT(*) AS Cnt
+                FROM dbo.Courier_Issuance
+                WHERE OBJECT_ID(N'dbo.Courier_Issuance', N'U') IS NOT NULL
+                  AND DT >= @From AND DT < @To
+                GROUP BY CAST(DT AS date)
+            ),
+            VehicleData AS
+            (
+                SELECT CAST(ISNULL(EntryTime, CreatedAt) AS date) AS WorkDate, COUNT(*) AS Cnt
+                FROM dbo.VehicleEntries
+                WHERE OBJECT_ID(N'dbo.VehicleEntries', N'U') IS NOT NULL
+                  AND ISNULL(EntryTime, CreatedAt) >= @From AND ISNULL(EntryTime, CreatedAt) < @To
+                GROUP BY CAST(ISNULL(EntryTime, CreatedAt) AS date)
             )
             SELECT d.WorkDate,
                    ISNULL(v.Cnt, 0) AS Visitors,
                    ISNULL(gi.Cnt, 0) AS GateIn,
-                   ISNULL(goa.Cnt, 0) AS GateOut
+                   ISNULL(gop.Cnt, 0) AS GateOutPermanent,
+                   ISNULL(gor.Cnt, 0) AS GateOutReturnable,
+                   ISNULL(c.Cnt, 0) AS Courier,
+                   ISNULL(vh.Cnt, 0) AS Vehicles
             FROM Days AS d
             LEFT JOIN VisitorsData AS v ON v.WorkDate = d.WorkDate
             LEFT JOIN GateInData AS gi ON gi.WorkDate = d.WorkDate
-            LEFT JOIN
-            (
-                SELECT WorkDate, SUM(Cnt) AS Cnt
-                FROM GateOutData
-                GROUP BY WorkDate
-            ) AS goa ON goa.WorkDate = d.WorkDate
+            LEFT JOIN GateOutPermData AS gop ON gop.WorkDate = d.WorkDate
+            LEFT JOIN GateOutRetData AS gor ON gor.WorkDate = d.WorkDate
+            LEFT JOIN CourierData AS c ON c.WorkDate = d.WorkDate
+            LEFT JOIN VehicleData AS vh ON vh.WorkDate = d.WorkDate
             ORDER BY d.WorkDate
             OPTION (MAXRECURSION 10);
             """;
@@ -104,7 +130,10 @@ public sealed class GateDashboardDataAccess : IGateDashboardDataAccess
                 Date = Convert.ToDateTime(reader["WorkDate"]),
                 Visitors = Convert.ToInt32(reader["Visitors"]),
                 GateIn = Convert.ToInt32(reader["GateIn"]),
-                GateOut = Convert.ToInt32(reader["GateOut"])
+                GateOutPermanent = Convert.ToInt32(reader["GateOutPermanent"]),
+                GateOutReturnable = Convert.ToInt32(reader["GateOutReturnable"]),
+                Courier = Convert.ToInt32(reader["Courier"]),
+                Vehicles = Convert.ToInt32(reader["Vehicles"])
             });
         }
 
@@ -117,10 +146,7 @@ public sealed class GateDashboardDataAccess : IGateDashboardDataAccess
         DateTime to,
         CancellationToken cancellationToken)
     {
-        var hasGateOut = await TableExistsAsync(connection, "dbo.MiscEntries_GateOut", cancellationToken);
-        var gateOutSql = BuildGateOutSectionSql(hasGateOut);
-
-        var sql = $$"""
+        const string sql = """
             SELECT
                 Visitors =
                     CASE WHEN OBJECT_ID(N'dbo.Visitors', N'U') IS NULL THEN 0 ELSE
@@ -128,7 +154,18 @@ public sealed class GateDashboardDataAccess : IGateDashboardDataAccess
                 GateIn =
                     CASE WHEN OBJECT_ID(N'dbo.MiscEntries_GateInTemp', N'U') IS NULL THEN 0 ELSE
                     (SELECT COUNT(*) FROM dbo.MiscEntries_GateInTemp WHERE DT >= @From AND DT < @To) END,
-                GateOut = {{gateOutSql}};
+                GateOutPermanent =
+                    CASE WHEN OBJECT_ID(N'dbo.MiscEntries_GateOut', N'U') IS NULL THEN 0 ELSE
+                    (SELECT COUNT(*) FROM dbo.MiscEntries_GateOut WHERE DT >= @From AND DT < @To) END,
+                GateOutReturnable =
+                    CASE WHEN OBJECT_ID(N'dbo.GatePass_Return', N'U') IS NULL THEN 0 ELSE
+                    (SELECT COUNT(*) FROM dbo.GatePass_Return WHERE DT >= @From AND DT < @To) END,
+                Courier =
+                    CASE WHEN OBJECT_ID(N'dbo.Courier_Issuance', N'U') IS NULL THEN 0 ELSE
+                    (SELECT COUNT(*) FROM dbo.Courier_Issuance WHERE DT >= @From AND DT < @To) END,
+                Vehicles =
+                    CASE WHEN OBJECT_ID(N'dbo.VehicleEntries', N'U') IS NULL THEN 0 ELSE
+                    (SELECT COUNT(*) FROM dbo.VehicleEntries WHERE (EntryTime >= @From AND EntryTime < @To) OR (CreatedAt >= @From AND CreatedAt < @To)) END;
             """;
 
         await using var command = connection.CreateCommand();
@@ -146,52 +183,10 @@ public sealed class GateDashboardDataAccess : IGateDashboardDataAccess
         {
             Visitors = Convert.ToInt32(reader["Visitors"]),
             GateIn = Convert.ToInt32(reader["GateIn"]),
-            GateOut = Convert.ToInt32(reader["GateOut"])
+            GateOutPermanent = Convert.ToInt32(reader["GateOutPermanent"]),
+            GateOutReturnable = Convert.ToInt32(reader["GateOutReturnable"]),
+            Courier = Convert.ToInt32(reader["Courier"]),
+            Vehicles = Convert.ToInt32(reader["Vehicles"])
         };
     }
-
-    private static async Task<bool> TableExistsAsync(
-        SqlConnection connection,
-        string fullyQualifiedName,
-        CancellationToken cancellationToken)
-    {
-        await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT CASE WHEN OBJECT_ID(@ObjectName, 'U') IS NULL THEN 0 ELSE 1 END;";
-        command.Parameters.Add("@ObjectName", SqlDbType.NVarChar, 256).Value = fullyQualifiedName;
-        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken)) == 1;
-    }
-
-    private static string BuildGateOutTrendCte(bool hasGateOut)
-    {
-        var parts = new List<string>();
-
-        if (hasGateOut)
-        {
-            parts.Add("""
-                SELECT CAST(DT AS date) AS WorkDate, COUNT(*) AS Cnt
-                FROM dbo.MiscEntries_GateOut
-                WHERE DT >= @From AND DT < @To
-                GROUP BY CAST(DT AS date)
-                """);
-        }
-
-        return parts.Count == 0
-            ? "SELECT CAST(@From AS date) AS WorkDate, CAST(0 AS int) AS Cnt WHERE 1 = 0"
-            : string.Join("\r\nUNION ALL\r\n", parts);
-    }
-
-    private static string BuildGateOutSectionSql(bool hasGateOut)
-    {
-        var parts = new List<string>();
-
-        if (hasGateOut)
-        {
-            parts.Add("(SELECT COUNT(*) FROM dbo.MiscEntries_GateOut WHERE DT >= @From AND DT < @To)");
-        }
-
-        return parts.Count == 0
-            ? "0"
-            : string.Join(" + ", parts);
-    }
 }
-

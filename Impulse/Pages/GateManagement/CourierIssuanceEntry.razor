@@ -1,0 +1,278 @@
+@page "/gate/courier-issuance/entry"
+@page "/gate/courier-issuance/edit/{EntryId:int}"
+@attribute [Authorize]
+@using Blazored.Typeahead
+
+<PageTitle>@(IsEditMode ? $"Edit Courier Issuance #{Model.EntryID}" : "New Courier Issuance") - Impulse</PageTitle>
+
+<style>
+    .blazored-typeahead { height: 35px !important; font-size: 0.85rem !important; padding-top: 0 !important; padding-bottom: 0 !important; box-sizing: border-box !important; }
+    .disabled-typeahead-wrapper .blazored-typeahead { background-color: #e9ecef !important; overflow: hidden !important; border-radius: 4px; }
+    .blazored-typeahead__input, .blazored-typeahead__controls { height: 33px !important; padding-top: 0 !important; padding-bottom: 0 !important; box-sizing: border-box !important; font-size: 0.85rem !important; }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper { height: 33px !important; display: flex !important; align-items: center !important; box-sizing: border-box !important; max-width: 100% !important; }
+    .blazored-typeahead__results { z-index: 1050 !important; }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body">
+            <!-- Header -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-4 text-warning"><i class="fas fa-shipping-fast"></i></span>
+                    <div>
+                        <h4 class="mb-0 fw-bold" style="color: #1a237e;">
+                            @(IsEditMode ? $"Edit Courier Issuance #{Model.EntryID}" : "Create New Courier Issuance")
+                        </h4>
+                        <small class="text-muted">Enter details for outgoing courier parcels, airway bill / tracking &amp; consignee</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="Cancel">
+                        <i class="fas fa-arrow-left me-1"></i> Back to List
+                    </button>
+                    @if (!IsEditMode)
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-success" @onclick="SaveAndNewAsync" disabled="@IsSaving">
+                            <i class="fas fa-plus-circle me-1"></i> Save &amp; New
+                        </button>
+                    }
+                    <button type="button" class="btn btn-sm btn-primary" @onclick="SaveAsync" disabled="@IsSaving">
+                        <i class="fas fa-check me-1"></i> @(IsSaving ? "Saving..." : "Save Courier Pass")
+                    </button>
+                </div>
+            </div>
+
+            @if (IsLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted">Loading courier pass details...</p>
+                </div>
+            }
+            else
+            {
+                <EditForm Model="Model">
+                    <DataAnnotationsValidator />
+
+                    <div class="row g-3">
+                        <!-- Left Column: Consignee & Dispatch -->
+                        <div class="col-lg-6">
+                            <div class="card border-0 bg-light p-3 h-100" style="border-radius: 8px;">
+                                <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">
+                                    <i class="fas fa-user-tag me-1 text-primary"></i> Consignee / Recipient Details
+                                </h6>
+                                <div class="row g-2">
+                                    <div class="col-md-6 col-sm-12">
+                                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">
+                                            Date &amp; Time <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="datetime-local" class="form-control form-control-sm"
+                                               value="@Model.DT.ToString("yyyy-MM-ddTHH:mm")"
+                                               @onchange="DateChanged" />
+                                    </div>
+
+                                    <div class="col-md-6 col-sm-12">
+                                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Registered Vendor</label>
+                                        <BlazoredTypeahead SearchMethod="SearchVendorsAsync"
+                                                           TItem="CourierVendorLookupModel"
+                                                           TValue="CourierVendorLookupModel"
+                                                           Value="SelectedVendor"
+                                                           ValueChanged="OnVendorChanged"
+                                                           ValueExpression="@(() => SelectedVendor)"
+                                                           Placeholder="Search Vendor / Consignee..."
+                                                           EnableDropDown="true"
+                                                           MaximumSuggestions="1000">
+                                            <SelectedTemplate Context="v">
+                                                @v.DisplayText
+                                            </SelectedTemplate>
+                                            <ResultTemplate Context="v">
+                                                <strong>[@v.AccNo]</strong> <span class="ms-1">@v.AccTitle</span>
+                                            </ResultTemplate>
+                                            <NotFoundTemplate Context="notFoundContext">
+                                                No vendor found. (You can type consignee name manually below)
+                                            </NotFoundTemplate>
+                                        </BlazoredTypeahead>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">
+                                            Vendor / Recipient Name <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="text" class="form-control form-control-sm text-uppercase"
+                                               placeholder="Enter recipient or company name"
+                                               @bind="Model.VendorName" />
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Address</label>
+                                        <textarea class="form-control form-control-sm text-uppercase" rows="2"
+                                                  placeholder="Delivery destination address"
+                                                  @bind="Model.VendorAddress"></textarea>
+                                    </div>
+
+                                    <div class="col-md-6 col-sm-12">
+                                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Concerned Person</label>
+                                        <input type="text" class="form-control form-control-sm text-uppercase"
+                                               placeholder="Contact person at destination"
+                                               @bind="Model.ConcernedPerson" />
+                                    </div>
+
+                                    <div class="col-md-6 col-sm-12">
+                                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Received By</label>
+                                        <input type="text" class="form-control form-control-sm text-uppercase"
+                                               placeholder="Courier agent or driver name"
+                                               @bind="Model.ReceivedBy" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Column: Parcel Details & Shipment -->
+                        <div class="col-lg-6">
+                            <div class="card border-0 bg-light p-3 h-100" style="border-radius: 8px;">
+                                <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">
+                                    <i class="fas fa-box me-1 text-warning"></i> Shipment &amp; Parcel Specifications
+                                </h6>
+                                <div class="row g-2">
+                                    <div class="col-md-6 col-sm-12">
+                                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">
+                                            Tracking / Airway Bill No
+                                        </label>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text"><i class="fas fa-barcode"></i></span>
+                                            <input type="text" class="form-control font-monospace text-uppercase"
+                                                   placeholder="e.g. TCS-892348"
+                                                   @bind="Model.TrackingNo" />
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-6 col-sm-12">
+                                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Issued By (Employee)</label>
+                                        <BlazoredTypeahead SearchMethod="SearchEmployeesAsync"
+                                                           TItem="CourierEmployeeLookupModel"
+                                                           TValue="CourierEmployeeLookupModel"
+                                                           Value="SelectedEmployee"
+                                                           ValueChanged="OnEmployeeChanged"
+                                                           ValueExpression="@(() => SelectedEmployee)"
+                                                           Placeholder="Search Employee Name or ID..."
+                                                           EnableDropDown="true"
+                                                           MaximumSuggestions="1000">
+                                            <SelectedTemplate Context="emp">
+                                                @if (!string.IsNullOrWhiteSpace(emp.EmpID) && emp.EmpID != "0")
+                                                {
+                                                    <text>[@emp.EmpID] </text>
+                                                }
+                                                @emp.Name
+                                            </SelectedTemplate>
+                                            <ResultTemplate Context="emp">
+                                                @if (!string.IsNullOrWhiteSpace(emp.EmpID) && emp.EmpID != "0")
+                                                {
+                                                    <text>[@emp.EmpID] </text>
+                                                }
+                                                @emp.Name
+                                                @if (!string.IsNullOrWhiteSpace(emp.Designation))
+                                                {
+                                                    <span class="text-muted ms-1" style="font-size: 0.75rem;">(@emp.Designation)</span>
+                                                }
+                                            </ResultTemplate>
+                                            <NotFoundTemplate Context="notFoundContext">
+                                                No employee found.
+                                            </NotFoundTemplate>
+                                        </BlazoredTypeahead>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Description / Contents</label>
+                                        <input type="text" class="form-control form-control-sm text-uppercase"
+                                               placeholder="Brief description of items or documents"
+                                               @bind="Model.Description" />
+                                    </div>
+
+                                    <div class="col-md-4 col-sm-6">
+                                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Weight</label>
+                                        <input type="text" class="form-control form-control-sm text-uppercase"
+                                               placeholder="e.g. 2.5 KG"
+                                               @bind="Model.Weight" />
+                                    </div>
+
+                                    <div class="col-md-4 col-sm-6">
+                                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Dimensions</label>
+                                        <input type="text" class="form-control form-control-sm text-uppercase"
+                                               placeholder="e.g. 10x12x4 in"
+                                               @bind="Model.Dimension" />
+                                    </div>
+
+                                    <div class="col-md-4 col-sm-12">
+                                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Parcel Qty</label>
+                                        <input type="number" step="any" class="form-control form-control-sm"
+                                               placeholder="1"
+                                               @bind="Model.Parcel_Qty" />
+                                    </div>
+
+                                    <div class="col-md-6 col-sm-12">
+                                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Vehicle / Courier Van No</label>
+                                        <input type="text" class="form-control form-control-sm text-uppercase"
+                                               placeholder="Vehicle registration if applicable"
+                                               @bind="Model.Vehicle_No" />
+                                    </div>
+
+                                    <div class="col-md-6 col-sm-12">
+                                        <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Payment Mode</label>
+                                        <div class="d-flex align-items-center gap-3 pt-1">
+                                            <div class="form-check mb-0">
+                                                <input class="form-check-input" type="radio" name="paymentRadio" id="paySelf"
+                                                       value="Self"
+                                                       checked="@(Model.PaymentMode == "Self")"
+                                                       @onchange="@(() => Model.PaymentMode = "Self")" />
+                                                <label class="form-check-label fw-semibold text-dark" for="paySelf" style="font-size: 0.85rem;">
+                                                    Self (Company)
+                                                </label>
+                                            </div>
+                                            <div class="form-check mb-0">
+                                                <input class="form-check-input" type="radio" name="paymentRadio" id="payPaid"
+                                                       value="Paid"
+                                                       checked="@(Model.PaymentMode == "Paid")"
+                                                       @onchange="@(() => Model.PaymentMode = "Paid")" />
+                                                <label class="form-check-label fw-semibold text-dark" for="payPaid" style="font-size: 0.85rem;">
+                                                    Paid (Receiver)
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bottom Section: Print on Save Checkbox -->
+                        <div class="col-12">
+                            <div class="card border-0 bg-white p-3 shadow-sm d-flex flex-row align-items-center justify-content-between" style="border-radius: 8px;">
+                                <div class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" id="chkPrintOnSave" @bind="Model.PrintSlipOnSave" />
+                                    <label class="form-check-label fw-semibold text-dark" for="chkPrintOnSave" style="font-size: 0.85rem;">
+                                        <i class="fas fa-print text-secondary me-1"></i> Print Courier Slip immediately after saving
+                                    </label>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="Cancel">
+                                        <i class="fas fa-times me-1"></i> Cancel
+                                    </button>
+                                    @if (!IsEditMode)
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-success" @onclick="SaveAndNewAsync" disabled="@IsSaving">
+                                            <i class="fas fa-plus-circle me-1"></i> Save &amp; New
+                                        </button>
+                                    }
+                                    <button type="button" class="btn btn-sm btn-primary" @onclick="SaveAsync" disabled="@IsSaving">
+                                        <i class="fas fa-check me-1"></i> @(IsSaving ? "Saving..." : "Save Courier Pass")
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </EditForm>
+            }
+        </div>
+    </div>
+</div>
+

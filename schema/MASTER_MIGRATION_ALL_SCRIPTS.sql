@@ -7316,3 +7316,415 @@ BEGIN
     ALTER TABLE Items ADD TipCap VARCHAR(1000) NULL;
 END
 GO
+
+-- ============================================================================
+-- Gate Management: Courier_Issuance Table
+-- ============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'Courier_Issuance')
+BEGIN
+    CREATE TABLE dbo.Courier_Issuance (
+        EntryID int IDENTITY(1,1) NOT NULL CONSTRAINT PK_Courier_Issuance PRIMARY KEY,
+        DT datetime NULL,
+        TrackingNo varchar(50) NULL,
+        Description varchar(255) NULL,
+        VendorName varchar(50) NULL,
+        VendorAddress varchar(255) NULL,
+        IssuedBy varchar(50) NULL,
+        ConcernedPerson varchar(50) NULL,
+        ReceivedBy varchar(50) NULL,
+        Self bit NULL CONSTRAINT DF_Courier_Issuance_Self DEFAULT ((1)),
+        Paid bit NULL CONSTRAINT DF_Courier_Issuance_Paid DEFAULT ((0)),
+        VendID varchar(50) NULL,
+        Weight varchar(50) NULL,
+        Dimension varchar(50) NULL,
+        CourierStatus bit NULL CONSTRAINT DF_Courier_Issuance_CourierStatus DEFAULT ((0)),
+        MachineName varchar(50) NULL,
+        UserName varchar(50) NULL,
+        Parcel_Qty real NULL,
+        Vehicle_No varchar(50) NULL
+    );
+END
+GO
+
+IF EXISTS (
+    SELECT 1 FROM sys.columns c
+    JOIN sys.types t ON c.user_type_id = t.user_type_id
+    WHERE c.object_id = OBJECT_ID('Courier_Issuance')
+      AND c.name = 'VendID'
+      AND t.name <> 'varchar'
+)
+BEGIN
+    ALTER TABLE dbo.Courier_Issuance ALTER COLUMN VendID varchar(50) NULL;
+END
+GO
+
+
+-- ============================================================================
+-- Gate Management: MiscEntries_GateOut & MiscEntries_GateOut_Details & VMiscEntries_GateOut
+-- ============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'MiscEntries_GateOut')
+BEGIN
+    CREATE TABLE dbo.MiscEntries_GateOut (
+        EntryID int IDENTITY(1,1) NOT NULL CONSTRAINT PK_MiscEntries_GateOut PRIMARY KEY,
+        GatePassNo varchar(50) NULL,
+        DT datetime NULL,
+        Detail varchar(255) NULL,
+        Unit varchar(50) NULL,
+        Packing varchar(50) NULL,
+        PersonName varchar(255) NULL,
+        VehicleNo varchar(50) NULL,
+        Description varchar(255) NULL,
+        Qty int NULL,
+        UserName varchar(50) NULL,
+        MachineName varchar(50) NULL,
+        DTEntry datetime NULL,
+        EmpID varchar(50) NULL,
+        GatePassType int NULL,
+        DeptID varchar(50) NULL,
+        Approved_HOD bit NULL CONSTRAINT DF_MiscEntries_GateOut_Approved_HOD DEFAULT (0),
+        Approved bit NULL CONSTRAINT DF_MiscEntries_GateOut_Approved DEFAULT (0),
+        Approved_Finance bit NULL CONSTRAINT DF_MiscEntries_GateOut_Approved_Finance DEFAULT (0),
+        VendID int NULL,
+        VendNameManual varchar(50) NULL,
+        VM_AccNo varchar(50) NULL
+    );
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.MiscEntries_GateOut') AND name = 'EmpID')
+BEGIN
+    ALTER TABLE dbo.MiscEntries_GateOut ADD EmpID varchar(50) NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.MiscEntries_GateOut') AND name = 'GatePassType')
+BEGIN
+    ALTER TABLE dbo.MiscEntries_GateOut ADD GatePassType int NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.MiscEntries_GateOut') AND name = 'DeptID')
+BEGIN
+    ALTER TABLE dbo.MiscEntries_GateOut ADD DeptID varchar(50) NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.MiscEntries_GateOut') AND name = 'Approved_HOD')
+BEGIN
+    ALTER TABLE dbo.MiscEntries_GateOut ADD Approved_HOD bit NULL CONSTRAINT DF_MiscEntries_GateOut_Approved_HOD DEFAULT (0);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.MiscEntries_GateOut') AND name = 'Approved')
+BEGIN
+    ALTER TABLE dbo.MiscEntries_GateOut ADD Approved bit NULL CONSTRAINT DF_MiscEntries_GateOut_Approved DEFAULT (0);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.MiscEntries_GateOut') AND name = 'Approved_Finance')
+BEGIN
+    ALTER TABLE dbo.MiscEntries_GateOut ADD Approved_Finance bit NULL CONSTRAINT DF_MiscEntries_GateOut_Approved_Finance DEFAULT (0);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.MiscEntries_GateOut') AND name = 'VendID')
+BEGIN
+    ALTER TABLE dbo.MiscEntries_GateOut ADD VendID int NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.MiscEntries_GateOut') AND name = 'VendNameManual')
+BEGIN
+    ALTER TABLE dbo.MiscEntries_GateOut ADD VendNameManual varchar(50) NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.MiscEntries_GateOut') AND name = 'VM_AccNo')
+BEGIN
+    ALTER TABLE dbo.MiscEntries_GateOut ADD VM_AccNo varchar(50) NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'MiscEntries_GateOut_Details')
+BEGIN
+    CREATE TABLE dbo.MiscEntries_GateOut_Details (
+        EntryID int IDENTITY(1,1) NOT NULL CONSTRAINT PK_MiscEntries_GateOut_Details PRIMARY KEY,
+        MEGO_RefID int NULL,
+        Detail varchar(255) NULL,
+        Unit varchar(50) NULL,
+        Packing varchar(255) NULL,
+        Qty real NULL,
+        Rate real NULL
+    );
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.MiscEntries_GateOut_Details') AND name = 'Rate')
+BEGIN
+    ALTER TABLE dbo.MiscEntries_GateOut_Details ADD Rate real NULL;
+END
+GO
+
+IF EXISTS (
+    SELECT 1 FROM sys.columns c
+    JOIN sys.types t ON c.user_type_id = t.user_type_id
+    WHERE c.object_id = OBJECT_ID('dbo.MiscEntries_GateOut_Details')
+      AND c.name = 'Qty'
+      AND t.name <> 'real'
+)
+BEGIN
+    ALTER TABLE dbo.MiscEntries_GateOut_Details ALTER COLUMN Qty real NULL;
+END
+GO
+
+CREATE OR ALTER VIEW dbo.VMiscEntries_GateOut
+AS
+SELECT 
+    m.EntryID, 
+    m.GatePassNo, 
+    m.DT, 
+    m.PersonName, 
+    m.VehicleNo, 
+    m.Description, 
+    m.UserName, 
+    m.MachineName, 
+    m.DTEntry, 
+    CAST(CONVERT(VARCHAR(50), m.DT, 6) AS DATETIME) AS OnlyDT, 
+    m.EmpID, 
+    m.GatePassType, 
+    m.DeptID, 
+    m.VendID, 
+    vm.AccTitle AS Name, 
+    m.VendNameManual,
+    m.VM_AccNo,
+    ISNULL(m.Approved_HOD, 0) AS Approved_HOD,
+    ISNULL(m.Approved, 0) AS Approved,
+    ISNULL(m.Approved_Finance, 0) AS Approved_Finance
+FROM dbo.MiscEntries_GateOut m
+LEFT OUTER JOIN dbo.VVendersAndMakers vm ON m.VM_AccNo = vm.AccNo;
+GO
+
+-- ============================================================================
+-- Gate Management: GatePass_Return & VGatePass_Return (Returnable Gate Pass)
+-- ============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.GatePass_Return') AND name = 'VM_AccNo')
+BEGIN
+    ALTER TABLE dbo.GatePass_Return ADD VM_AccNo varchar(50) NULL;
+END
+GO
+
+CREATE OR ALTER VIEW [dbo].[VGatePass_Return]
+AS
+SELECT        dbo.GatePass_Return.EntryID, dbo.GatePass_Return.GatePassNo, dbo.GatePass_Return.DT, dbo.GatePass_Return.PersonName, dbo.GatePass_Return.VehicleNo, 
+              dbo.GatePass_Return.Description, dbo.GatePass_Return.UserName, dbo.GatePass_Return.MachineName, dbo.GatePass_Return.DTEntry, 
+              CAST(CONVERT(VARCHAR(50), dbo.GatePass_Return.DT, 6) AS DATETIME) AS OnlyDT, dbo.GatePass_Return.SenderName, dbo.GatePass_Return.Returnable, 
+              dbo.GatePass_Return.IssdTo, dbo.GatePass_Return.GatePassType, dbo.GatePass_Return.ReturnDT, T1.TotalQty, T1.TotalQtyRcvd, 
+              dbo.GatePass_Return.DeptID_From, dbo.GatePass_Return.DeptID_To, dbo.Departments.name AS DeptName_From, 
+              CASE WHEN DeptID_To = '0' THEN 'Outdoor Issuance' ELSE Departments_1.name END AS DeptName_To, dbo.GatePass_Return.VendID, 
+              dbo.VVendersAndMakers.AccTitle AS Name, 
+              dbo.GatePass_Return.ApprovedBy_Name, dbo.GatePass_Return.ApprovedBy_Designation,
+              dbo.GatePass_Return.VM_AccNo
+FROM          dbo.Departments RIGHT OUTER JOIN
+              dbo.GatePass_Return LEFT OUTER JOIN
+              dbo.VVendersAndMakers ON dbo.GatePass_Return.VM_AccNo = dbo.VVendersAndMakers.AccNo LEFT OUTER JOIN
+              dbo.Departments AS Departments_1 ON dbo.GatePass_Return.DeptID_To = Departments_1.deptid ON 
+              dbo.Departments.deptid = dbo.GatePass_Return.DeptID_From LEFT OUTER JOIN
+              (SELECT MEGO_RefID, SUM(Qty) AS TotalQty, SUM(TotalQtyRcvd) AS TotalQtyRcvd
+               FROM dbo.VGatePass_Return_Details
+               GROUP BY MEGO_RefID) AS T1 ON dbo.GatePass_Return.EntryID = T1.MEGO_RefID;
+GO
+
+
+-- ============================================================================
+-- Gate Management: MiscEntries_GateInTemp & VMiscEntries_GateInTemp (Gate In)
+-- ============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.MiscEntries_GateInTemp') AND name = 'VM_AccNo')
+BEGIN
+    ALTER TABLE dbo.MiscEntries_GateInTemp ADD VM_AccNo varchar(50) NULL;
+END
+GO
+
+CREATE OR ALTER VIEW [dbo].[VMiscEntries_GateInTemp]
+AS
+SELECT 
+    m.EntryID, 
+    m.GatePassNo, 
+    m.DT, 
+    m.PersonName, 
+    m.VehicleNo, 
+    m.Description, 
+    m.UserName, 
+    m.MachineName, 
+    m.DTEntry, 
+    CAST(CONVERT(VARCHAR(50), m.DT, 6) AS DATETIME) AS OnlyDT, 
+    m.EmpID, 
+    emp.Name AS EmpName,
+    m.GatePassType, 
+    m.GatePassType2,
+    m.DeptID, 
+    d.name AS DeptName, 
+    m.VendID, 
+    vm.AccTitle AS Name, 
+    m.VendNameManual,
+    m.VM_AccNo,
+    ISNULL(m.Approved_HOD, 0) AS Approved_HOD,
+    ISNULL(m.Approved, 0) AS Approved,
+    ISNULL(m.Approved_Finance, 0) AS Approved_Finance
+FROM dbo.MiscEntries_GateInTemp m
+LEFT OUTER JOIN dbo.Departments d ON m.DeptID = d.deptid
+LEFT OUTER JOIN dbo.Employees emp ON m.EmpID = emp.EmpID
+LEFT OUTER JOIN dbo.VVendersAndMakers vm ON m.VM_AccNo = vm.AccNo;
+GO
+
+-- ============================================================================
+-- Gate Management: Screen & Menu Options Synchronization
+-- ============================================================================
+DELETE FROM dbo.UserMenuOptions 
+WHERE OptionID IN (
+    'GateMaterialInward', 'GateMaterialInwardEntry', 
+    'GateMaterialOutward', 'GateMaterialOutwardEntry',
+    'GateInwardList', 'GateInwardEntry', 'GateInwardReceive'
+);
+
+DELETE FROM dbo.MenuOptions 
+WHERE OptionID IN (
+    'GateMaterialInward', 'GateMaterialInwardEntry', 
+    'GateMaterialOutward', 'GateMaterialOutwardEntry',
+    'GateInwardList', 'GateInwardEntry', 'GateInwardReceive'
+);
+
+MERGE dbo.MenuOptions AS target
+USING (VALUES
+    ('GateHub', 'Gate Management Hub', 'GateManagement', 'GateManagementHub'),
+    ('GateDashboard', 'Gate Operations Dashboard', 'GateManagement', 'GateDashboard'),
+    ('GateIn', 'Gate In (Inward Register)', 'GateManagement', 'GateInList'),
+    ('GateInEntry', 'Gate In Pass Entry', 'GateManagement', 'GateInEntry'),
+    ('GatePassPermanent', 'Gate Pass Permanent (Outward)', 'GateManagement', 'GatePassPermanentList'),
+    ('GatePassPermanentEntry', 'Permanent Gate Pass Entry', 'GateManagement', 'GatePassPermanentEntry'),
+    ('GatePassReturnable', 'Gate pass Returnable', 'GateManagement', 'GatePassReturnableList'),
+    ('GatePassReturnableEntry', 'Returnable Gate Pass Entry', 'GateManagement', 'GatePassReturnableEntry'),
+    ('CourierIssuance', 'Courier Issuance', 'GateManagement', 'CourierIssuanceList'),
+    ('CourierIssuanceEntry', 'New Courier Pass', 'GateManagement', 'CourierIssuanceEntry'),
+    ('GateVisitors', 'Visitor Management Register', 'GateManagement', 'VisitorList'),
+    ('GateVisitorEntry', 'Visitor Pass Entry', 'GateManagement', 'VisitorEntry'),
+    ('GateVisitorCheckout', 'Visitor Gate Out Checkout', 'GateManagement', 'VisitorGateOut'),
+    ('GateVehicles', 'Vehicle Movement Log', 'GateManagement', 'VehicleList'),
+    ('GateVehicleEntry', 'Vehicle Entry / Exit', 'GateManagement', 'VehicleEntry'),
+    ('GatePassTypes', 'Gate Pass Types Setup', 'GateManagement', 'GatePassTypes'),
+    ('GateReports', 'Gate Security Reports', 'GateManagement', 'GateReports')
+) AS source (OptionID, OptionName, ModuleName, FormName)
+ON target.OptionID = source.OptionID
+WHEN MATCHED THEN
+    UPDATE SET 
+        target.OptionName = source.OptionName,
+        target.ModuleName = source.ModuleName,
+        target.FormName = source.FormName
+WHEN NOT MATCHED THEN
+    INSERT (OptionID, OptionName, ModuleName, FormName)
+    VALUES (source.OptionID, source.OptionName, source.ModuleName, source.FormName);
+
+INSERT INTO dbo.UserMenuOptions (UserID, OptionID)
+SELECT DISTINCT u.UserID, mo.OptionID
+FROM dbo.Users u
+CROSS JOIN dbo.MenuOptions mo
+WHERE mo.ModuleName = 'GateManagement'
+  AND (
+      u.UserName = 'Administrator'
+      OR ISNULL(u.GateMainLink, 0) = 1
+      OR ISNULL(u.UserManagement, 0) = 1
+      OR EXISTS (
+          SELECT 1 FROM dbo.UserMenuOptions umo2 
+          INNER JOIN dbo.MenuOptions mo2 ON umo2.OptionID = mo2.OptionID
+          WHERE umo2.UserID = u.UserID AND mo2.ModuleName = 'GateManagement'
+      )
+  )
+  AND NOT EXISTS (
+      SELECT 1 FROM dbo.UserMenuOptions existing 
+      WHERE existing.UserID = u.UserID AND existing.OptionID = mo.OptionID
+  );
+GO
+
+
+-- -------------------------------------------------------------------------------------------------
+-- Ensure CustCode normalization ('Stock') in RcvItemsSimple & IssItemsSimple
+-- and enhance VItemsWithShelfWiseStock_Customerwise for unified Stock lookups
+-- -------------------------------------------------------------------------------------------------
+IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'RcvItemsSimple' AND COLUMN_NAME = 'CustCode')
+BEGIN
+    UPDATE RcvItemsSimple 
+    SET CustCode = 'Stock' 
+    WHERE CustCode IS NULL OR LTRIM(RTRIM(CustCode)) = '' OR CustCode = '0';
+END
+GO
+
+IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'IssItemsSimple' AND COLUMN_NAME = 'CustCode')
+BEGIN
+    UPDATE IssItemsSimple 
+    SET CustCode = 'Stock' 
+    WHERE CustCode IS NULL OR LTRIM(RTRIM(CustCode)) = '' OR CustCode = '0';
+END
+GO
+
+CREATE OR ALTER VIEW [dbo].[VItemsWithShelfWiseStock_Customerwise]
+AS
+SELECT 
+    dbo.VStoreShelfs.StoreName, 
+    dbo.VStoreShelfs.RackNo, 
+    dbo.VStoreShelfs.ShelfNo, 
+    T1.ItemID, 
+    T1.RcvdQty - ISNULL(T1.IssdQty, 0) AS NetQty, 
+    T1.Shelf_RefID, 
+    T2.Remarks, 
+    dbo.VStoreShelfs.Store_RefID, 
+    T1.CustCode
+FROM dbo.VStoreShelfs 
+INNER JOIN (
+    SELECT ItemID, Shelf_RefID, CustCode, SUM(RcvdQty) AS RcvdQty, SUM(IssdQty) AS IssdQty
+    FROM (
+        SELECT dbo.RcvItemsSimpleDetail.ItemID, 
+               COALESCE(NULLIF(NULLIF(LTRIM(RTRIM(dbo.RcvItemsSimple.CustCode)), ''), '0'), 'Stock') AS CustCode, 
+               dbo.RcvItemsSimpleDetail_Placement.Shelf_RefID, 
+               SUM(dbo.RcvItemsSimpleDetail_Placement.RcvdQty) AS RcvdQty, 
+               0 AS IssdQty
+        FROM dbo.RcvItemsSimpleDetail_Placement 
+        INNER JOIN dbo.RcvItemsSimpleDetail ON dbo.RcvItemsSimpleDetail_Placement.RISD_RefID = dbo.RcvItemsSimpleDetail.EntryID 
+        INNER JOIN dbo.RcvItemsSimple ON dbo.RcvItemsSimple.RcvNo = dbo.RcvItemsSimpleDetail.RcvNo
+        GROUP BY dbo.RcvItemsSimpleDetail.ItemID, 
+                 COALESCE(NULLIF(NULLIF(LTRIM(RTRIM(dbo.RcvItemsSimple.CustCode)), ''), '0'), 'Stock'), 
+                 dbo.RcvItemsSimpleDetail_Placement.Shelf_RefID
+
+        UNION ALL
+
+        SELECT dbo.IssItemsSimpleDetail.ItemID, 
+               COALESCE(NULLIF(NULLIF(LTRIM(RTRIM(dbo.IssItemsSimple.CustCode)), ''), '0'), 'Stock') AS CustCode, 
+               dbo.IssItemsSimpleDetail_More.Shelf_RefID, 
+               0 AS RcvdQty, 
+               SUM(dbo.IssItemsSimpleDetail_More.IssdQty) AS IssdQty
+        FROM dbo.IssItemsSimpleDetail 
+        INNER JOIN dbo.IssItemsSimpleDetail_More ON dbo.IssItemsSimpleDetail.EntryID = dbo.IssItemsSimpleDetail_More.IISD_RefID 
+        INNER JOIN dbo.IssItemsSimple ON dbo.IssItemsSimple.IssNo = dbo.IssItemsSimpleDetail.IssNo
+        GROUP BY dbo.IssItemsSimpleDetail.ItemID, 
+                 COALESCE(NULLIF(NULLIF(LTRIM(RTRIM(dbo.IssItemsSimple.CustCode)), ''), '0'), 'Stock'), 
+                 dbo.IssItemsSimpleDetail_More.Shelf_RefID
+    ) AS TInner1
+    GROUP BY ItemID, CustCode, Shelf_RefID
+) AS T1 ON dbo.VStoreShelfs.EntryID = T1.Shelf_RefID 
+LEFT OUTER JOIN (
+    SELECT dbo.VRcvitemsSimpleDetail_Placement.ItemID, 
+           COALESCE(NULLIF(NULLIF(LTRIM(RTRIM(dbo.VRcvitemsSimpleDetail_Placement.CustCode)), ''), '0'), 'Stock') AS CustCode, 
+           dbo.VRcvitemsSimpleDetail_Placement.Shelf_RefID, 
+           dbo.VRcvitemsSimpleDetail_Placement.Remarks
+    FROM dbo.VRcvitemsSimpleDetail_Placement 
+    INNER JOIN (
+        SELECT ItemID, 
+               COALESCE(NULLIF(NULLIF(LTRIM(RTRIM(CustCode)), ''), '0'), 'Stock') AS CustCode, 
+               Shelf_RefID, 
+               MAX(EntryID) AS MaxEntryID
+        FROM dbo.VRcvitemsSimpleDetail_Placement
+        GROUP BY ItemID, 
+                 COALESCE(NULLIF(NULLIF(LTRIM(RTRIM(CustCode)), ''), '0'), 'Stock'), 
+                 Shelf_RefID
+    ) AS TMax ON dbo.VRcvitemsSimpleDetail_Placement.EntryID = TMax.MaxEntryID
+) AS T2 ON T1.CustCode = T2.CustCode AND T1.ItemID = T2.ItemID AND T1.Shelf_RefID = T2.Shelf_RefID
+WHERE (T1.RcvdQty - ISNULL(T1.IssdQty, 0)) > 0;
+GO

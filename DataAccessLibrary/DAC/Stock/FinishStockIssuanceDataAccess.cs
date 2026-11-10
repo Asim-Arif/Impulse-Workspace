@@ -84,10 +84,14 @@ namespace DataAccessLibrary.DAC.Stock
             using (IDbConnection db = new SqlConnection(_connectionString))
             {
                 string sql = @"
-                    SELECT DISTINCT Store_RefID AS EntryID, StoreName
-                    FROM VItemsWithLotWiseStock
-                    WHERE ItemID = @ItemId AND NetQty > 0
-                    ORDER BY StoreName";
+                    SELECT DISTINCT v.Store_RefID AS EntryID, sw.StoreName
+                    FROM VItemsWithLotWiseStock v
+                    INNER JOIN VItemsWithShelfWiseStock sw 
+                        ON v.ItemID = sw.ItemID AND v.Shelf_RefID = sw.Shelf_RefID
+                    WHERE v.ItemID = @ItemId 
+                      AND sw.NetQty > 0 
+                      AND v.NetQty > 0
+                    ORDER BY sw.StoreName";
                 var results = await db.QueryAsync<SFTargetStoreModel>(sql, new { ItemId = itemId });
                 return results.AsList();
             }
@@ -98,12 +102,20 @@ namespace DataAccessLibrary.DAC.Stock
             using (IDbConnection db = new SqlConnection(_connectionString))
             {
                 string sql = @"
-                    SELECT EntryID, ItemID, ISNULL(LotNo, '') AS LotNo, ISNULL(Batch_No, '') AS Batch_No,
-                           NetQty, Shelf_RefID, Store_RefID, ISNULL(StoreName, '') AS StoreName,
-                           ISNULL(RackNo, '') AS RackNo, ISNULL(ShelfNo, '') AS ShelfNo, ISNULL(Remarks, '') AS Remarks
-                    FROM VItemsWithLotWiseStock
-                    WHERE ItemID = @ItemId AND Store_RefID = @StoreRefId AND NetQty > 0
-                    ORDER BY EntryID";
+                    SELECT 
+                        v.EntryID, v.ItemID, ISNULL(v.LotNo, '') AS LotNo, ISNULL(v.Batch_No, '') AS Batch_No,
+                        CASE WHEN v.NetQty > sw.NetQty THEN sw.NetQty ELSE v.NetQty END AS NetQty, 
+                        v.Shelf_RefID, v.Store_RefID, 
+                        ISNULL(sw.StoreName, '') AS StoreName,
+                        ISNULL(sw.RackNo, '') AS RackNo, 
+                        ISNULL(sw.ShelfNo, '') AS ShelfNo, 
+                        ISNULL(v.Remarks, '') AS Remarks
+                    FROM VItemsWithLotWiseStock v
+                    INNER JOIN VItemsWithShelfWiseStock sw 
+                        ON v.ItemID = sw.ItemID AND v.Shelf_RefID = sw.Shelf_RefID
+                    WHERE v.ItemID = @ItemId AND v.Store_RefID = @StoreRefId 
+                      AND sw.NetQty > 0 AND v.NetQty > 0
+                    ORDER BY v.EntryID";
                 var results = await db.QueryAsync<LocationLotStockModel>(sql, new { ItemId = itemId, StoreRefId = storeRefId });
                 return results.AsList();
             }

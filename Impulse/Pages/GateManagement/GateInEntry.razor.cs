@@ -1,107 +1,85 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using DataAccessLibrary.Interface.Gate;
+using DataAccessLibrary.Models.ReportModels;
 using DataAccessLibrary.Models.ViewModels.Gate;
+using Impulse.Constants;
+using Impulse.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 using Radzen;
 
 namespace Impulse.Pages.GateManagement;
 
 public partial class GateInEntry : ComponentBase
 {
-    [Inject] private IGateInDataAccess GateInDataAccess { get; set; } = default!;
+    [Parameter] public int EntryId { get; set; }
+    [SupplyParameterFromQuery] public string? returnUrl { get; set; }
+
+    [Inject] private IGateInDataAccess DataAccess { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private NotificationService NotificationService { get; set; } = default!;
-
-    [Parameter] public int? EntryId { get; set; }
-    [Parameter, SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+    [Inject] private IReportNavigationService ReportNavigation { get; set; } = default!;
+    [Inject] private AuthenticationStateProvider AuthStateProvider { get; set; } = default!;
 
     protected GateInEntryModel Model { get; set; } = new();
-    protected GateInDetailModel NewDetail { get; set; } = new();
+    protected GateInDetailModel NewItem { get; set; } = new();
     protected IReadOnlyList<GateLookupOptionModel> DepartmentOptions { get; set; } = Array.Empty<GateLookupOptionModel>();
-    protected IReadOnlyList<GateLookupOptionModel> EmployeeOptions { get; set; } = Array.Empty<GateLookupOptionModel>();
-    protected IReadOnlyList<GateLookupOptionModel> GatePassTypeOptions { get; set; } = Array.Empty<GateLookupOptionModel>();
-    protected IReadOnlyList<GateLookupOptionModel> VendorOptions { get; set; } = Array.Empty<GateLookupOptionModel>();
+    protected GateInVendorLookupModel? SelectedVendor { get; set; }
+    protected GateInEmployeeLookupModel? SelectedEmployee { get; set; }
 
+    protected bool IsEditMode => EntryId > 0;
     protected bool IsLoading { get; set; } = true;
-    protected bool IsSaving { get; set; }
-    protected bool IsEditMode => EntryId.HasValue && EntryId.Value > 0;
-    protected string DateTimeInputValue => Model.DateTime.ToString("yyyy-MM-ddTHH:mm");
+    protected bool IsSaving { get; set; } = false;
 
     protected override async Task OnInitializedAsync()
-    {
-        await LoadLookupsAsync();
-        if (IsEditMode)
-        {
-            await LoadEntryAsync(EntryId!.Value);
-        }
-        else
-        {
-            Model = new GateInEntryModel
-            {
-                DateTime = DateTime.Now
-            };
-            if (DepartmentOptions.Count > 0)
-            {
-                Model.DepartmentId = DepartmentOptions[0].Id;
-                await LoadEmployeesForDepartmentAsync(Model.DepartmentId);
-            }
-            if (GatePassTypeOptions.Count > 0)
-            {
-                Model.GatePassTypeName = GatePassTypeOptions[0].Text;
-            }
-            Model.GatePassNo = await GateInDataAccess.GetNextGatePassNoAsync(Model.DateTime);
-            IsLoading = false;
-        }
-    }
-
-    private async Task LoadLookupsAsync()
-    {
-        try
-        {
-            DepartmentOptions = await GateInDataAccess.GetDepartmentsAsync();
-            GatePassTypeOptions = await GateInDataAccess.GetGatePassTypeOptionsAsync();
-            VendorOptions = await GateInDataAccess.GetVendorOptionsAsync();
-        }
-        catch (Exception ex)
-        {
-            NotificationService.Notify(NotificationSeverity.Warning, "Lookup Warning", ex.Message);
-        }
-    }
-
-    private async Task LoadEmployeesForDepartmentAsync(string deptId)
-    {
-        try
-        {
-            EmployeeOptions = await GateInDataAccess.GetEmployeesAsync(deptId);
-        }
-        catch (Exception ex)
-        {
-            NotificationService.Notify(NotificationSeverity.Warning, "Employee Warning", ex.Message);
-        }
-    }
-
-    private async Task LoadEntryAsync(int entryId)
     {
         IsLoading = true;
         try
         {
-            var entry = await GateInDataAccess.GetGateInAsync(entryId);
-            if (entry == null)
-            {
-                NotificationService.Notify(NotificationSeverity.Error, "Not Found", "Gate In entry was not found.");
-                Cancel();
-                return;
-            }
+            DepartmentOptions = await DataAccess.GetDepartmentsAsync();
 
-            Model = entry;
-            await LoadEmployeesForDepartmentAsync(Model.DepartmentId);
+            if (IsEditMode)
+            {
+                var existing = await DataAccess.GetGateInAsync(EntryId);
+                if (existing != null)
+                {
+                    Model = existing;
+
+                    if (!string.IsNullOrWhiteSpace(Model.VM_AccNo))
+                    {
+                        SelectedVendor = await DataAccess.GetVendorByAccNoAsync(Model.VM_AccNo);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(Model.EmpID))
+                    {
+                        SelectedEmployee = await DataAccess.GetEmployeeByIdAsync(Model.EmpID);
+                    }
+                }
+                else
+                {
+                    NotificationService.Notify(NotificationSeverity.Error, "Not Found", $"Gate In record #{EntryId} was not found.");
+                    Navigation.NavigateTo(returnUrl ?? "/gate/in");
+                    return;
+                }
+            }
+            else
+            {
+                Model = new GateInEntryModel
+                {
+                    DT = DateTime.Now,
+                    GatePassNo = await DataAccess.GetNextGatePassNoAsync(DateTime.Now),
+                    GatePassType = GateInPassTypes.Foc,
+                    GatePassType2 = GateInPassKinds.Permanent
+                };
+            }
         }
         catch (Exception ex)
         {
-            NotificationService.Notify(NotificationSeverity.Error, "Error Loading Entry", ex.Message);
+            NotificationService.Notify(NotificationSeverity.Error, "Initialization Error", ex.Message);
         }
         finally
         {
@@ -109,109 +87,129 @@ public partial class GateInEntry : ComponentBase
         }
     }
 
-    protected async Task DepartmentChangedAsync(ChangeEventArgs args)
+    protected async Task DateChangedAsync(ChangeEventArgs args)
     {
-        Model.DepartmentId = args.Value?.ToString() ?? "";
-        await LoadEmployeesForDepartmentAsync(Model.DepartmentId);
-    }
-
-    protected void EmployeeChanged(ChangeEventArgs args)
-    {
-        Model.EmployeeId = args.Value?.ToString() ?? "";
-        var emp = EmployeeOptions.FirstOrDefault(x => x.Id == Model.EmployeeId);
-        if (emp != null)
+        if (DateTime.TryParse(args.Value?.ToString(), out var dt))
         {
-            Model.EmployeeText = emp.Text;
-        }
-    }
-
-    protected async Task DateTimeChangedAsync(ChangeEventArgs args)
-    {
-        if (DateTime.TryParse(args.Value?.ToString(), out var parsed))
-        {
-            Model.DateTime = parsed;
+            Model.DT = dt;
             if (!IsEditMode)
             {
-                Model.GatePassNo = await GateInDataAccess.GetNextGatePassNoAsync(parsed);
+                Model.GatePassNo = await DataAccess.GetNextGatePassNoAsync(dt);
             }
         }
     }
 
-    protected void VendorChanged(ChangeEventArgs args)
+    protected async Task<IEnumerable<GateInVendorLookupModel>> SearchVendorsAsync(string searchText)
     {
-        if (int.TryParse(args.Value?.ToString(), out var vendId))
-        {
-            Model.VendorId = vendId;
-            var vend = VendorOptions.FirstOrDefault(x => x.Id == vendId.ToString());
-            if (vend != null)
-            {
-                Model.VendorText = vend.Text;
-            }
-        }
+        return await DataAccess.SearchVendorsAsync(searchText);
     }
 
-    protected void AddDetail()
+    protected Task OnVendorSelectedAsync(GateInVendorLookupModel? vendor)
     {
-        if (string.IsNullOrWhiteSpace(NewDetail.Detail))
+        SelectedVendor = vendor;
+        Model.VM_AccNo = vendor?.AccNo;
+        Model.VendorName = vendor?.AccTitle;
+        return Task.CompletedTask;
+    }
+
+    protected async Task<IEnumerable<GateInEmployeeLookupModel>> SearchEmployeesAsync(string searchText)
+    {
+        return await DataAccess.SearchEmployeesAsync(searchText, Model.DeptID);
+    }
+
+    protected Task OnEmployeeSelectedAsync(GateInEmployeeLookupModel? emp)
+    {
+        SelectedEmployee = emp;
+        Model.EmpID = emp?.EmpID ?? string.Empty;
+        Model.EmpName = emp?.Name ?? string.Empty;
+        return Task.CompletedTask;
+    }
+
+    protected void AddItem()
+    {
+        if (string.IsNullOrWhiteSpace(NewItem.Detail))
         {
-            NotificationService.Notify(NotificationSeverity.Warning, "Validation", "Item detail/name is required.");
+            NotificationService.Notify(NotificationSeverity.Warning, "Missing Detail", "Please enter the item detail/description.");
             return;
         }
 
-        if (NewDetail.Qty <= 0)
+        if (NewItem.Qty <= 0)
         {
-            NotificationService.Notify(NotificationSeverity.Warning, "Validation", "Quantity must be greater than zero.");
+            NotificationService.Notify(NotificationSeverity.Warning, "Invalid Quantity", "Item quantity must be greater than zero.");
             return;
         }
 
         Model.Details.Add(new GateInDetailModel
         {
-            Detail = NewDetail.Detail.Trim(),
-            Unit = NewDetail.Unit.Trim(),
-            Qty = NewDetail.Qty,
-            Rate = NewDetail.Rate,
-            ReturnType = NewDetail.ReturnType,
-            ReturnDate = NewDetail.ReturnDate
+            Detail = NewItem.Detail.Trim(),
+            Unit = !string.IsNullOrWhiteSpace(NewItem.Unit) ? NewItem.Unit.Trim() : "Pcs",
+            Qty = NewItem.Qty,
+            Rate = NewItem.Rate
         });
 
-        NewDetail = new GateInDetailModel();
+        NewItem = new GateInDetailModel();
     }
 
-    protected void RemoveDetail(GateInDetailModel item)
+    protected void RemoveItem(GateInDetailModel item)
     {
         Model.Details.Remove(item);
     }
 
-    protected async Task SaveAsync()
+    protected async Task<bool> ExecuteSaveAsync()
     {
-        if (string.IsNullOrWhiteSpace(Model.DepartmentId))
+        if (string.IsNullOrWhiteSpace(Model.DeptID))
         {
             NotificationService.Notify(NotificationSeverity.Warning, "Validation", "Please select a department.");
-            return;
+            return false;
         }
 
         if (string.IsNullOrWhiteSpace(Model.GatePassNo))
         {
-            NotificationService.Notify(NotificationSeverity.Warning, "Validation", "Gate Pass Number is required.");
-            return;
+            NotificationService.Notify(NotificationSeverity.Warning, "Validation", "Please enter Gate Pass number.");
+            return false;
         }
 
         if (Model.Details.Count == 0)
         {
-            NotificationService.Notify(NotificationSeverity.Warning, "Validation", "Please add at least one line item.");
-            return;
+            NotificationService.Notify(NotificationSeverity.Warning, "Validation", "Please add at least one material item to the pass.");
+            return false;
         }
 
         IsSaving = true;
         try
         {
-            await GateInDataAccess.SaveGateInAsync(Model, Environment.UserName);
-            NotificationService.Notify(NotificationSeverity.Success, "Saved", $"Gate pass {Model.GatePassNo} saved successfully.");
-            Cancel();
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var userName = authState.User.Identity?.Name ?? Environment.UserName;
+
+            var savedId = await DataAccess.SaveGateInAsync(Model, userName, Environment.MachineName);
+            Model.EntryId = savedId;
+            Model.EntryID = savedId;
+
+            NotificationService.Notify(NotificationSeverity.Success, "Saved Successfully", $"Gate In Pass '{Model.GatePassNo}' has been saved.");
+
+            if (Model.PrintSlipOnSave)
+            {
+                if (!Model.Approved_Finance)
+                {
+                    NotificationService.Notify(NotificationSeverity.Info, "Approval Required", "Pass is saved. Printing slip requires Finance Department approval.");
+                }
+                else
+                {
+                    var request = new ReportRequest
+                    {
+                        ReportName = ReportNames.GateManagement.MiscGateInTemp,
+                        SelectionFormula = $"{{MiscEntries_GateIn.EntryID}} = {savedId}"
+                    };
+                    await ReportNavigation.PrintReportAsync(request);
+                }
+            }
+
+            return true;
         }
         catch (Exception ex)
         {
             NotificationService.Notify(NotificationSeverity.Error, "Save Error", ex.Message);
+            return false;
         }
         finally
         {
@@ -219,10 +217,35 @@ public partial class GateInEntry : ComponentBase
         }
     }
 
+    protected async Task SaveAsync()
+    {
+        var success = await ExecuteSaveAsync();
+        if (success)
+        {
+            Navigation.NavigateTo(returnUrl ?? "/gate/in");
+        }
+    }
+
+    protected async Task SaveAndNewAsync()
+    {
+        var success = await ExecuteSaveAsync();
+        if (success)
+        {
+            Model = new GateInEntryModel
+            {
+                DT = DateTime.Now,
+                GatePassNo = await DataAccess.GetNextGatePassNoAsync(DateTime.Now),
+                GatePassType = GateInPassTypes.Foc,
+                GatePassType2 = GateInPassKinds.Permanent
+            };
+            SelectedVendor = null;
+            SelectedEmployee = null;
+            NewItem = new GateInDetailModel();
+        }
+    }
+
     protected void Cancel()
     {
-        var target = !string.IsNullOrWhiteSpace(ReturnUrl) ? ReturnUrl : "/gate/in/list";
-        Navigation.NavigateTo(target);
+        Navigation.NavigateTo(returnUrl ?? "/gate/in");
     }
 }
-

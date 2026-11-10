@@ -1,0 +1,357 @@
+@page "/gate/pass-permanent/entry"
+@page "/gate/pass-permanent/edit/{EntryId:int}"
+@attribute [Authorize]
+
+@using Blazored.Typeahead
+
+<PageTitle>@(IsEditMode ? $"Edit Gate Pass Permanent #{Model.GatePassNo}" : "New Gate Pass Permanent") - Impulse</PageTitle>
+
+<style>
+    .blazored-typeahead { height: 35px !important; font-size: 0.85rem !important; padding-top: 0 !important; padding-bottom: 0 !important; box-sizing: border-box !important; }
+    .disabled-typeahead-wrapper .blazored-typeahead { background-color: #e9ecef !important; overflow: hidden !important; border-radius: 4px; }
+    .blazored-typeahead__input, .blazored-typeahead__controls { height: 33px !important; padding-top: 0 !important; padding-bottom: 0 !important; box-sizing: border-box !important; font-size: 0.85rem !important; }
+    .blazored-typeahead__input-mask, .blazored-typeahead__input-mask-wrapper { height: 33px !important; display: flex !important; align-items: center !important; box-sizing: border-box !important; max-width: 100% !important; }
+    .blazored-typeahead__results { z-index: 1050 !important; }
+</style>
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body">
+            <!-- Header -->
+            <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-4 text-primary"><i class="fas fa-dolly-flatbed"></i></span>
+                    <div>
+                        <h4 class="mb-0 fw-bold" style="color: #1a237e;">
+                            @(IsEditMode ? $"Edit Gate Pass Permanent #{Model.GatePassNo}" : "Create New Gate Pass Permanent")
+                        </h4>
+                        <small class="text-muted">Record outbound material transfers, outward sales &amp; non-returnable items</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="Cancel">
+                        <i class="fas fa-arrow-left me-1"></i> Back to List
+                    </button>
+                    @if (!IsEditMode)
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-success" @onclick="SaveAndNewAsync" disabled="@IsSaving">
+                            <i class="fas fa-plus-circle me-1"></i> Save &amp; New
+                        </button>
+                    }
+                    <button type="button" class="btn btn-sm btn-primary" @onclick="SaveAsync" disabled="@IsSaving">
+                        <i class="fas fa-check me-1"></i> @(IsSaving ? "Saving..." : "Save Gate Pass")
+                    </button>
+                </div>
+            </div>
+
+            @if (IsLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted">Loading gate pass details...</p>
+                </div>
+            }
+            else
+            {
+                <EditForm Model="Model">
+                    <DataAnnotationsValidator />
+
+                    <!-- Section 1: Header / Pass Properties -->
+                    <div class="card border-0 bg-light p-3 mb-3" style="border-radius: 8px;">
+                        <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">
+                            <i class="fas fa-file-invoice me-1 text-primary"></i> Pass Specifications &amp; Classification
+                        </h6>
+                        <div class="row g-2">
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">
+                                    Gate Pass # <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" class="form-control form-control-sm font-monospace bg-white fw-bold text-primary"
+                                       @bind="Model.GatePassNo" />
+                            </div>
+
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">
+                                    Date &amp; Time <span class="text-danger">*</span>
+                                </label>
+                                <input type="datetime-local" class="form-control form-control-sm"
+                                       value="@Model.DT.ToString("yyyy-MM-ddTHH:mm")"
+                                       @onchange="DateChangedAsync" />
+                            </div>
+
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">
+                                    Department <span class="text-danger">*</span>
+                                </label>
+                                <select class="form-select form-select-sm" @bind="Model.DeptID">
+                                    <option value="">&lt;Select Department&gt;</option>
+                                    @foreach (var d in DepartmentOptions)
+                                    {
+                                        <option value="@d.Id">@d.Text</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">
+                                    Pass Type <span class="text-danger">*</span>
+                                </label>
+                                <div class="d-flex align-items-center gap-3 pt-1">
+                                    <div class="form-check form-check-inline mb-0">
+                                        <input class="form-check-input" type="radio" name="passTypeRadio" id="typeFOC"
+                                               checked="@(Model.GatePassType == GatePassPermanentTypes.FOC)"
+                                               @onchange="@(() => Model.GatePassType = GatePassPermanentTypes.FOC)" />
+                                        <label class="form-check-label fw-bold text-dark" for="typeFOC" style="font-size: 0.82rem;">FOC</label>
+                                    </div>
+                                    <div class="form-check form-check-inline mb-0">
+                                        <input class="form-check-input" type="radio" name="passTypeRadio" id="typeExport"
+                                               checked="@(Model.GatePassType == GatePassPermanentTypes.ExportSale)"
+                                               @onchange="@(() => Model.GatePassType = GatePassPermanentTypes.ExportSale)" />
+                                        <label class="form-check-label fw-bold text-primary" for="typeExport" style="font-size: 0.82rem;">Export Sale</label>
+                                    </div>
+                                    <div class="form-check form-check-inline mb-0">
+                                        <input class="form-check-input" type="radio" name="passTypeRadio" id="typeSale"
+                                               checked="@(Model.GatePassType == GatePassPermanentTypes.Sale)"
+                                               @onchange="@(() => Model.GatePassType = GatePassPermanentTypes.Sale)" />
+                                        <label class="form-check-label fw-bold text-success" for="typeSale" style="font-size: 0.82rem;">Sale</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 2: Destination & Transport Details -->
+                    <div class="card border-0 bg-light p-3 mb-3" style="border-radius: 8px;">
+                        <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">
+                            <i class="fas fa-truck-moving me-1 text-warning"></i> Destination, Transport &amp; Requester
+                        </h6>
+                        <div class="row g-2">
+                            <div class="col-md-4 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Registered Vendor / Customer</label>
+                                <BlazoredTypeahead SearchMethod="SearchVendorsAsync"
+                                                   TItem="CourierVendorLookupModel"
+                                                   TValue="CourierVendorLookupModel"
+                                                   Value="SelectedVendor"
+                                                   ValueChanged="OnVendorChanged"
+                                                   ValueExpression="@(() => SelectedVendor)"
+                                                   Placeholder="Search Vendor / Party..."
+                                                   EnableDropDown="true"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="v">
+                                        @v.DisplayText
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="v">
+                                        <strong>[@v.AccNo]</strong> <span class="ms-1">@v.AccTitle</span>
+                                    </ResultTemplate>
+                                    <NotFoundTemplate Context="notFoundContext">
+                                        No registered vendor found. (Use manual field below)
+                                    </NotFoundTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+
+                            <div class="col-md-4 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">
+                                    Party / Recipient Name (Manual / Custom)
+                                </label>
+                                <input type="text" class="form-control form-control-sm text-uppercase"
+                                       placeholder="Enter destination or recipient name"
+                                       @bind="Model.VendNameManual" />
+                            </div>
+
+                            <div class="col-md-4 col-sm-12">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Requested By (Employee)</label>
+                                <BlazoredTypeahead SearchMethod="SearchEmployeesAsync"
+                                                   TItem="CourierEmployeeLookupModel"
+                                                   TValue="CourierEmployeeLookupModel"
+                                                   Value="SelectedEmployee"
+                                                   ValueChanged="OnEmployeeChanged"
+                                                   ValueExpression="@(() => SelectedEmployee)"
+                                                   Placeholder="Search Employee Name or ID..."
+                                                   EnableDropDown="true"
+                                                   MaximumSuggestions="1000">
+                                    <SelectedTemplate Context="emp">
+                                        @if (!string.IsNullOrWhiteSpace(emp.EmpID) && emp.EmpID != "0")
+                                        {
+                                            <text>[@emp.EmpID] </text>
+                                        }
+                                        @emp.Name
+                                    </SelectedTemplate>
+                                    <ResultTemplate Context="emp">
+                                        @if (!string.IsNullOrWhiteSpace(emp.EmpID) && emp.EmpID != "0")
+                                        {
+                                            <text>[@emp.EmpID] </text>
+                                        }
+                                        @emp.Name
+                                        @if (!string.IsNullOrWhiteSpace(emp.Designation))
+                                        {
+                                            <span class="text-muted ms-1" style="font-size: 0.75rem;">(@emp.Designation)</span>
+                                        }
+                                    </ResultTemplate>
+                                    <NotFoundTemplate Context="notFoundContext">
+                                        No employee found.
+                                    </NotFoundTemplate>
+                                </BlazoredTypeahead>
+                            </div>
+
+                            <div class="col-md-4 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Carried By / Person Name</label>
+                                <input type="text" class="form-control form-control-sm text-uppercase"
+                                       placeholder="Driver or person carrying material"
+                                       @bind="Model.PersonName" />
+                            </div>
+
+                            <div class="col-md-4 col-sm-6">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">Vehicle No</label>
+                                <input type="text" class="form-control form-control-sm text-uppercase"
+                                       placeholder="e.g. LES-1234"
+                                       @bind="Model.VehicleNo" />
+                            </div>
+
+                            <div class="col-md-4 col-sm-12">
+                                <label class="form-label mb-1" style="font-size: 0.78rem; font-weight: 600;">General Purpose / Description</label>
+                                <input type="text" class="form-control form-control-sm text-uppercase"
+                                       placeholder="Reason for outward material movement"
+                                       @bind="Model.Description" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 3: Master-Detail Grid (Outward Items) -->
+                    <div class="card border-0 bg-white shadow-sm p-3 mb-3" style="border-radius: 8px;">
+                        <div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
+                            <h6 class="fw-bold text-dark mb-0">
+                                <i class="fas fa-boxes me-1 text-primary"></i> Outward Items Specification
+                            </h6>
+                            <span class="badge bg-light text-secondary border">
+                                @Model.Items.Count items added
+                            </span>
+                        </div>
+
+                        <!-- Add Item Row -->
+                        <div class="p-2 border rounded bg-light mb-3">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-5 col-sm-12">
+                                    <label class="form-label mb-1" style="font-size: 0.75rem; font-weight: 600;">Item Detail / Description <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control form-control-sm text-uppercase"
+                                           placeholder="e.g. Scrap Iron, Cutting Waste, Finished Samples"
+                                           @bind="NewItem.Detail" />
+                                </div>
+                                <div class="col-md-2 col-sm-4">
+                                    <label class="form-label mb-1" style="font-size: 0.75rem; font-weight: 600;">Unit</label>
+                                    <input type="text" class="form-control form-control-sm text-uppercase"
+                                           placeholder="Pcs, Kg, Bags"
+                                           @bind="NewItem.Unit" />
+                                </div>
+                                <div class="col-md-2 col-sm-4">
+                                    <label class="form-label mb-1" style="font-size: 0.75rem; font-weight: 600;">Quantity</label>
+                                    <input type="number" step="any" min="0" class="form-control form-control-sm text-end"
+                                           @bind="NewItem.Qty" />
+                                </div>
+                                <div class="col-md-2 col-sm-4">
+                                    <label class="form-label mb-1" style="font-size: 0.75rem; font-weight: 600;">Rate</label>
+                                    <input type="number" step="any" min="0" class="form-control form-control-sm text-end"
+                                           @bind="NewItem.Rate" />
+                                </div>
+                                <div class="col-md-1 col-sm-12 text-end">
+                                    <button type="button" class="btn btn-sm btn-success w-100" @onclick="AddItem" title="Add item row">
+                                        <i class="fas fa-plus"></i> Add
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Items Table -->
+                        <div class="table-responsive" style="max-height: 250px;">
+                            <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase;">
+                                    <tr>
+                                        <th class="text-center" style="width: 40px;">#</th>
+                                        <th>Item Detail</th>
+                                        <th style="width: 100px;">Unit</th>
+                                        <th class="text-end" style="width: 120px;">Qty</th>
+                                        <th class="text-end" style="width: 120px;">Rate</th>
+                                        <th class="text-end" style="width: 130px;">Amount</th>
+                                        <th class="text-center" style="width: 60px;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (!Model.Items.Any())
+                                    {
+                                        <tr>
+                                            <td colspan="7" class="text-center py-4 text-muted">
+                                                No items entered yet. Add items above to save the gate pass.
+                                            </td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        var idx = 1;
+                                        foreach (var item in Model.Items)
+                                        {
+                                            <tr>
+                                                <td class="text-center text-muted">@(idx++)</td>
+                                                <td>
+                                                    <span class="fw-semibold text-dark">@item.Detail</span>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-light text-secondary border">@item.Unit</span>
+                                                </td>
+                                                <td class="text-end font-monospace">@item.Qty.ToString("N2")</td>
+                                                <td class="text-end font-monospace">@item.Rate.ToString("N2")</td>
+                                                <td class="text-end font-monospace fw-bold text-dark">@item.Amount.ToString("N2")</td>
+                                                <td class="text-center">
+                                                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+                                                            title="Delete Item"
+                                                            @onclick="() => RemoveItem(item)">
+                                                        <i class="fas fa-trash-alt"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                                @if (Model.Items.Any())
+                                {
+                                    <tfoot class="table-light fw-bold" style="font-size: 0.85rem;">
+                                        <tr>
+                                            <td colspan="3" class="text-end text-uppercase">Totals:</td>
+                                            <td class="text-end font-monospace text-primary">@Model.TotalQty.ToString("N2")</td>
+                                            <td></td>
+                                            <td class="text-end font-monospace text-success">@Model.TotalAmount.ToString("N2")</td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
+                                }
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Footer Options -->
+                    <div class="d-flex align-items-center justify-content-between p-2 border rounded bg-white shadow-sm">
+                        <div class="form-check ms-2 mb-0">
+                            <input class="form-check-input" type="checkbox" id="chkPrintSlip" @bind="Model.PrintSlipOnSave" />
+                            <label class="form-check-label fw-bold text-secondary" for="chkPrintSlip" style="font-size: 0.85rem;">
+                                <i class="fas fa-print me-1 text-dark"></i> Print Gate Pass Slip on Save
+                            </label>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="Cancel">
+                                <i class="fas fa-times me-1"></i> Cancel
+                            </button>
+                            @if (!IsEditMode)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-success" @onclick="SaveAndNewAsync" disabled="@IsSaving">
+                                    <i class="fas fa-plus-circle me-1"></i> Save &amp; New
+                                </button>
+                            }
+                            <button type="button" class="btn btn-sm btn-primary" @onclick="SaveAsync" disabled="@IsSaving">
+                                <i class="fas fa-check me-1"></i> @(IsSaving ? "Saving..." : "Save Gate Pass")
+                            </button>
+                        </div>
+                    </div>
+                </EditForm>
+            }
+        </div>
+    </div>
+</div>
+

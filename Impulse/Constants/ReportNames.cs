@@ -287,11 +287,15 @@ namespace Impulse.Constants
         {
             private const string Folder = "";
             public const string DailyGateRcv = Folder + "DailyGateRcv.rpt";
+            public const string Courier_Issuance_Slip = Folder + "Courier_Issuance_Slip.rpt";
+            public const string Courier_Issuance_List = Folder + "Courier_Issuance_List.rpt";
             public const string GatePass_Return = Folder + "GatePass_Return.rpt";
             public const string GatePass_Return_List = Folder + "GatePass_Return_List.rpt";
+            public const string GatePass_Return_List_Detail = Folder + "GatePass_Return_List_Detail.rpt";
             public const string GatePass_Return_Receiving = Folder + "GatePass_Return_Receiving.rpt";
             public const string MiscGateInTemp = Folder + "MiscGateInTemp.rpt";
             public const string MiscGateInTempList = Folder + "MiscGateInTempList.rpt";
+            public const string MiscGateInTempList_Detail = Folder + "MiscGateInTempList_Detail.rpt";
             public const string MiscGateOut = Folder + "MiscGateOut.rpt";
             public const string MiscGateOutList = Folder + "MiscGateOutList.rpt";
             public const string Sales_Gatepass = Folder + "Sales_Gatepass.rpt";

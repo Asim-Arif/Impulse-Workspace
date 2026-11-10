@@ -14,8 +14,19 @@ public sealed class GateDashboardSection
 {
     public int Visitors { get; set; }
     public int GateIn { get; set; }
-    public int GateOut { get; set; }
-    public int Total => Visitors + GateIn + GateOut;
+    public int GateOutPermanent { get; set; }
+    public int GateOutReturnable { get; set; }
+    public int Courier { get; set; }
+    public int Vehicles { get; set; }
+
+    // Backward compatibility for any existing callers
+    public int GateOut
+    {
+        get => GateOutPermanent + GateOutReturnable;
+        set => GateOutPermanent = value;
+    }
+
+    public int Total => Visitors + GateIn + GateOutPermanent + GateOutReturnable + Courier + Vehicles;
 }
 
 public sealed class GateDashboardDayModel
@@ -23,7 +34,17 @@ public sealed class GateDashboardDayModel
     public DateTime Date { get; set; }
     public int Visitors { get; set; }
     public int GateIn { get; set; }
-    public int GateOut { get; set; }
-    public int Total => Visitors + GateIn + GateOut;
-}
+    public int GateOutPermanent { get; set; }
+    public int GateOutReturnable { get; set; }
+    public int Courier { get; set; }
+    public int Vehicles { get; set; }
 
+    // Backward compatibility
+    public int GateOut
+    {
+        get => GateOutPermanent + GateOutReturnable;
+        set => GateOutPermanent = value;
+    }
+
+    public int Total => Visitors + GateIn + GateOutPermanent + GateOutReturnable + Courier + Vehicles;
+}

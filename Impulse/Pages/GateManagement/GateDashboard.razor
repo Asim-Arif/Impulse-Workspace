@@ -12,7 +12,7 @@
                     <span class="fs-4 text-primary"><i class="fas fa-chart-line"></i></span>
                     <div>
                         <h4 class="mb-0 fw-bold" style="color: #1a237e;">Gate Operations Dashboard</h4>
-                        <small class="text-muted">Real-time overview of gate passes, visitors &amp; vehicle traffic</small>
+                        <small class="text-muted">Real-time overview of gate passes, material movements, visitors &amp; vehicle traffic</small>
                     </div>
                 </div>
                 <div class="d-flex align-items-center gap-2">
@@ -20,7 +20,7 @@
                         <i class="fas fa-sync-alt @(IsLoading ? "fa-spin" : "") me-1"></i> Refresh
                     </button>
                     <a href="/gate" class="btn btn-sm btn-outline-primary">
-                        <i class="fas fa-arrow-left me-1"></i> Gate Hub
+                        <i class="fas fa-th-large me-1"></i> Gate Hub
                     </a>
                 </div>
             </div>
@@ -34,87 +34,250 @@
             }
             else
             {
-                <!-- Today's Stats Cards Row -->
-                <div class="row g-3 mb-4">
-                    <div class="col-md-3 col-sm-6">
-                        <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-radius: 10px;">
-                            <div class="card-body d-flex align-items-center justify-content-between">
-                                <div>
-                                    <span class="text-secondary fw-semibold text-uppercase" style="font-size: 0.75rem;">Visitors Today</span>
-                                    <h3 class="mb-0 fw-bold text-primary mt-1">@Model.Today.Visitors.ToString("N0")</h3>
-                                    <small class="text-muted" style="font-size: 0.75rem;">Guest &amp; vendor check-ins</small>
+                <!-- Today's Stats Cards Row (6 Gate Modules with Permissions Guard) -->
+                <div class="row g-2 mb-3">
+                    <!-- Gate In -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        @if (CanAccess("GateIn"))
+                        {
+                            <a href="/gate/in" class="text-decoration-none">
+                                <div class="card border-0 shadow-sm h-100 p-2" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-radius: 10px; transition: transform 0.15s ease;">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div>
+                                            <span class="text-secondary fw-semibold text-uppercase" style="font-size: 0.72rem;">Gate In</span>
+                                            <h3 class="mb-0 fw-bold text-success mt-1">@Model.Today.GateIn.ToString("N0")</h3>
+                                            <small class="text-muted" style="font-size: 0.70rem;">Inward passes</small>
+                                        </div>
+                                        <div class="bg-white rounded-circle p-2 shadow-sm text-success">
+                                            <i class="fas fa-file-import fa-lg"></i>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="bg-white rounded-circle p-3 shadow-sm text-primary">
-                                    <i class="fas fa-id-badge fa-2x"></i>
+                            </a>
+                        }
+                        else
+                        {
+                            <div class="card border-0 shadow-sm h-100 p-2" style="background: #f1f3f4; border-radius: 10px; opacity: 0.6; cursor: not-allowed;" title="Access Restricted - Permission Required">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <span class="text-muted fw-semibold text-uppercase" style="font-size: 0.72rem;">Gate In</span>
+                                        <h3 class="mb-0 fw-bold text-muted mt-1">@Model.Today.GateIn.ToString("N0")</h3>
+                                        <small class="text-muted" style="font-size: 0.70rem;">Inward passes</small>
+                                    </div>
+                                    <div class="bg-white rounded-circle p-2 shadow-sm text-secondary">
+                                        <i class="fas fa-lock fa-lg"></i>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        }
                     </div>
-                    <div class="col-md-3 col-sm-6">
-                        <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-radius: 10px;">
-                            <div class="card-body d-flex align-items-center justify-content-between">
-                                <div>
-                                    <span class="text-secondary fw-semibold text-uppercase" style="font-size: 0.75rem;">Gate In Today</span>
-                                    <h3 class="mb-0 fw-bold text-success mt-1">@Model.Today.GateIn.ToString("N0")</h3>
-                                    <small class="text-muted" style="font-size: 0.75rem;">Inward material passes</small>
+
+                    <!-- Permanent Outward -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        @if (CanAccess("GatePassPermanent"))
+                        {
+                            <a href="/gate/pass-permanent" class="text-decoration-none">
+                                <div class="card border-0 shadow-sm h-100 p-2" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-radius: 10px; transition: transform 0.15s ease;">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div>
+                                            <span class="text-secondary fw-semibold text-uppercase" style="font-size: 0.72rem;">Permanent Pass</span>
+                                            <h3 class="mb-0 fw-bold text-primary mt-1">@Model.Today.GateOutPermanent.ToString("N0")</h3>
+                                            <small class="text-muted" style="font-size: 0.70rem;">Outward dispatches</small>
+                                        </div>
+                                        <div class="bg-white rounded-circle p-2 shadow-sm text-primary">
+                                            <i class="fas fa-dolly-flatbed fa-lg"></i>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="bg-white rounded-circle p-3 shadow-sm text-success">
-                                    <i class="fas fa-arrow-right-to-bracket fa-2x"></i>
+                            </a>
+                        }
+                        else
+                        {
+                            <div class="card border-0 shadow-sm h-100 p-2" style="background: #f1f3f4; border-radius: 10px; opacity: 0.6; cursor: not-allowed;" title="Access Restricted - Permission Required">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <span class="text-muted fw-semibold text-uppercase" style="font-size: 0.72rem;">Permanent Pass</span>
+                                        <h3 class="mb-0 fw-bold text-muted mt-1">@Model.Today.GateOutPermanent.ToString("N0")</h3>
+                                        <small class="text-muted" style="font-size: 0.70rem;">Outward dispatches</small>
+                                    </div>
+                                    <div class="bg-white rounded-circle p-2 shadow-sm text-secondary">
+                                        <i class="fas fa-lock fa-lg"></i>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        }
                     </div>
-                    <div class="col-md-3 col-sm-6">
-                        <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%); border-radius: 10px;">
-                            <div class="card-body d-flex align-items-center justify-content-between">
-                                <div>
-                                    <span class="text-secondary fw-semibold text-uppercase" style="font-size: 0.75rem;">Gate Out Today</span>
-                                    <h3 class="mb-0 fw-bold text-warning mt-1">@Model.Today.GateOut.ToString("N0")</h3>
-                                    <small class="text-muted" style="font-size: 0.75rem;">Outward dispatches</small>
+
+                    <!-- Returnable Outward -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        @if (CanAccess("GatePassReturnable"))
+                        {
+                            <a href="/gate/pass-returnable" class="text-decoration-none">
+                                <div class="card border-0 shadow-sm h-100 p-2" style="background: linear-gradient(135deg, #fff8e1 0%, #ffe082 100%); border-radius: 10px; transition: transform 0.15s ease;">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div>
+                                            <span class="text-secondary fw-semibold text-uppercase" style="font-size: 0.72rem;">Returnable Pass</span>
+                                            <h3 class="mb-0 fw-bold text-warning text-dark mt-1">@Model.Today.GateOutReturnable.ToString("N0")</h3>
+                                            <small class="text-muted" style="font-size: 0.70rem;">Returnable goods</small>
+                                        </div>
+                                        <div class="bg-white rounded-circle p-2 shadow-sm text-warning">
+                                            <i class="fas fa-exchange-alt fa-lg"></i>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="bg-white rounded-circle p-3 shadow-sm text-warning">
-                                    <i class="fas fa-arrow-right-from-bracket fa-2x"></i>
+                            </a>
+                        }
+                        else
+                        {
+                            <div class="card border-0 shadow-sm h-100 p-2" style="background: #f1f3f4; border-radius: 10px; opacity: 0.6; cursor: not-allowed;" title="Access Restricted - Permission Required">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <span class="text-muted fw-semibold text-uppercase" style="font-size: 0.72rem;">Returnable Pass</span>
+                                        <h3 class="mb-0 fw-bold text-muted mt-1">@Model.Today.GateOutReturnable.ToString("N0")</h3>
+                                        <small class="text-muted" style="font-size: 0.70rem;">Returnable goods</small>
+                                    </div>
+                                    <div class="bg-white rounded-circle p-2 shadow-sm text-secondary">
+                                        <i class="fas fa-lock fa-lg"></i>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        }
                     </div>
-                    <div class="col-md-3 col-sm-6">
-                        <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%); border-radius: 10px;">
-                            <div class="card-body d-flex align-items-center justify-content-between">
-                                <div>
-                                    <span class="text-secondary fw-semibold text-uppercase" style="font-size: 0.75rem;">Total Movements</span>
-                                    <h3 class="mb-0 fw-bold text-dark mt-1">@Model.Today.Total.ToString("N0")</h3>
-                                    <small class="text-muted" style="font-size: 0.75rem;">Combined daily traffic</small>
+
+                    <!-- Courier Issuance -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        @if (CanAccess("CourierIssuance"))
+                        {
+                            <a href="/gate/courier-issuance" class="text-decoration-none">
+                                <div class="card border-0 shadow-sm h-100 p-2" style="background: linear-gradient(135deg, #e0f2f1 0%, #b2dfdb 100%); border-radius: 10px; transition: transform 0.15s ease;">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div>
+                                            <span class="text-secondary fw-semibold text-uppercase" style="font-size: 0.72rem;">Courier Issuance</span>
+                                            <h3 class="mb-0 fw-bold text-info text-dark mt-1">@Model.Today.Courier.ToString("N0")</h3>
+                                            <small class="text-muted" style="font-size: 0.70rem;">Parcels &amp; letters</small>
+                                        </div>
+                                        <div class="bg-white rounded-circle p-2 shadow-sm text-info">
+                                            <i class="fas fa-shipping-fast fa-lg"></i>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="bg-white rounded-circle p-3 shadow-sm text-purple" style="color: #6a1b9a;">
-                                    <i class="fas fa-arrows-spin fa-2x"></i>
+                            </a>
+                        }
+                        else
+                        {
+                            <div class="card border-0 shadow-sm h-100 p-2" style="background: #f1f3f4; border-radius: 10px; opacity: 0.6; cursor: not-allowed;" title="Access Restricted - Permission Required">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <span class="text-muted fw-semibold text-uppercase" style="font-size: 0.72rem;">Courier Issuance</span>
+                                        <h3 class="mb-0 fw-bold text-muted mt-1">@Model.Today.Courier.ToString("N0")</h3>
+                                        <small class="text-muted" style="font-size: 0.70rem;">Parcels &amp; letters</small>
+                                    </div>
+                                    <div class="bg-white rounded-circle p-2 shadow-sm text-secondary">
+                                        <i class="fas fa-lock fa-lg"></i>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        }
+                    </div>
+
+                    <!-- Visitors -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        @if (CanAccess("GateVisitors"))
+                        {
+                            <a href="/gate/visitors" class="text-decoration-none">
+                                <div class="card border-0 shadow-sm h-100 p-2" style="background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%); border-radius: 10px; transition: transform 0.15s ease;">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div>
+                                            <span class="text-secondary fw-semibold text-uppercase" style="font-size: 0.72rem;">Visitors</span>
+                                            <h3 class="mb-0 fw-bold text-dark mt-1">@Model.Today.Visitors.ToString("N0")</h3>
+                                            <small class="text-muted" style="font-size: 0.70rem;">Guest check-ins</small>
+                                        </div>
+                                        <div class="bg-white rounded-circle p-2 shadow-sm text-purple" style="color: #6a1b9a;">
+                                            <i class="fas fa-id-badge fa-lg"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </a>
+                        }
+                        else
+                        {
+                            <div class="card border-0 shadow-sm h-100 p-2" style="background: #f1f3f4; border-radius: 10px; opacity: 0.6; cursor: not-allowed;" title="Access Restricted - Permission Required">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <span class="text-muted fw-semibold text-uppercase" style="font-size: 0.72rem;">Visitors</span>
+                                        <h3 class="mb-0 fw-bold text-muted mt-1">@Model.Today.Visitors.ToString("N0")</h3>
+                                        <small class="text-muted" style="font-size: 0.70rem;">Guest check-ins</small>
+                                    </div>
+                                    <div class="bg-white rounded-circle p-2 shadow-sm text-secondary">
+                                        <i class="fas fa-lock fa-lg"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Vehicles -->
+                    <div class="col-xl-2 col-md-4 col-sm-6">
+                        @if (CanAccess("GateVehicles"))
+                        {
+                            <a href="/gate/vehicles" class="text-decoration-none">
+                                <div class="card border-0 shadow-sm h-100 p-2" style="background: linear-gradient(135deg, #eceff1 0%, #cfd8dc 100%); border-radius: 10px; transition: transform 0.15s ease;">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div>
+                                            <span class="text-secondary fw-semibold text-uppercase" style="font-size: 0.72rem;">Vehicle Log</span>
+                                            <h3 class="mb-0 fw-bold text-secondary mt-1">@Model.Today.Vehicles.ToString("N0")</h3>
+                                            <small class="text-muted" style="font-size: 0.70rem;">Transport entries</small>
+                                        </div>
+                                        <div class="bg-white rounded-circle p-2 shadow-sm text-secondary">
+                                            <i class="fas fa-truck-moving fa-lg"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </a>
+                        }
+                        else
+                        {
+                            <div class="card border-0 shadow-sm h-100 p-2" style="background: #f1f3f4; border-radius: 10px; opacity: 0.6; cursor: not-allowed;" title="Access Restricted - Permission Required">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <span class="text-muted fw-semibold text-uppercase" style="font-size: 0.72rem;">Vehicle Log</span>
+                                        <h3 class="mb-0 fw-bold text-muted mt-1">@Model.Today.Vehicles.ToString("N0")</h3>
+                                        <small class="text-muted" style="font-size: 0.70rem;">Transport entries</small>
+                                    </div>
+                                    <div class="bg-white rounded-circle p-2 shadow-sm text-secondary">
+                                        <i class="fas fa-lock fa-lg"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        }
                     </div>
                 </div>
 
                 <!-- 7-Day Trend and Movement Summary -->
                 <div class="row g-3">
+                    <!-- Trend Table -->
                     <div class="col-lg-8">
                         <div class="card border-0 shadow-sm h-100" style="border-radius: 10px; background: #fafafa;">
                             <div class="card-header bg-transparent border-0 pt-3 pb-2 d-flex justify-content-between align-items-center">
                                 <h6 class="mb-0 fw-bold text-secondary">
-                                    <i class="fas fa-calendar-week me-1 text-primary"></i> Last 7 Days Activity Trend
+                                    <i class="fas fa-calendar-week me-1 text-primary"></i> Last 7 Days Operations Trend
                                 </h6>
-                                <span class="badge bg-light text-secondary border">Total 7D: @Model.LastSevenDays.Total</span>
+                                <span class="badge bg-light text-secondary border">Total 7 Days: @Model.LastSevenDays.Total</span>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
-                                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
-                                        <thead class="table-light text-secondary" style="font-size: 0.78rem; text-transform: uppercase;">
+                                    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.85rem;">
+                                        <thead class="table-light text-secondary" style="font-size: 0.75rem; text-transform: uppercase;">
                                             <tr>
                                                 <th>Date</th>
-                                                <th class="text-center">Visitors</th>
                                                 <th class="text-center">Gate In</th>
-                                                <th class="text-center">Gate Out</th>
+                                                <th class="text-center">Perm. Pass</th>
+                                                <th class="text-center">Ret. Pass</th>
+                                                <th class="text-center">Courier</th>
+                                                <th class="text-center">Visitors</th>
+                                                <th class="text-center">Vehicles</th>
                                                 <th class="text-end">Total Traffic</th>
-                                                <th>Activity Share</th>
+                                                <th style="width: 15%;">Share</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -122,12 +285,15 @@
                                             {
                                                 var pct = Model.LastSevenDays.Total > 0 ? (day.Total * 100.0 / Model.LastSevenDays.Total) : 0;
                                                 <tr>
-                                                    <td class="fw-semibold">@day.Date.ToString("ddd, dd MMM yyyy")</td>
-                                                    <td class="text-center"><span class="badge bg-primary-subtle text-primary">@day.Visitors</span></td>
+                                                    <td class="fw-semibold">@day.Date.ToString("ddd, dd MMM")</td>
                                                     <td class="text-center"><span class="badge bg-success-subtle text-success">@day.GateIn</span></td>
-                                                    <td class="text-center"><span class="badge bg-warning-subtle text-warning">@day.GateOut</span></td>
+                                                    <td class="text-center"><span class="badge bg-primary-subtle text-primary">@day.GateOutPermanent</span></td>
+                                                    <td class="text-center"><span class="badge bg-warning-subtle text-warning">@day.GateOutReturnable</span></td>
+                                                    <td class="text-center"><span class="badge bg-info-subtle text-info">@day.Courier</span></td>
+                                                    <td class="text-center"><span class="badge bg-purple-subtle" style="background: #f3e5f5; color: #6a1b9a;">@day.Visitors</span></td>
+                                                    <td class="text-center"><span class="badge bg-light text-secondary border">@day.Vehicles</span></td>
                                                     <td class="text-end fw-bold">@day.Total</td>
-                                                    <td style="width: 25%;">
+                                                    <td>
                                                         <div class="progress" style="height: 6px;">
                                                             <div class="progress-bar bg-primary" style="width: @pct.ToString("F0")%"></div>
                                                         </div>
@@ -141,49 +307,146 @@
                         </div>
                     </div>
 
+                    <!-- Operations Navigation & Action Triggers with Permissions Guard -->
                     <div class="col-lg-4">
                         <div class="card border-0 shadow-sm h-100" style="border-radius: 10px; background: #fafafa;">
                             <div class="card-header bg-transparent border-0 pt-3 pb-2">
                                 <h6 class="mb-0 fw-bold text-secondary">
-                                    <i class="fas fa-compass me-1 text-primary"></i> Quick Operations
+                                    <i class="fas fa-plus-circle me-1 text-primary"></i> Create New Passes
                                 </h6>
                             </div>
-                            <div class="card-body d-flex flex-column gap-2">
-                                <a href="/gate/in/entry" class="btn btn-outline-primary text-start d-flex align-items-center gap-2 p-2">
-                                    <i class="fas fa-plus-circle fs-5"></i>
-                                    <div>
-                                        <div class="fw-bold" style="font-size: 0.88rem;">New Gate In Pass</div>
-                                        <small class="text-muted" style="font-size: 0.75rem;">Record arriving goods or returns</small>
+                            <div class="card-body d-flex flex-column gap-2 pt-1">
+                                <!-- Gate In Entry -->
+                                @if (CanAccess("GateInEntry"))
+                                {
+                                    <a href="/gate/in/entry" class="btn btn-outline-success text-start d-flex align-items-center gap-2 p-2">
+                                        <i class="fas fa-file-import fs-5 text-success"></i>
+                                        <div>
+                                            <div class="fw-bold" style="font-size: 0.85rem;">New Gate In Pass</div>
+                                            <small class="text-muted" style="font-size: 0.72rem;">Record inward goods &amp; party delivery</small>
+                                        </div>
+                                    </a>
+                                }
+                                else
+                                {
+                                    <div class="btn btn-outline-secondary text-start d-flex align-items-center gap-2 p-2 disabled" style="opacity: 0.45; cursor: not-allowed;" title="Access Restricted - Permission Required">
+                                        <i class="fas fa-lock fs-5 text-muted"></i>
+                                        <div>
+                                            <div class="fw-bold" style="font-size: 0.85rem;">New Gate In Pass</div>
+                                            <small class="text-muted" style="font-size: 0.72rem;">Access Restricted</small>
+                                        </div>
                                     </div>
-                                </a>
-                                <a href="/gate/visitors/entry" class="btn btn-outline-success text-start d-flex align-items-center gap-2 p-2">
-                                    <i class="fas fa-user-plus fs-5"></i>
-                                    <div>
-                                        <div class="fw-bold" style="font-size: 0.88rem;">Register Visitor</div>
-                                        <small class="text-muted" style="font-size: 0.75rem;">Issue visitor badge and notify host</small>
+                                }
+
+                                <!-- Permanent Pass Entry -->
+                                @if (CanAccess("GatePassPermanentEntry"))
+                                {
+                                    <a href="/gate/pass-permanent/entry" class="btn btn-outline-primary text-start d-flex align-items-center gap-2 p-2">
+                                        <i class="fas fa-dolly-flatbed fs-5 text-primary"></i>
+                                        <div>
+                                            <div class="fw-bold" style="font-size: 0.85rem;">New Permanent Outward</div>
+                                            <small class="text-muted" style="font-size: 0.72rem;">Permanent material dispatches &amp; sales</small>
+                                        </div>
+                                    </a>
+                                }
+                                else
+                                {
+                                    <div class="btn btn-outline-secondary text-start d-flex align-items-center gap-2 p-2 disabled" style="opacity: 0.45; cursor: not-allowed;" title="Access Restricted - Permission Required">
+                                        <i class="fas fa-lock fs-5 text-muted"></i>
+                                        <div>
+                                            <div class="fw-bold" style="font-size: 0.85rem;">New Permanent Outward</div>
+                                            <small class="text-muted" style="font-size: 0.72rem;">Access Restricted</small>
+                                        </div>
                                     </div>
-                                </a>
-                                <a href="/gate/material-inward" class="btn btn-outline-info text-start d-flex align-items-center gap-2 p-2">
-                                    <i class="fas fa-truck-ramp-box fs-5"></i>
-                                    <div>
-                                        <div class="fw-bold" style="font-size: 0.88rem;">Material Inward</div>
-                                        <small class="text-muted" style="font-size: 0.75rem;">PO receiving &amp; weighment</small>
+                                }
+
+                                <!-- Returnable Pass Entry -->
+                                @if (CanAccess("GatePassReturnableEntry"))
+                                {
+                                    <a href="/gate/pass-returnable/entry" class="btn btn-outline-warning text-start d-flex align-items-center gap-2 p-2">
+                                        <i class="fas fa-exchange-alt fs-5 text-warning"></i>
+                                        <div>
+                                            <div class="fw-bold text-dark" style="font-size: 0.85rem;">New Returnable Outward</div>
+                                            <small class="text-muted" style="font-size: 0.72rem;">Temporary outward material transfers</small>
+                                        </div>
+                                    </a>
+                                }
+                                else
+                                {
+                                    <div class="btn btn-outline-secondary text-start d-flex align-items-center gap-2 p-2 disabled" style="opacity: 0.45; cursor: not-allowed;" title="Access Restricted - Permission Required">
+                                        <i class="fas fa-lock fs-5 text-muted"></i>
+                                        <div>
+                                            <div class="fw-bold" style="font-size: 0.85rem;">New Returnable Outward</div>
+                                            <small class="text-muted" style="font-size: 0.72rem;">Access Restricted</small>
+                                        </div>
                                     </div>
-                                </a>
-                                <a href="/gate/material-outward" class="btn btn-outline-warning text-start d-flex align-items-center gap-2 p-2">
-                                    <i class="fas fa-truck-arrow-right fs-5"></i>
-                                    <div>
-                                        <div class="fw-bold" style="font-size: 0.88rem;">Material Outward</div>
-                                        <small class="text-muted" style="font-size: 0.75rem;">Dispatches &amp; delivery orders</small>
+                                }
+
+                                <!-- Courier Issuance Entry -->
+                                @if (CanAccess("CourierIssuanceEntry"))
+                                {
+                                    <a href="/gate/courier-issuance/entry" class="btn btn-outline-info text-start d-flex align-items-center gap-2 p-2">
+                                        <i class="fas fa-paper-plane fs-5 text-info"></i>
+                                        <div>
+                                            <div class="fw-bold text-dark" style="font-size: 0.85rem;">New Courier Pass</div>
+                                            <small class="text-muted" style="font-size: 0.72rem;">Letters, documents &amp; sample parcels</small>
+                                        </div>
+                                    </a>
+                                }
+                                else
+                                {
+                                    <div class="btn btn-outline-secondary text-start d-flex align-items-center gap-2 p-2 disabled" style="opacity: 0.45; cursor: not-allowed;" title="Access Restricted - Permission Required">
+                                        <i class="fas fa-lock fs-5 text-muted"></i>
+                                        <div>
+                                            <div class="fw-bold" style="font-size: 0.85rem;">New Courier Pass</div>
+                                            <small class="text-muted" style="font-size: 0.72rem;">Access Restricted</small>
+                                        </div>
                                     </div>
-                                </a>
-                                <a href="/gate/vehicles" class="btn btn-outline-secondary text-start d-flex align-items-center gap-2 p-2">
-                                    <i class="fas fa-truck-moving fs-5"></i>
-                                    <div>
-                                        <div class="fw-bold" style="font-size: 0.88rem;">Vehicle Check-in</div>
-                                        <small class="text-muted" style="font-size: 0.75rem;">Monitor vehicles inside premises</small>
+                                }
+
+                                <!-- Visitor Entry -->
+                                @if (CanAccess("GateVisitorEntry"))
+                                {
+                                    <a href="/gate/visitors/entry" class="btn btn-outline-dark text-start d-flex align-items-center gap-2 p-2">
+                                        <i class="fas fa-user-plus fs-5 text-purple" style="color: #6a1b9a;"></i>
+                                        <div>
+                                            <div class="fw-bold" style="font-size: 0.85rem;">Register Visitor</div>
+                                            <small class="text-muted" style="font-size: 0.72rem;">Issue visitor pass &amp; log check-in</small>
+                                        </div>
+                                    </a>
+                                }
+                                else
+                                {
+                                    <div class="btn btn-outline-secondary text-start d-flex align-items-center gap-2 p-2 disabled" style="opacity: 0.45; cursor: not-allowed;" title="Access Restricted - Permission Required">
+                                        <i class="fas fa-lock fs-5 text-muted"></i>
+                                        <div>
+                                            <div class="fw-bold" style="font-size: 0.85rem;">Register Visitor</div>
+                                            <small class="text-muted" style="font-size: 0.72rem;">Access Restricted</small>
+                                        </div>
                                     </div>
-                                </a>
+                                }
+
+                                <!-- Vehicle Entry -->
+                                @if (CanAccess("GateVehicleEntry"))
+                                {
+                                    <a href="/gate/vehicles/entry" class="btn btn-outline-secondary text-start d-flex align-items-center gap-2 p-2">
+                                        <i class="fas fa-truck-moving fs-5 text-secondary"></i>
+                                        <div>
+                                            <div class="fw-bold" style="font-size: 0.85rem;">Record Vehicle Entry</div>
+                                            <small class="text-muted" style="font-size: 0.72rem;">Vehicle number, driver &amp; transport log</small>
+                                        </div>
+                                    </a>
+                                }
+                                else
+                                {
+                                    <div class="btn btn-outline-secondary text-start d-flex align-items-center gap-2 p-2 disabled" style="opacity: 0.45; cursor: not-allowed;" title="Access Restricted - Permission Required">
+                                        <i class="fas fa-lock fs-5 text-muted"></i>
+                                        <div>
+                                            <div class="fw-bold" style="font-size: 0.85rem;">Record Vehicle Entry</div>
+                                            <small class="text-muted" style="font-size: 0.72rem;">Access Restricted</small>
+                                        </div>
+                                    </div>
+                                }
                             </div>
                         </div>
                     </div>
@@ -192,4 +455,3 @@
         </div>
     </div>
 </div>
-

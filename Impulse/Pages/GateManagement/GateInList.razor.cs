@@ -9,46 +9,39 @@ using DataAccessLibrary.Models.ViewModels.Gate;
 using Impulse.Constants;
 using Impulse.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 using Radzen;
 
 namespace Impulse.Pages.GateManagement;
 
 public partial class GateInList : ComponentBase
 {
-    [Inject] private IGateInDataAccess GateInDataAccess { get; set; } = default!;
+    [Inject] private IGateInDataAccess DataAccess { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private NotificationService NotificationService { get; set; } = default!;
     [Inject] private IReportNavigationService ReportNavigation { get; set; } = default!;
+    [Inject] private IJSRuntime JS { get; set; } = default!;
 
     protected GateInFilterModel Filter { get; set; } = new();
     protected IReadOnlyList<GateInListRowModel> Entries { get; set; } = Array.Empty<GateInListRowModel>();
     protected IReadOnlyList<GateLookupOptionModel> DepartmentOptions { get; set; } = Array.Empty<GateLookupOptionModel>();
-    protected IReadOnlyList<GateLookupOptionModel> GatePassTypeOptions { get; set; } = Array.Empty<GateLookupOptionModel>();
-    protected IReadOnlyList<GateLookupOptionModel> VendorFilterOptions { get; set; } = Array.Empty<GateLookupOptionModel>();
+    protected GateInVendorLookupModel? SelectedVendor { get; set; }
 
     protected bool IsLoading { get; set; } = true;
-    protected int? SelectedEntryId { get; set; }
     protected bool IsCustomRange => Filter.RangeKey == GateInRangeKeys.Custom;
-    protected int TypeSelectValue => Filter.GatePassType ?? GateInPassTypes.All;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadLookupOptionsAsync();
-        await RefreshAsync();
-    }
-
-    private async Task LoadLookupOptionsAsync()
-    {
         try
         {
-            DepartmentOptions = await GateInDataAccess.GetDepartmentsAsync();
-            GatePassTypeOptions = await GateInDataAccess.GetGatePassTypeOptionsAsync();
-            VendorFilterOptions = await GateInDataAccess.GetVendorFilterOptionsAsync();
+            DepartmentOptions = await DataAccess.GetDepartmentsAsync();
         }
         catch (Exception ex)
         {
-            NotificationService.Notify(NotificationSeverity.Warning, "Lookup Warning", ex.Message);
+            NotificationService.Notify(NotificationSeverity.Error, "Lookup Load Failed", ex.Message);
         }
+
+        await RefreshAsync();
     }
 
     protected async Task RefreshAsync()
@@ -61,63 +54,16 @@ public partial class GateInList : ComponentBase
                 (Filter.FromDate, Filter.ToDate) = (Filter.ToDate, Filter.FromDate);
             }
 
-            Entries = await GateInDataAccess.GetGateInEntriesAsync(Filter);
+            Entries = await DataAccess.GetGateInEntriesAsync(Filter);
         }
         catch (Exception ex)
         {
-            Entries = Array.Empty<GateInListRowModel>();
-            NotificationService.Notify(NotificationSeverity.Error, "Error Loading List", ex.Message);
+            NotificationService.Notify(NotificationSeverity.Error, "Load Failed", ex.Message);
         }
         finally
         {
             IsLoading = false;
         }
-    }
-
-    protected void SelectRow(int entryId) => SelectedEntryId = entryId;
-
-    protected void NewEntry() => Navigation.NavigateTo("/gate/in/entry?returnUrl=/gate/in/list");
-
-    protected void EditEntry(int entryId)
-    {
-        var row = Entries.FirstOrDefault(x => x.EntryId == entryId);
-        if (row?.IsReceived == true)
-        {
-            NotificationService.Notify(NotificationSeverity.Warning, "Notice", "This gate pass is fully received and cannot be edited.");
-            return;
-        }
-        Navigation.NavigateTo($"/gate/in/entry/{entryId}?returnUrl=/gate/in/list");
-    }
-
-    protected void ReceiveEntry(int entryId)
-    {
-        Navigation.NavigateTo($"/gate/in/receive/{entryId}?returnUrl=/gate/in/list");
-    }
-
-    protected async Task DepartmentChangedAsync(ChangeEventArgs args)
-    {
-        Filter.DepartmentId = args.Value?.ToString() ?? "";
-        await RefreshAsync();
-    }
-
-    protected async Task TypeChangedAsync(ChangeEventArgs args)
-    {
-        var raw = args.Value?.ToString() ?? "";
-        if (int.TryParse(raw, out var parsed) && parsed != GateInPassTypes.All)
-        {
-            Filter.GatePassType = parsed;
-        }
-        else
-        {
-            Filter.GatePassType = null;
-        }
-        await RefreshAsync();
-    }
-
-    protected async Task GatePassTypeNameChangedAsync(ChangeEventArgs args)
-    {
-        Filter.GatePassTypeName = args.Value?.ToString() ?? "<All Gatepass Types>";
-        await RefreshAsync();
     }
 
     protected async Task RangeChangedAsync(ChangeEventArgs args)
@@ -149,72 +95,80 @@ public partial class GateInList : ComponentBase
         await RefreshAsync();
     }
 
-    protected async Task VendorChangedAsync(ChangeEventArgs args)
+    protected async Task FromDateChangedAsync(ChangeEventArgs args)
     {
-        Filter.VendorName = args.Value?.ToString() ?? "<All Vendors>";
+        if (DateTime.TryParse(args.Value?.ToString(), out var dt))
+        {
+            Filter.FromDate = dt;
+            await RefreshAsync();
+        }
+    }
+
+    protected async Task ToDateChangedAsync(ChangeEventArgs args)
+    {
+        if (DateTime.TryParse(args.Value?.ToString(), out var dt))
+        {
+            Filter.ToDate = dt;
+            await RefreshAsync();
+        }
+    }
+
+    protected async Task DepartmentChangedAsync(ChangeEventArgs args)
+    {
+        var raw = args.Value?.ToString() ?? "";
+        Filter.DeptID = !string.IsNullOrWhiteSpace(raw) ? raw : string.Empty;
         await RefreshAsync();
     }
 
-    protected async Task PrintSlipAsync(int entryId)
+    protected async Task TypeChangedAsync(ChangeEventArgs args)
     {
-        try
+        var raw = args.Value?.ToString() ?? "";
+        if (int.TryParse(raw, out var parsed))
         {
-            var parameters = new Dictionary<string, object>
-            {
-                { "@EntryID", entryId }
-            };
-
-            var request = new ReportRequest
-            {
-                ReportName = ReportNames.GateManagement.MiscGateInTemp,
-                Parameters = parameters
-            };
-
-            await ReportNavigation.PrintReportAsync(request);
+            Filter.GatePassType = parsed;
         }
-        catch (Exception ex)
+        else
         {
-            NotificationService.Notify(NotificationSeverity.Error, "Print Failed", ex.Message);
+            Filter.GatePassType = GateInPassTypes.All;
         }
+        await RefreshAsync();
     }
 
-    protected async Task PrintListAsync()
+    protected async Task<IEnumerable<GateInVendorLookupModel>> SearchVendorsAsync(string searchText)
     {
-        try
-        {
-            var parameters = new Dictionary<string, object>
-            {
-                { "@DTFrom", Filter.FromDate.Date },
-                { "@DTTo", Filter.ToDate.Date }
-            };
+        return await DataAccess.SearchVendorsAsync(searchText);
+    }
 
-            var request = new ReportRequest
-            {
-                ReportName = ReportNames.GateManagement.MiscGateInTempList,
-                Parameters = parameters
-            };
+    protected async Task OnVendorChangedAsync(GateInVendorLookupModel? vendor)
+    {
+        SelectedVendor = vendor;
+        Filter.VM_AccNo = vendor?.AccNo ?? string.Empty;
+        Filter.VendorName = vendor?.AccTitle ?? string.Empty;
+        await RefreshAsync();
+    }
 
-            await ReportNavigation.PrintReportAsync(request);
-        }
-        catch (Exception ex)
-        {
-            NotificationService.Notify(NotificationSeverity.Error, "Print Failed", ex.Message);
-        }
+    protected async Task SearchInputAsync(ChangeEventArgs args)
+    {
+        Filter.SearchText = args.Value?.ToString() ?? string.Empty;
+        await RefreshAsync();
+    }
+
+    protected async Task ClearSearchAsync()
+    {
+        Filter.SearchText = string.Empty;
+        await RefreshAsync();
+    }
+
+    protected void NavigateNewPass()
+    {
+        Navigation.NavigateTo("/gate/in/entry");
     }
 
     protected void OnContextEdit(ItemClickEventArgs e)
     {
         if (e.Data is GateInListRowModel row)
         {
-            EditEntry(row.EntryId);
-        }
-    }
-
-    protected void OnContextReceive(ItemClickEventArgs e)
-    {
-        if (e.Data is GateInListRowModel row)
-        {
-            ReceiveEntry(row.EntryId);
+            Navigation.NavigateTo($"/gate/in/edit/{row.EntryID}");
         }
     }
 
@@ -222,7 +176,31 @@ public partial class GateInList : ComponentBase
     {
         if (e.Data is GateInListRowModel row)
         {
-            await PrintSlipAsync(row.EntryId);
+            await PrintSlipAsync(row);
+        }
+    }
+
+    protected async Task OnContextPrintDetailList(ItemClickEventArgs e)
+    {
+        if (e.Data is GateInListRowModel row)
+        {
+            await PrintDetailSingleAsync(row);
+        }
+    }
+
+    protected async Task OnContextApproveHOD(ItemClickEventArgs e)
+    {
+        if (e.Data is GateInListRowModel row)
+        {
+            await ApproveAsync(row, "Approved_HOD", "HOD Approval");
+        }
+    }
+
+    protected async Task OnContextApproveAdmin(ItemClickEventArgs e)
+    {
+        if (e.Data is GateInListRowModel row)
+        {
+            await ApproveAsync(row, "Approved", "Admin Approval");
         }
     }
 
@@ -230,19 +208,171 @@ public partial class GateInList : ComponentBase
     {
         if (e.Data is GateInListRowModel row)
         {
+            await ApproveAsync(row, "Approved_Finance", "Finance Dept. Approval");
+        }
+    }
+
+    protected async Task OnContextDelete(ItemClickEventArgs e)
+    {
+        if (e.Data is GateInListRowModel row)
+        {
+            var confirmed = await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to delete Gate In Pass '{row.GatePassNo}'? This cannot be undone.");
+            if (!confirmed) return;
+
             try
             {
-                await GateInDataAccess.ApproveFinanceAsync(row.EntryId, Environment.UserName);
-                NotificationService.Notify(NotificationSeverity.Success, "Approved", $"Gate pass {row.GatePassNo} approved by Finance.");
-                await RefreshAsync();
+                var deleted = await DataAccess.DeleteGateInAsync(row.EntryID);
+                if (deleted)
+                {
+                    NotificationService.Notify(NotificationSeverity.Success, "Pass Deleted", $"Gate In Pass '{row.GatePassNo}' deleted successfully.");
+                    await RefreshAsync();
+                }
+                else
+                {
+                    NotificationService.Notify(NotificationSeverity.Warning, "Delete Failed", "The pass could not be deleted or was already removed.");
+                }
             }
             catch (Exception ex)
             {
-                NotificationService.Notify(NotificationSeverity.Error, "Approval Failed", ex.Message);
+                NotificationService.Notify(NotificationSeverity.Error, "Delete Error", ex.Message);
             }
         }
     }
 
-    protected void NavigateGatePassTypes() => Navigation.NavigateTo("/gate/pass-types");
-}
+    protected async Task ApproveAsync(GateInListRowModel row, string approvalCol, string title)
+    {
+        try
+        {
+            var success = await DataAccess.SetApprovalAsync(row.EntryID, approvalCol, true);
+            if (success)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, $"{title} Granted", $"Pass '{row.GatePassNo}' approved successfully.");
+                await RefreshAsync();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Warning, "Approval Failed", "Could not apply approval.");
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Approval Error", ex.Message);
+        }
+    }
 
+    protected async Task PrintSlipAsync(GateInListRowModel row)
+    {
+        if (!row.Approved_Finance)
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Approvals Incomplete", "Finance Department approval is required before printing the Gate Pass Slip.");
+            return;
+        }
+
+        try
+        {
+            var request = new ReportRequest
+            {
+                ReportName = ReportNames.GateManagement.MiscGateInTemp,
+                SelectionFormula = $"{{MiscEntries_GateIn.EntryID}} = {row.EntryID}"
+            };
+
+            await ReportNavigation.PrintReportAsync(request);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Print Error", ex.Message);
+        }
+    }
+
+    protected async Task PrintDetailSingleAsync(GateInListRowModel row)
+    {
+        try
+        {
+            var request = new ReportRequest
+            {
+                ReportName = ReportNames.GateManagement.MiscGateInTempList_Detail,
+                SelectionFormula = $"{{MiscEntries_GateIn.EntryID}} = {row.EntryID}"
+            };
+
+            await ReportNavigation.PrintReportAsync(request);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Print Error", ex.Message);
+        }
+    }
+
+    protected async Task PrintListAsync()
+    {
+        try
+        {
+            var cond = $"{{ItemIssuanceMisc.OnlyDT}} in DateTime({Filter.FromDate:yyyy,MM,dd}) to DateTime({Filter.ToDate:yyyy,MM,dd})";
+
+            if (!string.IsNullOrWhiteSpace(Filter.DeptID))
+            {
+                cond += $" and {{ItemIssuanceMisc.DeptID}} = '{Filter.DeptID}'";
+            }
+            if (Filter.GatePassType != GateInPassTypes.All)
+            {
+                cond += $" and {{ItemIssuanceMisc.GatePassType}} = {Filter.GatePassType}";
+            }
+            if (!string.IsNullOrWhiteSpace(Filter.VM_AccNo))
+            {
+                cond += $" and {{ItemIssuanceMisc.VM_AccNo}} = '{Filter.VM_AccNo}'";
+            }
+
+            var request = new ReportRequest
+            {
+                ReportName = ReportNames.GateManagement.MiscGateInTempList,
+                SelectionFormula = cond,
+                FormulaValues = new Dictionary<string, object>
+                {
+                    ["DateRange"] = $"'{Filter.FromDate:dd-MMM-yyyy} to {Filter.ToDate:dd-MMM-yyyy}'"
+                }
+            };
+
+            await ReportNavigation.PrintReportAsync(request);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Print Error", ex.Message);
+        }
+    }
+
+    protected async Task PrintDetailListAllAsync()
+    {
+        try
+        {
+            var cond = $"{{ItemIssuanceMisc.OnlyDT}} in DateTime({Filter.FromDate:yyyy,MM,dd}) to DateTime({Filter.ToDate:yyyy,MM,dd})";
+
+            if (!string.IsNullOrWhiteSpace(Filter.DeptID))
+            {
+                cond += $" and {{ItemIssuanceMisc.DeptID}} = '{Filter.DeptID}'";
+            }
+            if (Filter.GatePassType != GateInPassTypes.All)
+            {
+                cond += $" and {{ItemIssuanceMisc.GatePassType}} = {Filter.GatePassType}";
+            }
+            if (!string.IsNullOrWhiteSpace(Filter.VM_AccNo))
+            {
+                cond += $" and {{ItemIssuanceMisc.VM_AccNo}} = '{Filter.VM_AccNo}'";
+            }
+
+            var request = new ReportRequest
+            {
+                ReportName = ReportNames.GateManagement.MiscGateInTempList_Detail,
+                SelectionFormula = cond,
+                FormulaValues = new Dictionary<string, object>
+                {
+                    ["DateRange"] = $"'{Filter.FromDate:dd-MMM-yyyy} to {Filter.ToDate:dd-MMM-yyyy}'"
+                }
+            };
+
+            await ReportNavigation.PrintReportAsync(request);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Print Error", ex.Message);
+        }
+    }
+}
