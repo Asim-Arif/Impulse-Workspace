@@ -4,40 +4,67 @@ const qrcode = require('qrcode');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+const SESSION_CLIENT_ID = 'impulse-wa';
+
+// Helper to cleanly kill the Puppeteer browser process tree on Windows before exiting
+async function shutdownBrowserAndExit(exitCode = 1) {
+    try {
+        const pid = client?.pupBrowser?.process()?.pid;
+        try {
+            await client.destroy();
+        } catch {}
+        if (pid && process.platform === 'win32') {
+            try {
+                execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore', timeout: 5000 });
+            } catch {}
+        }
+    } catch {}
+    process.exit(exitCode);
+}
+
 process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception:', err);
     console.log('Exiting process to allow auto-recovery...');
-    process.exit(1);
+    shutdownBrowserAndExit(1);
 });
 
-// Clean up stale Chromium profile singleton lock files and any orphaned browser instances
+process.on('SIGINT', () => shutdownBrowserAndExit(0));
+process.on('SIGTERM', () => shutdownBrowserAndExit(0));
+
+// Clean up stale Chromium profile singleton lock files and any orphaned browser instances holding wwebjs_auth
 function cleanStaleSessionLocks() {
     try {
         if (process.platform === 'win32') {
-            const { execSync } = require('child_process');
             try {
-                // Terminate any orphaned chrome/edge processes holding this session
-                execSync('powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { ($_.Name -match \'chrome\\.exe|msedge\\.exe\') -and ($_.CommandLine -match \'wwebjs_auth\') } | Stop-Process -Force"', { stdio: 'ignore', timeout: 6000 });
+                // Terminate any orphaned chrome/edge processes holding wwebjs_auth
+                execSync(
+                    'powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { ($_.Name -match \'chrome\\.exe|msedge\\.exe\') -and ($_.CommandLine -match \'wwebjs_auth\') } | ForEach-Object { taskkill /F /T /PID $_.ProcessId }"',
+                    { stdio: 'ignore', timeout: 10000 }
+                );
             } catch (e) {
                 // Ignore if none found or permission denied
             }
         }
 
-        const sessionDir = path.join(__dirname, '.wwebjs_auth', 'session');
-        const lockFiles = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
-        for (const file of lockFiles) {
-            const p = path.join(sessionDir, file);
-            if (fs.existsSync(p)) {
-                try {
-                    fs.unlinkSync(p);
-                    console.log(`Removed stale lock file: ${file}`);
-                } catch (e) {
-                    // File is actively held by a running browser
+        const sessionDirs = [
+            path.join(__dirname, '.wwebjs_auth', `session-${SESSION_CLIENT_ID}`),
+            path.join(__dirname, '.wwebjs_auth', 'session')
+        ];
+        const lockFiles = ['SingletonLock', 'SingletonCookie', 'SingletonSocket', 'DevToolsActivePort'];
+        for (const sessionDir of sessionDirs) {
+            for (const file of lockFiles) {
+                const p = path.join(sessionDir, file);
+                if (fs.existsSync(p)) {
+                    try {
+                        fs.unlinkSync(p);
+                        console.log(`Removed stale lock file: ${p}`);
+                    } catch (e) {}
                 }
             }
         }
@@ -47,14 +74,14 @@ function cleanStaleSessionLocks() {
 }
 cleanStaleSessionLocks();
 
-// Locate browser executable dynamically across typical Windows/Server locations
+// Locate browser executable dynamically across typical Windows/Server locations (prefer Chrome over Edge)
 function getBrowserExecutablePath() {
     const candidates = [
-        'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-        'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+        process.env.PUPPETEER_EXECUTABLE_PATH,
         'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
         'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-        process.env.PUPPETEER_EXECUTABLE_PATH
+        'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+        'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
     ].filter(Boolean);
 
     for (const p of candidates) {
@@ -77,9 +104,13 @@ const puppeteerConfig = {
         '--disable-gpu',
         '--disable-dev-shm-usage',
         '--no-first-run',
-        '--no-zygote',
         '--disable-accelerated-2d-canvas',
-        '--disable-extensions'
+        '--disable-extensions',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-features=TranslateUI,msEdgeStartupBoost',
+        '--mute-audio'
     ]
 };
 if (browserExe) {
@@ -87,7 +118,11 @@ if (browserExe) {
 }
 
 const client = new Client({
-    authStrategy: new LocalAuth(),
+    authStrategy: new LocalAuth({ clientId: SESSION_CLIENT_ID }),
+    webVersionCache: { type: 'none' },
+    authTimeoutMs: 120000,
+    takeoverOnConflict: true,
+    takeoverTimeoutMs: 10000,
     puppeteer: puppeteerConfig
 });
 
@@ -125,15 +160,32 @@ client.on('auth_failure', msg => {
     lastErrorMessage = typeof msg === 'string' ? msg : 'Authentication failed';
 });
 
-client.on('disconnected', (reason) => {
+client.on('disconnected', async (reason) => {
     console.log('WhatsApp Client was disconnected', reason);
     qrCodeDataUrl = null;
     connectionStatus = 'DISCONNECTED';
     lastErrorMessage = reason || 'Client disconnected';
-    
-    // Exit process so the auto-restart loop can wipe the corrupted session and cleanly restart
+
+    if (reason === 'LOGOUT') {
+        console.log('Session logged out. Cleaning .wwebjs_auth before restart...');
+        try {
+            const pid = client?.pupBrowser?.process()?.pid;
+            try { await client.destroy(); } catch {}
+            if (pid && process.platform === 'win32') {
+                try { execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore', timeout: 5000 }); } catch {}
+            }
+            const authDir = path.join(__dirname, '.wwebjs_auth', `session-${SESSION_CLIENT_ID}`);
+            if (fs.existsSync(authDir)) {
+                fs.rmSync(authDir, { recursive: true, force: true });
+            }
+        } catch (e) {
+            console.error('Could not clear .wwebjs_auth:', e.message);
+        }
+    }
+
+    // Exit process cleanly so PM2 can restart
     console.log("Exiting process to allow clean restart...");
-    setTimeout(() => process.exit(1), 1000);
+    setTimeout(() => shutdownBrowserAndExit(1), 1000);
 });
 
 // API Endpoints
@@ -159,7 +211,7 @@ app.post('/disconnect', async (req, res) => {
             console.log("Client logout note:", e.message);
         }
         res.json({ success: true, message: 'WhatsApp session disconnected and logged out.' });
-        setTimeout(() => process.exit(0), 1000);
+        setTimeout(() => shutdownBrowserAndExit(0), 1000);
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -232,14 +284,13 @@ app.listen(PORT, () => {
     // Initialize WhatsApp client in the background after Express is active
     console.log('Initializing WhatsApp Client...');
     client.initialize().catch(err => {
-        console.error('Failed to initialize WhatsApp client:', err);
+        const errMsg = typeof err === 'string' ? err : (err?.message || String(err));
+        console.error('Failed to initialize WhatsApp client:', errMsg);
         connectionStatus = 'DISCONNECTED';
-        lastErrorMessage = err.message || 'Initialization failed';
+        lastErrorMessage = errMsg || 'Initialization failed';
 
-        // If it's a browser lock or protocol timeout error, exit so the background host service can cleanly respawn fresh
-        if (err.message && (err.message.includes('browser is already running') || err.message.includes('protocolTimeout') || err.message.includes('timed out'))) {
-            console.log('Fatal browser startup error. Exiting process in 3s to allow clean recovery...');
-            setTimeout(() => process.exit(1), 3000);
-        }
+        // Always shut down the browser and exit so PM2 can cleanly respawn without orphaned browser locks
+        console.log('Fatal browser startup error. Cleaning up browser and exiting in 3s for recovery...');
+        setTimeout(() => shutdownBrowserAndExit(1), 3000);
     });
 });

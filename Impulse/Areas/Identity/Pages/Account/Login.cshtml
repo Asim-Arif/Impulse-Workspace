@@ -475,6 +475,39 @@
                 </button>
             </form>
 
+            @if (!string.IsNullOrEmpty(Model.RequestSubmittedMessage))
+            {
+                <div class="alert alert-success border-0 shadow-sm mt-3 p-3 rounded-3" style="font-size: 0.85rem;">
+                    <div class="d-flex align-items-center gap-2 mb-1 fw-bold text-success">
+                        <i class="fas fa-check-circle"></i> Request Submitted
+                    </div>
+                    <div>@Model.RequestSubmittedMessage</div>
+                    <div class="mt-2 text-muted small">Once an administrator approves, you can sign in directly with your password.</div>
+                </div>
+            }
+            else if (Model.IsRemoteRestricted)
+            {
+                <div class="card border border-warning-subtle bg-warning-subtle shadow-sm mt-3 rounded-3 p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2 text-dark fw-bold" style="font-size: 0.88rem;">
+                        <i class="fas fa-shield-halved text-warning"></i> Outside Factory Access Restricted
+                    </div>
+                    <div class="text-secondary small mb-3">
+                        Your connection (IP: <strong>@Model.DetectedClientIp</strong>) is outside factory premises. You can request temporary remote access from administrators.
+                    </div>
+                    <form method="post" asp-page-handler="RequestRemoteAccess" asp-route-returnUrl="@Model.ReturnUrl">
+                        <input type="hidden" name="userId" value="@Model.RestrictedUserId" />
+                        <input type="hidden" name="userName" value="@Model.RestrictedUserName" />
+                        <div class="mb-2">
+                            <input type="text" name="requestReason" class="form-control form-control-sm bg-white" placeholder="Optional reason (e.g. Work from home / urgently needed)" maxlength="200" />
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-warning w-100 fw-semibold shadow-sm d-flex align-items-center justify-content-center gap-2">
+                            <i class="fab fa-whatsapp"></i>
+                            <span>Request Temporary Access</span>
+                        </button>
+                    </form>
+                </div>
+            }
+
             <div class="auth-footer-badge">
                 <i class="fas fa-lock"></i>
                 <span>Secured with 256-bit SSL Session Encryption</span>

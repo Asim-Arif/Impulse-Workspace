@@ -21,6 +21,7 @@ namespace DataAccessLibrary.Models.Setup
         // Core Management Permissions
         public bool UserManagement { get; set; }
         public bool ChangePassword { get; set; }
+        public bool AllowOutsideAccess { get; set; }
 
         // Module Access Flags
         public bool CompanyMainLink { get; set; }

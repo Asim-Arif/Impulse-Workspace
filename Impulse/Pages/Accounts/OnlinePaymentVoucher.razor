@@ -5,6 +5,7 @@
 @using DataAccessLibrary.Models.ViewModels
 @using DataAccessLibrary.Interface.Accounts
 @using Impulse.Services
+@using Impulse.Components.Common
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 @inject ICIPData CIPDataService
@@ -319,6 +320,17 @@
                         </div>
 
                         <div class="d-flex gap-2">
+                            <button type="button"
+                                    class="btn btn-outline-info position-relative"
+                                    @onclick="OpenAttachmentModal"
+                                    disabled="@(string.IsNullOrWhiteSpace(voucherViewModel.VchrNo))"
+                                    title="Manage Voucher Attachments">
+                                <i class="fas fa-paperclip me-1"></i> Attachments
+                                @if (attachmentCount > 0)
+                                {
+                                    <span class="badge bg-danger ms-1">@attachmentCount</span>
+                                }
+                            </button>
                             <button type="button" class="btn btn-primary" style="min-width: 180px" disabled="@isSaving" @onclick="SaveVoucher">
                                 <i class="fa-solid fa-floppy-disk me-2"></i> Save
                             </button>
@@ -333,3 +345,5 @@
         </form>
     </div>
 </div>
+
+<AttachmentModal @ref="attachmentModalRef" OnCountChanged="OnAttachmentCountChanged" />

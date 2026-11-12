@@ -1,8 +1,9 @@
 using DataAccessLibrary.Models.ViewModels;
 using DataAccessLibrary.Models.ViewModels.Accounts;
+using Impulse.Components.Common;
 using Impulse.Services;
+using Impulse.Services.Common;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.JSInterop;
 using Radzen;
 
@@ -27,6 +28,9 @@ namespace Impulse.Pages.Accounts
         [Inject]
         private IReportNavigationService ReportNavigationService { get; set; }
 
+        [Inject]
+        private IEntityAttachmentService AttachmentService { get; set; } = default!;
+
         [Parameter]
         public int p_bankId { get; set; }
 
@@ -39,13 +43,13 @@ namespace Impulse.Pages.Accounts
         private float fTaxRate=0;
         private float fTaxAmount = 0;
         private string VoucherNo { get; set; }
-        private bool bClearInputFile = false;        
         private bool EnableCostCenter = false;
         private string successMessage = string.Empty;
         private bool isError = false;
         private bool showTaxModal = false;
-        private string myFileExtension = string.Empty;
         private bool isSaving = false;
+        private AttachmentModal? attachmentModalRef;
+        private int attachmentCount = 0;
         private DateTime selectedDate = DateTime.Today;
         private string strCashBalance { get; set; } = string.Empty;
         private string strAccountBalance { get; set; } = string.Empty;
@@ -100,6 +104,7 @@ namespace Impulse.Pages.Accounts
         private async Task GetNextVoucherNo(DateTime selectedDate)
         {
             voucherViewModel.VchrNo = await _financialstatementService.GetNextVchrNo_Adjustment (selectedDate,"JV");
+            await LoadAttachmentCountAsync();
         }
 
         private async Task OnDTChanged(ChangeEventArgs e)
@@ -238,23 +243,54 @@ namespace Impulse.Pages.Accounts
         private async Task ResetForm()
         {
             await InitializeData();
-            bClearInputFile = true;
             voucherViewModel.DT = DateTime.Today;
             voucherViewModel.Remarks = string.Empty;
-            StateHasChanged();
             if (newVoucherLine != null) 
             { 
                 voucherViewModel.LineItems = new List<Vouchers_Detail_Model>();
             }
             StateHasChanged();
-            bClearInputFile = false;
-            StateHasChanged();
-
         }
 
         private void GoToIndexPage()
         {
             Navigation.NavigateTo("/Banks", true);
+        }
+
+        private void OpenAttachmentModal()
+        {
+            if (string.IsNullOrWhiteSpace(voucherViewModel.VchrNo)) return;
+
+            attachmentModalRef?.Open(
+                entityType: "Voucher",
+                entityId: voucherViewModel.VchrNo,
+                displayName: $"Adjustment Voucher #{voucherViewModel.VchrNo}"
+            );
+        }
+
+        private void OnAttachmentCountChanged(int count)
+        {
+            attachmentCount = count;
+            StateHasChanged();
+        }
+
+        private async Task LoadAttachmentCountAsync()
+        {
+            if (!string.IsNullOrWhiteSpace(voucherViewModel.VchrNo))
+            {
+                try
+                {
+                    attachmentCount = await AttachmentService.GetCountAsync("Voucher", voucherViewModel.VchrNo);
+                }
+                catch
+                {
+                    attachmentCount = 0;
+                }
+            }
+            else
+            {
+                attachmentCount = 0;
+            }
         }        
         private async Task<IEnumerable<GenericDropDownModel>> SearchSubmitTo(string searchText)
         {

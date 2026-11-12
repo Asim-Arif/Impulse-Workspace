@@ -41,6 +41,7 @@ namespace DataAccessLibrary.DAC.Setup
                         COALESCE(u.InActive, 0) AS InActive,
                         COALESCE(u.UserManagement, 0) AS UserManagement,
                         COALESCE(u.ChangePassword, 0) AS ChangePassword,
+                        COALESCE(u.AllowOutsideAccess, 0) AS AllowOutsideAccess,
                         COALESCE(u.CompanyMainLink, 0) AS CompanyMainLink,
                         COALESCE(u.FinancialMainLink, 0) AS FinancialMainLink,
                         COALESCE(u.PayrollMainLink, 0) AS PayrollMainLink,
@@ -139,6 +140,7 @@ namespace DataAccessLibrary.DAC.Setup
                         COALESCE(u.InActive, 0) AS InActive,
                         COALESCE(u.UserManagement, 0) AS UserManagement,
                         COALESCE(u.ChangePassword, 0) AS ChangePassword,
+                        COALESCE(u.AllowOutsideAccess, 0) AS AllowOutsideAccess,
                         COALESCE(u.CompanyMainLink, 0) AS CompanyMainLink,
                         COALESCE(u.FinancialMainLink, 0) AS FinancialMainLink,
                         COALESCE(u.PayrollMainLink, 0) AS PayrollMainLink,
@@ -236,14 +238,14 @@ namespace DataAccessLibrary.DAC.Setup
                 var sql = @"
                     INSERT INTO Users (
                         UserName, Password, FullUserName, EmpID, InActive,
-                        UserManagement, ChangePassword,
+                        UserManagement, ChangePassword, AllowOutsideAccess,
                         CompanyMainLink, FinancialMainLink, PayrollMainLink, ExportMainLink, StockMainLink, ProductionMainLink, DashBoardMainLink, QMSMainLink, FixedAssetsMainLink, BudgetingMainLink, GateMainLink, SamplingMainLink, HelpMainLink, IntraOfficeMainLink, SetupMainLink, OpenCommandCenter,
                         RestrictedItemProfile, GeneralInfoItemProfile, ProcessesItemProfile, WeightItemProfile, PriceItemProfile, ReferencesItemProfile, PictureItemProfile, RMItemProfile, ShipInfoItemProfile, RestrictCompanyCatalogEditing,
                         AuthorizeVouchers, AuthorizeIssuance, PostMakerBill, ChangeRateonIssuance, ChangeRateMakerAssign, MakerBill_EditRate, HideRateMakerAssign, AddEditCustomerComplaint, EditFollowUp, CloseCAPA,
                         BackupData, RestoreData, HicoVisible, AddProdPlan, ShowTips, Show_Customer_Order_No
                     ) VALUES (
                         @UserName, @Password, @FullUserName, @EmpID, @InActive,
-                        @UserManagement, @ChangePassword,
+                        @UserManagement, @ChangePassword, @AllowOutsideAccess,
                         @CompanyMainLink, @FinancialMainLink, @PayrollMainLink, @ExportMainLink, @StockMainLink, @ProductionMainLink, @DashBoardMainLink, @QMSMainLink, @FixedAssetsMainLink, @BudgetingMainLink, @GateMainLink, @SamplingMainLink, @HelpMainLink, @IntraOfficeMainLink, @SetupMainLink, @OpenCommandCenter,
                         @RestrictedItemProfile, @GeneralInfoItemProfile, @ProcessesItemProfile, @WeightItemProfile, @PriceItemProfile, @ReferencesItemProfile, @PictureItemProfile, @RMItemProfile, @ShipInfoItemProfile, @RestrictCompanyCatalogEditing,
                         @AuthorizeVouchers, @AuthorizeIssuance, @PostMakerBill, @ChangeRateonIssuance, @ChangeRateMakerAssign, @MakerBill_EditRate, @HideRateMakerAssign, @AddEditCustomerComplaint, @EditFollowUp, @CloseCAPA,
@@ -273,6 +275,7 @@ namespace DataAccessLibrary.DAC.Setup
                         InActive = @InActive,
                         UserManagement = @UserManagement,
                         ChangePassword = @ChangePassword,
+                        AllowOutsideAccess = @AllowOutsideAccess,
                         CompanyMainLink = @CompanyMainLink,
                         FinancialMainLink = @FinancialMainLink,
                         PayrollMainLink = @PayrollMainLink,

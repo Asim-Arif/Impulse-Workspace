@@ -43,6 +43,7 @@ namespace Impulse.Areas.Identity.Pages.Account
         public readonly UserSessionService _usersession;
         private readonly DataAccessLibrary.Interface.Setup.IUserRoleDataAccess _userRoleData;
         private readonly DataAccessLibrary.Interface.Setup.IUserDataAccess _userData;
+        private readonly Impulse.Services.Security.IFactoryIpSecurityService _ipSecurity;
 
         public LoginModel(
             CustomUserStore userStore, 
@@ -51,7 +52,8 @@ namespace Impulse.Areas.Identity.Pages.Account
             IDBHelper idbhelper, 
             UserSessionService userSession,
             DataAccessLibrary.Interface.Setup.IUserRoleDataAccess userRoleData,
-            DataAccessLibrary.Interface.Setup.IUserDataAccess userData) 
+            DataAccessLibrary.Interface.Setup.IUserDataAccess userData,
+            Impulse.Services.Security.IFactoryIpSecurityService ipSecurity) 
         { 
             _userStore = userStore; 
             _signInManager = signInManager; 
@@ -60,6 +62,7 @@ namespace Impulse.Areas.Identity.Pages.Account
             _usersession = userSession;
             _userRoleData = userRoleData;
             _userData = userData;
+            _ipSecurity = ipSecurity;
         }
 
         [BindProperty]
@@ -67,6 +70,12 @@ namespace Impulse.Areas.Identity.Pages.Account
         public IList<AuthenticationScheme> ExternalLogins { get; set; }
         public string ReturnUrl { get; set; }
         [TempData] public string ErrorMessage { get; set; }
+
+        public bool IsRemoteRestricted { get; set; }
+        public string DetectedClientIp { get; set; } = string.Empty;
+        public string RestrictedUserName { get; set; } = string.Empty;
+        public int RestrictedUserId { get; set; }
+        public string RequestSubmittedMessage { get; set; }
         public class InputModel
         {
             [Required]
@@ -79,15 +88,18 @@ namespace Impulse.Areas.Identity.Pages.Account
 
             public bool RememberMe { get; set; }
         }
-        public async Task OnGetAsync(string returnUrl = null)
+        public async Task OnGetAsync(string returnUrl = null, int? remoteExpired = null)
         {
+            if (remoteExpired == 1)
+            {
+                ErrorMessage = "Your temporary remote access session has expired. Please log in from factory premises or request remote access.";
+            }
+
             if (!string.IsNullOrEmpty(ErrorMessage))
             {
                 ModelState.AddModelError(string.Empty, ErrorMessage);
             }
             returnUrl ??= Url.Content("~/"); // Clear the existing external cookie to ensure a clean login process
-            /*await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
-            ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();*/
             await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             ReturnUrl = returnUrl;
@@ -118,6 +130,23 @@ namespace Impulse.Areas.Identity.Pages.Account
                 if (await _userStore.ValidateCredentialsAsync(currentusername, Input.Password))
                 {
                     currentusername = dbUser?.UserName ?? currentusername;
+
+                    var fullUser = await _userData.GetUserByUserNameAsync(currentusername);
+                    if (fullUser != null && _ipSecurity.IsIpRestrictionEnabled)
+                    {
+                        var clientIp = _ipSecurity.GetClientIp(HttpContext);
+                        DetectedClientIp = clientIp;
+                        bool isAllowed = await _ipSecurity.CanUserAccessRemotelyAsync(fullUser, clientIp);
+                        if (!isAllowed)
+                        {
+                            IsRemoteRestricted = true;
+                            RestrictedUserId = fullUser.UserID;
+                            RestrictedUserName = currentusername;
+                            ModelState.AddModelError(string.Empty, $"Remote access is restricted from your current connection ({clientIp}). Please submit a temporary access request below.");
+                            return Page();
+                        }
+                    }
+
                     _usersession.UserName = currentusername;
 
                     _logger.LogInformation("User {UserName} logged in.", currentusername);
@@ -143,7 +172,6 @@ namespace Impulse.Areas.Identity.Pages.Account
                                 }
                             }
 
-                            var fullUser = await _userData.GetUserByUserNameAsync(currentusername);
                             if (fullUser?.UserManagement == true)
                             {
                                 if (!claims.Any(c => c.Type == ClaimTypes.Role && c.Value.Equals("Administrator", StringComparison.OrdinalIgnoreCase)))
@@ -171,6 +199,17 @@ namespace Impulse.Areas.Identity.Pages.Account
                             claims.Add(new Claim(ClaimTypes.Role, "Director"));
                     }
 
+                    if (_ipSecurity.IsIpRestrictionEnabled && fullUser != null)
+                    {
+                        var clientIp = _ipSecurity.GetClientIp(HttpContext);
+                        bool isAllowedFactory = _ipSecurity.IsAllowedFactoryIp(clientIp);
+                        if (!isAllowedFactory && !fullUser.AllowOutsideAccess)
+                        {
+                            claims.Add(new Claim("IsRemoteSession", "true"));
+                            claims.Add(new Claim("RemoteUserId", fullUser.UserID.ToString()));
+                        }
+                    }
+
                     var claimsIdentity = new ClaimsIdentity(claims, IdentityConstants.ApplicationScheme);
                     var principal = new ClaimsPrincipal(claimsIdentity);
 
@@ -191,6 +230,35 @@ namespace Impulse.Areas.Identity.Pages.Account
                     ModelState.AddModelError(string.Empty, "Invalid login attempt.");
                     return Page();
                 }
+            }
+
+            return Page();
+        }
+
+        public async Task<IActionResult> OnPostRequestRemoteAccessAsync(int userId, string userName, string requestReason, string returnUrl = null)
+        {
+            ReturnUrl = returnUrl ?? Url.Content("~/");
+            var clientIp = _ipSecurity.GetClientIp(HttpContext);
+            DetectedClientIp = clientIp;
+
+            if (userId <= 0 && !string.IsNullOrWhiteSpace(userName))
+            {
+                var user = await _userData.GetUserByUserNameAsync(userName.Trim());
+                if (user != null) userId = user.UserID;
+            }
+
+            if (userId > 0 && !string.IsNullOrWhiteSpace(userName))
+            {
+                var requestBaseUrl = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}{HttpContext.Request.PathBase}";
+                await _ipSecurity.RequestAccessAsync(userId, userName.Trim(), clientIp, requestReason, requestBaseUrl);
+                RequestSubmittedMessage = "Your remote access request has been sent to administrators (via In-App & WhatsApp). Once approved, please sign in.";
+                IsRemoteRestricted = true;
+                RestrictedUserId = userId;
+                RestrictedUserName = userName;
+            }
+            else
+            {
+                ModelState.AddModelError(string.Empty, "Unable to submit request. Please enter a valid username.");
             }
 
             return Page();

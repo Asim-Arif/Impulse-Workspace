@@ -94,6 +94,8 @@ builder.Services.AddScoped<IDBHelper,DBHelper>();
 builder.Services.AddScoped<IChartOfAccountsDataAccess, ChartOfAccountsDataAccess>();
 builder.Services.AddScoped<ICIPData, ChartOfAccounts_DAC>();
 builder.Services.AddScoped<IPhotocopyData, PhotoCopyDataAccess>();
+
+
 builder.Services.AddScoped<IVouchersDataAccess, VouchersDataAccess>();
 builder.Services.AddScoped<ICommonDataAccess, CommonDataAccess>();
 builder.Services.AddSingleton<UserSessionService>();
@@ -540,6 +542,8 @@ builder.Services.AddHttpClient<Impulse.Services.IntraOffice.IAiService, Impulse.
 builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IUserDataAccess, DataAccessLibrary.DAC.Setup.UserDataAccess>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IUserRoleDataAccess, DataAccessLibrary.DAC.Setup.UserRoleDataAccess>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IWorkflowConfigurationDataAccess, DataAccessLibrary.DAC.Setup.WorkflowConfigurationDataAccess>();
+builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IRemoteAccessDataAccess, DataAccessLibrary.DAC.Setup.RemoteAccessDataAccess>();
+builder.Services.AddScoped<Impulse.Services.Security.IFactoryIpSecurityService, Impulse.Services.Security.FactoryIpSecurityService>();
 builder.Services.AddScoped<Impulse.Services.Setup.IUserService, Impulse.Services.Setup.UserService>();
 builder.Services.AddScoped<DataAccessLibrary.Interface.Setup.IUserPermissionDataAccess, DataAccessLibrary.DAC.Setup.UserPermissionDataAccess>();
 builder.Services.AddScoped<Impulse.Services.Setup.IUserPermissionService, Impulse.Services.Setup.UserPermissionService>();
@@ -557,7 +561,7 @@ builder.Services.AddScoped<DataAccessLibrary.Interface.Production.IProductionDel
 builder.Services.AddScoped<Impulse.Services.WorkflowTasks.IWorkflowTaskEngine, Impulse.Services.WorkflowTasks.WorkflowTaskEngine>();
 
 // WhatsApp Gateway Microservice Process Supervisor
-builder.Services.AddHostedService<Impulse.Services.IntraOffice.WhatsAppGatewayHostService>();
+// builder.Services.AddHostedService<Impulse.Services.IntraOffice.WhatsAppGatewayHostService>();
 
 // Hardware-Locked Cryptographic Licensing Engine
 builder.Services.AddSingleton<Impulse.Services.Licensing.IHardwareFingerprintService, Impulse.Services.Licensing.HardwareFingerprintService>();
@@ -612,6 +616,7 @@ app.UseRouting();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<Impulse.Middleware.RemoteAccessExpirationMiddleware>();
 
 app.MapRazorPages();
 app.MapControllers();

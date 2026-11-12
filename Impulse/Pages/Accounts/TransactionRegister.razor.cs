@@ -7,6 +7,7 @@ using DataAccessLibrary.Interface.Accounts;
 using DataAccessLibrary.Models;
 using DataAccessLibrary.Models.ViewModels.Accounts;
 using DataAccessLibrary.Models.ViewModels;
+using Impulse.Components.Common;
 using Impulse.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -173,7 +174,21 @@ namespace Impulse.Pages.Accounts
         private AccountsReportingModel SelectedVoucher;
         private bool ShowModal = false;
         private bool IsEdit = false;
+        private AttachmentModal? attachmentModalRef;
         string lastVoucher = null;
+
+        private void OpenVoucherAttachments(ItemClickEventArgs e)
+        {
+            var account = e.Data as AccountsReportingModel;
+            if (account != null && !string.IsNullOrWhiteSpace(account.VchrNo))
+            {
+                attachmentModalRef?.Open(
+                    entityType: "Voucher",
+                    entityId: account.VchrNo,
+                    displayName: $"Voucher #{account.VchrNo}"
+                );
+            }
+        }
         private async Task EditSelectedVoucher(ItemClickEventArgs e)
         {
             var account = e.Data as AccountsReportingModel;

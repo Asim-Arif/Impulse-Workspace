@@ -1,8 +1,9 @@
 using DataAccessLibrary.Models.ViewModels;
 using DataAccessLibrary.Models.ViewModels.Accounts;
+using Impulse.Components.Common;
 using Impulse.Services;
+using Impulse.Services.Common;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.JSInterop;
 using Radzen;
 
@@ -15,11 +16,11 @@ namespace Impulse.Pages.Accounts
         private string strCashInHandParent=string.Empty;
         private VoucherViewModel voucherViewModel = new VoucherViewModel();
         private string VoucherNo { get; set; }
-        private bool bClearInputFile = false;        
         private string successMessage = string.Empty;
         private bool isError = false;
-        private string myFileExtension = string.Empty;
         private bool isSaving = false;
+        private AttachmentModal? attachmentModalRef;
+        private int attachmentCount = 0;
         private DateTime selectedDate = DateTime.Today;
         private string strCashBalance { get; set; } = string.Empty;
         private string strAccountBalance { get; set; } = string.Empty;
@@ -78,6 +79,9 @@ namespace Impulse.Pages.Accounts
         [Inject]
         private IReportNavigationService ReportNavigationService { get; set; }
 
+        [Inject]
+        private IEntityAttachmentService AttachmentService { get; set; } = default!;
+
         [Parameter]
         public int p_bankId { get; set; }
 
@@ -85,6 +89,7 @@ namespace Impulse.Pages.Accounts
         private async Task GetNextVoucherNo(DateTime selectedDate)
         {
             voucherViewModel.VchrNo = await VoucherService.GetNextVchrNo(selectedDate,"JV");
+            await LoadAttachmentCountAsync();
         }
 
         private async Task OnDTChanged(ChangeEventArgs e)
@@ -232,11 +237,6 @@ namespace Impulse.Pages.Accounts
 
                 string strReturnVchrNo = await VoucherService.SaveVoucherAsync(voucherViewModel);
 
-                if (!bClearInputFile)
-                {
-                    await UploadFileAsync(strReturnVchrNo);
-                }
-
                 isError = false;
                 //successMessage = "Data Saved Successfully!";
                 NotificationServiceManager.ShowSuccess("Saved", "Transaction saved successfully.");
@@ -293,12 +293,7 @@ namespace Impulse.Pages.Accounts
         private async Task ResetForm()
         {
             await InitializeData();
-            //Following 4 lines are used to clear fileinput
-            bClearInputFile = true;
             StateHasChanged();
-            bClearInputFile = false;
-            StateHasChanged();
-
         }
 
         private void GoToIndexPage()
@@ -306,34 +301,39 @@ namespace Impulse.Pages.Accounts
             Navigation.NavigateTo("/financial");
         }
 
-        private IBrowserFile selectedFile;
-        private void HandleFileSelected(InputFileChangeEventArgs e)
+        private void OpenAttachmentModal()
         {
-            selectedFile = e.File;
+            if (string.IsNullOrWhiteSpace(voucherViewModel.VchrNo)) return;
+
+            attachmentModalRef?.Open(
+                entityType: "Voucher",
+                entityId: voucherViewModel.VchrNo,
+                displayName: $"Journal Voucher #{voucherViewModel.VchrNo}"
+            );
         }
 
-        private async Task UploadFileAsync(string primaryKey)
+        private void OnAttachmentCountChanged(int count)
         {
-            var client = ClientFactory.CreateClient("MyApiClient");
-            if (selectedFile != null)
+            attachmentCount = count;
+            StateHasChanged();
+        }
+
+        private async Task LoadAttachmentCountAsync()
+        {
+            if (!string.IsNullOrWhiteSpace(voucherViewModel.VchrNo))
             {
-                string extension = Path.GetExtension(selectedFile.Name);
-                string uniqueFileName = $"JV_{primaryKey}{extension}";
-                
-                uniqueFileName = uniqueFileName.Replace("/", "_");                
-
-                using (var content = new MultipartFormDataContent())
+                try
                 {
-                    var streamContent = new StreamContent(selectedFile.OpenReadStream(maxAllowedSize: 10_000_000)); // Set max allowed size
-                    content.Add(streamContent, "file", uniqueFileName);                    
-                    var response = await client.PostAsync("api/upload", content);
-
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        var errorDetails = await response.Content.ReadAsStringAsync();
-                        throw new InvalidOperationException("File upload failed." + response.ToString());
-                    }
+                    attachmentCount = await AttachmentService.GetCountAsync("Voucher", voucherViewModel.VchrNo);
                 }
+                catch
+                {
+                    attachmentCount = 0;
+                }
+            }
+            else
+            {
+                attachmentCount = 0;
             }
         }
         

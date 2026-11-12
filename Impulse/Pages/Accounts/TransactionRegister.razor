@@ -12,6 +12,7 @@
 @using DataAccessLibrary.Models.ViewModels.Accounts
 @using Impulse.Configurations
 @using DataAccessLibrary.Interface.Accounts
+@using Impulse.Components.Common
 @using Microsoft.AspNetCore.Components.Web.Virtualization
 
 @using Microsoft.AspNetCore.Identity
@@ -265,6 +266,10 @@
         <i class="fas fa-pen-to-square fa-fw win11-icon text-warning"></i> Edit Voucher
         </Item>
 
+        <Item class="menu-item" OnClick="@(e => OpenVoucherAttachments(e))">
+        <i class="fas fa-paperclip fa-fw win11-icon text-primary"></i> Attachments
+        </Item>
+
         <div class="menu-divider"></div>
 
         <Item class="menu-item" OnClick="@(async e => await PrintVoucher(e))">
@@ -449,3 +454,5 @@
         </div>
     </div>
 }
+
+<AttachmentModal @ref="attachmentModalRef" />

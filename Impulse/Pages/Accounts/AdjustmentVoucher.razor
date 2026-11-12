@@ -1,4 +1,4 @@
-﻿@page "/accounts/adjustmentvoucher"
+@page "/accounts/adjustmentvoucher"
 
 @attribute [Authorize]
 @using DataAccessLibrary
@@ -6,6 +6,7 @@
 @using DataAccessLibrary.Models.ViewModels
 @using DataAccessLibrary.Interface.Accounts
 @using Impulse.Services
+@using Impulse.Components.Common
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 @inject ICIPData CIPDataService
@@ -162,6 +163,17 @@
 
                 <div class="col-sm-6 d-flex flex-column">              
                     <div class="d-flex justify-content-end gap-2">
+                        <button type="button"
+                                class="btn btn-outline-info position-relative"
+                                @onclick="OpenAttachmentModal"
+                                disabled="@(string.IsNullOrWhiteSpace(voucherViewModel.VchrNo))"
+                                title="Manage Voucher Attachments">
+                            <i class="fas fa-paperclip me-1"></i> Attachments
+                            @if (attachmentCount > 0)
+                            {
+                                <span class="badge bg-danger ms-1">@attachmentCount</span>
+                            }
+                        </button>
                         <button type="button" class="btn btn-primary" disabled="@isSaving" @onclick="SaveVoucherMain">Save</button>
                         <button type="button" class="btn btn-primary" @onclick="GoToIndexPage">Close</button>
                     </div>
@@ -171,3 +183,5 @@
         </form>
     </div>
 </div>
+
+<AttachmentModal @ref="attachmentModalRef" OnCountChanged="OnAttachmentCountChanged" />

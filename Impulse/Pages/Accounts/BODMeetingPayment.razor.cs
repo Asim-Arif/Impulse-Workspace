@@ -233,47 +233,12 @@ namespace Impulse.Pages.Accounts
         private void ResetForm()
         {
             InitializeData();
-            //Following 4 lines are used to clear fileinput
-            bClearInputFile = true;
             StateHasChanged();
-            bClearInputFile = false;
-            StateHasChanged();
-
         }
 
         private void GoToIndexPage()
         {
             Navigation.NavigateTo("/Banks", true);
-        }
-
-        private IBrowserFile selectedFile;
-        private void HandleFileSelected(InputFileChangeEventArgs e)
-        {
-            selectedFile = e.File;
-        }
-
-        private async Task UploadFileAsync(string primaryKey)
-        {
-            var client = ClientFactory.CreateClient("MyApiClient");
-            if (selectedFile != null)
-            {
-                var uniqueFileName = $"{primaryKey}{Path.GetExtension(selectedFile.Name)}";
-                uniqueFileName = uniqueFileName.Replace("/", "_");
-                myFileExtension = Path.GetExtension(selectedFile.Name).ToLower();
-
-                using (var content = new MultipartFormDataContent())
-                {
-                    var streamContent = new StreamContent(selectedFile.OpenReadStream(maxAllowedSize: 10_000_000)); // Set max allowed size
-                    content.Add(streamContent, "file", uniqueFileName);
-                    //var response = await Http.PostAsync("api/upload", content);
-                    var response = await client.PostAsync("api/upload", content);
-
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        throw new InvalidOperationException("File upload failed." + response.ToString());
-                    }
-                }
-            }
         }
 
         private async Task<IEnumerable<BankAccountInfo>> SearchBankAccounts(string searchText)
