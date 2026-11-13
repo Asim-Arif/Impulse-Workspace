@@ -15,11 +15,50 @@ namespace DataAccessLibrary.DAC.Export
     public class CustomerOrderDataAccess : ICustomerOrderDataAccess
     {
         private readonly string _connectionString;
+        private readonly IConfiguration _configuration;
 
         public CustomerOrderDataAccess(IConfiguration configuration)
         {
+            _configuration = configuration;
             _connectionString = configuration.GetConnectionString("DefaultConnection")
                 ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+        }
+
+        public async Task<bool> IsAutoProformaEnabledAsync()
+        {
+            using IDbConnection db = new SqlConnection(_connectionString);
+            return await IsAutoProformaEnabledAsync(db);
+        }
+
+        private async Task<bool> IsAutoProformaEnabledAsync(IDbConnection db, IDbTransaction? trans = null)
+        {
+            try
+            {
+                const string gdSql = "SELECT TOP 1 DataValue FROM GeneralData WHERE DataName = 'AutoGenerateProformaOnOrderSave'";
+                string? dbVal = await db.QueryFirstOrDefaultAsync<string?>(gdSql, transaction: trans);
+                if (!string.IsNullOrWhiteSpace(dbVal))
+                {
+                    var trimmed = dbVal.Trim();
+                    if (string.Equals(trimmed, "True", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(trimmed, "1", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(trimmed, "Yes", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                    if (string.Equals(trimmed, "False", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(trimmed, "0", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(trimmed, "No", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return false;
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore if GeneralData query fails and fall back to appsettings
+            }
+
+            return bool.TryParse(_configuration["AppSettings:AutoGenerateProformaOnOrderSave"], out bool enabled) && enabled;
         }
 
         public async Task<List<GenericDropDownModel>> GetCompaniesAsync()
@@ -170,6 +209,13 @@ namespace DataAccessLibrary.DAC.Export
             using var trans = db.BeginTransaction();
             try
             {
+                bool autoProforma = await IsAutoProformaEnabledAsync(db, trans)
+                    && !string.Equals(order.CustCode, "HICO", StringComparison.OrdinalIgnoreCase);
+                string strPInvoiceNo = !string.IsNullOrWhiteSpace(order.InternalRefNo)
+                    ? order.InternalRefNo.Trim()
+                    : order.OrderNo.Trim();
+                double batchNo = double.TryParse(order.OrderRcvdVia, out var parsedBatch) ? parsedBatch : 0;
+
                 // Check if existing
                 const string checkSql = "SELECT COUNT(*) FROM FCustomerOrders WHERE OrderNo = @OrderNo";
                 int count = await db.QueryFirstOrDefaultAsync<int>(checkSql, new { OrderNo = order.OrderNo }, trans);
@@ -203,9 +249,79 @@ namespace DataAccessLibrary.DAC.Export
                     await db.ExecuteAsync(insertOrderSql, order, trans);
                 }
 
+                // Auto-create or sync Proforma Invoice header (FPInvoice)
+                if (autoProforma && !string.IsNullOrWhiteSpace(strPInvoiceNo))
+                {
+                    const string checkPiSql = "SELECT COUNT(*) FROM FPInvoice WHERE PInvoice = @PInvoice";
+                    int piCount = await db.QueryFirstOrDefaultAsync<int>(checkPiSql, new { PInvoice = strPInvoiceNo }, trans);
+                    if (piCount == 0)
+                    {
+                        const string insertPiSql = @"
+                            INSERT INTO FPInvoice (
+                                CustCode, Country, PInvoice, DT, SMethod, TradeTerms, PaymentTerms,
+                                CompanyRefID, DeliveryDT, BatchNo,
+                                Discount_Description, Insurance_Description, Insurance_Description_II,
+                                CIF_Description, Total_Description
+                            )
+                            VALUES (
+                                @CustCode, @Country, @PInvoice, @DT, @SMethod, @TradeTerms, @PaymentTerms,
+                                @CompanyRefID, @DeliveryDT, @BatchNo,
+                                'Discount', 'Insurance & Freight Charges', 'Insurance Charges',
+                                'CIF Value', 'FOB Value'
+                            )";
+                        await db.ExecuteAsync(insertPiSql, new
+                        {
+                            order.CustCode,
+                            order.Country,
+                            PInvoice = strPInvoiceNo,
+                            order.DT,
+                            SMethod = order.ShippingMode ?? string.Empty,
+                            order.TradeTerms,
+                            order.PaymentTerms,
+                            order.CompanyRefID,
+                            order.DeliveryDT,
+                            BatchNo = batchNo
+                        }, trans);
+                    }
+                    else
+                    {
+                        const string updatePiSql = @"
+                            UPDATE FPInvoice
+                            SET CustCode = @CustCode,
+                                Country = @Country,
+                                DT = @DT,
+                                SMethod = @SMethod,
+                                TradeTerms = @TradeTerms,
+                                PaymentTerms = @PaymentTerms,
+                                CompanyRefID = @CompanyRefID,
+                                DeliveryDT = @DeliveryDT,
+                                BatchNo = @BatchNo
+                            WHERE PInvoice = @PInvoice";
+                        await db.ExecuteAsync(updatePiSql, new
+                        {
+                            order.CustCode,
+                            order.Country,
+                            PInvoice = strPInvoiceNo,
+                            order.DT,
+                            SMethod = order.ShippingMode ?? string.Empty,
+                            order.TradeTerms,
+                            order.PaymentTerms,
+                            order.CompanyRefID,
+                            order.DeliveryDT,
+                            BatchNo = batchNo
+                        }, trans);
+                    }
+                }
+
                 // Delete deleted items
                 if (deletedItemIds != null && deletedItemIds.Any())
                 {
+                    if (autoProforma)
+                    {
+                        const string deleteProformaItemsSql = "DELETE FROM FProformaOrders WHERE OrderEntryID IN @Ids";
+                        await db.ExecuteAsync(deleteProformaItemsSql, new { Ids = deletedItemIds }, trans);
+                    }
+
                     const string deleteItemsSql = "DELETE FROM FOrderItems WHERE ID IN @Ids";
                     await db.ExecuteAsync(deleteItemsSql, new { Ids = deletedItemIds }, trans);
                 }
@@ -228,19 +344,85 @@ namespace DataAccessLibrary.DAC.Export
                                     @IW_OrderNo, @IW_BatchNo, 0, 0);
                             SELECT CAST(SCOPE_IDENTITY() as int);";
                         item.ID = await db.QuerySingleAsync<int>(insertItemSql, item, trans);
+
+                        if (autoProforma && !string.IsNullOrWhiteSpace(strPInvoiceNo))
+                        {
+                            const string insertProformaOrderSql = @"
+                                INSERT INTO FProformaOrders (PInvoice, OrderEntryID, Qty, InvQty, Price, CustomPrice, ItemDescription)
+                                VALUES (@PInvoice, @OrderEntryID, @Qty, @Qty, @Price, @CustomPrice, @ItemDescription);
+                                UPDATE FOrderItems SET InvQty = 0 WHERE ID = @OrderEntryID;";
+                            await db.ExecuteAsync(insertProformaOrderSql, new
+                            {
+                                PInvoice = strPInvoiceNo,
+                                OrderEntryID = item.ID,
+                                item.Qty,
+                                item.Price,
+                                CustomPrice = item.CustomPrice > 0 ? item.CustomPrice : item.Price,
+                                ItemDescription = item.Description ?? string.Empty
+                            }, trans);
+                            item.InvQty = 0;
+                        }
                     }
                     else
                     {
                         // Update existing item line - if Qty changes, reset Authorized = 0
                         const string updateItemSql = @"
                             UPDATE FOrderItems 
-                            SET Price = @Price, Qty = @Qty, SortNo = @SortNo, DeliveryDT = @DeliveryDT, 
+                            SET Item_Edited = CASE WHEN Qty <> @Qty OR Price <> @Price THEN 1 ELSE Item_Edited END,
+                                InvQty = CASE WHEN @AutoProforma = 1 THEN 0 ELSE InvQty - (Qty - @Qty) END,
+                                Price = @Price, CustomPrice = @CustomPrice, Qty = @Qty, SortNo = @SortNo, DeliveryDT = @DeliveryDT, 
                                 Quality = @Quality, Stamps = @Stamps, DeliveryStatus = @DeliveryStatus, 
                                 Remarks = @Remarks, Weight = @Weight, Item_Finishing_Type = @Item_Finishing_Type, 
                                 IW_OrderNo = @IW_OrderNo, IW_BatchNo = @IW_BatchNo,
                                 Authorized = CASE WHEN @Qty = ISNULL(AuthorizedQty, 0) THEN Authorized ELSE 0 END
                             WHERE ID = @ID";
-                        await db.ExecuteAsync(updateItemSql, item, trans);
+                        await db.ExecuteAsync(updateItemSql, new
+                        {
+                            item.ID,
+                            item.Price,
+                            CustomPrice = item.CustomPrice > 0 ? item.CustomPrice : item.Price,
+                            item.Qty,
+                            item.SortNo,
+                            item.DeliveryDT,
+                            item.Quality,
+                            item.Stamps,
+                            item.DeliveryStatus,
+                            item.Remarks,
+                            item.Weight,
+                            item.Item_Finishing_Type,
+                            item.IW_OrderNo,
+                            item.IW_BatchNo,
+                            AutoProforma = autoProforma ? 1 : 0
+                        }, trans);
+
+                        if (autoProforma && !string.IsNullOrWhiteSpace(strPInvoiceNo))
+                        {
+                            const string updateProformaOrderSql = @"
+                                IF EXISTS (SELECT 1 FROM FProformaOrders WHERE OrderEntryID = @OrderEntryID)
+                                BEGIN
+                                    UPDATE FProformaOrders
+                                    SET Qty = @Qty,
+                                        InvQty = InvQty - (Qty - @Qty),
+                                        Price = @Price,
+                                        CustomPrice = @CustomPrice,
+                                        ItemDescription = @ItemDescription
+                                    WHERE OrderEntryID = @OrderEntryID;
+                                END
+                                ELSE
+                                BEGIN
+                                    INSERT INTO FProformaOrders (PInvoice, OrderEntryID, Qty, InvQty, Price, CustomPrice, ItemDescription)
+                                    VALUES (@PInvoice, @OrderEntryID, @Qty, @Qty, @Price, @CustomPrice, @ItemDescription);
+                                END";
+                            await db.ExecuteAsync(updateProformaOrderSql, new
+                            {
+                                PInvoice = strPInvoiceNo,
+                                OrderEntryID = item.ID,
+                                item.Qty,
+                                item.Price,
+                                CustomPrice = item.CustomPrice > 0 ? item.CustomPrice : item.Price,
+                                ItemDescription = item.Description ?? string.Empty
+                            }, trans);
+                        }
                     }
 
                     // Update price in catalog as per VB6 logic
@@ -282,9 +464,31 @@ namespace DataAccessLibrary.DAC.Export
             }
         }
 
-        public async Task<string> GetNextInternalRefNoAsync(int companyId)
+        public async Task<string> GetNextInternalRefNoAsync(int companyId, DateTime? orderDate = null)
         {
             using IDbConnection db = new SqlConnection(_connectionString);
+            bool autoProforma = await IsAutoProformaEnabledAsync(db);
+            if (autoProforma)
+            {
+                string yy = (orderDate ?? DateTime.Today).ToString("yy");
+                string prefix = $"PI/{yy}-";
+                const string piSeqSql = @"
+                    SELECT MAX(SeqNo) FROM (
+                        SELECT CAST(SUBSTRING(InternalRefNo, 7, 50) AS INT) AS SeqNo
+                        FROM FCustomerOrders
+                        WHERE InternalRefNo LIKE @PrefixPattern
+                          AND ISNUMERIC(SUBSTRING(InternalRefNo, 7, 50)) = 1
+                        UNION ALL
+                        SELECT CAST(SUBSTRING(PInvoice, 7, 50) AS INT) AS SeqNo
+                        FROM FPInvoice
+                        WHERE PInvoice LIKE @PrefixPattern
+                          AND ISNUMERIC(SUBSTRING(PInvoice, 7, 50)) = 1
+                    ) t";
+                int? maxPiSeq = await db.QueryFirstOrDefaultAsync<int?>(piSeqSql, new { PrefixPattern = prefix + "%" });
+                int nextSeq = (maxPiSeq == null || maxPiSeq <= 0) ? 786 : maxPiSeq.Value + 1;
+                return $"{prefix}{nextSeq:0000}";
+            }
+
             // Default max query logic matching VB6 GetInternalRefNo
             const string sql = "SELECT MAX(CAST(InternalRefNo AS INT)) AS MaxNo FROM FCustomerOrders WHERE ISNUMERIC(InternalRefNo) = 1";
             int? maxResult = await db.QueryFirstOrDefaultAsync<int?>(sql);

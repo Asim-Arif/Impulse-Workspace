@@ -49,6 +49,11 @@ namespace Impulse.Services.Production
             return _dataAccess.AssignItemAsync(vendId, processId, itemId, rate, custCode);
         }
 
+        public Task<int> AssignAllUnassignedItemsAsync(long vendId, int processId, decimal rate, string? custCode = null)
+        {
+            return _dataAccess.AssignAllUnassignedItemsAsync(vendId, processId, rate, custCode);
+        }
+
         public Task UpdateAssignedItemRateAndRemarksAsync(long entryId, decimal newRate, decimal oldRate, string newRemarks, string userName)
         {
             return _dataAccess.UpdateAssignedItemRateAndRemarksAsync(entryId, newRate, oldRate, newRemarks, userName);

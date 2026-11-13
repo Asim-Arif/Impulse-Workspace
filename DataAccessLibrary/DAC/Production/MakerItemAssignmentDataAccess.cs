@@ -178,6 +178,49 @@ namespace DataAccessLibrary.DAC.Production
             await db.ExecuteAsync("SP_VendAssItem", parameters, commandType: CommandType.StoredProcedure);
         }
 
+        public async Task<int> AssignAllUnassignedItemsAsync(long vendId, int processId, decimal rate, string? custCode = null)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            bool isCustWise = await HasCustomerWiseRatesSupportAsync();
+            string effectiveCustCode = isCustWise && !string.IsNullOrWhiteSpace(custCode) ? custCode.Trim() : "Stock";
+
+            string countSql = @"SELECT COUNT(1)
+                                FROM Items
+                                WHERE ItemID IN (SELECT ItemID FROM ItemProcesses WHERE ProcessID = @ProcessID)
+                                  AND ItemID NOT IN (
+                                      SELECT ItemID
+                                      FROM VendAssItems
+                                      WHERE VendID = @VendID
+                                        AND ProcessID = @ProcessID
+                                        AND (CustCode = @EffectiveCustCode OR (@EffectiveCustCode = 'Stock' AND (CustCode IS NULL OR CustCode = '' OR CustCode = 'Stock')))
+                                  )";
+
+            int pendingCount = await db.ExecuteScalarAsync<int>(countSql, new
+            {
+                VendID = vendId,
+                ProcessID = processId,
+                EffectiveCustCode = effectiveCustCode
+            });
+
+            if (pendingCount <= 0)
+            {
+                return 0;
+            }
+
+            var parameters = new DynamicParameters();
+            parameters.Add("@VendID", vendId);
+            parameters.Add("@ItemID", "0");
+            parameters.Add("@ProcessID", processId);
+            parameters.Add("@Rate", rate);
+            if (isCustWise && !string.IsNullOrWhiteSpace(custCode))
+            {
+                parameters.Add("@CustCode", custCode.Trim());
+            }
+
+            await db.ExecuteAsync("SP_VendAssItem", parameters, commandType: CommandType.StoredProcedure);
+            return pendingCount;
+        }
+
         public async Task UpdateRateForAllCustomersAsync(long vendId, int processId, string itemId, decimal newRate, decimal oldRate, string newRemarks, string userName)
         {
             using IDbConnection db = new SqlConnection(ConnectionString);

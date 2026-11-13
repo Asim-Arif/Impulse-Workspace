@@ -36,7 +36,8 @@ namespace Impulse.Services.Export
 
         public async Task<CustomerOrderViewModel?> GetOrderAsync(string orderNo) => await _dac.GetOrderAsync(orderNo);
         public async Task<bool> SaveOrderAsync(CustomerOrderViewModel order, List<int> deletedItemIds) => await _dac.SaveOrderAsync(order, deletedItemIds);
-        public async Task<string> GetNextInternalRefNoAsync(int companyId) => await _dac.GetNextInternalRefNoAsync(companyId);
+        public async Task<string> GetNextInternalRefNoAsync(int companyId, DateTime? orderDate = null) => await _dac.GetNextInternalRefNoAsync(companyId, orderDate);
+        public async Task<bool> IsAutoProformaEnabledAsync() => await _dac.IsAutoProformaEnabledAsync();
         public async Task<bool> IsOrderNoExistsAsync(string orderNo) => await _dac.IsOrderNoExistsAsync(orderNo);
         public async Task<bool> IsOrderUsedInProformaAsync(string orderNo) => await _dac.IsOrderUsedInProformaAsync(orderNo);
         public async Task<bool> DeleteCustomerOrderAsync(string orderNo) => await _dac.DeleteCustomerOrderAsync(orderNo);

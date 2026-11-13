@@ -11,5 +11,6 @@ namespace Impulse.Services.Production
         Task<List<PurchaseProcessLookupDto>> GetPurchaseProcessesForItemAsync(string itemId);
         Task<List<MakerLookupDto>> GetMakersForItemAndProcessAsync(string itemId, int processId);
         Task<bool> SavePpcPlanAndDispatchTasksAsync(PpcPlanSaveRequest request);
+        Task<PpcExceptionActionResult> ExecutePlanningExceptionAsync(PpcExceptionActionRequest request);
     }
 }

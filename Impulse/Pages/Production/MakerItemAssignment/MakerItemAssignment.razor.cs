@@ -101,6 +101,8 @@ namespace Impulse.Pages.Production.MakerItemAssignment
 
         public bool IsLoadingItems { get; set; } = false;
         public bool IsAssigning { get; set; } = false;
+        public bool IsBulkAssigning { get; set; } = false;
+        public bool ShowBulkAssignModal { get; set; } = false;
 
         // Modal Edit State
         public AssignedMakerItemModel? EditingItem { get; set; }
@@ -440,6 +442,101 @@ namespace Impulse.Pages.Production.MakerItemAssignment
             finally
             {
                 IsAssigning = false;
+            }
+        }
+
+        public void OpenBulkAssignModal()
+        {
+            if (SelectedMaker == null || SelectedProcess == null) return;
+
+            if (IsCustomerWiseRatesEnabled && SelectedCustomer == null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Customer Required",
+                    Detail = "Please select a Customer before bulk assigning items.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            if (UnassignedItems.Count == 0)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Info,
+                    Summary = "Nothing to Assign",
+                    Detail = "All items for this process are already assigned to the selected maker.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            ShowBulkAssignModal = true;
+        }
+
+        public void CloseBulkAssignModal()
+        {
+            if (IsBulkAssigning) return;
+            ShowBulkAssignModal = false;
+        }
+
+        public async Task ConfirmBulkAssignAsync()
+        {
+            if (SelectedMaker == null || SelectedProcess == null) return;
+
+            if (IsCustomerWiseRatesEnabled && SelectedCustomer == null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Customer Required",
+                    Detail = "Please select a Customer before bulk assigning items.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            IsBulkAssigning = true;
+            try
+            {
+                string? custCode = IsCustomerWiseRatesEnabled ? SelectedCustomer?.CustCode : null;
+                int assignedCount = await MakerItemAssignmentService.AssignAllUnassignedItemsAsync(
+                    SelectedMaker.VendID,
+                    SelectedProcess.ProcessID,
+                    1m,
+                    custCode);
+
+                ShowBulkAssignModal = false;
+
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = assignedCount > 0 ? Radzen.NotificationSeverity.Success : Radzen.NotificationSeverity.Info,
+                    Summary = assignedCount > 0 ? "Bulk Assignment Complete" : "No Items Assigned",
+                    Detail = assignedCount > 0
+                        ? $"{assignedCount} unassigned item(s) assigned to {SelectedMaker.VenderName} at rate 1.00."
+                        : "All items for this process were already assigned.",
+                    Duration = 5000
+                });
+
+                SelectedUnassignedItem = null;
+                await LoadAssignedItemsAsync();
+                await LoadUnassignedItemsAsync();
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Error,
+                    Summary = "Bulk Assignment Failed",
+                    Detail = ex.Message,
+                    Duration = 6000
+                });
+            }
+            finally
+            {
+                IsBulkAssigning = false;
             }
         }
 

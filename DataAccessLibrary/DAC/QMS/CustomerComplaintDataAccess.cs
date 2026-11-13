@@ -1054,10 +1054,10 @@ namespace DataAccessLibrary.DAC.QMS
                 if (!string.IsNullOrWhiteSpace(invoiceNo) && invoiceNo != "<All Items>")
                 {
                     const string sql = @"
-                        SELECT DISTINCT ItemID, CustItemID AS CompItemID
+                        SELECT DISTINCT ItemID AS CompItemID, CustItemID AS ItemID
                         FROM VCustomInvoiceItems
                         WHERE CustomInvoice = @InvoiceNo
-                        ORDER BY ItemID";
+                        ORDER BY CompItemID";
 
                     var list = await db.QueryAsync<InvoiceItemLookupDto>(sql, new { InvoiceNo = invoiceNo });
                     return list.ToList();

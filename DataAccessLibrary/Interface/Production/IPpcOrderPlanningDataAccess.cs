@@ -11,5 +11,6 @@ namespace DataAccessLibrary.Interface.Production
         Task<List<PurchaseProcessLookupDto>> GetPurchaseProcessesForItemAsync(string itemId);
         Task<List<MakerLookupDto>> GetMakersForItemAndProcessAsync(string itemId, int processId);
         Task<bool> SavePpcPlanAsync(PpcPlanSaveRequest request);
+        Task<PpcExceptionActionResult> ExecutePlanningExceptionAsync(PpcExceptionActionRequest request);
     }
 }

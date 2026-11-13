@@ -12,13 +12,30 @@
         <div class="card-body pt-3">
 
             <!-- Title Header -->
-            <div class="row g-2 mb-3 align-items-end border-bottom pb-2">
+            <div class="row g-2 mb-3 align-items-end justify-content-between border-bottom pb-2">
                 <div class="col-auto d-flex align-items-end pb-1">
                     <h5 class="mb-0 fw-bold text-dark-emphasis">
                         <i class="fas fa-file-invoice text-primary me-2"></i>
                         New Customer Order
                     </h5>
                 </div>
+                @if (IsAutoProformaEnabled)
+                {
+                    <div class="col-auto pb-1">
+                        @if (string.Equals(Order.CustCode, "HICO", StringComparison.OrdinalIgnoreCase))
+                        {
+                            <span class="badge rounded-pill border px-3 py-1" style="background: #fff8e6; color: #9a6700; border-color: #ffe08a !important; font-size: 0.78rem; font-weight: 600;">
+                                <i class="fas fa-info-circle me-1"></i> Auto-Proforma bypassed for HICO
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge rounded-pill border px-3 py-1" style="background: #eef6ff; color: #0b5ed7; border-color: #b6d4fe !important; font-size: 0.78rem; font-weight: 600;" title="Saving this order will automatically create or update its Proforma Invoice">
+                                <i class="fas fa-magic me-1"></i> Auto-Proforma Active (PI: @(string.IsNullOrWhiteSpace(Order.InternalRefNo) ? Order.OrderNo : Order.InternalRefNo))
+                            </span>
+                        }
+                    </div>
+                }
             </div>
 
             <EditForm Model="Order">
@@ -35,22 +52,26 @@
                             <!-- Company -->
                             <div class="col-md-3">
                                 <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Company <span class="text-danger">*</span></label>
-                                <BlazoredTypeahead SearchMethod="SearchCompanies"
-                                                   EnableDropDown="true"
-                                                   Data="Companies"
-                                                   TValue="CompanyLookupModel"
-                                                   TItem="CompanyLookupModel"
-                                                   Value="SelectedCompany"
-                                                   ValueChanged="OnCompanySelected"
-                                                   ValueExpression="@(() => SelectedCompany)"
-                                                   Placeholder="Select Company">
-                                    <SelectedTemplate Context="selectedComp">
-                                        @selectedComp?.CompanyName
-                                    </SelectedTemplate>
-                                    <ResultTemplate Context="comp">
-                                        @comp.CompanyName
-                                    </ResultTemplate>
-                                </BlazoredTypeahead>
+                                <div class="@(IsUsedInProforma ? "disabled-typeahead-wrapper" : "")">
+                                    <BlazoredTypeahead SearchMethod="SearchCompanies"
+                                                       EnableDropDown="true"
+                                                       Data="Companies"
+                                                       TValue="CompanyLookupModel"
+                                                       TItem="CompanyLookupModel"
+                                                       Value="SelectedCompany"
+                                                       ValueChanged="OnCompanySelected"
+                                                       ValueExpression="@(() => SelectedCompany)"
+                                                       Disabled="@IsUsedInProforma"
+                                                       MaximumSuggestions="1000"
+                                                       Placeholder="Select Company">
+                                        <SelectedTemplate Context="selectedComp">
+                                            @selectedComp?.CompanyName
+                                        </SelectedTemplate>
+                                        <ResultTemplate Context="comp">
+                                            @comp.CompanyName
+                                        </ResultTemplate>
+                                    </BlazoredTypeahead>
+                                </div>
                             </div>
 
                             <!-- Customer -->
@@ -101,7 +122,7 @@
                             <!-- Order Date -->
                             <div class="col-md-2">
                                 <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Order Date</label>
-                                <input type="date" class="form-control form-control-sm" @bind="Order.DT" />
+                                <input type="date" class="form-control form-control-sm" value="@Order.DT.ToString("yyyy-MM-dd")" @onchange="OnOrderDateChanged" />
                             </div>
 
                             <!-- Trade Terms -->
@@ -135,7 +156,13 @@
 
                             <!-- Internal Ref No -->
                             <div class="col-md-2">
-                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">Internal Ref #</label>
+                                <label class="form-label fw-bold text-secondary mb-1" style="font-size: 0.82rem;">
+                                    Internal Ref #
+                                    @if (IsAutoProformaEnabled)
+                                    {
+                                        <span class="text-primary fw-normal" style="font-size: 0.74rem;">(Auto-PI #)</span>
+                                    }
+                                </label>
                                 <input type="text" class="form-control form-control-sm text-center fw-bold text-primary" @bind="Order.InternalRefNo" readonly style="background: #f0f2f5;" />
                             </div>
 
@@ -382,6 +409,10 @@
         font-size: 0.875rem !important;
         padding-top: 0 !important;
         padding-bottom: 0 !important;
+    }
+    .disabled-typeahead-wrapper .blazored-typeahead {
+        overflow: hidden !important;
+        border-radius: 4px;
     }
     .blazored-typeahead__input, .blazored-typeahead__controls {
         height: 29px !important;

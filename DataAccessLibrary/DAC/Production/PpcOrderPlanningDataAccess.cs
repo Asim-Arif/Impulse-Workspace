@@ -26,11 +26,60 @@ namespace DataAccessLibrary.DAC.Production
 
         private IDbConnection CreateConnection() => new SqlConnection(_connectionString);
 
+        private static bool _schemaEnsured = false;
+
+        private async Task EnsureExceptionSchemaAsync(IDbConnection db)
+        {
+            if (_schemaEnsured) return;
+            try
+            {
+                const string ddl = @"
+                    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('PPC_Order_Item_Planning') AND name = 'RejectedStockQty')
+                        ALTER TABLE PPC_Order_Item_Planning ADD RejectedStockQty INT NOT NULL CONSTRAINT DF_PPC_ItemPlan_RejectedStockQty DEFAULT 0;
+                    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('PPC_Order_Item_Planning') AND name = 'RejectedSFQty')
+                        ALTER TABLE PPC_Order_Item_Planning ADD RejectedSFQty INT NOT NULL CONSTRAINT DF_PPC_ItemPlan_RejectedSFQty DEFAULT 0;
+                    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('PPC_Order_Item_Purchases') AND name = 'Status')
+                        ALTER TABLE PPC_Order_Item_Purchases ADD Status VARCHAR(30) NOT NULL CONSTRAINT DF_PPC_ItemPurch_Status DEFAULT 'Active';
+                    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('PPC_Order_Item_Purchases') AND name = 'OriginalPlannedQty')
+                        ALTER TABLE PPC_Order_Item_Purchases ADD OriginalPlannedQty INT NULL;
+                    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('PPC_Order_Item_Purchases') AND name = 'ShortClosedQty')
+                        ALTER TABLE PPC_Order_Item_Purchases ADD ShortClosedQty INT NOT NULL CONSTRAINT DF_PPC_ItemPurch_ShortClosedQty DEFAULT 0;
+                    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('PPC_Order_Item_Purchases') AND name = 'ExceptionNotes')
+                        ALTER TABLE PPC_Order_Item_Purchases ADD ExceptionNotes NVARCHAR(500) NULL;
+                    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('PPC_Order_Item_Purchases') AND name = 'UpdatedAt')
+                        ALTER TABLE PPC_Order_Item_Purchases ADD UpdatedAt DATETIME2 NULL;
+                    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('PPC_Order_Item_Purchases') AND name = 'UpdatedBy')
+                        ALTER TABLE PPC_Order_Item_Purchases ADD UpdatedBy NVARCHAR(100) NULL;
+                    IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'PPC_Order_Planning_Exceptions')
+                    BEGIN
+                        CREATE TABLE dbo.PPC_Order_Planning_Exceptions (
+                            EntryID INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                            OrderNo VARCHAR(100) NOT NULL,
+                            ItemID VARCHAR(50) NOT NULL,
+                            ExceptionType VARCHAR(50) NOT NULL,
+                            AffectedQty INT NOT NULL DEFAULT 0,
+                            SourceRef VARCHAR(100) NULL,
+                            Reason NVARCHAR(500) NOT NULL,
+                            CreatedBy NVARCHAR(100) NOT NULL,
+                            CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE()
+                        );
+                        CREATE INDEX IX_PPC_Exceptions_Order_Item ON dbo.PPC_Order_Planning_Exceptions(OrderNo, ItemID, CreatedAt DESC);
+                    END";
+                await db.ExecuteAsync(ddl);
+                _schemaEnsured = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "EnsureExceptionSchemaAsync warning in PpcOrderPlanningDataAccess");
+            }
+        }
+
         public async Task<List<PpcOrderSummaryListItem>> GetAuthorizedOrdersForPlanningAsync()
         {
             try
             {
                 using var db = CreateConnection();
+                await EnsureExceptionSchemaAsync(db);
                 const string sql = @"
                     SELECT 
                         o.OrderNo,
@@ -89,6 +138,7 @@ namespace DataAccessLibrary.DAC.Production
             try
             {
                 using var db = CreateConnection();
+                await EnsureExceptionSchemaAsync(db);
 
                 const string headerSql = @"
                     SELECT 
@@ -151,11 +201,22 @@ namespace DataAccessLibrary.DAC.Production
 
                 // 1. Fetch saved item planning if previously saved
                 const string savedPlanningSql = @"
-                    SELECT ItemID, OrderQty, StockQty, ISNULL(SFStockQty, 0) AS SFStockQty, TotalPurchaseQty, ProductionQty
+                    SELECT ItemID, OrderQty, StockQty, ISNULL(SFStockQty, 0) AS SFStockQty,
+                           ISNULL(RejectedStockQty, 0) AS RejectedStockQty, ISNULL(RejectedSFQty, 0) AS RejectedSFQty,
+                           TotalPurchaseQty, ProductionQty
                     FROM PPC_Order_Item_Planning
                     WHERE OrderNo = @OrderNo";
                 var savedPlanning = (await db.QueryAsync(savedPlanningSql, new { OrderNo = orderNo })).ToList();
                 var savedPlanMap = savedPlanning.ToDictionary(x => (string)x.ItemID, x => x);
+
+                // 1a. Fetch live finish stock already adjusted/withdrawn from store for this order
+                const string adjustedStockSql = @"
+                    SELECT ItemID, ISNULL(SUM(Qty), 0) AS AlreadyAdjustedQty
+                    FROM StockOrderAdjustments
+                    WHERE OrderNo = @OrderNo
+                    GROUP BY ItemID";
+                var adjustedStockRows = (await db.QueryAsync(adjustedStockSql, new { OrderNo = orderNo })).ToList();
+                var adjustedStockMap = adjustedStockRows.ToDictionary(x => (string)x.ItemID, x => (int)x.AlreadyAdjustedQty);
 
                 // 1b. Fetch available semi-finished stock lots for items
                 const string sfLotsSql = @"
@@ -174,25 +235,31 @@ namespace DataAccessLibrary.DAC.Production
                     ORDER BY SOO.EntryID DESC";
                 var availableSfLots = (await db.QueryAsync<PpcItemSFLotDto>(sfLotsSql, new { ItemIds = itemIds })).ToList();
 
-                // 1c. Fetch saved semi-finished stock allocations for this order
+                // 1c. Fetch saved semi-finished stock allocations for this order with live issued qty
                 const string savedSfAllocSql = @"
                     SELECT 
-                        EntryID,
-                        OrderNo,
-                        ItemID,
-                        SOO_RefID,
-                        ProcessID,
-                        ISNULL(ProcessName, '') AS ProcessName,
-                        ISNULL(LotNo, '') AS LotNo,
-                        ISNULL(BatchNo, '') AS BatchNo,
-                        ISNULL(Shelf_RefID, 0) AS Shelf_RefID,
-                        ISNULL(StoreLocation, '') AS StoreLocation,
-                        AllocatedQty
-                    FROM PPC_Order_Item_SF_Allocations
-                    WHERE OrderNo = @OrderNo";
+                        A.EntryID,
+                        A.OrderNo,
+                        A.ItemID,
+                        A.SOO_RefID,
+                        A.ProcessID,
+                        ISNULL(A.ProcessName, '') AS ProcessName,
+                        ISNULL(A.LotNo, '') AS LotNo,
+                        ISNULL(A.BatchNo, '') AS BatchNo,
+                        ISNULL(A.Shelf_RefID, 0) AS Shelf_RefID,
+                        ISNULL(A.StoreLocation, '') AS StoreLocation,
+                        A.AllocatedQty,
+                        ISNULL((
+                            SELECT SUM(SOOI.QtyIssd)
+                            FROM StockOrderOpening_Issuance SOOI
+                            INNER JOIN VendIssdDetail VID ON SOOI.VID_RefID = VID.EntryID
+                            WHERE VID.OrderNo = A.OrderNo AND SOOI.SOO_RefID = A.SOO_RefID
+                        ), 0) AS AlreadyIssuedQty
+                    FROM PPC_Order_Item_SF_Allocations A
+                    WHERE A.OrderNo = @OrderNo";
                 var savedSfAllocations = (await db.QueryAsync<dynamic>(savedSfAllocSql, new { OrderNo = orderNo })).ToList();
 
-                // 2. Fetch saved purchases
+                // 2. Fetch saved purchases with live PO execution status
                 const string savedPurchasesSql = @"
                     SELECT 
                         pip.EntryID,
@@ -204,15 +271,49 @@ namespace DataAccessLibrary.DAC.Production
                         pip.PurchaseQty,
                         pip.PurchaseRate,
                         ISNULL(pip.ExcessQtyPercentage, 50) AS ExcessQtyPercentage,
-                        pip.VendIssued_RefID,
-                        pip.MasterPONo,
+                        COALESCE(pip.VendIssued_RefID, po_exec.VendIssued_RefID) AS VendIssued_RefID,
+                        COALESCE(pip.MasterPONo, po_exec.MasterPONo) AS MasterPONo,
                         pip.IssuedAt,
-                        pip.IssuedBy
+                        pip.IssuedBy,
+                        ISNULL(pip.Status, 'Active') AS Status,
+                        pip.OriginalPlannedQty,
+                        ISNULL(pip.ShortClosedQty, 0) AS ShortClosedQty,
+                        pip.ExceptionNotes,
+                        po_exec.DetailEntryID AS VendIssdDetail_EntryID,
+                        ISNULL(po_exec.IssQty, 0) AS IssuedQty,
+                        ISNULL(po_exec.RcvdQty, 0) AS ReceivedQty
                     FROM PPC_Order_Item_Purchases pip
                     INNER JOIN Processes p ON pip.ProcessID = p.ProcessID
                     LEFT JOIN Makers m ON pip.VendID = m.VendID
-                    WHERE pip.OrderNo = @OrderNo";
+                    OUTER APPLY (
+                        SELECT TOP 1 
+                            vid.RefID AS VendIssued_RefID,
+                            vi.MasterPONo,
+                            vid.EntryID AS DetailEntryID,
+                            CAST(ISNULL(vid.IssQty, 0) AS INT) AS IssQty,
+                            CAST(ISNULL((SELECT SUM(vrd.RcvdQty) FROM VendRcvdDetail vrd WHERE vrd.Issue_RefID = vid.EntryID), ISNULL(vid.RcvdQty, 0)) AS INT) AS RcvdQty
+                        FROM VendIssdDetail vid
+                        INNER JOIN VendIssued vi ON vid.RefID = vi.EntryID
+                        WHERE vid.OrderNo = pip.OrderNo
+                          AND vid.ItemCode = pip.ItemID
+                          AND vid.RcvProcessID = pip.ProcessID
+                          AND (
+                              (pip.VendIssued_RefID IS NOT NULL AND pip.VendIssued_RefID > 0 AND vid.RefID = pip.VendIssued_RefID)
+                              OR (pip.VendIssued_RefID IS NULL AND vi.MasterPONo IS NOT NULL AND vi.MasterPONo <> '' AND vid.LotNo = '0')
+                          )
+                        ORDER BY vid.EntryID DESC
+                    ) po_exec
+                    WHERE pip.OrderNo = @OrderNo
+                      AND ISNULL(pip.Status, 'Active') <> 'Cancelled'";
                 var savedPurchases = (await db.QueryAsync(savedPurchasesSql, new { OrderNo = orderNo })).ToList();
+
+                // 2b. Fetch exception audit logs for this order
+                const string exceptionsSql = @"
+                    SELECT EntryID, OrderNo, ItemID, ExceptionType, AffectedQty, SourceRef, Reason, CreatedBy, CreatedAt
+                    FROM PPC_Order_Planning_Exceptions
+                    WHERE OrderNo = @OrderNo
+                    ORDER BY CreatedAt DESC";
+                header.ExceptionLogs = (await db.QueryAsync<PpcPlanningExceptionLogDto>(exceptionsSql, new { OrderNo = orderNo })).ToList();
 
                 // 3. Fetch saved hub schedules
                 const string savedSchedulesSql = @"
@@ -276,14 +377,20 @@ namespace DataAccessLibrary.DAC.Production
                         .Where(l => l.ItemID == item.CompItemID)
                         .ToList();
 
+                    // Live already-adjusted finish stock and exception logs
+                    item.AlreadyAdjustedStockQty = adjustedStockMap.TryGetValue(item.CompItemID, out int adjQty) ? adjQty : 0;
+                    item.ItemExceptions = header.ExceptionLogs.Where(e => e.ItemID == item.CompItemID).ToList();
+
                     // Restore saved planning values if available (only for authorized items)
                     if (item.Authorized && savedPlanMap.TryGetValue(item.CompItemID, out var plan))
                     {
                         var planOrderQty = (int)plan.OrderQty;
                         item.PreviouslyPlannedOrderQty = planOrderQty;
                         item.StockQty = (int)plan.StockQty;
-                        // Effective available stock accounts for finish stock already allocated to this order
-                        item.AvailableInHandStock = Math.Max(item.AvailableInHandStock, item.StockQty);
+                        item.RejectedStockQty = (int)plan.RejectedStockQty;
+                        item.RejectedSFQty = (int)plan.RejectedSFQty;
+                        // Effective available stock accounts for finish stock already allocated/adjusted to this order
+                        item.AvailableInHandStock = Math.Max(item.AvailableInHandStock + item.AlreadyAdjustedStockQty, item.StockQty);
 
                         if (item.OrderQty > planOrderQty)
                         {
@@ -300,6 +407,8 @@ namespace DataAccessLibrary.DAC.Production
                     {
                         item.PreviouslyPlannedOrderQty = 0;
                         item.StockQty = 0;
+                        item.RejectedStockQty = 0;
+                        item.RejectedSFQty = 0;
                         item.IsSavedPlan = false;
                         item.IsPlanned = false;
                     }
@@ -312,9 +421,10 @@ namespace DataAccessLibrary.DAC.Production
                         {
                             int sooRefId = (int)sa.SOO_RefID;
                             int allocQty = (int)sa.AllocatedQty;
+                            int alreadyIssuedQty = (int)sa.AlreadyIssuedQty;
                             var matchingLot = item.AvailableSFLots.FirstOrDefault(l => l.EntryID == sooRefId);
                             int effectiveAvailable = matchingLot != null 
-                                ? (matchingLot.AvailableQty + allocQty) 
+                                ? Math.Max(matchingLot.AvailableQty + allocQty, allocQty)
                                 : allocQty;
 
                             if (matchingLot != null)
@@ -333,7 +443,8 @@ namespace DataAccessLibrary.DAC.Production
                                 Shelf_RefID = (int)sa.Shelf_RefID,
                                 StoreLocation = (string)sa.StoreLocation,
                                 AvailableQty = effectiveAvailable,
-                                AllocatedQty = allocQty
+                                AllocatedQty = allocQty,
+                                AlreadyIssuedQty = alreadyIssuedQty
                             });
                         }
                     }
@@ -357,7 +468,14 @@ namespace DataAccessLibrary.DAC.Production
                             VendIssued_RefID = (long?)p.VendIssued_RefID,
                             MasterPONo = (string?)p.MasterPONo,
                             IssuedAt = (DateTime?)p.IssuedAt,
-                            IssuedBy = (string?)p.IssuedBy
+                            IssuedBy = (string?)p.IssuedBy,
+                            Status = (string)p.Status,
+                            OriginalPlannedQty = (int?)p.OriginalPlannedQty,
+                            ShortClosedQty = (int)p.ShortClosedQty,
+                            ExceptionNotes = (string?)p.ExceptionNotes,
+                            VendIssdDetail_EntryID = (long?)p.VendIssdDetail_EntryID,
+                            IssuedQty = (int)p.IssuedQty,
+                            ReceivedQty = (int)p.ReceivedQty
                         };
 
                         // Pre-populate available makers for this process
@@ -424,6 +542,7 @@ namespace DataAccessLibrary.DAC.Production
             try
             {
                 using var db = CreateConnection();
+                await EnsureExceptionSchemaAsync(db);
                 const string sql = @"
                     SELECT DISTINCT ip.ProcessID, p.Description AS ProcessName
                     FROM ItemProcesses ip
@@ -447,6 +566,7 @@ namespace DataAccessLibrary.DAC.Production
             try
             {
                 using var db = CreateConnection();
+                await EnsureExceptionSchemaAsync(db);
                 return await GetMakersForItemAndProcessInternalAsync(db, itemId, processId);
             }
             catch (Exception ex)
@@ -475,6 +595,7 @@ namespace DataAccessLibrary.DAC.Production
 
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
+            await EnsureExceptionSchemaAsync(conn);
             using var trans = conn.BeginTransaction();
 
             try
@@ -486,6 +607,52 @@ namespace DataAccessLibrary.DAC.Production
                 var plannedItems = request.Items
                     .Where(i => i.Authorized && (i.IsPlanned || i.HasDeltaQty))
                     .ToList();
+
+                // Server-side floor validations against live downstream execution
+                const string liveAdjSql = @"
+                    SELECT ItemID, ISNULL(SUM(Qty), 0) AS AlreadyAdjustedQty
+                    FROM StockOrderAdjustments
+                    WHERE OrderNo = @OrderNo
+                    GROUP BY ItemID";
+                var liveAdjMap = (await conn.QueryAsync(liveAdjSql, new { OrderNo = orderNo }, trans))
+                    .ToDictionary(x => (string)x.ItemID, x => (int)x.AlreadyAdjustedQty);
+
+                const string liveSfSql = @"
+                    SELECT VID.ItemCode AS ItemID, SOOI.SOO_RefID, ISNULL(SUM(SOOI.QtyIssd), 0) AS IssuedQty
+                    FROM StockOrderOpening_Issuance SOOI
+                    INNER JOIN VendIssdDetail VID ON SOOI.VID_RefID = VID.EntryID
+                    WHERE VID.OrderNo = @OrderNo
+                    GROUP BY VID.ItemCode, SOOI.SOO_RefID";
+                var liveSfRows = (await conn.QueryAsync(liveSfSql, new { OrderNo = orderNo }, trans)).ToList();
+
+                foreach (var item in plannedItems)
+                {
+                    int liveAdjusted = liveAdjMap.TryGetValue(item.CompItemID, out int a) ? a : 0;
+                    int minStockFloor = Math.Max(liveAdjusted, item.RejectedStockQty);
+                    if (item.StockQty < minStockFloor)
+                    {
+                        throw new InvalidOperationException($"Finish Stock for {item.CompItemID} cannot be less than already-adjusted/rejected quantity ({minStockFloor} pcs). Use Handle Exception to record rejections.");
+                    }
+
+                    foreach (var sf in item.SFStockAllocations)
+                    {
+                        var liveSfIssued = liveSfRows
+                            .Where(r => (string)r.ItemID == item.CompItemID && (int)r.SOO_RefID == sf.SOO_RefID)
+                            .Sum(r => (int)r.IssuedQty);
+                        if (sf.AllocatedQty < liveSfIssued)
+                        {
+                            throw new InvalidOperationException($"SF Lot {sf.LotNo} for {item.CompItemID} cannot be reduced below already-issued quantity ({liveSfIssued} pcs).");
+                        }
+                    }
+
+                    foreach (var p in item.Purchases.Where(x => !string.Equals(x.Status, "Cancelled", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        if (p.IsIssued && p.PurchaseQty < p.ReceivedQty)
+                        {
+                            throw new InvalidOperationException($"Maker PO #{p.MasterPONo} for {item.CompItemID} cannot be less than already received quantity ({p.ReceivedQty} pcs).");
+                        }
+                    }
+                }
 
                 int totalAuthorizedCount = request.Items.Count(i => i.Authorized);
                 string status = (plannedItems.Count >= totalAuthorizedCount && totalAuthorizedCount > 0)
@@ -522,9 +689,9 @@ namespace DataAccessLibrary.DAC.Production
                 // 3. Insert Item Planning & Upsert Purchases & Hub Schedules (only for planned items)
                 const string itemPlanSql = @"
                     INSERT INTO PPC_Order_Item_Planning 
-                        (OrderNo, ItemID, OrderQty, StockQty, SFStockQty, TotalPurchaseQty, ProductionQty, Remarks, CreatedAt, CreatedBy)
+                        (OrderNo, ItemID, OrderQty, StockQty, SFStockQty, RejectedStockQty, RejectedSFQty, TotalPurchaseQty, ProductionQty, Remarks, CreatedAt, CreatedBy)
                     VALUES 
-                        (@OrderNo, @ItemID, @OrderQty, @StockQty, @SFStockQty, @TotalPurchaseQty, @ProductionQty, @Remarks, GETUTCDATE(), @CreatedBy)";
+                        (@OrderNo, @ItemID, @OrderQty, @StockQty, @SFStockQty, @RejectedStockQty, @RejectedSFQty, @TotalPurchaseQty, @ProductionQty, @Remarks, GETUTCDATE(), @CreatedBy)";
 
                 const string insertSfAllocSql = @"
                     INSERT INTO PPC_Order_Item_SF_Allocations
@@ -564,6 +731,8 @@ namespace DataAccessLibrary.DAC.Production
                         OrderQty = item.OrderQty,
                         StockQty = item.StockQty,
                         SFStockQty = item.SFStockQty,
+                        RejectedStockQty = item.RejectedStockQty,
+                        RejectedSFQty = item.RejectedSFQty,
                         TotalPurchaseQty = item.TotalPurchaseQty,
                         ProductionQty = item.ProductionQty,
                         Remarks = "",
@@ -646,19 +815,20 @@ namespace DataAccessLibrary.DAC.Production
                     }
                 }
 
-                // Delete only UNISSUED purchase allocations that were removed from the plan
+                // Delete only UNISSUED active purchase allocations that were removed from the plan
                 if (retainedEntryIds.Any())
                 {
                     const string deleteUnretainedSql = @"
                         DELETE FROM PPC_Order_Item_Purchases 
                         WHERE OrderNo = @OrderNo 
+                          AND ISNULL(Status, 'Active') = 'Active'
                           AND (VendIssued_RefID IS NULL OR VendIssued_RefID = 0)
                           AND EntryID NOT IN @RetainedEntryIds";
                     await conn.ExecuteAsync(deleteUnretainedSql, new { OrderNo = orderNo, RetainedEntryIds = retainedEntryIds }, trans);
                 }
                 else
                 {
-                    await conn.ExecuteAsync("DELETE FROM PPC_Order_Item_Purchases WHERE OrderNo = @OrderNo AND (VendIssued_RefID IS NULL OR VendIssued_RefID = 0)", new { OrderNo = orderNo }, trans);
+                    await conn.ExecuteAsync("DELETE FROM PPC_Order_Item_Purchases WHERE OrderNo = @OrderNo AND ISNULL(Status, 'Active') = 'Active' AND (VendIssued_RefID IS NULL OR VendIssued_RefID = 0)", new { OrderNo = orderNo }, trans);
                 }
 
                 trans.Commit();
@@ -670,6 +840,346 @@ namespace DataAccessLibrary.DAC.Production
                 trans.Rollback();
                 _logger.LogError(ex, "Failed to save PPC Plan for Order #{OrderNo}", request.OrderNo);
                 throw;
+            }
+        }
+
+        public async Task<PpcExceptionActionResult> ExecutePlanningExceptionAsync(PpcExceptionActionRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.OrderNo) || string.IsNullOrWhiteSpace(request.ItemID))
+                return new PpcExceptionActionResult { Success = false, Message = "Order and Item are required." };
+
+            if (string.IsNullOrWhiteSpace(request.Reason))
+                return new PpcExceptionActionResult { Success = false, Message = "A mandatory reason is required for audit tracking." };
+
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+            await EnsureExceptionSchemaAsync(conn);
+            using var trans = conn.BeginTransaction();
+
+            try
+            {
+                string orderNo = request.OrderNo.Trim();
+                string itemId = request.ItemID.Trim();
+                string actionBy = string.IsNullOrWhiteSpace(request.ActionBy) ? "PPC Planner" : request.ActionBy.Trim();
+                string reason = request.Reason.Trim();
+                string? sourceRef = null;
+                int affectedQty = request.AffectedQty;
+                string resultMessage = "Exception recorded and item opened for re-planning.";
+
+                switch (request.ExceptionType)
+                {
+                    case "FinishStockRelease":
+                    {
+                        var plan = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                            "SELECT StockQty FROM PPC_Order_Item_Planning WHERE OrderNo = @OrderNo AND ItemID = @ItemID",
+                            new { OrderNo = orderNo, ItemID = itemId }, trans);
+                        if (plan == null) throw new InvalidOperationException("Item planning record not found.");
+
+                        int stockQty = (int)plan.StockQty;
+                        int alreadyAdjusted = await conn.ExecuteScalarAsync<int>(
+                            "SELECT ISNULL(SUM(Qty), 0) FROM StockOrderAdjustments WHERE OrderNo = @OrderNo AND ItemID = @ItemID",
+                            new { OrderNo = orderNo, ItemID = itemId }, trans);
+
+                        int unissued = Math.Max(0, stockQty - alreadyAdjusted);
+                        if (affectedQty <= 0 || affectedQty > unissued)
+                            throw new InvalidOperationException($"Release quantity ({affectedQty}) must be between 1 and {unissued} unissued pcs.");
+
+                        await conn.ExecuteAsync(
+                            @"UPDATE PPC_Order_Item_Planning 
+                              SET StockQty = StockQty - @Qty, ProductionQty = ProductionQty + @Qty 
+                              WHERE OrderNo = @OrderNo AND ItemID = @ItemID",
+                            new { Qty = affectedQty, OrderNo = orderNo, ItemID = itemId }, trans);
+
+                        sourceRef = "Finish Stock";
+                        resultMessage = $"Released {affectedQty} pcs of unissued Finish Stock for re-planning.";
+                        break;
+                    }
+
+                    case "FinishStockRejection":
+                    {
+                        var plan = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                            "SELECT StockQty, ISNULL(RejectedStockQty, 0) AS RejectedStockQty FROM PPC_Order_Item_Planning WHERE OrderNo = @OrderNo AND ItemID = @ItemID",
+                            new { OrderNo = orderNo, ItemID = itemId }, trans);
+                        if (plan == null) throw new InvalidOperationException("Item planning record not found.");
+
+                        int rejectedSoFar = (int)plan.RejectedStockQty;
+                        int alreadyAdjusted = await conn.ExecuteScalarAsync<int>(
+                            "SELECT ISNULL(SUM(Qty), 0) FROM StockOrderAdjustments WHERE OrderNo = @OrderNo AND ItemID = @ItemID",
+                            new { OrderNo = orderNo, ItemID = itemId }, trans);
+
+                        int maxRejectable = Math.Max(0, alreadyAdjusted - rejectedSoFar);
+                        if (affectedQty <= 0 || affectedQty > maxRejectable)
+                            throw new InvalidOperationException($"Rejection quantity ({affectedQty}) must be between 1 and {maxRejectable} pcs already withdrawn from store.");
+
+                        await conn.ExecuteAsync(
+                            @"UPDATE PPC_Order_Item_Planning 
+                              SET RejectedStockQty = ISNULL(RejectedStockQty, 0) + @Qty, ProductionQty = ProductionQty + @Qty 
+                              WHERE OrderNo = @OrderNo AND ItemID = @ItemID",
+                            new { Qty = affectedQty, OrderNo = orderNo, ItemID = itemId }, trans);
+
+                        sourceRef = "Finish Stock QC Rejection";
+                        resultMessage = $"Recorded {affectedQty} pcs Finish Stock QC rejection. Replacement quantity opened for re-planning.";
+                        break;
+                    }
+
+                    case "SFStockRelease":
+                    {
+                        if (!request.SfAllocationSooRefID.HasValue || request.SfAllocationSooRefID.Value <= 0)
+                            throw new InvalidOperationException("Please select the SF Lot allocation.");
+
+                        int sooRefId = request.SfAllocationSooRefID.Value;
+                        var sfAlloc = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                            "SELECT EntryID, LotNo, AllocatedQty FROM PPC_Order_Item_SF_Allocations WHERE OrderNo = @OrderNo AND ItemID = @ItemID AND SOO_RefID = @SooRefID",
+                            new { OrderNo = orderNo, ItemID = itemId, SooRefID = sooRefId }, trans);
+                        if (sfAlloc == null) throw new InvalidOperationException("SF lot allocation record not found.");
+
+                        int allocated = (int)sfAlloc.AllocatedQty;
+                        int alreadyIssued = await conn.ExecuteScalarAsync<int>(
+                            @"SELECT ISNULL(SUM(SOOI.QtyIssd), 0)
+                              FROM StockOrderOpening_Issuance SOOI
+                              INNER JOIN VendIssdDetail VID ON SOOI.VID_RefID = VID.EntryID
+                              WHERE VID.OrderNo = @OrderNo AND SOOI.SOO_RefID = @SooRefID",
+                            new { OrderNo = orderNo, SooRefID = sooRefId }, trans);
+
+                        int unissued = Math.Max(0, allocated - alreadyIssued);
+                        if (affectedQty <= 0 || affectedQty > unissued)
+                            throw new InvalidOperationException($"SF release quantity ({affectedQty}) must be between 1 and {unissued} unissued pcs.");
+
+                        int remainingAlloc = allocated - affectedQty;
+                        if (remainingAlloc <= 0)
+                        {
+                            await conn.ExecuteAsync("DELETE FROM PPC_Order_Item_SF_Allocations WHERE EntryID = @EntryID", new { EntryID = (int)sfAlloc.EntryID }, trans);
+                        }
+                        else
+                        {
+                            await conn.ExecuteAsync("UPDATE PPC_Order_Item_SF_Allocations SET AllocatedQty = @Remaining WHERE EntryID = @EntryID",
+                                new { Remaining = remainingAlloc, EntryID = (int)sfAlloc.EntryID }, trans);
+                        }
+
+                        await conn.ExecuteAsync(
+                            @"UPDATE PPC_Order_Item_Planning 
+                              SET SFStockQty = CASE WHEN ISNULL(SFStockQty, 0) >= @Qty THEN ISNULL(SFStockQty, 0) - @Qty ELSE 0 END,
+                                  ProductionQty = ProductionQty + @Qty
+                              WHERE OrderNo = @OrderNo AND ItemID = @ItemID",
+                            new { Qty = affectedQty, OrderNo = orderNo, ItemID = itemId }, trans);
+
+                        sourceRef = $"SF Lot {sfAlloc.LotNo}";
+                        resultMessage = $"Released {affectedQty} pcs from SF Lot {sfAlloc.LotNo} for re-planning.";
+                        break;
+                    }
+
+                    case "SFStockRejection":
+                    {
+                        var plan = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                            "SELECT ISNULL(SFStockQty, 0) AS SFStockQty, ISNULL(RejectedSFQty, 0) AS RejectedSFQty FROM PPC_Order_Item_Planning WHERE OrderNo = @OrderNo AND ItemID = @ItemID",
+                            new { OrderNo = orderNo, ItemID = itemId }, trans);
+                        if (plan == null) throw new InvalidOperationException("Item planning record not found.");
+
+                        int totalSfIssued = await conn.ExecuteScalarAsync<int>(
+                            @"SELECT ISNULL(SUM(SOOI.QtyIssd), 0)
+                              FROM StockOrderOpening_Issuance SOOI
+                              INNER JOIN VendIssdDetail VID ON SOOI.VID_RefID = VID.EntryID
+                              WHERE VID.OrderNo = @OrderNo AND VID.ItemCode = @ItemID",
+                            new { OrderNo = orderNo, ItemID = itemId }, trans);
+
+                        int rejectedSf = (int)plan.RejectedSFQty;
+                        int sfCeiling = Math.Max(totalSfIssued, (int)plan.SFStockQty) - rejectedSf;
+                        if (affectedQty <= 0 || affectedQty > sfCeiling)
+                            throw new InvalidOperationException($"SF rejection quantity ({affectedQty}) must be between 1 and {sfCeiling} pcs.");
+
+                        await conn.ExecuteAsync(
+                            @"UPDATE PPC_Order_Item_Planning 
+                              SET RejectedSFQty = ISNULL(RejectedSFQty, 0) + @Qty, ProductionQty = ProductionQty + @Qty 
+                              WHERE OrderNo = @OrderNo AND ItemID = @ItemID",
+                            new { Qty = affectedQty, OrderNo = orderNo, ItemID = itemId }, trans);
+
+                        sourceRef = "SF Stock QC Rejection";
+                        resultMessage = $"Recorded {affectedQty} pcs SF Stock rejection. Replacement quantity opened for re-planning.";
+                        break;
+                    }
+
+                    case "CancelMakerPO":
+                    {
+                        if (!request.PurchaseSplitEntryID.HasValue || request.PurchaseSplitEntryID.Value <= 0)
+                            throw new InvalidOperationException("Please select the Maker PO allocation to cancel.");
+
+                        var purch = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                            @"SELECT EntryID, ProcessID, PurchaseQty, VendIssued_RefID, MasterPONo, ISNULL(Status, 'Active') AS Status
+                              FROM PPC_Order_Item_Purchases
+                              WHERE EntryID = @EntryID AND OrderNo = @OrderNo AND ItemID = @ItemID",
+                            new { EntryID = request.PurchaseSplitEntryID.Value, OrderNo = orderNo, ItemID = itemId }, trans);
+                        if (purch == null) throw new InvalidOperationException("Purchase split not found.");
+                        if (string.Equals((string)purch.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+                            throw new InvalidOperationException("This purchase split is already cancelled.");
+
+                        int purchaseQty = (int)purch.PurchaseQty;
+                        long? vendIssuedRefId = (long?)purch.VendIssued_RefID;
+                        string masterPoNo = (string?)purch.MasterPONo ?? string.Empty;
+
+                        if (vendIssuedRefId.HasValue && vendIssuedRefId.Value > 0)
+                        {
+                            var detailRow = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                                @"SELECT TOP 1 EntryID, CAST(ISNULL(IssQty, 0) AS INT) AS IssQty
+                                  FROM VendIssdDetail
+                                  WHERE RefID = @RefID AND OrderNo = @OrderNo AND ItemCode = @ItemID AND RcvProcessID = @ProcessID
+                                  ORDER BY EntryID DESC",
+                                new { RefID = vendIssuedRefId.Value, OrderNo = orderNo, ItemID = itemId, ProcessID = (int)purch.ProcessID }, trans);
+
+                            if (detailRow != null)
+                            {
+                                long detailEntryId = (long)detailRow.EntryID;
+                                int rcvdQty = await conn.ExecuteScalarAsync<int>(
+                                    "SELECT CAST(ISNULL(SUM(RcvdQty), 0) AS INT) FROM VendRcvdDetail WHERE Issue_RefID = @DetailEntryID",
+                                    new { DetailEntryID = detailEntryId }, trans);
+
+                                if (rcvdQty > 0)
+                                    throw new InvalidOperationException($"PO #{masterPoNo} already has {rcvdQty} pcs received. Use 'Short-Close PO' instead of Cancel.");
+
+                                await conn.ExecuteAsync("DELETE FROM VendIssdDetail_ReturnDTs WHERE VIS_RefID = @DetailEntryID", new { DetailEntryID = detailEntryId }, trans);
+                                await conn.ExecuteAsync("DELETE FROM VendIssdDetail_MoreDetails WHERE VID_RefID = @DetailEntryID", new { DetailEntryID = detailEntryId }, trans);
+                                await conn.ExecuteAsync("DELETE FROM VendIssAuthDetail WHERE IssID = @DetailEntryID", new { DetailEntryID = detailEntryId }, trans);
+                                await conn.ExecuteAsync("DELETE FROM VendIssdDetail WHERE EntryID = @DetailEntryID", new { DetailEntryID = detailEntryId }, trans);
+
+                                int remainingLines = await conn.ExecuteScalarAsync<int>(
+                                    "SELECT COUNT(1) FROM VendIssdDetail WHERE RefID = @RefID",
+                                    new { RefID = vendIssuedRefId.Value }, trans);
+                                if (remainingLines == 0)
+                                {
+                                    await conn.ExecuteAsync("DELETE FROM VendIssued WHERE EntryID = @RefID", new { RefID = vendIssuedRefId.Value }, trans);
+                                }
+                            }
+                        }
+
+                        await conn.ExecuteAsync(
+                            @"UPDATE PPC_Order_Item_Purchases
+                              SET Status = 'Cancelled',
+                                  OriginalPlannedQty = ISNULL(OriginalPlannedQty, PurchaseQty),
+                                  ExceptionNotes = @Reason,
+                                  UpdatedAt = GETUTCDATE(),
+                                  UpdatedBy = @ActionBy
+                              WHERE EntryID = @EntryID",
+                            new { Reason = reason, ActionBy = actionBy, EntryID = (int)purch.EntryID }, trans);
+
+                        await conn.ExecuteAsync(
+                            @"UPDATE PPC_Order_Item_Planning
+                              SET TotalPurchaseQty = CASE WHEN ISNULL(TotalPurchaseQty, 0) >= @Qty THEN TotalPurchaseQty - @Qty ELSE 0 END,
+                                  ProductionQty = ProductionQty + @Qty
+                              WHERE OrderNo = @OrderNo AND ItemID = @ItemID",
+                            new { Qty = purchaseQty, OrderNo = orderNo, ItemID = itemId }, trans);
+
+                        affectedQty = purchaseQty;
+                        sourceRef = string.IsNullOrWhiteSpace(masterPoNo) ? $"Split #{purch.EntryID}" : $"PO #{masterPoNo}";
+                        resultMessage = $"Cancelled {sourceRef} ({purchaseQty} pcs). Full quantity freed for re-planning.";
+                        break;
+                    }
+
+                    case "ShortCloseMakerPO":
+                    {
+                        if (!request.PurchaseSplitEntryID.HasValue || request.PurchaseSplitEntryID.Value <= 0)
+                            throw new InvalidOperationException("Please select the Maker PO allocation to short-close.");
+
+                        var purch = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                            @"SELECT EntryID, ProcessID, PurchaseQty, VendIssued_RefID, MasterPONo, ISNULL(Status, 'Active') AS Status
+                              FROM PPC_Order_Item_Purchases
+                              WHERE EntryID = @EntryID AND OrderNo = @OrderNo AND ItemID = @ItemID",
+                            new { EntryID = request.PurchaseSplitEntryID.Value, OrderNo = orderNo, ItemID = itemId }, trans);
+                        if (purch == null) throw new InvalidOperationException("Purchase split not found.");
+                        if (string.Equals((string)purch.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+                            throw new InvalidOperationException("Cannot short-close a cancelled PO split.");
+
+                        int purchaseQty = (int)purch.PurchaseQty;
+                        long? vendIssuedRefId = (long?)purch.VendIssued_RefID;
+                        string masterPoNo = (string?)purch.MasterPONo ?? string.Empty;
+
+                        if (!vendIssuedRefId.HasValue || vendIssuedRefId.Value <= 0)
+                            throw new InvalidOperationException("This split has not been issued as a PO yet. Unlock and edit/delete it instead.");
+
+                        var detailRow = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                            @"SELECT TOP 1 EntryID
+                              FROM VendIssdDetail
+                              WHERE RefID = @RefID AND OrderNo = @OrderNo AND ItemCode = @ItemID AND RcvProcessID = @ProcessID
+                              ORDER BY EntryID DESC",
+                            new { RefID = vendIssuedRefId.Value, OrderNo = orderNo, ItemID = itemId, ProcessID = (int)purch.ProcessID }, trans);
+                        if (detailRow == null) throw new InvalidOperationException("Linked VendIssdDetail PO line not found.");
+
+                        long detailEntryId = (long)detailRow.EntryID;
+                        int rcvdQty = await conn.ExecuteScalarAsync<int>(
+                            "SELECT CAST(ISNULL(SUM(RcvdQty), 0) AS INT) FROM VendRcvdDetail WHERE Issue_RefID = @DetailEntryID",
+                            new { DetailEntryID = detailEntryId }, trans);
+
+                        if (rcvdQty <= 0)
+                            throw new InvalidOperationException($"PO #{masterPoNo} has 0 received pcs. Use 'Cancel Maker PO' instead.");
+                        if (rcvdQty >= purchaseQty)
+                            throw new InvalidOperationException($"PO #{masterPoNo} is already fully received ({rcvdQty}/{purchaseQty} pcs).");
+
+                        int shortfallQty = purchaseQty - rcvdQty;
+
+                        await conn.ExecuteAsync(
+                            "UPDATE VendIssdDetail SET IssQty = @RcvdQty WHERE EntryID = @DetailEntryID",
+                            new { RcvdQty = rcvdQty, DetailEntryID = detailEntryId }, trans);
+                        await conn.ExecuteAsync(
+                            "UPDATE VendIssdDetail_ReturnDTs SET IssQty = @RcvdQty WHERE VIS_RefID = @DetailEntryID",
+                            new { RcvdQty = rcvdQty, DetailEntryID = detailEntryId }, trans);
+
+                        await conn.ExecuteAsync(
+                            @"UPDATE PPC_Order_Item_Purchases
+                              SET OriginalPlannedQty = ISNULL(OriginalPlannedQty, PurchaseQty),
+                                  PurchaseQty = @RcvdQty,
+                                  ShortClosedQty = ISNULL(ShortClosedQty, 0) + @ShortfallQty,
+                                  Status = 'ShortClosed',
+                                  ExceptionNotes = @Reason,
+                                  UpdatedAt = GETUTCDATE(),
+                                  UpdatedBy = @ActionBy
+                              WHERE EntryID = @EntryID",
+                            new { RcvdQty = rcvdQty, ShortfallQty = shortfallQty, Reason = reason, ActionBy = actionBy, EntryID = (int)purch.EntryID }, trans);
+
+                        await conn.ExecuteAsync(
+                            @"UPDATE PPC_Order_Item_Planning
+                              SET TotalPurchaseQty = CASE WHEN ISNULL(TotalPurchaseQty, 0) >= @ShortfallQty THEN TotalPurchaseQty - @ShortfallQty ELSE 0 END,
+                                  ProductionQty = ProductionQty + @ShortfallQty
+                              WHERE OrderNo = @OrderNo AND ItemID = @ItemID",
+                            new { ShortfallQty = shortfallQty, OrderNo = orderNo, ItemID = itemId }, trans);
+
+                        affectedQty = shortfallQty;
+                        sourceRef = string.IsNullOrWhiteSpace(masterPoNo) ? $"Split #{purch.EntryID}" : $"PO #{masterPoNo}";
+                        resultMessage = $"Short-closed {sourceRef} at received qty ({rcvdQty} pcs). Remaining {shortfallQty} pcs freed for re-planning.";
+                        break;
+                    }
+
+                    case "UnlockPlan":
+                    {
+                        sourceRef = "Manual Plan Revision";
+                        resultMessage = "Item unlocked for allocation revision.";
+                        break;
+                    }
+
+                    default:
+                        throw new InvalidOperationException($"Unsupported exception type: {request.ExceptionType}");
+                }
+
+                await conn.ExecuteAsync(
+                    @"INSERT INTO PPC_Order_Planning_Exceptions (OrderNo, ItemID, ExceptionType, AffectedQty, SourceRef, Reason, CreatedBy, CreatedAt)
+                      VALUES (@OrderNo, @ItemID, @ExceptionType, @AffectedQty, @SourceRef, @Reason, @CreatedBy, GETUTCDATE())",
+                    new
+                    {
+                        OrderNo = orderNo,
+                        ItemID = itemId,
+                        request.ExceptionType,
+                        AffectedQty = affectedQty,
+                        SourceRef = sourceRef,
+                        Reason = reason,
+                        CreatedBy = actionBy
+                    }, trans);
+
+                trans.Commit();
+                return new PpcExceptionActionResult { Success = true, Message = resultMessage };
+            }
+            catch (Exception ex)
+            {
+                trans.Rollback();
+                _logger.LogError(ex, "Error executing PPC planning exception {ExceptionType} for Order #{OrderNo} Item {ItemID}",
+                    request.ExceptionType, request.OrderNo, request.ItemID);
+                return new PpcExceptionActionResult { Success = false, Message = ex.Message };
             }
         }
     }

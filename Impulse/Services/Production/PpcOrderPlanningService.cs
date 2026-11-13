@@ -75,6 +75,11 @@ namespace Impulse.Services.Production
             return true;
         }
 
+        public async Task<PpcExceptionActionResult> ExecutePlanningExceptionAsync(PpcExceptionActionRequest request)
+        {
+            return await _dataAccess.ExecutePlanningExceptionAsync(request);
+        }
+
         private async Task DispatchDownstreamWorkflowTasksAsync(PpcPlanSaveRequest request)
         {
             var orderNo = request.OrderNo;

@@ -13,6 +13,7 @@ namespace DataAccessLibrary.Interface.Production
         Task<List<UnassignedItemModel>> GetUnassignedItemsAsync(long vendId, int processId, string? custCode = null);
         Task<List<AssignedMakerItemModel>> GetAssignedItemsAsync(long vendId, int processId, string? custCode = null);
         Task AssignItemAsync(long vendId, int processId, string itemId, decimal rate, string? custCode = null);
+        Task<int> AssignAllUnassignedItemsAsync(long vendId, int processId, decimal rate, string? custCode = null);
         Task UpdateAssignedItemRateAndRemarksAsync(long entryId, decimal newRate, decimal oldRate, string newRemarks, string userName);
         Task UpdateRateForAllCustomersAsync(long vendId, int processId, string itemId, decimal newRate, decimal oldRate, string newRemarks, string userName);
         Task<bool> IsItemReceivableAsync(long vendId, int processId, string itemId);

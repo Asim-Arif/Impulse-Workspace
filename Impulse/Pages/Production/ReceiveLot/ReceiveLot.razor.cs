@@ -81,6 +81,7 @@ namespace Impulse.Pages.Production.ReceiveLot
         public decimal TotalPrevRcvdQty => Lines.Sum(l => l.PrevRcvdQty);
         public decimal TotalPendingQty => Lines.Sum(l => l.PendingQty);
         public decimal TotalReceivingQty => Lines.Sum(l => l.ReceivingQty);
+        public decimal TotalReceivingWeight => Lines.Sum(l => l.ReceivingWeight ?? 0m);
         public decimal TotalReceivingValue => Lines.Sum(l => l.ReceivingQty * l.Rate);
 
         protected override async Task OnInitializedAsync()
@@ -432,6 +433,7 @@ namespace Impulse.Pages.Production.ReceiveLot
                     OrderNo = l.OrderNo,
                     Rate = l.Rate,
                     RcvdQty = l.ReceivingQty,
+                    RcvdWeight = l.ReceivingWeight,
                     CountedBy = l.SelectedCountedBy?.Name ?? (!string.IsNullOrWhiteSpace(l.CountedBy) ? l.CountedBy : (SelectedCheckedBy?.Name ?? "")),
                     Insp_EmpID = l.SelectedCountedBy?.EmpID ?? (!string.IsNullOrWhiteSpace(l.Insp_EmpID) ? l.Insp_EmpID : (SelectedCheckedBy?.EmpID ?? "")),
                     LotNo = string.IsNullOrWhiteSpace(l.LotNo) ? LotHeader.LotNo : l.LotNo,

@@ -239,10 +239,14 @@ namespace Impulse.Pages.QMS.CustomerComplaints
         {
             selectedInvoiceItem = item;
             availableLots.Clear();
+            newDetailLotRef = string.Empty;
 
             if (selectedInvoiceItem != null && !string.IsNullOrWhiteSpace(newDetailInvoice) && newDetailInvoice != "<All Items>")
             {
-                availableLots = await ComplaintData.GetLotsAsync(newDetailInvoice, selectedInvoiceItem.ItemID);
+                var companyItemId = !string.IsNullOrWhiteSpace(selectedInvoiceItem.CompItemID)
+                    ? selectedInvoiceItem.CompItemID
+                    : selectedInvoiceItem.ItemID;
+                availableLots = await ComplaintData.GetLotsAsync(newDetailInvoice, companyItemId);
             }
         }
 

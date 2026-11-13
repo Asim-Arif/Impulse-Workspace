@@ -28,7 +28,8 @@ namespace Impulse.Services.Export
 
         Task<CustomerOrderViewModel?> GetOrderAsync(string orderNo);
         Task<bool> SaveOrderAsync(CustomerOrderViewModel order, List<int> deletedItemIds);
-        Task<string> GetNextInternalRefNoAsync(int companyId);
+        Task<string> GetNextInternalRefNoAsync(int companyId, DateTime? orderDate = null);
+        Task<bool> IsAutoProformaEnabledAsync();
         Task<bool> IsOrderNoExistsAsync(string orderNo);
         Task<bool> IsOrderUsedInProformaAsync(string orderNo);
         Task<bool> DeleteCustomerOrderAsync(string orderNo);

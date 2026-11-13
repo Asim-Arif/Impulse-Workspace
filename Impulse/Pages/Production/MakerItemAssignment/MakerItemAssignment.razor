@@ -85,6 +85,13 @@
                 <div class="ms-auto d-flex align-items-center gap-2">
                     @if (SelectedMaker != null && SelectedProcess != null)
                     {
+                        <button type="button"
+                                class="btn btn-sm btn-outline-primary"
+                                @onclick="OpenBulkAssignModal"
+                                disabled="@(UnassignedItems.Count == 0 || IsAssigning || IsBulkAssigning)"
+                                title="Assign all unassigned items for this process to the selected maker with rate 1">
+                            <i class="fas fa-layer-group me-1"></i> Assign All Unassigned (@UnassignedItems.Count)
+                        </button>
                         <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="PrintReport">
                             <i class="fas fa-print me-1"></i> Print Assignment
                         </button>
@@ -496,6 +503,58 @@
                 </div>
                 <div class="modal-footer py-2" style="background:#f8f9fb; border-radius: 0 0 12px 12px;">
                     <button type="button" class="btn btn-sm btn-secondary px-4" @onclick="CloseHistoryModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- =====================================================
+     BULK ASSIGN CONFIRMATION MODAL
+   ===================================================== -->
+@if (ShowBulkAssignModal && SelectedMaker != null && SelectedProcess != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5); z-index: 1055;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+                <div class="modal-header py-2" style="background:#eef0f7; border-radius: 12px 12px 0 0;">
+                    <h6 class="modal-title fw-bold text-dark mb-0">
+                        <i class="fas fa-layer-group me-1 text-primary"></i> Bulk Assign Unassigned Items
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="CloseBulkAssignModal" disabled="@IsBulkAssigning"></button>
+                </div>
+                <div class="modal-body py-3" style="font-size: 0.9rem;">
+                    <p class="mb-2">
+                        This will assign all <strong>@UnassignedItems.Count</strong> unassigned item(s) configured for process
+                        <strong>@SelectedProcess.Description</strong> to maker <strong>@SelectedMaker.VenderName</strong>.
+                    </p>
+                    <div class="bg-light border rounded p-2 mb-2" style="font-size: 0.84rem;">
+                        <div><strong>Maker:</strong> @SelectedMaker.DisplayText</div>
+                        <div><strong>Process:</strong> @SelectedProcess.Description</div>
+                        @if (IsCustomerWiseRatesEnabled)
+                        {
+                            <div><strong>Customer:</strong> @(SelectedCustomer?.DisplayText ?? "Not Selected")</div>
+                        }
+                        <div><strong>Default Rate:</strong> <span class="text-success fw-bold">1.00</span></div>
+                    </div>
+                    <div class="text-muted small">
+                        <i class="fas fa-info-circle me-1"></i> Items already assigned to this maker on this process will not be modified.
+                    </div>
+                </div>
+                <div class="modal-footer py-2" style="background:#f8f9fb; border-radius: 0 0 12px 12px;">
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-3" @onclick="CloseBulkAssignModal" disabled="@IsBulkAssigning">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-primary px-4" @onclick="ConfirmBulkAssignAsync" disabled="@IsBulkAssigning">
+                        @if (IsBulkAssigning)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <span>Assigning...</span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-check me-1"></i>
+                            <span>Assign @UnassignedItems.Count Item(s)</span>
+                        }
+                    </button>
                 </div>
             </div>
         </div>

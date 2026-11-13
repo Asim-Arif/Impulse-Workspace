@@ -36,10 +36,14 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public bool IsPartiallyPlanned => !IsPlanned && (Items.Any(i => i.IsPlanned) || HasDeltaItems);
         public bool HasUnplannedItems => Items.Any(i => (!i.IsPlanned && !i.HasDeltaQty) || !i.Authorized || i.HasDeltaQty);
         public int PlannedItemsCount => Items.Count(i => i.IsPlanned && !i.HasDeltaQty);
+        public int ActionRequiredItemsCount => Items.Count(i => i.Authorized && i.NeedsPlanningAction);
+        public int LockedPlannedItemsCount => Items.Count(i => i.Authorized && !i.NeedsPlanningAction);
+        public int AwaitingAuthItemsCount => Items.Count(i => !i.Authorized);
         public string? PlannedBy { get; set; }
         public DateTime? PlannedAt { get; set; }
         public string? Notes { get; set; }
         public List<PpcOrderItemDto> Items { get; set; } = new();
+        public List<PpcPlanningExceptionLogDto> ExceptionLogs { get; set; } = new();
     }
 
     public class PpcOrderItemDto
@@ -62,6 +66,18 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         }
         public int AvailableInHandStock { get; set; }
 
+        // Live execution & exception tracking
+        public bool IsUnlockedForRevision { get; set; } = false;
+        public bool IsExpandedInLockedTab { get; set; } = false;
+        public int AlreadyAdjustedStockQty { get; set; } = 0;
+        public int RejectedStockQty { get; set; } = 0;
+        public int EffectiveStockQty => Math.Max(0, StockQty - RejectedStockQty);
+        public int MinAllowedStockQty => Math.Max(AlreadyAdjustedStockQty, RejectedStockQty);
+        public int RejectedSFQty { get; set; } = 0;
+        public int AlreadyIssuedSFQty => SFStockAllocations.Sum(a => a.AlreadyIssuedQty);
+        public int EffectiveSFStockQty => Math.Max(0, SFStockQty - RejectedSFQty);
+        public List<PpcPlanningExceptionLogDto> ItemExceptions { get; set; } = new();
+
         // 1. Stock Allocation (Finish Stock)
         public int StockQty { get; set; }
 
@@ -83,10 +99,12 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public List<PurchaseProcessLookupDto> AvailablePurchaseProcesses { get; set; } = new();
 
         // Derived Properties
-        public int TotalPurchaseQty => Purchases.Sum(p => p.PurchaseQty);
-        public int ProductionQty => Math.Max(0, OrderQty - StockQty - SFStockQty - TotalPurchaseQty);
-        public int TotalPlannedQty => StockQty + SFStockQty + TotalPurchaseQty + ProductionQty;
-        public bool IsBalanced => (StockQty + SFStockQty + TotalPurchaseQty + ProductionQty) == OrderQty;
+        public int TotalPurchaseQty => Purchases.Where(p => !string.Equals(p.Status, "Cancelled", StringComparison.OrdinalIgnoreCase)).Sum(p => p.PurchaseQty);
+        public int ProductionQty => Math.Max(0, OrderQty - EffectiveStockQty - EffectiveSFStockQty - TotalPurchaseQty);
+        public int TotalPlannedQty => EffectiveStockQty + EffectiveSFStockQty + TotalPurchaseQty + ProductionQty;
+        public bool IsBalanced => TotalPlannedQty == OrderQty;
+        public bool NeedsPlanningAction => !IsSavedPlan || HasDeltaQty || IsUnlockedForRevision || !IsBalanced;
+        public bool IsLockedInUi => Authorized && IsSavedPlan && !HasDeltaQty && !IsUnlockedForRevision && IsBalanced;
     }
 
     public class PpcItemSFLotDto
@@ -114,6 +132,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string StoreLocation { get; set; } = string.Empty;
         public int AvailableQty { get; set; }
         public int AllocatedQty { get; set; }
+        public int AlreadyIssuedQty { get; set; } = 0;
     }
 
     public class PpcItemPurchaseAllocationDto
@@ -131,6 +150,16 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public DateTime? IssuedAt { get; set; }
         public string? IssuedBy { get; set; }
         public bool IsIssued => VendIssued_RefID.HasValue && VendIssued_RefID.Value > 0;
+        public long? VendIssdDetail_EntryID { get; set; }
+        public int IssuedQty { get; set; }
+        public int ReceivedQty { get; set; }
+        public int PendingPoQty => Math.Max(0, IssuedQty - ReceivedQty);
+        public string Status { get; set; } = "Active";
+        public int? OriginalPlannedQty { get; set; }
+        public int ShortClosedQty { get; set; }
+        public string? ExceptionNotes { get; set; }
+        public bool CanCancelIssuedPo => IsIssued && ReceivedQty <= 0 && !string.Equals(Status, "Cancelled", StringComparison.OrdinalIgnoreCase);
+        public bool CanShortCloseIssuedPo => IsIssued && ReceivedQty > 0 && ReceivedQty < PurchaseQty && !string.Equals(Status, "Cancelled", StringComparison.OrdinalIgnoreCase);
         public List<MakerLookupDto> AvailableMakers { get; set; } = new();
     }
 
@@ -162,5 +191,36 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string PlannedBy { get; set; } = string.Empty;
         public string? Notes { get; set; }
         public List<PpcOrderItemDto> Items { get; set; } = new();
+    }
+
+    public class PpcPlanningExceptionLogDto
+    {
+        public int EntryID { get; set; }
+        public string OrderNo { get; set; } = string.Empty;
+        public string ItemID { get; set; } = string.Empty;
+        public string ExceptionType { get; set; } = string.Empty;
+        public int AffectedQty { get; set; }
+        public string? SourceRef { get; set; }
+        public string Reason { get; set; } = string.Empty;
+        public string CreatedBy { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class PpcExceptionActionRequest
+    {
+        public string OrderNo { get; set; } = string.Empty;
+        public string ItemID { get; set; } = string.Empty;
+        public string ExceptionType { get; set; } = string.Empty;
+        public int AffectedQty { get; set; }
+        public int? PurchaseSplitEntryID { get; set; }
+        public int? SfAllocationSooRefID { get; set; }
+        public string Reason { get; set; } = string.Empty;
+        public string ActionBy { get; set; } = string.Empty;
+    }
+
+    public class PpcExceptionActionResult
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = string.Empty;
     }
 }

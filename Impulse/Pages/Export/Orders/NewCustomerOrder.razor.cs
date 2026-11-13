@@ -45,6 +45,8 @@ namespace Impulse.Pages.Export.Orders
         // layout state
         public string ActiveTab { get; set; } = "ArticleDetail";
         public bool IsSaving { get; set; } = false;
+        public bool IsUsedInProforma { get; set; } = false;
+        public bool IsAutoProformaEnabled { get; set; } = false;
         public int AttachmentCount { get; set; } = 0;
 
         // lookup lists
@@ -77,6 +79,7 @@ namespace Impulse.Pages.Export.Orders
         protected override async Task OnInitializedAsync()
         {
             await LoadLookups();
+            IsAutoProformaEnabled = await CustomerOrderService.IsAutoProformaEnabledAsync();
 
             if (!string.IsNullOrEmpty(OrderNo))
             {
@@ -95,6 +98,7 @@ namespace Impulse.Pages.Export.Orders
                     if (!string.IsNullOrEmpty(Order.OrderNo))
                     {
                         AttachmentCount = await AttachmentService.GetCountAsync("Order", Order.OrderNo, Order.CustCode);
+                        IsUsedInProforma = await CustomerOrderService.IsOrderUsedInProformaAsync(Order.OrderNo);
                     }
                 }
                 else
@@ -128,12 +132,29 @@ namespace Impulse.Pages.Export.Orders
             try
             {
                 int companyId = SelectedCompany?.EntryID ?? 1;
-                Order.InternalRefNo = await CustomerOrderService.GetNextInternalRefNoAsync(companyId);
-                Order.OrderNo = Order.InternalRefNo;
+                string prevRef = Order.InternalRefNo;
+                Order.InternalRefNo = await CustomerOrderService.GetNextInternalRefNoAsync(companyId, Order.DT);
+                if (string.IsNullOrEmpty(OrderNo) && (string.IsNullOrEmpty(Order.OrderNo) || Order.OrderNo == prevRef))
+                {
+                    Order.OrderNo = Order.InternalRefNo;
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Failed to generate Internal Ref: {ex.Message}");
+            }
+        }
+
+        public async Task OnOrderDateChanged(ChangeEventArgs e)
+        {
+            if (DateTime.TryParse(e.Value?.ToString(), out var dt))
+            {
+                Order.DT = dt;
+                Order.DeliveryDT = dt.AddMonths(2);
+                if (string.IsNullOrEmpty(OrderNo))
+                {
+                    await RefreshInternalRef();
+                }
             }
         }
 
@@ -683,7 +704,11 @@ namespace Impulse.Pages.Export.Orders
                         Detail = "Order saved and Director task created. Clearing form.",
                         Duration = 3000
                     });
-                    Order = new();
+                    Order = new()
+                    {
+                        DT = DateTime.Today,
+                        DeliveryDT = DateTime.Today.AddMonths(2)
+                    };
                     if (Companies.Any())
                     {
                         SelectedCompany = Companies.First();
@@ -691,6 +716,7 @@ namespace Impulse.Pages.Export.Orders
                     }
                     DeletedItemIds.Clear();
                     SelectedCustomer = null;
+                    IsUsedInProforma = false;
                     await RefreshInternalRef();
                 }
             }

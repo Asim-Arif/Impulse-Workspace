@@ -42,6 +42,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public decimal Rate { get; set; }
         public string LotNo { get; set; } = string.Empty;
         public decimal ReceivingQty { get; set; }
+        public decimal? ReceivingWeight { get; set; }
         public string CountedBy { get; set; } = string.Empty;
         public string Insp_EmpID { get; set; } = string.Empty;
         public EmployeeLookupModel? SelectedCountedBy { get; set; }
@@ -71,6 +72,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string OrderNo { get; set; } = string.Empty;
         public decimal Rate { get; set; }
         public decimal RcvdQty { get; set; }
+        public decimal? RcvdWeight { get; set; }
         public string CountedBy { get; set; } = string.Empty;
         public string Insp_EmpID { get; set; } = string.Empty;
         public string LotNo { get; set; } = string.Empty;

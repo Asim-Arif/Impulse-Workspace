@@ -51,6 +51,10 @@ namespace DataAccessLibrary.DAC.Production
                 BEGIN
                     ALTER TABLE PPC_Order_Item_Purchases ADD IssuedBy NVARCHAR(100) NULL;
                 END
+                IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('PPC_Order_Item_Purchases') AND name = 'Status')
+                BEGIN
+                    ALTER TABLE PPC_Order_Item_Purchases ADD Status VARCHAR(30) NOT NULL CONSTRAINT DF_PPC_ItemPurch_Status DEFAULT 'Active';
+                END
 
                 -- Clean up any legacy erroneous M-ISU receipt references from MasterPONo
                 UPDATE PPC_Order_Item_Purchases 
@@ -80,7 +84,7 @@ namespace DataAccessLibrary.DAC.Production
                     COUNT(CASE WHEN pip.VendIssued_RefID IS NULL OR pip.MasterPONo IS NULL OR pip.MasterPONo = '' OR pip.MasterPONo LIKE 'M-ISU%' OR pip.MasterPONo LIKE 'ISU%' THEN 1 END) AS PendingPurchaseLinesCount
                 FROM FCustomerOrders co
                 LEFT JOIN ForeignCustomers fc ON co.CustCode = fc.CustCode AND co.Country = fc.Country
-                LEFT JOIN PPC_Order_Item_Purchases pip ON co.OrderNo = pip.OrderNo
+                LEFT JOIN PPC_Order_Item_Purchases pip ON co.OrderNo = pip.OrderNo AND ISNULL(pip.Status, 'Active') <> 'Cancelled'
                 WHERE co.OrderNo = @OrderNo
                 GROUP BY co.OrderNo, fc.Name, co.CustCode, co.DT, co.DeliveryDT, co.InternalRefNo";
 
@@ -104,6 +108,7 @@ namespace DataAccessLibrary.DAC.Production
                 FROM PPC_Order_Item_Purchases pip
                 INNER JOIN FCustomerOrders co ON pip.OrderNo = co.OrderNo
                 LEFT JOIN ForeignCustomers fc ON co.CustCode = fc.CustCode AND co.Country = fc.Country
+                WHERE ISNULL(pip.Status, 'Active') <> 'Cancelled'
                 GROUP BY co.OrderNo, fc.Name, co.CustCode, co.DT, co.DeliveryDT, co.InternalRefNo
                 ORDER BY PendingPurchaseLinesCount DESC, co.DT DESC";
 
@@ -175,6 +180,7 @@ namespace DataAccessLibrary.DAC.Production
                 ) vid
                 LEFT JOIN VendIssued vi ON vid.RefID = vi.EntryID
                 WHERE pip.OrderNo = @OrderNo
+                  AND ISNULL(pip.Status, 'Active') <> 'Cancelled'
                 ORDER BY pip.EntryID";
 
             var list = (await conn.QueryAsync<PpcMakerPoItemRowDto>(sql, new { OrderNo = orderNo })).ToList();

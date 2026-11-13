@@ -289,6 +289,7 @@
                                         <th class="text-end" style="width: 75px;">Prev Rcvd</th>
                                         <th class="text-end" style="width: 75px;">Pending Qty</th>
                                         <th class="text-end" style="width: 95px;">Receiving Qty</th>
+                                        <th class="text-end" style="width: 105px;">Receiving Weight</th>
                                         <th style="width: 250px; min-width: 220px;">Counted By @if (RequireCountedBy) { <span class="text-danger">*</span> }</th>
                                         <th class="text-end" style="width: 85px;">Rate (Pcs)</th>
                                         <th class="text-end" style="width: 105px;">Receiving Value</th>
@@ -321,6 +322,11 @@
                                                        @bind="line.ReceivingQty"
                                                        readonly
                                                        placeholder="0" />
+                                            </td>
+                                            <td class="text-end" style="width: 105px;">
+                                                <input type="number" step="any" min="0" class="form-control form-control-sm text-end fw-semibold"
+                                                       @bind="line.ReceivingWeight"
+                                                       placeholder="0.00" />
                                             </td>
                                             <td style="width: 250px; min-width: 220px;" class="table-typeahead py-1">
                                                 <BlazoredTypeahead SearchMethod="SearchCheckedByEmployees"
@@ -355,7 +361,7 @@
                                     @if (!Lines.Any())
                                     {
                                         <tr>
-                                            <td colspan="12" class="text-center text-muted py-4">
+                                            <td colspan="13" class="text-center text-muted py-4">
                                                 <i class="fas fa-info-circle me-1"></i> No issued line items found for Lot No: @LotHeader.LotNo.
                                             </td>
                                         </tr>
@@ -370,6 +376,7 @@
                                             <td class="text-end">@TotalPrevRcvdQty.ToString("N0")</td>
                                             <td class="text-end text-danger fs-6">@TotalPendingQty.ToString("N0")</td>
                                             <td class="text-end text-success fs-6">@TotalReceivingQty.ToString("N0")</td>
+                                            <td class="text-end text-secondary fs-6">@TotalReceivingWeight.ToString("N2")</td>
                                             <td colspan="2"></td>
                                             <td class="text-end text-primary fs-6">@TotalReceivingValue.ToString("N2")</td>
                                         </tr>

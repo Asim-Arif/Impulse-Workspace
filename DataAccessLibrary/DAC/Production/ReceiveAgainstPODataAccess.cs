@@ -141,7 +141,7 @@ namespace DataAccessLibrary.DAC.Production
                                                 LotNo, ReqAuth, OrderNo, CountedBy, Issue_RefID, ProcessID, RcvdWeight, ReWorkLot, Repair_RefID, Insp_EmpID, LostQty
                                              ) VALUES (
                                                 @RefID, @RecieptID, @ItemCode, @NextProcessID, @RcvdQty, 0, 0, @Rate,
-                                                @LotNo, @ReqAuth, @OrderNo, @CountedBy, @IssueRefID, @ProcessID, 0, @ReWorkLot, @RepairType, @InspEmpID, 0
+                                                @LotNo, @ReqAuth, @OrderNo, @CountedBy, @IssueRefID, @ProcessID, @RcvdWeight, @ReWorkLot, @RepairType, @InspEmpID, 0
                                              );";
 
                     await db.ExecuteAsync(insertLineSql, new
@@ -158,6 +158,7 @@ namespace DataAccessLibrary.DAC.Production
                         CountedBy = line.CountedBy ?? "",
                         IssueRefID = line.VendIssdDetailEntryID,
                         line.ProcessID,
+                        RcvdWeight = line.RcvdWeight ?? 0m,
                         ReWorkLot = line.ReWorkLot,
                         RepairType = line.RepairType,
                         InspEmpID = line.Insp_EmpID ?? ""
