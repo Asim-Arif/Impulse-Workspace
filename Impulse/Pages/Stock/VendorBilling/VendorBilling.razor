@@ -205,12 +205,20 @@
                 <div class="summary-divider mx-1"></div>
                 <div class="summary-stat deduction">
                     <div class="label">Short Term Ded.</div>
-                    <div class="value">@Summary.ShortTermDeduction.ToString("N0")</div>
+                    <input type="number" step="1" min="0"
+                           class="form-control form-control-sm text-end fw-bold text-danger mx-auto mt-1"
+                           style="width: 110px; height: 28px !important;"
+                           @bind="Summary.ShortTermDeduction"
+                           @bind:event="oninput" />
                 </div>
                 <div class="summary-divider mx-1"></div>
                 <div class="summary-stat deduction">
                     <div class="label">Long Term Ded.</div>
-                    <div class="value">@Summary.LongTermDeduction.ToString("N0")</div>
+                    <input type="number" step="1" min="0"
+                           class="form-control form-control-sm text-end fw-bold text-danger mx-auto mt-1"
+                           style="width: 110px; height: 28px !important;"
+                           @bind="Summary.LongTermDeduction"
+                           @bind:event="oninput" />
                 </div>
                 <div class="summary-divider mx-1"></div>
                 <div class="summary-stat deduction">

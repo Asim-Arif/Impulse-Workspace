@@ -44,31 +44,38 @@ namespace DataAccessLibrary.DAC.Stock
         {
             using IDbConnection db = new SqlConnection(_connectionString);
             
-            string sql = "SELECT * FROM VRawMaterialIssuanceList WHERE DT BETWEEN @DtFrom AND @DtTo";
+            string sql = @"
+                SELECT l.IssNo, l.DT,
+                       ISNULL(NULLIF(l.VenderName, ''), vm.AccTitle) AS VenderName,
+                       l.IssdToEmpID, l.RM, l.Total_Issued_Qty
+                FROM VRawMaterialIssuanceList l
+                INNER JOIN RawMaterialIssuance rmi ON l.IssNo = rmi.IssNo
+                LEFT JOIN VVendersAndMakers vm ON rmi.Vendor_AccNo = vm.AccNo
+                WHERE l.DT BETWEEN @DtFrom AND @DtTo";
             
             if (!string.IsNullOrEmpty(materialId))
             {
-                sql += " AND IssNo IN (SELECT IssNo FROM RawMaterialIssuanceDetail WHERE RMID1 = @MaterialId)";
+                sql += " AND l.IssNo IN (SELECT IssNo FROM RawMaterialIssuanceDetail WHERE RMID1 = @MaterialId)";
             }
             else if (groupId.HasValue)
             {
-                sql += " AND IssNo IN (SELECT IssNo FROM RawMaterialIssuanceDetail INNER JOIN RM ON RM.RMID1 = RawMaterialIssuanceDetail.RMID1 WHERE GroupID = @GroupId)";
+                sql += " AND l.IssNo IN (SELECT IssNo FROM RawMaterialIssuanceDetail INNER JOIN RM ON RM.RMID1 = RawMaterialIssuanceDetail.RMID1 WHERE GroupID = @GroupId)";
             }
 
             if (!string.IsNullOrEmpty(employeeId))
             {
-                sql += " AND IssdToEmpIDOnly = @EmployeeId";
+                sql += " AND l.IssdToEmpIDOnly = @EmployeeId";
             }
             else if (vendorId.HasValue)
             {
-                sql += " AND VendID = @VendorId";
+                sql += " AND (l.VendID = @VendorId OR vm.VendID = @VendorId)";
             }
             else if (!string.IsNullOrEmpty(deptId))
             {
-                sql += " AND deptid = @DeptId";
+                sql += " AND l.deptid = @DeptId";
             }
 
-            sql += " ORDER BY DT, IssNo";
+            sql += " ORDER BY l.DT, l.IssNo";
 
             return await db.QueryAsync<RMIssuanceListRowModel>(sql, new 
             { 

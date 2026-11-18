@@ -72,15 +72,6 @@ namespace DataAccessLibrary.DAC.Payroll
                 var empList = (await db.QueryAsync<OverTimeAuthRowDto>(empSql, new { DeptID = deptId, DT = attDate })).AsList();
                 if (!empList.Any()) return empList;
 
-                // Query existing EmpTimes payable hours
-                string timesSql = @"
-                    SELECT EmpID, ISNULL(SUM(PayableHrs), 0) AS PayableHrs
-                    FROM EmpTimes
-                    WHERE CAST(DT AS DATE) = @DT AND EmpID IN (SELECT EmpID FROM Employees WHERE DeptID = @DeptID)
-                    GROUP BY EmpID";
-                var timesDict = (await db.QueryAsync(timesSql, new { DT = attDate, DeptID = deptId }))
-                                .ToDictionary(x => (string)x.EmpID, x => (double)x.PayableHrs);
-
                 // Query existing EmpOTHrs authorization records
                 string otSql = @"
                     SELECT EntryID, EmpID, ISNULL(OTHrs, 0) AS OTHrs
@@ -102,11 +93,6 @@ namespace DataAccessLibrary.DAC.Payroll
                         row.EntryID = otVal.EntryID;
                         row.OtHrs = otVal.OTHrs;
                         row.IsAuthorized = true;
-                    }
-                    else if (timesDict.TryGetValue(row.EmpID, out var payableHrs))
-                    {
-                        row.OtHrs = payableHrs;
-                        row.IsAuthorized = false;
                     }
                     else
                     {

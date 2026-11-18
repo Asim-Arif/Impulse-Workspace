@@ -34,5 +34,6 @@ namespace DataAccessLibrary.Interface.Payroll
 
         Task SaveMachineAsync(BiometricMachineItem machine);
         Task DeleteMachineAsync(int entryId);
+        Task LogMachineReadAsync(string userName, string clientIp, string machineIp, int machineNo, DateTime readStartTime, DateTime readEndTime, int totalRecordsRead, int totalTransferred, string remarks);
     }
 }

@@ -114,18 +114,9 @@ namespace Impulse.Pages.Company
             if (cust != null)
             {
                 countries = await CustomerCatalogService.GetCountriesForCustomerAsync(cust.CustCode);
-                if (countries.Any())
-                {
-                    selectedCountry = countries.First();
-                    await LoadCustomerCountryData();
-                }
+                selectedCountry = countries.FirstOrDefault() ?? string.Empty;
+                await LoadCustomerCountryData();
             }
-        }
-
-        private async Task OnCountrySelected(string? country)
-        {
-            selectedCountry = country ?? string.Empty;
-            await LoadCustomerCountryData();
         }
 
         private async Task OnItemGroupSelected(ItemGroupLookupModel? group)
@@ -136,7 +127,7 @@ namespace Impulse.Pages.Company
 
         private async Task LoadCustomerCountryData()
         {
-            if (selectedCustomer == null || string.IsNullOrEmpty(selectedCountry)) return;
+            if (selectedCustomer == null) return;
 
             isGridLoading = true;
             try
@@ -158,7 +149,7 @@ namespace Impulse.Pages.Company
 
         private async Task RefreshGrid()
         {
-            if (selectedCustomer == null || string.IsNullOrEmpty(selectedCountry)) return;
+            if (selectedCustomer == null) return;
 
             isGridLoading = true;
             try
@@ -600,7 +591,17 @@ namespace Impulse.Pages.Company
 
         private async Task OnItemSearchSelected(CustomerCatalogItemViewModel? item)
         {
-            if (item != null) await HighlightItem(item);
+            if (item == null) return;
+
+            if (!string.IsNullOrWhiteSpace(searchText) && !GetFilteredItems().Any(x => x.EntryID == item.EntryID))
+            {
+                searchText = string.Empty;
+            }
+
+            await HighlightItem(item);
+            StateHasChanged();
+            await Task.Yield();
+            await JSRuntime.InvokeVoidAsync("eval", $"document.getElementById('catalog-row-{item.EntryID}')?.scrollIntoView({{ behavior: 'smooth', block: 'center' }})");
         }
 
         // ── Reporting ────────────────────────────────────────────────────────

@@ -1,4 +1,6 @@
+using BlazorContextMenu;
 using DataAccessLibrary.Models.ViewModels.Payroll;
+using Impulse.Constants;
 using Impulse.Services;
 using Impulse.Services.Payroll;
 using Microsoft.AspNetCore.Components;
@@ -16,10 +18,11 @@ namespace Impulse.Pages.Payroll.GatePassEntry
         public string? ReturnUrl { get; set; }
 
         // ── Injected Services ──────────────────────────────────────────────
-        [Inject] private IGatePassService     GatePassService     { get; set; } = default!;
-        [Inject] private IEmployeeService     EmployeeService     { get; set; } = default!;
-        [Inject] private INotificationService NotificationService { get; set; } = default!;
-        [Inject] private NavigationManager    NavigationManager   { get; set; } = default!;
+        [Inject] private IGatePassService         GatePassService         { get; set; } = default!;
+        [Inject] private IEmployeeService         EmployeeService         { get; set; } = default!;
+        [Inject] private INotificationService     NotificationService     { get; set; } = default!;
+        [Inject] private NavigationManager        NavigationManager       { get; set; } = default!;
+        [Inject] private IReportNavigationService ReportNavigationService { get; set; } = default!;
 
         // ── State ──────────────────────────────────────────────────────────
         private bool IsLoading = false;
@@ -27,14 +30,23 @@ namespace Impulse.Pages.Payroll.GatePassEntry
 
         private DepartmentListItemModel? SelectedDepartment { get; set; }
         private DateTime SelectedDate { get; set; } = DateTime.Today;
+        private string SearchText { get; set; } = string.Empty;
 
         private List<DepartmentListItemModel> AllDepartments = new();
         private List<GatePassRowModel> Rows = new();
 
+        private List<GatePassRowModel> FilteredRows =>
+            string.IsNullOrWhiteSpace(SearchText)
+                ? Rows
+                : Rows.Where(r =>
+                    r.EmpID.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
+                    r.EmpName.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
+                  .ToList();
+
         private bool ShowEditModal = false;
         private GatePassRowModel? EditingRow;
 
-        private bool IsAllSelected => Rows.Any() && Rows.All(r => r.IsSelected);
+        private bool IsAllSelected => FilteredRows.Any() && FilteredRows.All(r => r.IsSelected);
 
         // ── Initialization ─────────────────────────────────────────────────
         protected override async Task OnInitializedAsync()
@@ -98,18 +110,57 @@ namespace Impulse.Pages.Payroll.GatePassEntry
         // ── Selection Controls ─────────────────────────────────────────────
         private void SelectAll()
         {
-            foreach (var r in Rows) r.IsSelected = true;
+            foreach (var r in FilteredRows) r.IsSelected = true;
         }
 
         private void DeselectAll()
         {
-            foreach (var r in Rows) r.IsSelected = false;
+            foreach (var r in FilteredRows) r.IsSelected = false;
         }
 
         private void ToggleSelectAll(ChangeEventArgs e)
         {
             bool select = (bool)(e?.Value ?? false);
-            foreach (var r in Rows) r.IsSelected = select;
+            foreach (var r in FilteredRows) r.IsSelected = select;
+        }
+
+        // ── Context Menu & Reporting ───────────────────────────────────────
+        private void OnContextMenuEdit(ItemClickEventArgs e)
+        {
+            if (e.Data is GatePassRowModel row)
+            {
+                EditGatePass(row);
+            }
+        }
+
+        private async Task OnContextMenuPrint(ItemClickEventArgs e)
+        {
+            if (e.Data is GatePassRowModel row)
+            {
+                await PrintGatePassAsync(row);
+            }
+        }
+
+        private async Task PrintGatePassAsync(GatePassRowModel row)
+        {
+            if (!row.IsSelected || row.EntryID <= 0)
+            {
+                NotificationService.ShowWarning("Not Saved", "Please save the gate pass entry before printing.");
+                return;
+            }
+
+            try
+            {
+                await ReportNavigationService.PrintReportAsync(new ReportRequest
+                {
+                    ReportName = ReportNames.Payroll.EmployeesGatePass,
+                    SelectionFormula = $"{{VEmpGPHrs.EntryID}}={row.EntryID}"
+                });
+            }
+            catch (Exception ex)
+            {
+                NotificationService.ShowError("Report Error", ex.Message);
+            }
         }
 
         // ── Gate Pass Modal Editing & Duration Calculations ───────────────

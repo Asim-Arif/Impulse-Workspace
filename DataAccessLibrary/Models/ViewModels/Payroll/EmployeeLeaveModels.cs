@@ -9,6 +9,7 @@ namespace DataAccessLibrary.Models.ViewModels.Payroll
         public DateTime ToDate { get; set; } = DateTime.Today;
         public bool IsAbsent { get; set; } = false;             // false = Leave, true = Absent
         public string DurationMode { get; set; } = "FullDay";   // FullDay, HalfDay, ShortLeave
+        public byte? HalfDayType { get; set; } = 1;             // 1 = First Half, 2 = Second Half
         public string FromTime { get; set; } = "08:00";
         public string ToTime { get; set; } = "17:00";
         public string LeaveTypeCode { get; set; } = "CL";

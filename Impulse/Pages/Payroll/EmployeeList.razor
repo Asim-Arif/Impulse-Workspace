@@ -154,6 +154,9 @@
                                                 <th>Designation</th>
                                                 <th>Phone</th>
                                                 <th class="text-end">Salary</th>
+                                                <th>Payment By</th>
+                                                <th>Bank Account No.</th>
+                                                <th class="text-end">Tax Amount</th>
                                                 <th>Since</th>
                                                 <th class="text-center" style="width: 150px;">Actions</th>
                                             </tr>
@@ -176,6 +179,9 @@
                                                     <td><span class="badge bg-light-subtle border text-dark-emphasis">@emp.Designation</span></td>
                                                     <td>@emp.Phone1</td>
                                                     <td class="text-end fw-bold">@emp.StartingSalary.ToString("N0")</td>
+                                                    <td>@(emp.BankPymt ? "Bank" : "Cash")</td>
+                                                    <td>@(string.IsNullOrWhiteSpace(emp.EmpAccNo) ? "-" : emp.EmpAccNo)</td>
+                                                    <td class="text-end">@emp.TaxAmt.ToString("N0")</td>
                                                     <td>@emp.JoinDate?.ToString("dd-MMM-yyyy")</td>
                                                     <td class="text-center" @onclick:stopPropagation="true">
                                                         <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2 me-1" style="font-size: 0.8rem;" @onclick="() => OpenAttachments(emp)" title="View & Manage Attachments">
@@ -204,6 +210,9 @@
                                                 <th>Designation</th>
                                                 <th>Phone</th>
                                                 <th class="text-end">Salary</th>
+                                                <th>Payment By</th>
+                                                <th>Bank Account No.</th>
+                                                <th class="text-end">Tax Amount</th>
                                                 <th>Since</th>
                                                 <th class="text-center" style="width: 150px;">Actions</th>
                                             </tr>
@@ -216,7 +225,7 @@
                                                 {
                                                     @* Department group-header row *@
                                                     <tr style="background: linear-gradient(90deg, @(ConvertWin32ColorToHex(dept.Color))18 0%, #f8f9fa 100%); border-top: 2px solid @(ConvertWin32ColorToHex(dept.Color))40;">
-                                                        <td colspan="8" class="py-2 ps-3">
+                                                        <td colspan="11" class="py-2 ps-3">
                                                             <div class="d-flex align-items-center justify-content-between">
                                                                 <div class="d-flex align-items-center">
                                                                     <span class="rounded-circle d-inline-block me-2" style="background-color: @ConvertWin32ColorToHex(dept.Color); width: 10px; height: 10px; flex-shrink: 0;"></span>
@@ -247,6 +256,9 @@
                                                             <td><span class="badge bg-light-subtle border text-dark-emphasis">@emp.Designation</span></td>
                                                             <td>@emp.Phone1</td>
                                                             <td class="text-end fw-bold">@emp.StartingSalary.ToString("N0")</td>
+                                                            <td>@(emp.BankPymt ? "Bank" : "Cash")</td>
+                                                            <td>@(string.IsNullOrWhiteSpace(emp.EmpAccNo) ? "-" : emp.EmpAccNo)</td>
+                                                            <td class="text-end">@emp.TaxAmt.ToString("N0")</td>
                                                             <td>@emp.JoinDate?.ToString("dd-MMM-yyyy")</td>
                                                             <td class="text-center" @onclick:stopPropagation="true">
                                                                 <button type="button" class="btn btn-outline-secondary btn-xs py-0 px-2 me-1" style="font-size: 0.8rem;" @onclick="() => OpenAttachments(emp)" title="View & Manage Attachments">

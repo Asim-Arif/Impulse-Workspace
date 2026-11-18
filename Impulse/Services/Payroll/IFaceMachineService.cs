@@ -22,6 +22,7 @@ namespace Impulse.Services.Payroll
         private readonly ITakeAttendanceDataAccess _takeAttendance;
         private readonly IEmployeeDataAccess _employeeDataAccess;
         private readonly IBiometricAgentCoordinator _agentCoordinator;
+        private readonly IBiometricLedgerDataAccess _biometricLedgerDataAccess;
         private readonly IConfiguration _config;
         private readonly ILogger<IFaceMachineService> _logger;
 
@@ -29,12 +30,14 @@ namespace Impulse.Services.Payroll
             ITakeAttendanceDataAccess takeAttendance,
             IEmployeeDataAccess employeeDataAccess,
             IBiometricAgentCoordinator agentCoordinator,
+            IBiometricLedgerDataAccess biometricLedgerDataAccess,
             IConfiguration config,
             ILogger<IFaceMachineService> logger)
         {
             _takeAttendance = takeAttendance;
             _employeeDataAccess = employeeDataAccess;
             _agentCoordinator = agentCoordinator;
+            _biometricLedgerDataAccess = biometricLedgerDataAccess;
             _config = config;
             _logger = logger;
         }
@@ -47,91 +50,122 @@ namespace Impulse.Services.Payroll
         public async Task<(int recordsRead, int recordsProcessed, string message)> ReadAndProcessAsync(
             string ipAddress, int machineNo, int portNo = 4370, string userName = "System", string computerName = "Unknown", bool? clearLogs = null, string clientKey = "Default")
         {
+            DateTime readStartTime = DateTime.Now;
             int recordsRead = 0;
             int recordsProcessed = 0;
+            string logRemarks = "Successful";
 
-            bool shouldClear = clearLogs ?? _config.GetValue<bool>("Biometric:ClearLogsAfterRead", false);
-
-            string prefix = "EMP";
             try
             {
-                prefix = await _employeeDataAccess.GetEmployeePrefixAsync();
+                bool shouldClear = clearLogs ?? _config.GetValue<bool>("Biometric:ClearLogsAfterRead", false);
+
+                string prefix = "EMP";
+                try
+                {
+                    prefix = await _employeeDataAccess.GetEmployeePrefixAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to resolve employee prefix from company; defaulting to EMP");
+                }
+
+                List<IFacePunchRecord> punches;
+
+                // ── Auto-Routing: Cloud VPS (Agent) vs Local Server (Direct COM) ──
+                if (_agentCoordinator.HasConnectedAgent())
+                {
+                    _logger.LogInformation("Routing IFace machine read via connected Biometric Sync Agent for IP {IP} (ClientKey={ClientKey}, ClearLogs={Clear})", ipAddress, clientKey, shouldClear);
+                    var remoteResult = await _agentCoordinator.RequestPunchesAsync(ipAddress, machineNo, portNo, prefix, clientKey, shouldClear);
+                    if (!remoteResult.success)
+                    {
+                        logRemarks = remoteResult.error;
+                        return (0, 0, remoteResult.error);
+                    }
+                    punches = remoteResult.records;
+                    recordsRead = punches.Count;
+                }
+                else
+                {
+                    // Local COM driver mode (Server is on-premises with ZKTeco SDK registered)
+                    Type? czKemType = Type.GetTypeFromProgID("zkemkeeper.ZKEM")
+                                   ?? Type.GetTypeFromProgID("zkemkeeper.CZKEM")
+                                   ?? Type.GetTypeFromCLSID(new Guid("00853A19-BD51-419B-9269-2DABE57EB61F"));
+                    if (czKemType == null)
+                    {
+                        string comMissingError = "No office Biometric Sync Agent is connected, and ZKTeco COM component is not registered on this server. " +
+                                                 "Please start the office Sync Agent or register zkemkeeper.dll in C:\\Windows\\System32.";
+                        logRemarks = comMissingError;
+                        return (0, 0, comMissingError);
+                    }
+
+                    try
+                    {
+                        var result = await Task.Run(() =>
+                        {
+                            return ReadFromMachine(czKemType, ipAddress, machineNo, portNo, prefix, shouldClear);
+                        });
+
+                        if (!result.success)
+                        {
+                            logRemarks = result.errorMessage;
+                            return (0, 0, result.errorMessage);
+                        }
+
+                        punches = result.list;
+                        recordsRead = result.totalRead;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "IFace machine read failed: {IP}", ipAddress);
+                        string readError = $"Failed to connect or read from machine ({ipAddress}): {ex.Message}";
+                        logRemarks = readError;
+                        return (0, 0, readError);
+                    }
+                }
+
+                if (recordsRead == 0)
+                {
+                    logRemarks = "Successful (No new punch records)";
+                    return (0, 0, $"No new punch records found on machine ({ipAddress}).");
+                }
+
+                // Process each punch through the central attendance engine
+                foreach (var punch in punches)
+                {
+                    try
+                    {
+                        await _takeAttendance.ProcessPunchAsync(punch.EmpID, punch.AttDate, punch.AttTime, userName, computerName);
+                        recordsProcessed++;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Punch processing failed for EmpID={EmpID} DT={DT} Time={Time}",
+                            punch.EmpID, punch.AttDate, punch.AttTime);
+                    }
+                }
+
+                string message = $"Read {recordsRead} punch records, processed {recordsProcessed} successfully. (Logs preserved on machine for trial)";
+                logRemarks = "Successful";
+                return (recordsRead, recordsProcessed, message);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to resolve employee prefix from company; defaulting to EMP");
+                logRemarks = ex.Message;
+                throw;
             }
-
-            List<IFacePunchRecord> punches;
-
-            // ── Auto-Routing: Cloud VPS (Agent) vs Local Server (Direct COM) ──
-            if (_agentCoordinator.HasConnectedAgent())
+            finally
             {
-                _logger.LogInformation("Routing IFace machine read via connected Biometric Sync Agent for IP {IP} (ClientKey={ClientKey}, ClearLogs={Clear})", ipAddress, clientKey, shouldClear);
-                var remoteResult = await _agentCoordinator.RequestPunchesAsync(ipAddress, machineNo, portNo, prefix, clientKey, shouldClear);
-                if (!remoteResult.success)
-                {
-                    return (0, 0, remoteResult.error);
-                }
-                punches = remoteResult.records;
-                recordsRead = punches.Count;
+                await _biometricLedgerDataAccess.LogMachineReadAsync(
+                    userName,
+                    computerName,
+                    ipAddress,
+                    machineNo,
+                    readStartTime,
+                    DateTime.Now,
+                    recordsRead,
+                    recordsProcessed,
+                    logRemarks);
             }
-            else
-            {
-                // Local COM driver mode (Server is on-premises with ZKTeco SDK registered)
-                Type? czKemType = Type.GetTypeFromProgID("zkemkeeper.ZKEM")
-                               ?? Type.GetTypeFromProgID("zkemkeeper.CZKEM")
-                               ?? Type.GetTypeFromCLSID(new Guid("00853A19-BD51-419B-9269-2DABE57EB61F"));
-                if (czKemType == null)
-                {
-                    return (0, 0, "No office Biometric Sync Agent is connected, and ZKTeco COM component is not registered on this server. " +
-                                  "Please start the office Sync Agent or register zkemkeeper.dll in C:\\Windows\\System32.");
-                }
-
-                try
-                {
-                    var result = await Task.Run(() =>
-                    {
-                        return ReadFromMachine(czKemType, ipAddress, machineNo, portNo, prefix, shouldClear);
-                    });
-
-                    if (!result.success)
-                    {
-                        return (0, 0, result.errorMessage);
-                    }
-
-                    punches = result.list;
-                    recordsRead = result.totalRead;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "IFace machine read failed: {IP}", ipAddress);
-                    return (0, 0, $"Failed to connect or read from machine ({ipAddress}): {ex.Message}");
-                }
-            }
-
-            if (recordsRead == 0)
-            {
-                return (0, 0, $"No new punch records found on machine ({ipAddress}).");
-            }
-
-            // Process each punch through the central attendance engine
-            foreach (var punch in punches)
-            {
-                try
-                {
-                    await _takeAttendance.ProcessPunchAsync(punch.EmpID, punch.AttDate, punch.AttTime, userName, computerName);
-                    recordsProcessed++;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Punch processing failed for EmpID={EmpID} DT={DT} Time={Time}",
-                        punch.EmpID, punch.AttDate, punch.AttTime);
-                }
-            }
-
-            string message = $"Read {recordsRead} punch records, processed {recordsProcessed} successfully. (Logs preserved on machine for trial)";
-            return (recordsRead, recordsProcessed, message);
         }
 
         /// <summary>

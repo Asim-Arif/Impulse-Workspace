@@ -80,16 +80,23 @@ namespace Impulse.Services.Production
             return await _dataAccess.ExecutePlanningExceptionAsync(request);
         }
 
+        private static bool IsPendingUnissuedPurchase(PpcItemPurchaseAllocationDto p) =>
+            !p.IsIssued &&
+            !string.Equals(p.Status, "Cancelled", StringComparison.OrdinalIgnoreCase) &&
+            p.PurchaseQty > 0 &&
+            p.ProcessID > 0;
+
         private async Task DispatchDownstreamWorkflowTasksAsync(PpcPlanSaveRequest request)
         {
             var orderNo = request.OrderNo;
             var plannerUser = request.PlannedBy ?? "PPC Planner";
 
-            // ── 1. Stock User Role Task & Notification (Finish Stock) ────────
-            int totalStockQty = request.Items.Sum(i => i.StockQty);
-            int stockItemsCount = request.Items.Count(i => i.StockQty > 0);
+            // ── 1. Stock User Role Task & Notification (Pending Finish Stock Only) ──
+            int totalPendingStockQty = request.Items.Sum(i => Math.Max(0, i.StockQty - i.AlreadyAdjustedStockQty));
+            int pendingStockItemsCount = request.Items.Count(i => (i.StockQty - i.AlreadyAdjustedStockQty) > 0);
+            bool hasActiveUnissuedStock = request.Items.Any(i => !i.IsLockedInUi && (i.StockQty - i.AlreadyAdjustedStockQty) > 0);
 
-            if (totalStockQty > 0)
+            if (totalPendingStockQty > 0 && hasActiveUnissuedStock)
             {
                 try
                 {
@@ -99,14 +106,15 @@ namespace Impulse.Services.Production
                         SourceEntityRefId = orderNo,
                         TargetRole = "Stock",
                         Title = $"Finish Stock Issuance Request for Order #{orderNo}",
-                        Description = $"PPC has planned Finish Stock issuance of {totalStockQty:N0} pcs across {stockItemsCount} items for Customer Order #{orderNo}. Please review and issue from store.",
+                        Description = $"PPC has planned Finish Stock issuance of {totalPendingStockQty:N0} pending pcs across {pendingStockItemsCount} items for Customer Order #{orderNo}. Please review and issue from store.",
                         ActionUrl = $"/stock/stock-order-adjustment?orderNo={orderNo}",
                         Priority = 2, // High
                         DueDate = DateTime.Today.AddDays(2),
-                        CreatedBy = plannerUser
+                        CreatedBy = plannerUser,
+                        UpdateExistingIfExists = true
                     });
 
-                    _logger.LogInformation("Finish stock issuance task dispatched for Order #{OrderNo} ({StockQty} pcs)", orderNo, totalStockQty);
+                    _logger.LogInformation("Finish stock issuance task dispatched for Order #{OrderNo} ({PendingStockQty} pending pcs)", orderNo, totalPendingStockQty);
                 }
                 catch (Exception ex)
                 {
@@ -114,11 +122,12 @@ namespace Impulse.Services.Production
                 }
             }
 
-            // ── 1b. Semi-Finished (SF) Stock Role Task & Notification ────────
-            int totalSFQty = request.Items.Sum(i => i.SFStockQty);
-            int sfItemsCount = request.Items.Count(i => i.SFStockQty > 0);
+            // ── 1b. Semi-Finished (SF) Stock Role Task & Notification (Pending SF Stock Only) ──
+            int totalPendingSFQty = request.Items.Sum(i => i.SFStockAllocations.Sum(a => Math.Max(0, a.AllocatedQty - a.AlreadyIssuedQty)));
+            int pendingSfItemsCount = request.Items.Count(i => i.SFStockAllocations.Sum(a => Math.Max(0, a.AllocatedQty - a.AlreadyIssuedQty)) > 0);
+            bool hasActiveUnissuedSF = request.Items.Any(i => !i.IsLockedInUi && i.SFStockAllocations.Sum(a => Math.Max(0, a.AllocatedQty - a.AlreadyIssuedQty)) > 0);
 
-            if (totalSFQty > 0)
+            if (totalPendingSFQty > 0 && hasActiveUnissuedSF)
             {
                 try
                 {
@@ -128,14 +137,15 @@ namespace Impulse.Services.Production
                         SourceEntityRefId = orderNo,
                         TargetRole = "Stock",
                         Title = $"Semi-Finished Stock Issuance for Order #{orderNo}",
-                        Description = $"PPC has planned Semi-Finished stock issuance of {totalSFQty:N0} pcs across {sfItemsCount} items for Customer Order #{orderNo}. Please issue via 'Maker Issuance from SF' to return to production.",
+                        Description = $"PPC has planned Semi-Finished stock issuance of {totalPendingSFQty:N0} pending pcs across {pendingSfItemsCount} items for Customer Order #{orderNo}. Please issue via 'Maker Issuance from SF' to return to production.",
                         ActionUrl = $"/production/maker-issuance-from-sf?orderNo={orderNo}&returnUrl={Uri.EscapeDataString($"/production/order-planning?orderNo={orderNo}")}",
                         Priority = 2, // High
                         DueDate = DateTime.Today.AddDays(2),
-                        CreatedBy = plannerUser
+                        CreatedBy = plannerUser,
+                        UpdateExistingIfExists = true
                     });
 
-                    _logger.LogInformation("Semi-finished stock task dispatched for Order #{OrderNo} ({SFQty} pcs)", orderNo, totalSFQty);
+                    _logger.LogInformation("Semi-finished stock task dispatched for Order #{OrderNo} ({PendingSFQty} pending pcs)", orderNo, totalPendingSFQty);
                 }
                 catch (Exception ex)
                 {
@@ -143,18 +153,22 @@ namespace Impulse.Services.Production
                 }
             }
 
-            // ── 2. Purchaser User Role Task & Notification ───────────────────
-            int totalPurchaseQty = request.Items.Sum(i => i.TotalPurchaseQty);
-            int purchaseItemsCount = request.Items.Count(i => i.TotalPurchaseQty > 0);
+            // ── 2. Purchaser User Role Task & Notification (Pending Unissued POs Only) ──
+            int totalPendingPurchaseQty = request.Items.Sum(i =>
+                i.Purchases.Where(IsPendingUnissuedPurchase).Sum(p => p.PurchaseQty));
+            int pendingPurchaseItemsCount = request.Items.Count(i =>
+                i.Purchases.Any(IsPendingUnissuedPurchase));
+            bool hasActiveUnissuedPurchase = request.Items.Any(i =>
+                !i.IsLockedInUi && i.Purchases.Any(IsPendingUnissuedPurchase));
 
-            if (totalPurchaseQty > 0)
+            if (totalPendingPurchaseQty > 0 && hasActiveUnissuedPurchase)
             {
                 try
                 {
                     var purchaseSummaryList = new List<string>();
-                    foreach (var item in request.Items.Where(i => i.Purchases.Any(p => p.PurchaseQty > 0)))
+                    foreach (var item in request.Items.Where(i => i.Purchases.Any(IsPendingUnissuedPurchase)))
                     {
-                        foreach (var p in item.Purchases.Where(p => p.PurchaseQty > 0))
+                        foreach (var p in item.Purchases.Where(IsPendingUnissuedPurchase))
                         {
                             string makerPart = !string.IsNullOrEmpty(p.MakerName) ? $" with {p.MakerName}" : "";
                             purchaseSummaryList.Add($"• {item.CompItemID}: {p.PurchaseQty:N0} pcs at [{p.ProcessName}]{makerPart}");
@@ -170,14 +184,15 @@ namespace Impulse.Services.Production
                         SourceEntityRefId = orderNo,
                         TargetRole = "Purchaser",
                         Title = $"Maker Purchase Orders Required for Order #{orderNo}",
-                        Description = $"PPC has planned Maker POs for {totalPurchaseQty:N0} pcs across {purchaseItemsCount} items for Customer Order #{orderNo}.\n{summaryText}\nPlease generate Maker Purchase Orders.",
+                        Description = $"PPC has planned Maker POs for {totalPendingPurchaseQty:N0} pending pcs across {pendingPurchaseItemsCount} items for Customer Order #{orderNo}.\n{summaryText}\nPlease generate Maker Purchase Orders.",
                         ActionUrl = $"/production/maker-orders?orderNo={orderNo}",
                         Priority = 2, // High
                         DueDate = DateTime.Today.AddDays(3),
-                        CreatedBy = plannerUser
+                        CreatedBy = plannerUser,
+                        UpdateExistingIfExists = true
                     });
 
-                    _logger.LogInformation("Purchaser role task dispatched for Order #{OrderNo} ({PurchaseQty} pcs)", orderNo, totalPurchaseQty);
+                    _logger.LogInformation("Purchaser role task dispatched for Order #{OrderNo} ({PendingPurchaseQty} pending pcs)", orderNo, totalPendingPurchaseQty);
                 }
                 catch (Exception ex)
                 {
@@ -185,11 +200,11 @@ namespace Impulse.Services.Production
                 }
             }
 
-            // ── 3. Hub Supervisors Tasks (Per Item & Hub) ─────────────────────
-            foreach (var item in request.Items)
+            // ── 3. Hub Supervisors Tasks (Active/Unlocked Items with In-House Production Only) ──
+            foreach (var item in request.Items.Where(i => !i.IsLockedInUi && (i.IsPlanned || i.HasDeltaQty)))
             {
                 // Only dispatch hub tasks if manufacturing quantity is allocated
-                if (item.ProductionQty <= 0 && !item.HubSchedules.Any(h => h.PlannedQty > 0))
+                if (item.ProductionQty <= 0)
                 {
                     continue;
                 }

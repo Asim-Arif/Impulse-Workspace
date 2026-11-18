@@ -1,4 +1,5 @@
 @page "/payroll/gate-pass"
+@using BlazorContextMenu
 @using DataAccessLibrary.Models.ViewModels.Payroll
 @using Impulse.Services.Payroll
 @using Impulse.Services
@@ -12,6 +13,10 @@
     .blazored-typeahead { height: 35px !important; min-height: 35px !important; padding: 0 !important; box-sizing: border-box !important; }
     .blazored-typeahead__controls { min-height: 35px !important; height: 35px !important; }
     .blazored-typeahead__input { height: 33px !important; }
+    .blazor-context-menu { max-height: 40vh; overflow-y: auto; }
+    .win11-menu-item { font-size: 0.85rem !important; padding: 6px 14px !important; display: flex !important; align-items: center !important; }
+    .win11-icon { width: 20px !important; margin-right: 8px !important; text-align: center !important; }
+    .win11-section-header { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: #6c757d; padding: 4px 14px; }
 </style>
 
 <div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
@@ -47,9 +52,9 @@
                 </div>
             </div>
 
-            <!-- Toolbar: Department & Date Selector -->
+            <!-- Toolbar: Department, Date & Employee Search -->
             <div class="row g-3 align-items-end mb-4 toolbar-row">
-                <div class="col-md-5">
+                <div class="col-md-4">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Department</label>
                     <BlazoredTypeahead SearchMethod="SearchDepartments"
                                        Value="SelectedDepartment"
@@ -65,16 +70,29 @@
                     </BlazoredTypeahead>
                 </div>
 
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Attendance Date</label>
                     <input type="date" class="form-control form-control-sm"
                            value="@SelectedDate.ToString("yyyy-MM-dd")"
                            @onchange="OnDateChanged" style="height:35px;" />
                 </div>
 
-                <div class="col-md-3 text-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Search Employee</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light text-secondary border-end-0" style="height:35px;">
+                            <i class="fas fa-search"></i>
+                        </span>
+                        <input type="text" class="form-control form-control-sm border-start-0 ps-0"
+                               placeholder="Search by Emp ID or Name..."
+                               @bind="SearchText" @bind:event="oninput"
+                               style="height:35px;" />
+                    </div>
+                </div>
+
+                <div class="col-md-2 text-end">
                     <span class="badge bg-light text-dark border px-3 py-2" style="font-size:0.85rem;">
-                        <i class="fas fa-users me-1 text-primary"></i> Present Staff: <strong>@Rows.Count</strong>
+                        <i class="fas fa-users me-1 text-primary"></i> Staff: <strong>@FilteredRows.Count</strong>
                     </span>
                 </div>
             </div>
@@ -107,20 +125,20 @@
                                 </td>
                             </tr>
                         }
-                        else if (!Rows.Any())
+                        else if (!FilteredRows.Any())
                         {
                             <tr>
                                 <td colspan="9" class="text-center py-5 text-muted">
                                     <i class="fas fa-info-circle me-2"></i>
-                                    No present employees found for the selected department & date.
+                                    No present employees found for the selected department &amp; date.
                                 </td>
                             </tr>
                         }
                         else
                         {
-                            @foreach (var row in Rows)
+                            @foreach (var row in FilteredRows)
                             {
-                                <tr class="@(row.IsSelected ? "table-active" : "")">
+                                <ContextMenuTrigger WrapperTag="tr" MenuId="rowContextMenu" Data="@row" CssClass="@(row.IsSelected ? "table-active" : "")">
                                     <td class="text-center">
                                         <input class="form-check-input" type="checkbox" @bind="row.IsSelected" />
                                     </td>
@@ -177,7 +195,7 @@
                                             <i class="fas fa-pencil-alt"></i>
                                         </button>
                                     </td>
-                                </tr>
+                                </ContextMenuTrigger>
                             }
                         }
                     </tbody>
@@ -238,3 +256,13 @@
         </div>
     </div>
 }
+
+<ContextMenu Id="rowContextMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <Item OnClick="OnContextMenuEdit" CssClass="win11-menu-item">
+        <i class="fas fa-pencil-alt win11-icon text-primary"></i>Edit Gate Pass Details
+    </Item>
+    <Seperator />
+    <Item OnClick="OnContextMenuPrint" CssClass="win11-menu-item">
+        <i class="fas fa-print win11-icon text-success"></i>Print Gate Pass
+    </Item>
+</ContextMenu>

@@ -83,6 +83,7 @@ namespace Impulse.Constants
 
 
             public const string DailyOverTime          = Folder + "DailyOverTime.rpt";
+            public const string EmployeesGatePass      = Folder + "Employees_Gate_Pass.rpt";
 
             // Biometric Ledger / Daily Attendance Reports
             public const string MonthlyAttendanceStatus = Folder + "MonthlyAttendanceStatus.rpt";

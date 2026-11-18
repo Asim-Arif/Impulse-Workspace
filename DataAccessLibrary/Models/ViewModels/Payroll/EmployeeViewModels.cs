@@ -27,6 +27,9 @@ namespace DataAccessLibrary.Models.ViewModels.Payroll
         public string DeptID { get; set; } = string.Empty;
         public string DeptName { get; set; } = string.Empty;
         public byte[]? EmpPic { get; set; }
+        public bool BankPymt { get; set; }
+        public string EmpAccNo { get; set; } = string.Empty;
+        public int TaxAmt { get; set; }
     }
 
     public class EmployeeInActiveDetailsModel
@@ -94,29 +97,29 @@ namespace DataAccessLibrary.Models.ViewModels.Payroll
         public DateTime? DiscontinuedOn { get; set; }
         public byte[]? ThumbExp { get; set; }
         public bool Transport { get; set; }
-        public bool? ExemptSettings { get; set; }
+        public bool? ExemptSettings { get; set; } = false;
         public int EmployeeID { get; set; }
 
         [Required(ErrorMessage = "Please Select Blood Group.")]
         public string BloodGroup { get; set; } = string.Empty;
 
         public string ProcessID { get; set; } = string.Empty;
-        public bool? BankPymt { get; set; }
-        public bool? ShowInExternal { get; set; }
+        public bool? BankPymt { get; set; } = false;
+        public bool? ShowInExternal { get; set; } = false;
         public string EmergencyName { get; set; } = string.Empty;
         public string EmergencyFName { get; set; } = string.Empty;
         public string EmergencyPhone1 { get; set; } = string.Empty;
         public string EmergencyPhone2 { get; set; } = string.Empty;
         public string EmergencyAddress { get; set; } = string.Empty;
-        public bool? OTByQty { get; set; }
+        public bool? OTByQty { get; set; } = false;
         public float? MinQty { get; set; }
-        public bool? UnionFund { get; set; }
-        public bool? Lunch { get; set; }
+        public bool? UnionFund { get; set; } = false;
+        public bool? Lunch { get; set; } = false;
         public int? TaxAmt { get; set; }
         public DateTime? InsurableDT { get; set; }
-        public bool? ArmyRetired { get; set; }
+        public bool? ArmyRetired { get; set; } = false;
         public string EmpAccNo { get; set; } = string.Empty;
-        public bool? PerPieceRate { get; set; }
+        public bool? PerPieceRate { get; set; } = false;
         public float? Rate { get; set; }
         public string MainContractorID { get; set; } = string.Empty;
         public DateTime? EntryDT { get; set; }
@@ -214,14 +217,14 @@ namespace DataAccessLibrary.Models.ViewModels.Payroll
         public float? AdvSalPer { get; set; }
         public float? LongTermTime { get; set; }
         public string LongTermLimit { get; set; } = string.Empty;
-        public bool? BGHoliday { get; set; }
-        public bool? AGHoliday { get; set; }
-        public bool? BPHoliday { get; set; }
-        public bool? APHoliday { get; set; }
+        public bool? BGHoliday { get; set; } = false;
+        public bool? AGHoliday { get; set; } = false;
+        public bool? BPHoliday { get; set; } = false;
+        public bool? APHoliday { get; set; } = false;
         public float? WorkingHrs { get; set; }
-        public bool? AllowMultiple { get; set; }
-        public bool? DeductAbsents { get; set; }
-        public bool? DeductLHrs { get; set; }
+        public bool? AllowMultiple { get; set; } = false;
+        public bool? DeductAbsents { get; set; } = false;
+        public bool? DeductLHrs { get; set; } = false;
         public string LunchInTime { get; set; } = "12:30";
         public string LunchOutTime { get; set; } = "13:30";
     }
@@ -263,7 +266,7 @@ namespace DataAccessLibrary.Models.ViewModels.Payroll
         public int? AntiHcv { get; set; }
         public int? BloodSugar { get; set; }
         public int? BloodPressure { get; set; }
-        public bool? Allergy { get; set; }
+        public bool? Allergy { get; set; } = false;
         public string AllergyDescription { get; set; } = string.Empty;
     }
 
@@ -297,8 +300,8 @@ namespace DataAccessLibrary.Models.ViewModels.Payroll
         public string Class { get; set; } = string.Empty;
         public string Institute { get; set; } = string.Empty;
         public string Occupation { get; set; } = string.Empty;
-        public bool? Male { get; set; }
-        public bool? Dependent { get; set; }
+        public bool? Male { get; set; } = false;
+        public bool? Dependent { get; set; } = false;
         public DateTime? DOM { get; set; }
         public DateTime? DOD { get; set; }
     }

@@ -37,5 +37,7 @@ namespace Impulse.Pages.Stock.VendorBilling.Tabs
         {
             if (e.Key == "Enter") await AddRow();
         }
+
+        private Task NotifyDataChanged() => OnDataChanged.InvokeAsync();
     }
 }

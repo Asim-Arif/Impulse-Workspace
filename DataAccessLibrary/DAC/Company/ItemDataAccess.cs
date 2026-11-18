@@ -508,6 +508,7 @@ namespace DataAccessLibrary.DAC.Company
             item.ForgingWeight ??= 0;
             item.FinishedWeight ??= 0;
             item.WasteVisible ??= 0;
+            item.MasterCartonTotalPcs ??= 0;
 
             if (isAdd)
             {
@@ -556,7 +557,7 @@ namespace DataAccessLibrary.DAC.Company
                         @PackingInstructions, @PolyBag, @TipCap, @POInustructions,
                         @MasterCartonL, @MasterCartonW, @MasterCartonH,
                         @SmallCartonL, @SmallCartonW, @SmallCartonH,
-                        @SmallBoxPcs, @MasterCartonSmallBoxes, @MasterCartonTotalPcs,
+                        @SmallBoxPcs, @MasterCartonSmallBoxes, ISNULL(@MasterCartonTotalPcs, 0),
                         @FinishDescription1, @FinishDescription2,
                         @MakerDescription1, @MakerDescription2,
                         ISNULL(@InActive, 0), @Sample, @AvailableForECommerce,
@@ -649,7 +650,7 @@ namespace DataAccessLibrary.DAC.Company
                         SmallCartonH        = @SmallCartonH,
                         SmallBoxPcs         = @SmallBoxPcs,
                         MasterCartonSmallBoxes = @MasterCartonSmallBoxes,
-                        MasterCartonTotalPcs   = @MasterCartonTotalPcs,
+                        MasterCartonTotalPcs   = ISNULL(@MasterCartonTotalPcs, 0),
                         FinishDescription1  = @FinishDescription1,
                         FinishDescription2  = @FinishDescription2,
                         MakerDescription1   = @MakerDescription1,

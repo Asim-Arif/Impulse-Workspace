@@ -157,6 +157,7 @@ namespace DataAccessLibrary.DAC.Payroll
                         int fullFlag  = (input.DurationMode == "FullDay") ? 1 : 0;
                         int deductFlag = input.WithDeduction ? 1 : 0;
                         int attCode   = input.IsAbsent ? 0 : (input.WithDeduction ? 3 : 2);
+                        byte? halfDayType = (input.DurationMode == "HalfDay") ? (input.HalfDayType ?? (byte)1) : null;
 
                         // Validate allowed column names for leaves
                         string validCode = "CL";
@@ -180,21 +181,22 @@ namespace DataAccessLibrary.DAC.Payroll
                             if (!input.IsAbsent)
                             {
                                 string leaveSql = $@"
-                                    INSERT INTO Leaves(EmpID, DT, AuthPerson, Reason, [From], [To], [Full], Hrs, Deduct, {validCode})
-                                    VALUES(@EmpID, @DT, @AuthPerson, @Reason, @FromTime, @ToTime, @FullFlag, @Hrs, @DeductFlag, @LeaveVal)";
+                                    INSERT INTO Leaves(EmpID, DT, AuthPerson, Reason, [From], [To], [Full], Hrs, Deduct, HalfDayType, {validCode})
+                                    VALUES(@EmpID, @DT, @AuthPerson, @Reason, @FromTime, @ToTime, @FullFlag, @Hrs, @DeductFlag, @HalfDayType, @LeaveVal)";
 
                                 await db.ExecuteAsync(leaveSql, new
                                 {
-                                    EmpID      = input.EmpID,
-                                    DT         = dt,
-                                    AuthPerson = input.AuthPerson,
-                                    Reason     = input.Reason,
-                                    FromTime   = input.FromTime,
-                                    ToTime     = input.ToTime,
-                                    FullFlag   = fullFlag,
-                                    Hrs        = dHrs,
-                                    DeductFlag = deductFlag,
-                                    LeaveVal   = dLeave
+                                    EmpID       = input.EmpID,
+                                    DT          = dt,
+                                    AuthPerson  = input.AuthPerson,
+                                    Reason      = input.Reason,
+                                    FromTime    = input.FromTime,
+                                    ToTime      = input.ToTime,
+                                    FullFlag    = fullFlag,
+                                    Hrs         = dHrs,
+                                    DeductFlag  = deductFlag,
+                                    HalfDayType = halfDayType,
+                                    LeaveVal    = dLeave
                                 }, trans);
                             }
                         }

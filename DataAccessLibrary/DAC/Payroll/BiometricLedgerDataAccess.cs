@@ -144,6 +144,53 @@ namespace DataAccessLibrary.DAC.Payroll
             }
         }
 
+        public async Task LogMachineReadAsync(
+            string userName,
+            string clientIp,
+            string machineIp,
+            int machineNo,
+            DateTime readStartTime,
+            DateTime readEndTime,
+            int totalRecordsRead,
+            int totalTransferred,
+            string remarks)
+        {
+            try
+            {
+                static string? Truncate(string? value, int maxLen) =>
+                    string.IsNullOrEmpty(value) ? value : (value.Length <= maxLen ? value : value.Substring(0, maxLen));
+
+                using (IDbConnection db = new SqlConnection(_connectionString))
+                {
+                    const string sql = @"
+                        INSERT INTO AttendanceMachineReadLog (
+                            UserName, ClientIPAddress, MachineIPAddress, MachineNo,
+                            ReadStartTime, ReadEndTime, TotalRecordsRead, TotalTransferred, Remarks
+                        ) VALUES (
+                            @UserName, @ClientIPAddress, @MachineIPAddress, @MachineNo,
+                            @ReadStartTime, @ReadEndTime, @TotalRecordsRead, @TotalTransferred, @Remarks
+                        );";
+
+                    await db.ExecuteAsync(sql, new
+                    {
+                        UserName         = Truncate(userName, 100),
+                        ClientIPAddress  = Truncate(clientIp, 50),
+                        MachineIPAddress = Truncate(machineIp, 50),
+                        MachineNo        = machineNo,
+                        ReadStartTime    = readStartTime,
+                        ReadEndTime      = readEndTime,
+                        TotalRecordsRead = totalRecordsRead,
+                        TotalTransferred = totalTransferred,
+                        Remarks          = Truncate(remarks, 500)
+                    });
+                }
+            }
+            catch
+            {
+                // Avoid interrupting attendance processing if audit logging fails
+            }
+        }
+
         // ── Report Staging Stored Procedures ──────────────────────────────────────
 
         public async Task ExecutePrintDailyAbsentLeaveDetailAsync(DateTime date)

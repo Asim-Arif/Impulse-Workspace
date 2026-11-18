@@ -7832,3 +7832,1611 @@ BEGIN
     CREATE INDEX IX_PPC_Exceptions_Order_Item ON dbo.PPC_Order_Planning_Exceptions(OrderNo, ItemID, CreatedAt DESC);
 END
 GO
+-- =============================================================================
+-- METRO SYNC DELTA (2026-11-17) - Idempotent Additions & Updates
+-- =============================================================================
+SET NOCOUNT ON;
+GO
+IF OBJECT_ID(N'[dbo].[Items_Parts]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[Items_Parts] (
+        [EntryID] [int] IDENTITY(1, 1) NOT NULL,
+        [ItemID] [varchar](50) NOT NULL,
+        [ItemID_Part] [varchar](50) NOT NULL,
+        [Qty] [real] NULL,
+        [ProcessID] [int] NULL,
+        CONSTRAINT [PK_Items_Parts] PRIMARY KEY CLUSTERED ([ItemID] ASC, [ItemID_Part] ASC)
+    );
+END
+GO
+IF OBJECT_ID(N'[dbo].[PTC_Printing]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[PTC_Printing] (
+        [OrderNo] [varchar](50) NULL,
+        [ItemCode] [varchar](50) NULL,
+        [Qty] [int] NULL,
+        [CustCode] [varchar](50) NULL,
+        [Country] [varchar](50) NULL,
+        [DT] [datetime] NULL,
+        [ItemName] [varchar](255) NULL,
+        [ItemSize] [varchar](255) NULL,
+        [SizeUnit] [varchar](50) NULL,
+        [Type] [varchar](50) NULL,
+        [Packaging] [varchar](50) NULL,
+        [DeliveryDT] [datetime] NULL,
+        [SNo] [int] NULL,
+        [ProcessID] [int] NULL,
+        [Description] [varchar](255) NULL,
+        [RcvdQty] [int] NULL,
+        [LotNo] [varchar](50) NULL,
+        [VendID] [int] NULL,
+        [VenderName] [varchar](255) NULL,
+        [RcvDT] [datetime] NULL,
+        [IssDT] [datetime] NULL,
+        [MinProcessID] [int] NULL,
+        [Wastage] [int] NULL,
+        [PassQty] [int] NULL,
+        [EmpID] [varchar](50) NULL,
+        [Name] [varchar](255) NULL,
+        [ReWorkQty] [int] NULL,
+        [CompItemCode] [varchar](50) NULL,
+        [Code] [varchar](50) NULL,
+        [ProcessNameUrdu] [nvarchar](255) NULL,
+        [ItemNameUrdu] [nvarchar](255) NULL,
+        [RcvEmpName] [varchar](50) NULL,
+        [Rate] [real] NULL,
+        [MasterPONo] [varchar](50) NULL,
+        [SteelBatchNo] [varchar](50) NULL,
+        [ForgeBatchNo] [varchar](50) NULL,
+        [SFRemarks] [varchar](255) NULL,
+        [SplitQty] [int] NULL,
+        [SplitType] [tinyint] NULL,
+        [ToOrderNo] [varchar](50) NULL,
+        [ToLotNo] [varchar](50) NULL,
+        [FromOrderNo] [varchar](50) NULL,
+        [FromLotNo] [varchar](50) NULL,
+        [SplitQtyFrom] [int] NULL,
+        [FromItemCode] [varchar](50) NULL,
+        [ToItemCode] [varchar](50) NULL,
+        [RecieptID] [varchar](50) NULL,
+        [IssSFLotNo] [varchar](50) NULL,
+        [IssSFRemarks] [varchar](50) NULL,
+        [IssSFQty] [int] NULL,
+        [LotLastEntryID] [int] NULL,
+        [ShippedQty] [int] NULL,
+        [FromLotPolisher] [varchar](50) NULL,
+        [FromLotOriginator] [varchar](50) NULL,
+        [RcvTemperValue] [varchar](50) NULL,
+        [IssSpecialInstructions] [varchar](50) NULL,
+        [InternalRefNo] [varchar](50) NULL,
+        [PGReference] [varchar](50) NULL,
+        [ReceivedEntryID] [int] NULL,
+        [Employees] [varchar](255) NULL,
+        [Quality] [varchar](255) NULL,
+        [RepairLots] [varchar](255) NULL,
+        [LotTransferRemarks] [varchar](255) NULL,
+        [LotTransferRemarksFrom] [varchar](255) NULL,
+        [UserName] [varchar](50) NULL,
+        [MachineName] [varchar](50) NULL,
+        [Hub_Name] [varchar](50) NULL,
+        [VI_DT] [datetime] NULL,
+        [VID_Batch_No] [varchar](50) NULL,
+        [MasterPODT] [datetime] NULL,
+        [StoreName] [varchar](50) NULL,
+        [Location] [varchar](50) NULL,
+        [Lots_List_Batch_No] [varchar](50) NULL,
+        [Reference_LotNo] [varchar](50) NULL,
+        [Mill_Certificate_No] [varchar](50) NULL,
+        [Mill_Certificate_No_From_RM] [varchar](50) NULL,
+        [HRC_From] [int] NULL,
+        [HRC_To] [int] NULL,
+        [Lots_List_Forge_Batch_No] [varchar](50) NULL,
+        [FinQuality] [varchar](50) NULL,
+        [SpecialInstructions_FCC] [varchar](50) NULL,
+        [StampInstructions] [varchar](50) NULL,
+        [PackingInstructions] [varchar](50) NULL,
+        [MDMA] [varchar](50) NULL,
+        [SFDA_Listing_No] [varchar](50) NULL,
+        [MD_Group] [varchar](50) NULL,
+        [ItemPic] [image] NULL,
+        [FOI_Stamps] [varchar](50) NULL,
+        [SpecialInstruction] [varchar](50) NULL,
+        [BatchNo] [varchar](50) NULL,
+        [Maker_Second_Name] [varchar](50) NULL,
+        [Finishing] [varchar](50) NULL,
+        [ItemOrderNo] [varchar](50) NULL,
+        [DeliveryDate] [datetime] NULL,
+        [ItemRemarks] [varchar](50) NULL,
+        [VI_UserName] [varchar](50) NULL,
+        [VI_MachineName] [varchar](50) NULL,
+        [IssEmpID] [varchar](50) NULL,
+        [Iss_Emp_Name] [varchar](50) NULL
+    );
+END
+GO
+IF EXISTS (
+    SELECT 1
+    FROM sys.columns c
+    JOIN sys.types ty ON c.user_type_id = ty.user_type_id
+    WHERE c.object_id = OBJECT_ID(N'[dbo].[MiscEntries_GateOut_Details]') AND c.name = N'Qty' AND (ty.name <> N'real' OR c.is_nullable = 0)
+)
+BEGIN
+    ALTER TABLE [dbo].[MiscEntries_GateOut_Details] ALTER COLUMN [Qty] [real] NULL;
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[vendRcvdDetail]') AND name = N'IX_vendRcvdDetail_RefID_ItemCode')
+BEGIN
+    CREATE NONCLUSTERED INDEX [IX_vendRcvdDetail_RefID_ItemCode] ON [dbo].[vendRcvdDetail] ([RefID] ASC, [ItemCode] ASC) INCLUDE ([EntryID], [RecieptID], [LotNo], [OrderNo], [RcvdQty], [Wastage], [LostQty], [ReWorkQty], [ReWorkLot], [IssQty], [Opening_RefID], [Issue_RefID]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[VendReceived]') AND name = N'IX_VendReceived_DT')
+BEGIN
+    CREATE NONCLUSTERED INDEX [IX_VendReceived_DT] ON [dbo].[VendReceived] ([DT] ASC) INCLUDE ([EntryID], [VendID], [ProcessID], [Issuance_RefID], [EmpID], [UserID]);
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[VendReceived_Employees]') AND name = N'IX_VendReceived_Employees_VR_RefID')
+BEGIN
+    CREATE NONCLUSTERED INDEX [IX_VendReceived_Employees_VR_RefID] ON [dbo].[VendReceived_Employees] ([VR_RefID] ASC, [EmpID] ASC);
+END
+GO
+IF OBJECT_ID(N'[dbo].[Items_Parts]', N'U') IS NOT NULL
+   AND OBJECT_ID(N'[dbo].[Items]', N'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_Items_Parts_Items' AND parent_object_id = OBJECT_ID(N'[dbo].[Items_Parts]'))
+BEGIN
+    ALTER TABLE [dbo].[Items_Parts] WITH NOCHECK ADD CONSTRAINT [FK_Items_Parts_Items] FOREIGN KEY ([ItemID]) REFERENCES [dbo].[Items] ([ItemID]) ON DELETE CASCADE ON UPDATE CASCADE;
+END
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VendReceived_Employees_F]') AND type IN (N'FN', N'IF', N'TF'))
+BEGIN
+    DROP FUNCTION [dbo].[VendReceived_Employees_F];
+END
+GO
+CREATE   FUNCTION [dbo].[VendReceived_Employees_F] (@EntryID INT)
+RETURNS VARCHAR(1000)
+AS
+BEGIN
+    DECLARE @ReturnStr AS VARCHAR(1000);
+
+    SELECT @ReturnStr = STUFF((
+        SELECT ', ' + E.Name
+        FROM dbo.VendReceived_Employees VRE
+        INNER JOIN dbo.Employees E ON VRE.EmpID = E.EmpID
+        WHERE VRE.VR_RefID = @EntryID
+        FOR XML PATH(''), TYPE
+    ).value('.', 'NVARCHAR(MAX)'), 1, 2, '');
+
+    RETURN ISNULL(@ReturnStr, '');
+END
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VDispatchList]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VDispatchList];
+END
+GO
+CREATE VIEW [dbo].[VDispatchList]
+AS
+SELECT dbo.DispatchList.DispatchListNo, dbo.DispatchList.DT, CASE WHEN NewFormat = 1 THEN T2.TotalCartons ELSE T1.TotalCartons END AS TotalCartons, dbo.DispatchList.EntryID, dbo.DispatchList.NewFormat, dbo.DispatchList.Finalyzed, dbo.DispatchList.FinalyzedDT, dbo.DispatchList.FinalyzedUserName, dbo.DispatchList.FinalyzedMachineName, dbo.DispatchList.CustCode, 
+         T2.TotalQty
+         ,dbo.DispatchList.UserName , dbo.DispatchList.MachineName , dbo.DispatchList.EntryDT , dbo.DispatchList.Country 
+FROM  dbo.DispatchList LEFT OUTER JOIN
+             (SELECT dbo.DispatchListDetails_Adv.RefID, MAX(dbo.DispatchListDetail_Cartons.CartonTo) AS TotalCartons
+            FROM  dbo.DispatchListDetail_Cartons INNER JOIN
+                     dbo.DispatchListDetails_Adv ON dbo.DispatchListDetails_Adv.EntryID = dbo.DispatchListDetail_Cartons.RefID
+            GROUP BY dbo.DispatchListDetails_Adv.RefID) AS T1 ON dbo.DispatchList.EntryID = T1.RefID LEFT OUTER JOIN
+             (SELECT DispatchListDetails_Adv_1.RefID, MAX(dbo.DispatchListDetail_Inners.CartonNo) AS TotalCartons, SUM(dbo.DispatchListDetail_Inners.Qty) AS TotalQty
+            FROM  dbo.DispatchListDetail_Inners INNER JOIN
+                     dbo.DispatchListDetails_Adv AS DispatchListDetails_Adv_1 ON DispatchListDetails_Adv_1.EntryID = dbo.DispatchListDetail_Inners.RefID
+            GROUP BY DispatchListDetails_Adv_1.RefID) AS T2 ON dbo.DispatchList.EntryID = T2.RefID
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VEmpTimes2]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VEmpTimes2];
+END
+GO
+CREATE VIEW [dbo].[VEmpTimes2]
+AS
+SELECT     TOP 100 PERCENT dbo.Employees.empid, dbo.Employees.deptid, dbo.Employees.name, dbo.Employees.fname, dbo.Employees.Rel, dbo.Employees.Active, 
+                      dbo.VEmpDailyEntries.DT, EmpTimes_1.InTime AS FirstInTime, EmpTimes_1.OutTime AS FirstOutTime, EmpTimes_2.InTime AS SecondInTime, 
+                      EmpTimes_2.OutTime AS SecondOutTime, EmpTimes_3.InTime AS OTInTime, EmpTimes_3.OutTime AS OTOutTime, dbo.VEmpDailyEntries.FirstEntryID, 
+                      ISNULL(EmpTimes_1.Hrs, 0) + ISNULL(EmpTimes_2.Hrs, 0) AS Hrs, ISNULL(EmpTimes_1.PayableHrs, 0) + ISNULL(EmpTimes_2.PayableHrs, 0) AS PayableHrs, 
+                      ISNULL(EmpTimes_3.Hrs, 0) AS OTHrs, dbo.VEmpDailyEntries.TotalEntries, dbo.VEmpDailyEntries.SecondEntryID, dbo.VEmpDailyEntries.OverTimeEntryID, 
+                      dbo.VEmpSettings.LunchInTime, dbo.VEmpSettings.LunchOutTime,AttendanceSheet.LateHours
+FROM         dbo.VEmpDailyEntries INNER JOIN
+                      dbo.Employees ON dbo.VEmpDailyEntries.EmpID = dbo.Employees.empid LEFT OUTER JOIN
+                      dbo.VEmpSettings ON dbo.Employees.empid = dbo.VEmpSettings.empid LEFT OUTER JOIN
+                      dbo.VEmpPayableHrs EmpTimes_1 ON dbo.VEmpDailyEntries.FirstEntryID = EmpTimes_1.EntryID LEFT OUTER JOIN
+                      dbo.VEmpPayableHrs EmpTimes_2 ON dbo.VEmpDailyEntries.SecondEntryID = EmpTimes_2.EntryID LEFT OUTER JOIN
+                      dbo.VEmpPayableHrsOverTime EmpTimes_3 ON dbo.VEmpDailyEntries.OverTimeEntryID = EmpTimes_3.EntryID
+					  INNER JOIN AttendanceSheet ON EmpTimes_1.EmpID=AttendanceSheet.EmpID AND EmpTimes_1.DT=AttendanceSheet.DT
+ORDER BY dbo.Employees.empid
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VFCustomers]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VFCustomers];
+END
+GO
+CREATE VIEW [dbo].[VFCustomers]
+AS
+SELECT        dbo.ForeignCustomers.CustCode, dbo.ForeignCustomers.Country, dbo.ForeignCustomers.Name, dbo.ForeignCustomers.Address, dbo.ForeignCustomers.FakeAddress, dbo.ForeignCustomers.Phone1, 
+                         dbo.ForeignCustomers.Phone2, dbo.ForeignCustomers.Phone3, dbo.ForeignCustomers.Email1, dbo.ForeignCustomers.Email2, dbo.ForeignCustomers.Fax1, dbo.ForeignCustomers.Fax2, dbo.ForeignCustomers.Fax3, 
+                         dbo.ForeignCustomers.URL, dbo.ForeignCustomers.Curr, dbo.ForeignCustomers.Cont1name, dbo.ForeignCustomers.cont1phone, dbo.ForeignCustomers.cont1email, dbo.ForeignCustomers.cont1Mobile, 
+                         dbo.ForeignCustomers.Cont1Skype, dbo.ForeignCustomers.cont2name, dbo.ForeignCustomers.cont2phone, dbo.ForeignCustomers.cont2email, dbo.ForeignCustomers.cont2Mobile, dbo.ForeignCustomers.Cont2Skype, 
+                         dbo.ForeignCustomers.AgentName, dbo.ForeignCustomers.AgentAddress, dbo.ForeignCustomers.AgentPhone1, dbo.ForeignCustomers.AgentPhone2, dbo.ForeignCustomers.AgentFax1, dbo.ForeignCustomers.AgentFax2, 
+                         dbo.ForeignCustomers.AgentEmail, dbo.ForeignCustomers.AgentWeb, dbo.ForeignCustomers.ACName, dbo.ForeignCustomers.ACPhone, dbo.ForeignCustomers.ACMobile, dbo.ForeignCustomers.AgentURL, 
+                         dbo.ForeignCustomers.ACEmail, dbo.ForeignCustomers.DTFormat, dbo.ForeignCustomers.Active, dbo.ForeignCustomers.AccNo, dbo.ForeignCustomers.NearestAirport, dbo.ForeignCustomers.NearestRailwaystation, 
+                         dbo.ForeignCustomers.FedexNo, dbo.ForeignCustomers.DHLNo, dbo.ForeignCustomers.TradeTerms, dbo.ForeignCustomers.PaymentTerms, dbo.ForeignCustomers.AcceptsExtraQty, dbo.ForeignCustomers.SpecialInstructions, 
+                         dbo.ForeignCustomers.City, dbo.ForeignCustomers.MaxDiscount, dbo.ForeignCustomers.PaymentDays, dbo.ForeignCustomers.LateOrderAlerts, dbo.ForeignCustomers.Customer_Type, 
+                         dbo.ForeignCustomers.OuterPackingLabel, dbo.ForeignCustomers.InnerPackingLabel, dbo.ForeignCustomers.ShowCustomerRef, dbo.ForeignCustomers.FinishingQuality, dbo.ForeignCustomers.Stamps, 
+                         dbo.ForeignCustomers.RcvdVia, dbo.ForeignCustomers.DefaultPort, dbo.ForeignCustomers.DefaultShipMethod, dbo.ForeignCustomers.Cont1Designation, dbo.ForeignCustomers.Cont2Designation, 
+                         dbo.ForeignCustomers.CustomerSource, dbo.ForeignCustomers.Name AS AccTitle, dbo.VPorts.CityID AS DisCityID, dbo.VPorts.City AS DisCity, dbo.VPorts.PortID AS DisPortID, dbo.VPorts.Port AS DisPort, 
+                         dbo.ForeignCustomers.FC_Note_I, dbo.ForeignCustomers.FC_Note_II, dbo.ForeignCustomers.Inner_Label_Manual_I, dbo.ForeignCustomers.Inner_Label_Manual_II
+FROM            dbo.ForeignCustomers LEFT OUTER JOIN
+                         dbo.VPorts ON dbo.ForeignCustomers.DefaultPort = dbo.VPorts.PortID
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER OFF;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VGatePass_Return_Details]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VGatePass_Return_Details];
+END
+GO
+CREATE     VIEW [dbo].[VGatePass_Return_Details]
+AS
+SELECT     dbo.GatePass_Return_Details.EntryID, dbo.GatePass_Return_Details.MEGO_RefID, dbo.GatePass_Return_Details.Detail, 
+                      dbo.GatePass_Return_Details.Unit, dbo.GatePass_Return_Details.Packing, dbo.GatePass_Return_Details.Qty, ISNULL(T1.QtyRcvd, 0) 
+                      AS TotalQtyRcvd
+FROM         dbo.GatePass_Return_Details LEFT OUTER JOIN
+                          (SELECT     ME_GO_D_RefID, SUM(QtyRcvd) AS QtyRcvd
+                             FROM         dbo.GatePass_Return_Receiving_Detail
+                             GROUP BY ME_GO_D_RefID) AS T1 ON dbo.GatePass_Return_Details.EntryID = T1.ME_GO_D_RefID
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VItems]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VItems];
+END
+GO
+CREATE   VIEW [dbo].[VItems]
+AS
+SELECT dbo.Items.CreateDT, dbo.Items.CatID, dbo.Items.ItemID, dbo.Items.ItemName, dbo.Items.Unit, dbo.Items.Type, dbo.Items.ItemSize, dbo.Items.SizeUnit, dbo.Items.ItemUsage, dbo.Items.Attributes, dbo.Items.FinQuality, dbo.Items.SteelUsed, dbo.Items.Gage, dbo.Items.PacknLabel, dbo.Items.AssetAccNo, dbo.Items.SaleAccNo, dbo.Items.SRTAccNo, dbo.Items.FOB, dbo.Items.CIFSea, 
+         dbo.Items.CIFAir, dbo.Items.CnFSea, dbo.Items.CnFAir, dbo.Items.ExWorks, dbo.Items.CnISea, dbo.Items.CnIAir, dbo.Items.ItemCurr, dbo.Items.UnitWeight, dbo.Items.ForgingWeight, dbo.Items.WasteVisible, dbo.Items.FinishedWeight, dbo.Items.InActive, dbo.Items.ItemPic, dbo.Items.RevID, dbo.Items.GroupID, dbo.Items.PlantRate, dbo.Items.SnaffRate, dbo.Items.StampRate, 
+         dbo.Items.ReorderPoint, dbo.Items.FinishDescription1, dbo.Items.FinishDescription2, dbo.Items.MakerDescription1, dbo.Items.MakerDescription2, dbo.Items.Tagging, dbo.Items.EAN128, dbo.Items.CustomDescription, dbo.Items.ItemColor, dbo.Items.PackingInstructions, dbo.Items.MasterCartonL, dbo.Items.MasterCartonW, dbo.Items.MasterCartonH, dbo.Items.SmallCartonL, 
+         dbo.Items.SmallCartonW, dbo.Items.SmallCartonH, dbo.Items.PolyBag, dbo.Items.FixedPackingUnit, dbo.VItemWithStocks.TotalFinishedStock AS InHand, dbo.Items.OpenBal, dbo.Items.ItemNameUrdu, dbo.Items.PriceForCost, dbo.Items.TechnicalDrawing, dbo.Items.TipSize, dbo.Items.MinLevel, dbo.Items.MaxLevel, dbo.Items.ReOrderLevel, dbo.Items.ItemType, dbo.Items.FOBTop, 
+         dbo.Items.CIFSeaTop, dbo.Items.CIFAirTop, dbo.Items.CnFSeaTop, dbo.Items.CnFAirTop, dbo.Items.ExWorksTop, dbo.Items.CnISeaTop, dbo.Items.CnIAirTop, dbo.Items.GTINBarcodeNo, dbo.Items.Description, dbo.Items.UMDNSCode, dbo.Items.FDAListingNo, dbo.Items.FDAProductCode, dbo.Items.EuropeanRegNo, dbo.Items.FDA510K, dbo.Items.ItemMaxLotSize, 
+         dbo.Items.ItemLotSizeBuffer, dbo.Items.ReadyFinishPrice, dbo.Items.FillingPrice, dbo.Items.MainGroupID, dbo.Items.Sample, dbo.Items.Type AS Typ1, Accounts_3.AccTitle AS AssetAccNoText, Accounts_1.AccTitle AS SaleAccNoText, Accounts_2.AccTitle AS SRTAccNoText, dbo.SteelGages.Gage AS SteelGage, dbo.SteelTypes.SteelType, dbo.ItemGroups.Description AS ItemGroup, 
+         dbo.ItemGroups.GrpColor, dbo.ItemCatagories.Description AS Category, dbo.ItemGroupsMain.MainGroupName, dbo.Items.SmallBoxPcs, dbo.Items.MasterCartonSmallBoxes, dbo.Items.AvailableForECommerce, dbo.Items.PicForECommerce, dbo.Items.DescriptionForECommerce, dbo.Items.PriceForECommerce, dbo.Items.GroupIDForECommerce, 
+         dbo.ItemGroups_ECommerce.ECommerceGroupName, dbo.Items.POInustructions, dbo.Items.SFDA_Name, dbo.Items.SFDA_No, dbo.Items.SFDA_Listing, dbo.Items.HRC_From, dbo.Items.HRC_To,
+         dbo.Items.Fig_No, dbo.Items.Scale, dbo.Items.Additional_Detail, dbo.SteelGages.GageUnit, dbo.Items.MakerDescription
+         ,0 AS Parts
+         ,dbo.Items.MasterCartonTotalPcs,dbo.Items.TipCap
+FROM  dbo.SteelTypes RIGHT OUTER JOIN
+         dbo.Items INNER JOIN
+         dbo.ItemCatagories ON dbo.Items.CatID = dbo.ItemCatagories.CatID LEFT OUTER JOIN
+         dbo.ItemGroups_ECommerce ON dbo.Items.GroupIDForECommerce = dbo.ItemGroups_ECommerce.ID LEFT OUTER JOIN
+         dbo.ItemGroupsMain ON dbo.Items.MainGroupID = dbo.ItemGroupsMain.MainGroupID LEFT OUTER JOIN
+         dbo.ItemGroups ON dbo.Items.GroupID = dbo.ItemGroups.ID ON dbo.SteelTypes.SteelID = dbo.Items.SteelUsed LEFT OUTER JOIN
+         dbo.SteelGages ON dbo.Items.Gage = dbo.SteelGages.GageID LEFT OUTER JOIN
+         dbo.Accounts AS Accounts_2 ON dbo.Items.SRTAccNo = Accounts_2.AccNo LEFT OUTER JOIN
+         dbo.Accounts AS Accounts_1 ON dbo.Items.SaleAccNo = Accounts_1.AccNo LEFT OUTER JOIN
+         dbo.Accounts AS Accounts_3 ON dbo.Items.AssetAccNo = Accounts_3.AccNo LEFT OUTER JOIN
+         dbo.VItemWithStocks ON dbo.Items.ItemID = dbo.VItemWithStocks.ItemID
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VItems_Parts]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VItems_Parts];
+END
+GO
+CREATE VIEW [dbo].[VItems_Parts]
+AS
+SELECT dbo.Items_Parts.EntryID, dbo.Items_Parts.ItemID, dbo.Items_Parts.ItemID_Part, dbo.Items_Parts.Qty, dbo.Items_Parts.ProcessID, dbo.Items.ItemName, T1.ItemName AS ItemName_Part, dbo.Processes.Description
+FROM  dbo.Items_Parts INNER JOIN
+         dbo.Items ON dbo.Items.ItemID = dbo.Items_Parts.ItemID INNER JOIN
+         dbo.Items AS T1 ON dbo.Items_Parts.ItemID_Part = T1.ItemID INNER JOIN
+         dbo.Processes ON dbo.Items_Parts.ProcessID = dbo.Processes.ProcessID
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VItems_StockReport]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VItems_StockReport];
+END
+GO
+CREATE VIEW [dbo].[VItems_StockReport]
+AS
+SELECT        dbo.VItems.CatID, dbo.VItems.ItemID, dbo.VItems.ItemName, dbo.VItems.Unit, dbo.VItems.Type, dbo.VItems.ItemSize, dbo.VItems.SizeUnit, dbo.VItems.ItemUsage, dbo.VItems.FinQuality, dbo.VItems.ItemGroup, 
+                         dbo.VItems.InActive, TSF.SFStock, TForging.ForgingStock, dbo.VItems.MinLevel, dbo.VItems.MaxLevel, dbo.VItems.ReOrderLevel, TFinished.InHand, TRunning.InProductionQty, dbo.VStoreShelfs.ShelfNo, TFinished.Shelf_RefID, 
+dbo.VStoreShelfs.RackNo, dbo.VStoreShelfs.StoreName, dbo.VItems.PriceForCost, dbo.VItems.FillingPrice,
+ISNULL(TMakerPO.MaxRate,0) AS ItemMaxRate
+,VItems.Parts
+FROM            dbo.VStoreShelfs RIGHT OUTER JOIN
+                             (SELECT        ItemID, SUM(NetQty) AS InHand, MAX(Shelf_RefID) AS Shelf_RefID
+                                FROM            dbo.VItemsWithShelfWiseStock_Simple
+                                GROUP BY ItemID) AS TFinished ON dbo.VStoreShelfs.EntryID = TFinished.Shelf_RefID RIGHT OUTER JOIN
+                         dbo.VItems LEFT OUTER JOIN
+                             (SELECT        ItemID, SUM(Qty) AS SFStock
+                                FROM            dbo.VItemSFStock
+                                GROUP BY ItemID) AS TSF ON dbo.VItems.ItemID = TSF.ItemID LEFT OUTER JOIN
+                             (SELECT        dbo.ItemsRMComp.ItemID, SUM(dbo.VRM.QtyInStock) AS ForgingStock
+                                FROM            dbo.ItemsRMComp INNER JOIN
+                                                         dbo.VRM ON dbo.VRM.RMID = dbo.ItemsRMComp.RMID
+                                GROUP BY dbo.ItemsRMComp.ItemID) AS TForging ON dbo.VItems.ItemID = TForging.ItemID ON TFinished.ItemID = dbo.VItems.ItemID LEFT OUTER JOIN
+                             (SELECT        dbo.VRunningLots_Simple_PHF.ItemCode, SUM(dbo.VRunningLots_Simple_PHF.Qty) AS InProductionQty
+                                FROM            dbo.VRunningLots_Simple_PHF INNER JOIN
+                                                         dbo.FCustomerOrders ON dbo.VRunningLots_Simple_PHF.OrderNo = dbo.FCustomerOrders.OrderNo
+                                WHERE        (dbo.FCustomerOrders.CustCode IN ('Stock'))
+                                GROUP BY dbo.VRunningLots_Simple_PHF.ItemCode) AS TRunning ON dbo.VItems.ItemID = TRunning.ItemCode
+LEFT JOIN (SELECT ItemCode,MAX(IssRate) As MaxRate FROM VVendRcvdDetail GROUP BY ItemCode) TMakerPO ON 
+VItems.ItemID=TMakerPO.ItemCode
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VItemsRMComp]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VItemsRMComp];
+END
+GO
+CREATE VIEW [dbo].[VItemsRMComp]
+AS
+SELECT        dbo.ItemsRMComp.EntryID, dbo.ItemsRMComp.ItemID, dbo.ItemsRMComp.RMID, dbo.ItemsRMComp.Qty, dbo.ItemsRMComp.ProcessID, dbo.VRM.RMName AS Description, dbo.Processes.Description AS ProcDesc, 
+                         dbo.VRM.Description AS GroupDescription, dbo.Items.ItemName, dbo.VRM.RMID1, dbo.VRM.GroupID, dbo.VRM.QtyInStock,dbo.ItemsRMComp.Functional_Status
+                         ,VRM.GroupName,VRM.Unit,VRM.InActive
+FROM            dbo.ItemsRMComp INNER JOIN
+                         dbo.VRM ON dbo.ItemsRMComp.RMID = dbo.VRM.RMID INNER JOIN
+                         dbo.Items ON dbo.ItemsRMComp.ItemID = dbo.Items.ItemID LEFT OUTER JOIN
+                         dbo.Processes ON dbo.ItemsRMComp.ProcessID = dbo.Processes.ProcessID
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VItemsWithLotWiseStock]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VItemsWithLotWiseStock];
+END
+GO
+CREATE VIEW [dbo].[VItemsWithLotWiseStock]
+AS
+SELECT dbo.VStoreShelfs.StoreName, dbo.VStoreShelfs.RackNo, dbo.VStoreShelfs.ShelfNo, T1.ItemID, T1.LotNo, T1.RcvdQty - ISNULL(T1.IssdQty, 0) AS NetQty, T1.Shelf_RefID, T1.Remarks, dbo.VStoreShelfs.Store_RefID, T1.EntryID
+    ,CASE WHEN ISNULL(Lots_List.Batch_No,'')='' THEN 'No-Batch' ELSE ISNULL(Lots_List.Batch_No,'') END  AS Batch_No,ISNULL(Lots_List.Mill_Certificate_No,'') AS Mill_Certificate_No
+FROM  dbo.VStoreShelfs INNER JOIN
+             (SELECT dbo.RcvItemsSimpleDetail.EntryID, dbo.RcvItemsSimpleDetail.ItemID, ISNULL(dbo.vendRcvdDetail.LotNo, dbo.RcvItemsSimpleDetail.LotNo_Manual) AS LotNo, dbo.RcvItemsSimpleDetail_Placement.Shelf_RefID, dbo.RcvItemsSimpleDetail_Placement.RcvdQty, ISNULL(T1_1.IssdQty, 0) AS IssdQty, dbo.RcvItemsSimpleDetail_Placement.RcvdQty - ISNULL(T1_1.IssdQty, 0) 
+                     AS NetQty, dbo.RcvItemsSimpleDetail.Remarks
+            FROM  dbo.RcvItemsSimpleDetail INNER JOIN
+                     dbo.RcvItemsSimpleDetail_Placement ON dbo.RcvItemsSimpleDetail.EntryID = dbo.RcvItemsSimpleDetail_Placement.RISD_RefID LEFT OUTER JOIN
+                     dbo.TransferredToReadyFinishLotsDetail ON dbo.RcvItemsSimpleDetail.TTRFLD_RefID = dbo.TransferredToReadyFinishLotsDetail.EntryID LEFT OUTER JOIN
+                     dbo.vendRcvdDetail ON dbo.TransferredToReadyFinishLotsDetail.VRD_RefID = dbo.vendRcvdDetail.EntryID LEFT OUTER JOIN
+                         (SELECT RCV_ISD_RefID, SUM(Qty) AS IssdQty
+                        FROM  dbo.IssItemsSimpleDetail
+                        GROUP BY RCV_ISD_RefID) AS T1_1 ON dbo.RcvItemsSimpleDetail.EntryID = T1_1.RCV_ISD_RefID) AS T1 ON T1.Shelf_RefID = dbo.VStoreShelfs.EntryID
+                        LEFT OUTER JOIN Lots_List ON T1.LotNo=Lots_List.LotNo
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VMakerAdvancesLedger]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VMakerAdvancesLedger];
+END
+GO
+CREATE VIEW [dbo].[VMakerAdvancesLedger]
+AS
+SELECT VendID,T1.* FROM
+(SELECT EntryID,AccNo,DT,Description,Amount,AccVoucherNo,DAmount,'' AS Remarks FROM MakerAdvances
+UNION
+SELECT MakerAmtCleared.EntryID,MakerAmtCleared.AccNo,MakerAmtCleared.DT,'Deduction in Bill',-AmtClrd,MakerAmtCleared.VchrNo,0 AS DAmount,MakerLoanClearance_Manual.Remarks FROM MakerAmtCleared
+LEFT JOIN MakerLoanClearance_Manual ON MakerAmtCleared.EntryID=MakerLoanClearance_Manual.MPB_STD_EntryID
+) T1 INNER JOIN Makers ON T1.AccNo=Makers.AccNo
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VMakerBilling_Receivings_Hidden]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VMakerBilling_Receivings_Hidden];
+END
+GO
+CREATE VIEW [dbo].[VMakerBilling_Receivings_Hidden]
+AS
+SELECT        dbo.MakerBilling_Receivings_Hidden.EntryID, dbo.MakerBilling_Receivings_Hidden.VRD_RefID, dbo.VVendReceivingList_Simple.DT, dbo.VVendReceivingList_Simple.ProcessID, dbo.VVendReceivingList_Simple.ItemCode, 
+                         dbo.VVendReceivingList_Simple.RcvdQty, dbo.VVendReceivingList_Simple.VenderName, dbo.VVendReceivingList_Simple.VendID1, dbo.VVendReceivingList_Simple.OnlyDT, dbo.VVendReceivingList_Simple.Description, 
+                         dbo.VVendReceivingList_Simple.LotNo, dbo.VVendReceivingList_Simple.OrderNo, dbo.VVendReceivingList_Simple.CompItemCode, dbo.VVendReceivingList_Simple.ReWorkLot, dbo.VVendReceivingList_Simple.ItemName, 
+                         dbo.VVendReceivingList_Simple.ItemSize, dbo.VVendReceivingList_Simple.SizeUnit, dbo.VVendReceivingList_Simple.Type, dbo.VVendReceivingList_Simple.CustCode, dbo.VVendReceivingList_Simple.VendID
+FROM            dbo.MakerBilling_Receivings_Hidden INNER JOIN
+                         dbo.VVendReceivingList_Simple ON dbo.MakerBilling_Receivings_Hidden.VRD_RefID = dbo.VVendReceivingList_Simple.VRD_EntryID
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VMaterialLocationWiseStatus]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VMaterialLocationWiseStatus];
+END
+GO
+CREATE VIEW [dbo].[VMaterialLocationWiseStatus]
+AS
+SELECT     dbo.MaterialLocationwiseStatus.EntryID, dbo.MaterialLocationwiseStatus.Rcvd_RefID, dbo.MaterialLocationwiseStatus.Shelf_RefID, dbo.MaterialLocationwiseStatus.QtyPlaced, dbo.MaterialLocationwiseStatus.QtyIssued, dbo.VendRcvdDetailPO.MaterialID, 
+                  dbo.MaterialLocationwiseStatus.SheetsPlaced, dbo.MaterialLocationwiseStatus.SheetsIssued, dbo.RM.RMName, dbo.VVenders.AccTitle, dbo.VendRcvdDetailPO.QtyRcvd, dbo.MaterialLocationwiseStatus.BatchNo, dbo.MaterialLocationwiseStatus.LotNo, 
+                  dbo.VStoreShelfs.StoreName, dbo.VStoreShelfs.RackNo, dbo.VStoreShelfs.ShelfNo, dbo.VendRcvdDetailPO.RcvID, dbo.VendRcvdDetailPO.PORefNo, dbo.VendRcvd.RcvDate, dbo.MaterialLocationwiseStatus.Mill_Certificate_No, dbo.VVenders.AccNo, dbo.RM.Pic, 
+                  dbo.RM.Unit, dbo.RM.GroupID, dbo.RM.RMID1, dbo.RM.TechnicalDrawing, dbo.MaterialLocationwiseStatus.UserName, dbo.MaterialLocationwiseStatus.MachineName, dbo.VVenders.VendID, dbo.VVenders.VenderDescription, dbo.VVenders.ContactPerson, 
+                  dbo.VVenders.CPhone
+FROM        dbo.MaterialLocationwiseStatus INNER JOIN
+                  dbo.VendRcvdDetailPO ON dbo.MaterialLocationwiseStatus.Rcvd_RefID = dbo.VendRcvdDetailPO.EntryID INNER JOIN
+                  dbo.RM ON dbo.VendRcvdDetailPO.MaterialID = dbo.RM.RMID1 INNER JOIN
+                  dbo.VendRcvd ON dbo.VendRcvdDetailPO.RcvID = dbo.VendRcvd.RcvID INNER JOIN
+                  dbo.VStoreShelfs ON dbo.MaterialLocationwiseStatus.Shelf_RefID = dbo.VStoreShelfs.EntryID LEFT OUTER JOIN
+                  dbo.VVenders ON dbo.VendRcvd.VendID = dbo.VVenders.AccNo
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER OFF;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VMiscEntries_GateInTemp]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VMiscEntries_GateInTemp];
+END
+GO
+CREATE   VIEW [dbo].[VMiscEntries_GateInTemp] AS 
+SELECT m.EntryID, m.GatePassNo, m.DT, m.PersonName, m.VehicleNo, m.Description, m.UserName, m.MachineName, 
+m.DTEntry, CAST(CONVERT(VARCHAR(50), m.DT, 6) AS DATETIME) AS OnlyDT, m.EmpID, emp.Name AS EmpName, m.GatePassType, m.GatePassType2, 
+m.DeptID, d.name AS DeptName, m.VendID, vm.AccTitle AS Name, m.VendNameManual, m.VM_AccNo, ISNULL(m.Approved_HOD, 0) AS Approved_HOD
+, ISNULL(m.Approved, 0) AS Approved, ISNULL(m.Approved_Finance, 0) AS Approved_Finance FROM dbo.MiscEntries_GateInTemp m 
+LEFT OUTER JOIN dbo.Departments d ON m.DeptID = d.deptid 
+LEFT OUTER JOIN dbo.Employees emp ON m.EmpID = emp.EmpID 
+LEFT OUTER JOIN dbo.VVendersAndMakers vm ON m.VM_AccNo = vm.AccNo;
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VPaySlip]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VPaySlip];
+END
+GO
+CREATE VIEW [dbo].[VPaySlip]
+AS
+SELECT        dbo.Departments.deptid, dbo.Departments.name AS DeptName, dbo.Employees.empid, dbo.Employees.name, dbo.Employees.Rel, dbo.Employees.fname, dbo.PrintSalary.BSal, dbo.PrintSalary.Rate, dbo.PrintSalary.ADays, 
+                         dbo.PrintSalary.AAmt, dbo.PrintSalary.SDays, dbo.PrintSalary.SAmt, dbo.PrintSalary.OHrs, dbo.PrintSalary.OAmt, dbo.PrintSalary.LHrs, dbo.PrintSalary.LAmt, dbo.PrintSalary.Total, dbo.PrintSalary.Tax, dbo.PrintSalary.NetTtl, 
+                         dbo.PrintSalary.Paid, dbo.PrintSalary.Balance, dbo.PrintSalary.DT, dbo.Employees.Salary, dbo.Employees.PProfit, dbo.Employees.StartingSalary, dbo.PrintSalary.LongTerm, dbo.Employees.Designation, 
+                         dbo.PrintSalary.AdvSal, dbo.Employees.EmpType, dbo.Employees.Status, dbo.PrintSalary.PrevLTLoan, dbo.PrintSalary.AdvPer, dbo.PrintSalary.AAllow, dbo.PrintSalary.AAllowAmt, dbo.PrintSalary.Leaves, 
+                         dbo.PrintSalary.LeaveAmt, dbo.PrintSalary.Fine, dbo.PrintSalary.Bonus, dbo.PrintSalary.SocialAmt, dbo.Employees.NTN, dbo.Employees.BankPymt, dbo.PrintSalary.CasualLeaves, dbo.PrintSalary.SickLeaves, 
+                         dbo.PrintSalary.AnnualLeaves, dbo.PrintSalary.CompensatoryLeaves, dbo.PrintSalary.MaternityLeaves, dbo.PrintSalary.WPLeaves, dbo.Employees.sex, dbo.Employees.Lunch, dbo.PrintSalary.EOBI, dbo.Employees.EmpIDOld, 
+                         dbo.PrintSalary.SundayOTHrs, dbo.PrintSalary.SundayOTRate, dbo.PrintSalary.FixAllowance, dbo.Employees.EOBIAmt, dbo.Employees.SocialSecurityAmt, dbo.Employees.EmpLunchAmt, dbo.PrintSalary.HoldSalaryAmt, 
+                         dbo.PrintSalary.PresentDays, dbo.PrintSalary.LeaveDays, dbo.PrintSalary.LateComingHrs, dbo.PrintSalary.ShortHrs, dbo.PrintSalary.AmtPaid, dbo.PrintSalary.GPHrs, dbo.PrintSalary.GPHrsAmt, dbo.PrintSalary.OTDinnerCount, 
+                         dbo.PrintSalary.OTDinnerAmount, dbo.PrintSalary.DedOnePercent, dbo.PrintSalary.PerformanceDedAmt, dbo.PrintSalary.RejectionDedAmt, dbo.PrintSalary.ShortHrsAmt, dbo.PrintSalary.ZeroAbsentBonus, 
+                         dbo.VEmpSettings.OTRate, dbo.PrintSalary.OTHrs_Original, dbo.PrintSalary.LateHrs_Original, dbo.PrintSalary.OTHrs_Net, dbo.PrintSalary.LateHrs_Net
+FROM            dbo.Departments INNER JOIN
+                         dbo.PrintSalary INNER JOIN
+                         dbo.Employees ON dbo.PrintSalary.EmpID = dbo.Employees.empid ON dbo.Departments.deptid = dbo.PrintSalary.DeptID INNER JOIN
+                         dbo.VEmpSettings ON dbo.Employees.empid = dbo.VEmpSettings.empid
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VRawMaterialIssuanceList]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VRawMaterialIssuanceList];
+END
+GO
+CREATE   VIEW [dbo].[VRawMaterialIssuanceList]
+AS
+SELECT        dbo.RawMaterialIssuance.IssNo, dbo.RawMaterialIssuance.DT, dbo.RawMaterialIssuance.EntryDT, dbo.RawMaterialIssuance.UserName, dbo.RawMaterialIssuance.ComputerName, dbo.RawMaterialIssuance.VI_RefID, 
+                         dbo.RawMaterialIssuance.IssdToEmpID, dbo.RawMaterialIssuance.VchrNo, dbo.RawMaterialIssuance.VO_OrderNo, dbo.RawMaterialIssuance.AuthorizedByEmpID, dbo.RawMaterialIssuance.EntryID, 
+                         dbo.VEmp.name AS IssdToEmpName, dbo.Makers.VenderName, TInner1.RM, dbo.VEmp.deptid, dbo.VendIssued.VendID, dbo.RawMaterialIssuance.Remarks, dbo.RawMaterialIssuance.Entry_Type, 
+                         dbo.RawMaterialIssuance.Vendor_AccNo, dbo.RawMaterialIssuance.Vendor_PO_No, dbo.RawMaterialIssuance.Vendor_VchrNo,
+                         VVendersAndMakers.AccTitle AS Debit_Note_Vendor,
+                         TInner1.Total_Issued_Qty,
+                         TEmpID.IssdToEmpIDOnly
+FROM            dbo.Makers RIGHT OUTER JOIN
+                         dbo.VendIssued ON dbo.Makers.VendID = dbo.VendIssued.VendID RIGHT OUTER JOIN
+                         dbo.RawMaterialIssuance ON dbo.VendIssued.EntryID = dbo.RawMaterialIssuance.VI_RefID
+                         OUTER APPLY (SELECT CASE WHEN CHARINDEX('}', dbo.RawMaterialIssuance.IssdToEmpID) > 2 
+                                                  THEN SUBSTRING(dbo.RawMaterialIssuance.IssdToEmpID, 2, CHARINDEX('}', dbo.RawMaterialIssuance.IssdToEmpID) - 2)
+                                                  ELSE dbo.RawMaterialIssuance.IssdToEmpID END AS IssdToEmpIDOnly) TEmpID
+                         LEFT OUTER JOIN
+                         dbo.VEmp ON TEmpID.IssdToEmpIDOnly = dbo.VEmp.empid LEFT OUTER JOIN
+                             (SELECT        IssNo, MAX('{' + RMID1 + '} ' + RMName) AS RM, SUM(Qty) AS Total_Issued_Qty
+                               FROM            dbo.VRawMaterialIssuance
+                               GROUP BY IssNo) AS TInner1 ON dbo.RawMaterialIssuance.IssNo = TInner1.IssNo
+LEFT JOIN VVendersAndMakers ON dbo.RawMaterialIssuance.Vendor_AccNo=VVendersAndMakers.AccNo
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VRcvitemsSimpleDetail_Placement]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VRcvitemsSimpleDetail_Placement];
+END
+GO
+CREATE VIEW [dbo].[VRcvitemsSimpleDetail_Placement]
+AS
+SELECT        dbo.RcvItemsSimpleDetail.ItemID, dbo.RcvItemsSimpleDetail_Placement.Shelf_RefID, dbo.RcvItemsSimpleDetail_Placement.RcvdQty, dbo.RcvItemsSimpleDetail_Placement.IssdQty, 
+                         dbo.RcvItemsSimpleDetail_Placement.EntryID, dbo.RcvItemsSimpleDetail_Placement.RISD_RefID, dbo.RcvItemsSimpleDetail_Placement.Remarks, dbo.RcvItemsSimpleDetail.Sample_Type, 
+                         dbo.RcvItemsSimple.CustCode, dbo.VStoreShelfs.StoreName, dbo.VStoreShelfs.RackNo, dbo.VStoreShelfs.ShelfNo, dbo.RcvItemsSimpleDetail.TTRFLD_RefID
+FROM            dbo.RcvItemsSimpleDetail INNER JOIN
+                         dbo.RcvItemsSimpleDetail_Placement ON dbo.RcvItemsSimpleDetail.EntryID = dbo.RcvItemsSimpleDetail_Placement.RISD_RefID INNER JOIN
+                         dbo.RcvItemsSimple ON dbo.RcvItemsSimpleDetail.RcvNo = dbo.RcvItemsSimple.RcvNo LEFT OUTER JOIN
+         dbo.VStoreShelfs ON dbo.RcvItemsSimpleDetail_Placement.Shelf_RefID = dbo.VStoreShelfs.EntryID
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VrptOrders]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VrptOrders];
+END
+GO
+CREATE VIEW [dbo].[VrptOrders]
+AS
+SELECT dbo.FOrderItems.ID, dbo.FOrderItems.ItemCode, dbo.FOrderItems.Price, dbo.FOrderItems.Qty, dbo.FOrderItems.Qty - ISNULL(TProforma.ProformaUsedQty, 0) AS InvQty, dbo.Items.ItemName, dbo.FCustomerCatalog.Description, dbo.FCustomerCatalog.ItemID, dbo.FCustomerCatalog.CompItemID, dbo.ForeignCustomers.Curr, dbo.FCustomerCatalog.Unit, 
+         dbo.ForeignCustomers.Name, dbo.ForeignCustomers.Address, dbo.FOrderItems.CustomPrice, dbo.Items.CustomDescription, dbo.Items.ItemSize, dbo.Items.SizeUnit, dbo.SteelTypes.SteelType, dbo.SteelGages.Gage, dbo.Items.ItemColor, dbo.FCustomerCatalog.BarcodeNo, dbo.FCustomerCatalog.PackingMode, dbo.Items.MasterCartonL, dbo.Items.MasterCartonW, 
+         dbo.Items.MasterCartonH, dbo.Items.SmallCartonL, dbo.Items.SmallCartonW, dbo.Items.SmallCartonH, dbo.Items.PolyBag, dbo.FCustomerCatalog.SpecialInstructions, dbo.FCustomerCatalog.StampInstructions, dbo.FCustomerCatalog.PackingInstructions, dbo.Items.Unit AS UnitItems, dbo.FCustomerCatalog.ItemColor AS CustomerColor, ISNULL(Shipped.TotalShipped, 0) 
+         AS ShippedQty, dbo.Items.ItemNameUrdu, dbo.Items.InHand, dbo.FOrderItems.SortNo, dbo.ItemCatagories.MaxLotSize, dbo.FOrderItems.DeliveryDT AS DeliveryDTItem, dbo.FOrderItems.Stamps AS StampsItem, dbo.FOrderItems.Quality AS QualityItem, dbo.Items.FinQuality, dbo.Items.Type, dbo.FOrderItems.DeliveryStatus, dbo.FCustomerCatalog.OCR, 
+         dbo.FOrderItems.CompItemCode, dbo.ItemGroups.Description AS GroupDescription, dbo.FCustomerOrders.OrderNo, dbo.FCustomerOrders.DT, dbo.FCustomerOrders.TradeTerms, dbo.FCustomerOrders.CustCode, dbo.FCustomerOrders.Country, dbo.FCustomerOrders.PartialShipment, dbo.FCustomerOrders.PaymentTerms, dbo.FCustomerOrders.TransShipment, 
+         dbo.FCustomerOrders.Packaging, dbo.FCustomerOrders.DeliveryDT, dbo.FCustomerOrders.BatchNo, dbo.FCustomerOrders.CompanyRefID, dbo.FCustomerOrders.StampDT, dbo.FCustomerOrders.Quality, dbo.FCustomerOrders.InternalRefNo, dbo.FCustomerOrders.OrderRcvdVia, dbo.FOrderItems.Remarks, dbo.FCustomerOrders.OrderType, dbo.Items.GroupID, T1.FOI_RefID, 
+         dbo.FCustomerFinalOrders.Cancelled, dbo.Items.MasterCartonSmallBoxes, dbo.Items.SmallBoxPcs, dbo.Items.FinishedWeight, dbo.FCustomerOrders.OrderRevisionNo, dbo.FCustomerOrders.OrderRevisionDT, dbo.FOrderItems.Item_Edited, dbo.FCustomerOrders.ShippingMode, dbo.FOrderItems.Weight, dbo.FOrderItems.Item_Finishing_Type, 
+         dbo.Item_Finishing_Type.Item_Finishing_Type_Text
+         , dbo.FOrderItems.IW_OrderNo, dbo.FOrderItems.IW_BatchNo, dbo.Items.ItemPic
+				  ,dbo.FCustomerOrders.Packaging_Weight,ReadyFinishPrice,Fillingprice,PriceForCost
+FROM  dbo.FCustomerOrders INNER JOIN
+         dbo.FOrderItems ON dbo.FCustomerOrders.OrderNo = dbo.FOrderItems.OrderNo INNER JOIN
+         dbo.FCustomerCatalog ON dbo.FCustomerOrders.CustCode = dbo.FCustomerCatalog.CustCode AND dbo.FCustomerOrders.Country = dbo.FCustomerCatalog.Country AND dbo.FOrderItems.CompItemCode = dbo.FCustomerCatalog.CompItemID INNER JOIN
+         dbo.Items ON dbo.FCustomerCatalog.CompItemID = dbo.Items.ItemID INNER JOIN
+         dbo.ForeignCustomers ON dbo.FCustomerOrders.CustCode = dbo.ForeignCustomers.CustCode AND dbo.FCustomerOrders.Country = dbo.ForeignCustomers.Country INNER JOIN
+         dbo.ItemCatagories ON dbo.Items.CatID = dbo.ItemCatagories.CatID INNER JOIN
+         dbo.ItemGroups ON dbo.Items.GroupID = dbo.ItemGroups.ID LEFT OUTER JOIN
+         dbo.Item_Finishing_Type ON dbo.FOrderItems.Item_Finishing_Type = dbo.Item_Finishing_Type.EntryID LEFT OUTER JOIN
+         dbo.FCustomerFinalOrders ON dbo.FCustomerOrders.OrderNo = dbo.FCustomerFinalOrders.OrderNo LEFT OUTER JOIN
+         dbo.SteelGages ON dbo.Items.Gage = dbo.SteelGages.GageID LEFT OUTER JOIN
+         dbo.SteelTypes ON dbo.Items.SteelUsed = dbo.SteelTypes.SteelID LEFT OUTER JOIN
+             (SELECT FOI_RefID
+            FROM  dbo.FOrderItems_PDF
+            GROUP BY FOI_RefID) AS T1 ON dbo.FOrderItems.ID = T1.FOI_RefID LEFT OUTER JOIN
+             (SELECT OrderEntryID, SUM(Qty) AS ProformaUsedQty
+            FROM  dbo.FProformaOrders
+            GROUP BY OrderEntryID) AS TProforma ON dbo.FOrderItems.ID = TProforma.OrderEntryID LEFT OUTER JOIN
+             (SELECT FProformaOrders_1.OrderEntryID, SUM(ISNULL(dbo.CustomInvoiceItems.Qty, 0)) AS TotalShipped
+            FROM  dbo.CustomInvoiceItems INNER JOIN
+                     dbo.CustomInvoice ON dbo.CustomInvoiceItems.CustomInvoice = dbo.CustomInvoice.CustomInvoice INNER JOIN
+                     dbo.FProformaOrders AS FProformaOrders_1 ON dbo.CustomInvoiceItems.RefID = FProformaOrders_1.EntryID
+            WHERE (dbo.CustomInvoice.GatePassDT IS NOT NULL)
+            GROUP BY FProformaOrders_1.OrderEntryID) AS Shipped ON dbo.FOrderItems.ID = Shipped.OrderEntryID
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VRunningLots_POI_Old]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VRunningLots_POI_Old];
+END
+GO
+CREATE VIEW [dbo].[VRunningLots_POI_Old]
+AS
+SELECT     TUnion.StartDT, TUnion.LotNo, TUnion.ItemCode, TUnion.Qty, TUnion.Description, TUnion.LastProcessDays, TUnion.OrderNo, TUnion.Remarks, TUnion.DT, 
+                      TUnion.ProcessID, TUnion.ReWorkLot, VItems_1.GroupID, FCustomerOrders_1.CustCode, FCustomerOrders_1.Country, TRunning.TLRunning, 
+                      TRunningOrder.TLRunning_Order, TSF.R1, TSF.R2, TPack.PackStock, VItems_1.ItemName, VUnshippedOrderItemList_1.OrderNo AS UnShipped_OrderNo, 
+                      TUnion.EntryType, TUnion.POIRemarks, TUnion.OpenPOQty, TUnion.VendID, TUnion.R1 AS RunningLots_R1, TLOrder.TLUnShippedQty, 
+                      TLot_Wastage.Lot_Wastage_Qty, VUnshippedOrderItemList_1.Price, VUnshippedOrderItemList_1.PriceForCost, dbo.FOrderItems.Price AS FOI_Price, 
+                      dbo.ForeignCustomers.Curr
+FROM         dbo.ForeignCustomers INNER JOIN
+                      dbo.FCustomerOrders AS FCustomerOrders_1 ON dbo.ForeignCustomers.CustCode = FCustomerOrders_1.CustCode AND 
+                      dbo.ForeignCustomers.Country = FCustomerOrders_1.Country RIGHT OUTER JOIN
+                          (SELECT     ISNULL(T1.StartDT, T2.StartDT) AS StartDT, dbo.RunningLots_Temp.LotNo, dbo.RunningLots_Temp.ItemCode, dbo.RunningLots_Temp.Qty, 
+                                                   dbo.RunningLots_Temp.Description, DATEDIFF(day, dbo.RunningLots_Temp.DT, GETDATE()) AS LastProcessDays, dbo.RunningLots_Temp.OrderNo, 
+                                                   '' AS Remarks, dbo.RunningLots_Temp.DT, dbo.RunningLots_Temp.ProcessID, dbo.RunningLots_Temp.ReWorkLot, 0 AS EntryType, 
+                                                   dbo.POI_Remarks.Remarks AS POIRemarks, 0 AS OpenPOQty, dbo.RunningLots_Temp.VendID, 
+                                                   CASE WHEN SNo <= PolishingItemSNo THEN 1 ELSE 0 END AS R1
+                             FROM         dbo.RunningLots_Temp LEFT OUTER JOIN
+                                                   dbo.POI_Remarks ON dbo.RunningLots_Temp.LotNo = dbo.POI_Remarks.LotNo LEFT OUTER JOIN
+                                                       (SELECT     dbo.vendRcvdDetail.LotNo, MIN(dbo.VendReceived.DT) AS StartDT
+                                                          FROM         dbo.VendReceived INNER JOIN
+                                                                                dbo.vendRcvdDetail ON dbo.VendReceived.EntryID = dbo.vendRcvdDetail.RefID
+                                                          GROUP BY dbo.vendRcvdDetail.LotNo) AS T1 ON dbo.RunningLots_Temp.LotNo = T1.LotNo INNER JOIN
+                                                   dbo.VItems ON dbo.RunningLots_Temp.ItemCode = dbo.VItems.ItemID LEFT OUTER JOIN
+                                                   dbo.FCustomerOrders ON dbo.RunningLots_Temp.OrderNo = dbo.FCustomerOrders.OrderNo LEFT OUTER JOIN
+                                                       (SELECT     dbo.VendIssdDetail.LotNo, MIN(dbo.VendIssued.DT) AS StartDT
+                                                          FROM         dbo.VendIssued INNER JOIN
+                                                                                dbo.VendIssdDetail ON dbo.VendIssued.EntryID = dbo.VendIssdDetail.RefID
+                                                          GROUP BY dbo.VendIssdDetail.LotNo) AS T2 ON dbo.RunningLots_Temp.LotNo = T2.LotNo
+                             UNION ALL
+                             SELECT     dbo.VUnshippedOrderItemList.DT, '' AS LotNo, dbo.VUnshippedOrderItemList.CompItemCode, 
+                                                   dbo.VUnshippedOrderItemList.OrderQty - dbo.VUnshippedOrderItemList.ShippedQty - ISNULL(T1_1.RLQty, 0) AS Qty, '' AS Description, 
+                                                   0 AS LastProcessDays, dbo.VUnshippedOrderItemList.OrderNo, dbo.VUnshippedOrderItemList.Remarks, dbo.VUnshippedOrderItemList.DT AS Expr1, 
+                                                   0 AS ProcessID, 0 AS ReWorkLot, 1 AS EntryType, POI_Remarks_1.Remarks AS POIRemarks, TOpenPOs.OpenPOQty, 0 AS VendID, 0 AS R1
+                             FROM         dbo.VUnshippedOrderItemList LEFT OUTER JOIN
+                                                   dbo.POI_Remarks AS POI_Remarks_1 ON dbo.VUnshippedOrderItemList.OrderNo = POI_Remarks_1.OrderNo AND 
+                                                   dbo.VUnshippedOrderItemList.CompItemCode = POI_Remarks_1.ItemCode LEFT OUTER JOIN
+                                                       (SELECT     OrderNo, ItemCode, SUM(Qty) AS OpenPOQty
+                                                          FROM         dbo.VItemOpenPOs
+                                                          GROUP BY OrderNo, ItemCode) AS TOpenPOs ON dbo.VUnshippedOrderItemList.OrderNo = TOpenPOs.OrderNo AND 
+                                                   dbo.VUnshippedOrderItemList.CompItemCode = TOpenPOs.ItemCode LEFT OUTER JOIN
+                                                       (SELECT     OrderNo, ItemCode, SUM(Qty) AS RLQty
+                                                          FROM         dbo.RunningLots_Temp AS VRunningLots_Simple_3
+                                                          GROUP BY OrderNo, ItemCode) AS T1_1 ON dbo.VUnshippedOrderItemList.OrderNo = T1_1.OrderNo AND 
+                                                   dbo.VUnshippedOrderItemList.CompItemCode = T1_1.ItemCode) AS TUnion INNER JOIN
+                      dbo.VItems AS VItems_1 ON TUnion.ItemCode = VItems_1.ItemID INNER JOIN
+                      dbo.FOrderItems ON TUnion.ItemCode = dbo.FOrderItems.CompItemCode AND TUnion.OrderNo = dbo.FOrderItems.OrderNo ON 
+                      FCustomerOrders_1.OrderNo = TUnion.OrderNo LEFT OUTER JOIN
+                          (SELECT     OrderNo, ItemCode, SUM(Qty) AS TLRunning
+                             FROM         dbo.RunningLots_Temp AS VRunningLots_Simple_2
+                             GROUP BY OrderNo, ItemCode) AS TRunning ON TUnion.OrderNo = TRunning.OrderNo AND TUnion.ItemCode = TRunning.ItemCode LEFT OUTER JOIN
+                          (SELECT     OrderNo, ItemCode, SUM(Qty) AS TLRunning_Order
+                             FROM         dbo.RunningLots_Temp AS VRunningLots_Simple_1
+                             GROUP BY OrderNo, ItemCode) AS TRunningOrder ON TUnion.OrderNo = TRunningOrder.OrderNo AND 
+                      TUnion.ItemCode = TRunningOrder.ItemCode LEFT OUTER JOIN
+                          (SELECT     ItemID, SUM(CASE WHEN R1 = 1 THEN Qty - IssdQty ELSE 0 END) AS R1, SUM(CASE WHEN R1 = 0 THEN Qty - IssdQty ELSE 0 END) AS R2
+                             FROM         dbo.VStockOrderOpening
+                             WHERE     (Qty > IssdQty)
+                             GROUP BY ItemID) AS TSF ON TUnion.ItemCode = TSF.ItemID LEFT OUTER JOIN
+                          (SELECT     ItemID, SUM(NetQty) AS PackStock
+                             FROM         dbo.VItemsWithShelfWiseStock
+                             GROUP BY ItemID) AS TPack ON TUnion.ItemCode = TPack.ItemID LEFT OUTER JOIN
+                      dbo.VUnshippedOrderItemList AS VUnshippedOrderItemList_1 ON TUnion.ItemCode = VUnshippedOrderItemList_1.CompItemCode AND 
+                      TUnion.OrderNo = VUnshippedOrderItemList_1.OrderNo LEFT OUTER JOIN
+                          (SELECT     CompItemCode, SUM(OrderQty - ShippedQty) AS TLUnShippedQty
+                             FROM         dbo.VUnshippedOrderItemList AS VUnshippedOrderItemList_2
+                             GROUP BY CompItemCode) AS TLOrder ON VItems_1.ItemID = TLOrder.CompItemCode LEFT OUTER JOIN
+                          (SELECT     LotNo, SUM(Wastage) AS Lot_Wastage_Qty
+                             FROM         dbo.vendRcvdDetail AS vendRcvdDetail_1
+                             GROUP BY LotNo) AS TLot_Wastage ON TUnion.LotNo = TLot_Wastage.LotNo
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VSFStockTransaction]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VSFStockTransaction];
+END
+GO
+-- ============================================================================
+-- Fix VSFStockTransaction View: Ensure LotNo is populated for manual SF open receiving
+-- Fallback to StockOrderOpening.LotNo_Manual when VendRcvdDetail.LotNo is null
+-- ============================================================================
+CREATE   VIEW [dbo].[VSFStockTransaction]
+AS
+SELECT        dbo.StockOrderOpening.EntryID, dbo.VendIssued.UserName, dbo.VendIssued.DT, dbo.VendIssdDetail.ItemCode, dbo.Items.ItemName, dbo.StockOrderOpening.ProcessID, dbo.Processes.Description, dbo.StockOrderOpening_Issuance.QtyIssd, 1 AS Issuance, 
+                         Location, StoreName, Store_RefID, ISNULL(NULLIF(VendIssdDetail.LotNo, ''), StockOrderOpening.LotNo_Manual) AS LotNo
+                         ,dbo.VendIssdDetail.OrderNo,StockOrderOpening.Remarks
+FROM            dbo.StockOrderOpening_Issuance INNER JOIN
+                         dbo.StockOrderOpening ON dbo.StockOrderOpening_Issuance.SOO_RefID = dbo.StockOrderOpening.EntryID INNER JOIN
+                         dbo.VendIssdDetail ON dbo.VendIssdDetail.EntryID = dbo.StockOrderOpening_Issuance.VID_RefID INNER JOIN
+                         dbo.VendIssued ON dbo.VendIssued.EntryID = dbo.VendIssdDetail.RefID INNER JOIN
+                         dbo.Items ON dbo.VendIssdDetail.ItemCode = dbo.Items.ItemID INNER JOIN
+                         dbo.Processes ON dbo.StockOrderOpening.ProcessID = dbo.Processes.ProcessID INNER JOIN
+                         VStoreShelfs ON VStoreShelfs.EntryID = StockOrderOpening.Shelf_RefID
+UNION
+SELECT        StockOrderOpening.EntryID, UserName, CAST(CONVERT(VARCHAR(50), DTEntry, 6) AS DATETIME), Items.ItemID, ItemName, StockOrderOpening.ProcessID, Processes.Description, StockOrderOpening.Qty, 0 AS Issuance, Location, StoreName, Store_RefID, 
+                         ISNULL(NULLIF(VendRcvdDetail.LotNo, ''), StockOrderOpening.LotNo_Manual) AS LotNo
+                         ,VendRcvdDetail.OrderNo,StockOrderOpening.Remarks
+FROM            StockOrderOpening INNER JOIN
+                         Items ON StockOrderOpening.ItemID = Items.ItemID INNER JOIN
+                         Processes ON StockOrderOpening.ProcessID = Processes.ProcessID INNER JOIN
+                         VStoreShelfs ON VStoreShelfs.EntryID = StockOrderOpening.Shelf_RefID LEFT OUTER JOIN
+                         LotTransferDetails ON StockOrderOpening.EntryID = LotTransferDetails.SOO_RefID LEFT OUTER JOIN
+                         VendRcvdDetail ON LotTransferDetails.VRD_From_RefID = VendRcvdDetail.EntryID
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VStockTransactions]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VStockTransactions];
+END
+GO
+CREATE VIEW [dbo].[VStockTransactions]
+AS
+SELECT     StockTransactions.EntryNo, StockTransactions.DT, StockTransactions.OrderNo, StockTransactions.RcvdBy, StockTransactions.RcvdFrom, StockTransactions.ItemID, StockTransactions.Qty, StockTransactions.Location, StockTransactions.ChildEntryID, 
+                  StockTransactions.EntryType, StockTransactions.Shelf_RefID, dbo.Items.ItemName, dbo.VStoreShelfs.Store_RefID, StockTransactions.SampleEntry, StockTransactions.LotNo_Manual, dbo.Items.ItemPic, StockTransactions.Remarks, dbo.VStoreShelfs.StoreName, 
+                  dbo.VStoreShelfs.RackNo, dbo.VStoreShelfs.ShelfNo, dbo.Items.ItemNameUrdu, dbo.Items.Unit,StockTransactions.TransferRemarks
+FROM        dbo.Items INNER JOIN
+                      (SELECT     dbo.RcvItemsSimple.RcvNo AS EntryNo, CAST(CONVERT(VARCHAR(50), dbo.RcvItemsSimple.DT, 6) AS DATETIME) AS DT, dbo.RcvItemsSimple.OrderNo, dbo.RcvItemsSimple.RcvdBy, dbo.RcvItemsSimple.RcvdFrom, dbo.RcvItemsSimpleDetail.ItemID, 
+                                         dbo.RcvItemsSimpleDetail.Qty, dbo.RcvItemsSimpleDetail.Location, dbo.RcvItemsSimpleDetail.EntryID AS ChildEntryID, 1 AS EntryType, dbo.RcvItemsSimpleDetail_Placement.Shelf_RefID, 0 AS SampleEntry, dbo.RcvItemsSimpleDetail.LotNo_Manual, 
+                                         dbo.RcvItemsSimpleDetail.Remarks,
+										 dbo.RcvItemsSimpleDetail_Placement.Remarks TransferRemarks
+                       FROM        dbo.RcvItemsSimple INNER JOIN
+                                         dbo.RcvItemsSimpleDetail ON dbo.RcvItemsSimple.RcvNo = dbo.RcvItemsSimpleDetail.RcvNo INNER JOIN
+                                         dbo.RcvItemsSimpleDetail_Placement ON dbo.RcvItemsSimpleDetail.EntryID = dbo.RcvItemsSimpleDetail_Placement.RISD_RefID
+                       UNION
+                       SELECT     dbo.IssItemsSimple.IssNo AS EntryNo, CAST(CONVERT(VARCHAR(50), dbo.IssItemsSimple.DT, 6) AS DATETIME) AS DT, dbo.IssItemsSimple.OrderNo, dbo.IssItemsSimple.Department, dbo.IssItemsSimple.AttnPerson, dbo.IssItemsSimpleDetail.ItemID, 
+                                         dbo.IssItemsSimpleDetail_More.IssdQty AS Qty, dbo.IssItemsSimpleDetail.Location, dbo.IssItemsSimpleDetail.EntryID AS ChildEntryID, 0 AS EntryType, dbo.IssItemsSimpleDetail_More.Shelf_RefID, 
+                                         dbo.IssItemsSimple.SampleIssuance AS SampleEntry, dbo.IssItemsSimpleDetail.LotNo_Manual, 
+										 dbo.IssItemsSimpleDetail.Remarks,
+										 dbo.IssItemsSimpleDetail_More.Remarks  TransferRemarks
+                       FROM        dbo.IssItemsSimple INNER JOIN
+                                         dbo.IssItemsSimpleDetail ON dbo.IssItemsSimple.IssNo = dbo.IssItemsSimpleDetail.IssNo INNER JOIN
+                                         dbo.IssItemsSimpleDetail_More ON dbo.IssItemsSimpleDetail.EntryID = dbo.IssItemsSimpleDetail_More.IISD_RefID
+				  ) AS StockTransactions ON dbo.Items.ItemID = StockTransactions.ItemID LEFT OUTER JOIN
+                  dbo.VStoreShelfs ON StockTransactions.Shelf_RefID = dbo.VStoreShelfs.EntryID
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VTransferredToReadyFinishLotsDetail]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VTransferredToReadyFinishLotsDetail];
+END
+GO
+CREATE VIEW [dbo].[VTransferredToReadyFinishLotsDetail]
+AS
+SELECT dbo.vendRcvdDetail.LotNo, dbo.TransferredToReadyFinishLotsDetail.Qty, dbo.TransferredToReadyFinishLotsDetail.EntryID, dbo.TransferredToReadyFinishLotsDetail.RefID, dbo.TransferredToReadyFinishLotsDetail.VRD_RefID, dbo.TransferredToReadyFinishLots.DT, dbo.TransferredToReadyFinishLots.UserName, dbo.TransferredToReadyFinishLots.MachineName, 
+         dbo.vendRcvdDetail.ItemCode, dbo.TransferredToReadyFinishLots.ItemID, dbo.TransferredToReadyFinishLots.Remarks
+         
+		 ,VRcvItemsSimpleDetail_Placement.Shelf_RefID,VRcvItemsSimpleDetail_Placement.StoreName,VRcvItemsSimpleDetail_Placement.ShelfNo,VRcvItemsSimpleDetail_Placement.RackNo
+FROM  dbo.TransferredToReadyFinishLots INNER JOIN
+         dbo.TransferredToReadyFinishLotsDetail ON dbo.TransferredToReadyFinishLots.EntryID = dbo.TransferredToReadyFinishLotsDetail.RefID INNER JOIN
+         dbo.vendRcvdDetail ON dbo.TransferredToReadyFinishLotsDetail.VRD_RefID = dbo.vendRcvdDetail.EntryID
+         LEFT JOIN VRcvItemsSimpleDetail_Placement ON dbo.TransferredToReadyFinishLots.EntryID=VRcvItemsSimpleDetail_Placement.TTRFLD_RefID
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VVenderAssItems]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VVenderAssItems];
+END
+GO
+CREATE VIEW [dbo].[VVenderAssItems]
+AS
+SELECT     dbo.VenderAssItems.VendID, dbo.VenderAssItems.RMID, dbo.VenderAssItems.Rate, dbo.RM.RMID1, dbo.RM.RMName, dbo.RM.Unit, 
+                      dbo.RMGroups.Description AS GroupName, dbo.VenderAssItems.EntryID
+                      ,dbo.VenderAssItems.Remarks
+                      ,Accounts.AccTitle
+FROM         dbo.VenderAssItems INNER JOIN
+                      dbo.RM ON dbo.VenderAssItems.RMID = dbo.RM.RMID INNER JOIN
+                      dbo.RMGroups ON dbo.RM.GroupID = dbo.RMGroups.ID
+                      INNER JOIN Accounts ON dbo.VenderAssItems.VendID=Accounts.AccNo
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VVendIssdDetailWithValueWORcving]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VVendIssdDetailWithValueWORcving];
+END
+GO
+CREATE   VIEW [dbo].[VVendIssdDetailWithValueWORcving]
+AS
+SELECT        dbo.VendIssued.EntryID AS MainEntryID, dbo.VendIssued.RecieptID AS MainRecieptID, dbo.VendIssued.DT, dbo.VendIssdDetail.EntryID, dbo.VendIssued.VendID, 
+                         dbo.VendIssdDetail.RefID, dbo.VendIssdDetail.RecieptID, dbo.VendIssdDetail.ItemCode, dbo.VendIssdDetail.Rate, dbo.VendIssdDetail.IssQty, 
+                         dbo.VendIssdDetail.RcvdQty, dbo.VendIssdDetail.LotNo, dbo.VendIssdDetail.ReqAuth, dbo.VendIssdDetail.OrderNo, dbo.VendIssdDetail.RcvProcessID, 
+                         dbo.VendIssdDetail.ReturnDT, dbo.VendIssdDetail.Priority, dbo.VendIssdDetail.SpecialInstructions, dbo.VendIssued.VchrNo, dbo.Items.ForgingWeight, 
+                         VendIssdDetail.IssQty * VendIssdDetail.Rate AS IssValue, 
+                         (VendIssdDetail.IssQty - VendIssdDetail.RcvdQty) * VendIssdDetail.Rate AS BalanceValue
+                         , dbo.VendIssdDetail.ReWorkLot, 
+                         dbo.VendIssdDetail.Repair_RefID, dbo.FCustomerOrders.CustCode, dbo.FCustomerOrders.InternalRefNo, dbo.VID_Bookmarks.EntryID AS BookMarkEntryID, 
+                         T1.ItemCode AS CustItemCode, 
+			T1.Quality, dbo.VIssuanceEntryWithWastage.WastageQty,T1.OrderQty,VendIssdDetail.Batch_No
+FROM            dbo.VendIssdDetail INNER JOIN
+                         dbo.VendIssued ON dbo.VendIssdDetail.RefID = dbo.VendIssued.EntryID INNER JOIN
+                         dbo.Items ON dbo.VendIssued.ItemID = dbo.Items.ItemID INNER JOIN
+                         dbo.FCustomerOrders ON dbo.VendIssdDetail.OrderNo = dbo.FCustomerOrders.OrderNo LEFT OUTER JOIN
+                         dbo.VID_Bookmarks ON dbo.VendIssdDetail.EntryID = dbo.VID_Bookmarks.VID_RefID LEFT OUTER JOIN
+                             (SELECT        OrderNo, ItemCode,CompItemCode, MAX(Quality) AS Quality,SUM(Qty) AS OrderQty
+                                FROM            dbo.FOrderItems
+                                GROUP BY OrderNo, ItemCode,CompItemCode) AS T1 ON dbo.VendIssdDetail.OrderNo = T1.OrderNo AND 
+                         dbo.VendIssdDetail.ItemCode = T1.CompItemCode LEFT OUTER JOIN
+                         dbo.VIssuanceEntryWithWastage ON dbo.VendIssdDetail.EntryID = dbo.VIssuanceEntryWithWastage.EntryID
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VVendRcvdDetail]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VVendRcvdDetail];
+END
+GO
+CREATE VIEW [dbo].[VVendRcvdDetail]
+AS
+SELECT     dbo.VendReceived.DT, dbo.VendReceived.VendID, dbo.VendRcvdDetail.RcvdQty - dbo.VendRcvdDetail.Wastage - ISNULL(dbo.VendRcvdDetail.RcvRepairQty, 0) 
+                      - dbo.VendRcvdDetail.IssQty AS IssuableQty, dbo.VendReceived.UserID, dbo.VItems1.CompleteItemName AS ItemDescription, dbo.VendReceived.Issuance_RefID, 
+                      dbo.VendReceived.ProcessID AS MainProcessID, dbo.VendAssItems.Unit, dbo.VItems1.ForgingWeight, 
+                      CASE WHEN VendAssItems.UNIT = 'Kgs' THEN (RcvdWeight - ((RcvdWeight / dbo.VendRcvdDetail.RcvdQty) * (Wastage + LostQty))) 
+                      * VendIssdDetail.Rate ELSE VendIssdDetail.Rate * (dbo.VendRcvdDetail.RcvdQty - Wastage - LostQty) END AS RcvdValue, 
+                      (CASE WHEN dbo.VendRcvdDetail.RcvdQty = 0 THEN 0 ELSE RcvdWeight / dbo.VendRcvdDetail.RcvdQty END) * dbo.VendRcvdDetail.LostQty AS LostQtyWeight, 
+                      (CASE WHEN dbo.VendRcvdDetail.RcvdQty = 0 THEN 0 ELSE RcvdWeight / dbo.VendRcvdDetail.RcvdQty END) * dbo.VendRcvdDetail.Wastage AS WasteQtyWeight, 
+                      dbo.VendIssdDetail.Rate AS IssRate, CAST(CONVERT(VARCHAR(50), dbo.VendReceived.DT, 6) AS DATETIME) AS OnlyDT, dbo.Processes.BillingProcessID, 
+                      dbo.Makers.VenderName, dbo.Processes.Code, dbo.Processes.Description, dbo.VItems1.ItemName, dbo.VItems1.ItemSize, dbo.VItems1.SizeUnit, 
+                      dbo.VItems1.TipSize, dbo.VendIssued.RecieptID AS MainRecieptID, dbo.VendReceived.EmpID, 
+                      dbo.Employees.name + ' ' + dbo.Employees.Rel + ' ' + dbo.Employees.fname AS EmployeeName, dbo.ItemProcesses.SNO AS ItemSNo, 
+                      ItemBillingProcess.SNO AS BillingProcessSNo, dbo.VendReceived.EntryID AS ReceivedEntryID, dbo.VendRcvdDetail.EntryID, dbo.VendRcvdDetail.RefID, 
+                      dbo.VendRcvdDetail.ItemCode, dbo.VendRcvdDetail.RecieptID, dbo.VendRcvdDetail.RcvdQty, dbo.VendRcvdDetail.Wastage, dbo.VendRcvdDetail.Rate, 
+                      dbo.VendRcvdDetail.LotNo, dbo.VendRcvdDetail.ReqAuth, dbo.VendRcvdDetail.RcvRepairQty, dbo.VendRcvdDetail.IssRepairQty, dbo.VendRcvdDetail.NextProcessID, 
+                      dbo.VendRcvdDetail.LostQty, dbo.VendRcvdDetail.OrderNo, dbo.VendRcvdDetail.CountedBy, dbo.VendRcvdDetail.Issue_RefID, dbo.VendRcvdDetail.ProcessID, 
+                      dbo.VendRcvdDetail.RcvdWeight, dbo.VendRcvdDetail.RepairAmt, dbo.VendRcvdDetail.Opening_RefID, dbo.VendRcvdDetail.ReWorkQty, 
+                      dbo.VendRcvdDetail.ReWorkLot, dbo.VendRcvdDetail.Repair_RefID, dbo.VendRcvdDetail.Insp_EmpID, dbo.VendRcvdDetail.Audited, dbo.VendRcvdDetail.IssQty, 
+                      dbo.VendAssItems.Rate AS VAIRate
+                      ,VendIssdDetail.Rate * (dbo.VendRcvdDetail.RcvdQty) AS RcvdValue_For_Billing
+FROM         dbo.VendReceived INNER JOIN
+                      dbo.VendRcvdDetail ON dbo.VendReceived.EntryID = dbo.VendRcvdDetail.RefID INNER JOIN
+                      dbo.VItems1 ON dbo.VendRcvdDetail.ItemCode = dbo.VItems1.ItemID 
+					  LEFT JOIN FCustomerOrders ON VendRcvdDetail.OrderNo=FCustomerOrders.OrderNo
+                      LEFT OUTER JOIN dbo.VendAssItems ON dbo.VendRcvdDetail.ItemCode = dbo.VendAssItems.ItemID AND dbo.VendReceived.VendID = dbo.VendAssItems.VendID AND dbo.VendRcvdDetail.ProcessID = dbo.VendAssItems.ProcessID  AND dbo.FCustomerOrders.CustCode=dbo.VendAssItems.CustCode
+                      INNER JOIN dbo.VendIssdDetail ON dbo.VendIssdDetail.EntryID = dbo.VendRcvdDetail.Issue_RefID INNER JOIN
+                      dbo.Processes ON dbo.VendRcvdDetail.ProcessID = dbo.Processes.ProcessID LEFT OUTER JOIN
+                      dbo.ItemProcesses ON dbo.VendRcvdDetail.ItemCode = dbo.ItemProcesses.ItemID AND 
+                      dbo.VendRcvdDetail.ProcessID = dbo.ItemProcesses.ProcessID LEFT OUTER JOIN
+                      dbo.ItemProcesses AS ItemBillingProcess ON dbo.Processes.BillingProcessID = ItemBillingProcess.ProcessID AND 
+                      dbo.VendRcvdDetail.ItemCode = ItemBillingProcess.ItemID INNER JOIN
+                      dbo.Makers ON dbo.VendReceived.VendID = dbo.Makers.VendID INNER JOIN
+                      dbo.VendIssued ON dbo.VendIssdDetail.RefID = dbo.VendIssued.EntryID LEFT OUTER JOIN
+                      dbo.Employees ON dbo.VendReceived.EmpID = dbo.Employees.empid LEFT OUTER JOIN
+                          (SELECT     VRD_From_RefID, SUM(SplitQty) AS SplitQtyForRcvdQty
+                             FROM         dbo.LotTransferDetails
+                             GROUP BY VRD_From_RefID) AS TSplitQtyForRcvdQty ON dbo.VendRcvdDetail.EntryID = TSplitQtyForRcvdQty.VRD_From_RefID
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER OFF;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[VVendReceivingList]') AND type IN (N'V'))
+BEGIN
+    DROP VIEW [dbo].[VVendReceivingList];
+END
+GO
+CREATE   VIEW [dbo].[VVendReceivingList]
+AS
+SELECT     dbo.VendReceived.EntryID, dbo.VendReceived.VendID, dbo.VendReceived.DT, dbo.VendReceived.UserID, dbo.VendReceived.ProcessID, dbo.vendRcvdDetail.RecieptID, dbo.vendRcvdDetail.ItemCode, dbo.vendRcvdDetail.RcvdQty, dbo.vendRcvdDetail.Wastage, 
+                  dbo.vendRcvdDetail.LostQty, dbo.Makers.VenderName, dbo.Makers.VendID1, CAST(CONVERT(Varchar(10), dbo.VendReceived.DT, 1) AS DATETIME) AS OnlyDT, dbo.vendRcvdDetail.ReqAuth, dbo.VendReceived.Issuance_RefID, dbo.Processes.Description, 
+                  dbo.ItemProcesses.Scanning, dbo.vendRcvdDetail.LotNo, dbo.vendRcvdDetail.NextProcessID, dbo.vendRcvdDetail.IssQty, dbo.vendRcvdDetail.EntryID AS VRD_EntryID, dbo.vendRcvdDetail.Opening_RefID, dbo.Items.CatID, dbo.vendRcvdDetail.OrderNo, 
+                  dbo.VendIssued.MasterPONo, dbo.vendRcvdDetail.ReWorkLot, FOrderItems.CompItemCode, dbo.vendRcvdDetail.ReWorkQty, dbo.FCustomerOrders.CustCode, dbo.Items.ItemName, dbo.Items.ItemSize, dbo.Items.SizeUnit, dbo.Items.Type, dbo.Items.GroupID, 
+                  dbo.ItemGroups.Description AS ItemGroup, dbo.VendReceived.EmpID, T1.VRD_From_RefID, dbo.VendIssued.DT AS IssDT, dbo.VendIssdDetail.IssQty AS Issuance_IssQty, dbo.VendIssdDetail.RcvdQty AS Issuance_RcvdQty, 
+                  dbo.VendReceived_Employees_F(dbo.VendReceived.EntryID) AS Empoloyees, TDL.VRD_RefID, dbo.VendIssdDetail.ReturnDT, dbo.MakerPostedBillsDetail_Receivings.EntryID AS MPB_D_EntryID, dbo.MakerPostedBills.BillNo, dbo.FCustomerOrders.InternalRefNo, 
+                  FOrderItems.OrderQty, dbo.VendIssued.Closed, dbo.VItems_Complaints.ItemID AS ComplaintItemID, dbo.Lots_List.Batch_No, dbo.Lots_List.Mill_Certificate_No, dbo.Items.TipSize, dbo.VendReceived.EntryDT, dbo.Employees.Phone1, 
+                VHubSupervisors.Hub_Name,VHubSupervisors.Supervisors,
+                ISNULL(TDL.DispatchQty, 0) AS DispatchQty,
+                ISNULL(TTRF.StoreTransferQty, 0) AS StoreTransferQty,
+                CASE WHEN TLC.ClosedLotNo IS NOT NULL THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END AS IsLotClosed
+                ,dbo.VendIssued.BillingDays, dbo.VendIssdDetail.Rate, TLotDispatch.DispatchListNo, 
+                 TTRFLD.TTRFD_EntryID
+		         ,VRunningLots_Simple.Description AS Lot_Current_Process
+		         ,TTotalRcvd.Total_Rcvd_Qty
+		         ,TTRFLD.Shelf_RefID,TTRFLD.StoreName,TTRFLD.RackNo,TTRFLD.ShelfNo
+FROM        dbo.Employees RIGHT OUTER JOIN
+                  dbo.VendReceived INNER JOIN
+                  dbo.vendRcvdDetail ON dbo.VendReceived.EntryID = dbo.vendRcvdDetail.RefID INNER JOIN
+                  dbo.Makers ON dbo.VendReceived.VendID = dbo.Makers.VendID INNER JOIN
+                  dbo.Processes ON dbo.VendReceived.ProcessID = dbo.Processes.ProcessID INNER JOIN
+                  dbo.Items ON dbo.vendRcvdDetail.ItemCode = dbo.Items.ItemID LEFT OUTER JOIN
+                  dbo.Lots_List ON dbo.vendRcvdDetail.LotNo = dbo.Lots_List.LotNo LEFT OUTER JOIN
+                  dbo.FCustomerOrders ON dbo.vendRcvdDetail.OrderNo = dbo.FCustomerOrders.OrderNo LEFT OUTER JOIN
+                  dbo.VItems_Complaints ON dbo.Items.ItemID = dbo.VItems_Complaints.ItemID LEFT OUTER JOIN
+                  dbo.MakerPostedBillsDetail_Receivings INNER JOIN
+                  dbo.MakerPostedBills ON dbo.MakerPostedBillsDetail_Receivings.MPB_RefID = dbo.MakerPostedBills.EntryID ON dbo.vendRcvdDetail.EntryID = dbo.MakerPostedBillsDetail_Receivings.VRD_RefID LEFT OUTER JOIN
+                  dbo.VendIssued INNER JOIN
+                  dbo.VendIssdDetail ON dbo.VendIssued.EntryID = dbo.VendIssdDetail.RefID ON dbo.vendRcvdDetail.Issue_RefID = dbo.VendIssdDetail.EntryID LEFT OUTER JOIN
+                  dbo.ItemGroups ON dbo.Items.GroupID = dbo.ItemGroups.ID ON dbo.Employees.empid = dbo.VendReceived.EmpID LEFT OUTER JOIN
+                  dbo.VFOrderItems_Grouped AS FOrderItems ON dbo.vendRcvdDetail.OrderNo = FOrderItems.OrderNo AND dbo.vendRcvdDetail.ItemCode = FOrderItems.CompItemCode LEFT OUTER JOIN
+                  dbo.ItemProcesses ON dbo.Processes.ProcessID = dbo.ItemProcesses.ProcessID AND dbo.vendRcvdDetail.ItemCode = dbo.ItemProcesses.ItemID AND dbo.VendReceived.ProcessID = dbo.ItemProcesses.ProcessID LEFT OUTER JOIN
+                      (SELECT     VRD_From_RefID
+                       FROM        dbo.LotTransferDetails
+                       WHERE     (Type = 1)
+                       GROUP BY VRD_From_RefID) AS T1 ON dbo.vendRcvdDetail.EntryID = T1.VRD_From_RefID LEFT OUTER JOIN
+                      (SELECT     VRD_RefID, SUM(Qty) AS DispatchQty
+                       FROM        dbo.DispatchListDetail_VRD
+                       GROUP BY VRD_RefID) AS TDL ON dbo.vendRcvdDetail.EntryID = TDL.VRD_RefID 
+                       LEFT OUTER JOIN
+                       (SELECT LotNo, MAX(DispatchListNo) AS DispatchListNo
+                            FROM  dbo.VDispatchListDetail_Adv_Lot
+                            GROUP BY LotNo) AS TLotDispatch ON dbo.vendRcvdDetail.LotNo = TLotDispatch.LotNo
+                       LEFT OUTER JOIN
+                       (SELECT LotNo, MAX(EntryID) AS TTRFD_EntryID,MAX(Shelf_RefID) AS Shelf_RefID,MAX(StoreName) AS StoreName,MAX(ShelfNo) AS ShelfNo,MAX(RackNo) AS RackNo
+                        FROM  dbo.VTransferredToReadyFinishLotsDetail
+                        GROUP BY LotNo) AS TTRFLD ON dbo.vendRcvdDetail.LotNo = TTRFLD.LotNo
+                       LEFT OUTER JOIN
+                      (SELECT     VRD_RefID, SUM(Qty) AS StoreTransferQty
+                       FROM        dbo.TransferredToReadyFinishLotsDetail
+                       GROUP BY VRD_RefID) AS TTRF ON dbo.vendRcvdDetail.EntryID = TTRF.VRD_RefID LEFT OUTER JOIN
+                      (SELECT     LotNo AS ClosedLotNo
+                       FROM        dbo.Lots_Closed
+                       GROUP BY LotNo) AS TLC ON dbo.vendRcvdDetail.LotNo = TLC.ClosedLotNo
+                LEFT OUTER JOIN dbo.ItemProcessGroups ON dbo.vendRcvdDetail.ItemCode = dbo.ItemProcessGroups.ItemID 
+                LEFT OUTER JOIN dbo.ProcessGroupsProcesses ON dbo.ItemProcessGroups.PG_RefID = dbo.ProcessGroupsProcesses.Group_RefID 
+                                                          AND dbo.VendReceived.ProcessID = dbo.ProcessGroupsProcesses.Process_RefID 
+                LEFT OUTER JOIN dbo.VHubSupervisors ON dbo.ProcessGroupsProcesses.Group_RefID = dbo.VHubSupervisors.GroupID 
+                                                  AND dbo.ProcessGroupsProcesses.Hub_Name = dbo.VHubSupervisors.Hub_Name
+                LEFT JOIN VRunningLots_Simple ON dbo.vendRcvdDetail.LotNo=VRunningLots_Simple.LotNo
+			    LEFT JOIN (SELECT VendRcvdDetail.Issue_RefID,SUM(VendRcvdDetail.RcvdQty) AS Total_Rcvd_Qty FROM VendRcvdDetail WHERE VendRcvdDetail.Issue_RefID<>0 GROUP BY VendRcvdDetail.Issue_RefID) TTotalRcvd ON VendRcvdDetail.Issue_RefID=TTotalRcvd.Issue_RefID
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS OFF;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[MakerBilling_RcvingWise_SP]') AND type IN (N'P'))
+BEGIN
+    DROP PROCEDURE [dbo].[MakerBilling_RcvingWise_SP];
+END
+GO
+CREATE PROCEDURE [dbo].[MakerBilling_RcvingWise_SP] (@MakerID AS INT=0,@DTFrom AS DATETIME,@DTTo AS DATETIME,@CatID AS VARCHAR(255),@ProcessID AS INT=0,@MasterPONo VARCHAR(50)='')
+AS
+BEGIN
+
+CREATE TABLE #myTBL (CatID VARCHAR(50))
+CREATE TABLE #Processes(ProcessID INT)
+IF @ProcessID=0 
+	INSERT INTO #Processes SELECT ProcessID FROM Processes
+ELSE
+	INSERT INTO #Processes SELECT ProcessID FROM Processes WHERE ProcessID=@ProcessID
+	
+DECLARE @myQuery AS VARCHAR(1000)
+
+IF @CatID='0' 
+	INSERT INTO #myTBL SELECT CatID FROM ItemCatagories
+ELSE
+	BEGIN	
+		SET @myQuery='INSERT INTO #myTBL(CatID) SELECT CatID FROM ItemCatagories WHERE CatID IN(' + @CatID +')'
+		EXEC(@myQuery)
+	END
+	
+SELECT Makers.VendID,Makers.VendID1,Makers.VenderName,VendIssued.EntryID,VendIssued.RecieptID,Vendissued.DT,VendIssued.ItemID,TabIssd.IssQty,TabIssd.Rate,TempAdvance,TabRcvd.RcvdQty ,RcvdQtyUnAuth,RcvdWeight,
+RcvdWeightUnAuth,RcvdValue,RcvdValueUnAuth
+--,(TabRcvd.RcvdQty+RcvdQtyUnAuth)/CAST(TabIssd.IssQty AS FLOAT)*100 AS PercentRcvd
+,100 AS PercentRcvd
+,TabRcvd.RepairAmt,ItemName,ItemNameUrdu,Wastage,Accounts.Balance As AccBalance,TabRcvd.OrderNo,
+Issue_RefID,TabRcvd.EntryID AS RcvDetailEntryID,TabRcvd.RecieptID AS RcvRecieptID,TabRcvd.LotNo,
+BillingProcRcvdQty-ISNULL(WastageQtyFromRepair,0) AS BillingProcRcvdQty,BillingProcAmount-(ISNULL(WastageQtyFromRepair,0)*TabIssd.Rate) AS BillingProcAmount
+--BillingProcRcvdQty-ISNULL(WastageQtyFromRepair,0) AS BillingProcRcvdQty,BillingProcAmount-ISNULL(WastageQtyFromRepair*Rate,0) AS BillingProcAmount
+--TabRcvd.RcvdQty-ISNULL(ReWorkQty,0)-ISNULL(WastageQtyFromRepair,0) AS BillingProcRcvdQty,((TabRcvd.RcvdQty-ISNULL(ReWorkQty,0)-ISNULL(WastageQtyFromRepair,0))*Rate) AS BillingProcAmount
+,OnlyDT,TabRcvd.ProcessID,Processes.Description,
+CatID,TabRcvd.MasterPONo,MasterRecieptID,MainIssuanceEntryID,LotClearDT
+,WastageQtyFromRepair,WastageQtyFromRepair*VendAssItems.Rate AS WastageValueFromRepair,RcvDT,ItemGroups.Description AS ItemGroupName,Audited,BillQtyDirect,BillQtyInDirect,FCustomerOrders.CustCode
+,VendIssued.BillingDays,TRunningLots.Lot_Current_Process
+,FCustomerOrders.InternalRefNo
+FROM VendIssued
+LEFT OUTER JOIN VendIssdDetail TabIssd ON VendIssued.EntryID=TabIssd.RefID
+LEFT OUTER JOIN VendAssItems ON VendIssued.VendID=VendAssItems.VendID AND VendIssued.ProcessID=VendAssItems.ProcessID AND TabIssd.ItemCode=VendAssItems.ItemID
+LEFT OUTER JOIN (SELECT VVendRcvdDetail.EntryID,Issuance_RefID,Issue_RefID,OrderNo,0 AS Not_Available_For_Billing
+					--,CASE WHEN ReqAuth=0 THEN RcvdQty ELSE 0 END +ISNULL(SplitQtyForRcvdQty,0) AS RcvdQty
+					,CASE WHEN ReqAuth=0 THEN RcvdQty ELSE 0 END AS RcvdQty
+					,CASE WHEN ReqAuth=1 THEN RcvdQty ELSE 0 END AS RcvdQtyUnAuth,
+					CASE WHEN ReqAuth=0 THEN RcvdWeight ELSE 0 END AS RcvdWeight,CASE WHEN ReqAuth=1 THEN RcvdWeight ELSE 0 END AS RcvdWeightUnAuth,
+					CASE WHEN ReqAuth=0 THEN RcvdValue_For_Billing ELSE 0 END AS RcvdValue,CASE WHEN ReqAuth=1 THEN RcvdValue_For_Billing ELSE 0 END AS RcvdValueUnAuth,RepairAmt AS RepairAmt
+,Wastage,VVendRcvdDetail.LotNo,VVendRcvdDetail.RecieptID,ISNULL(BillQtyDirect,0)+ISNULL(BillQtyInDirect,0) AS BillingProcRcvdQty,(ISNULL(BillQtyDirect,0)+ISNULL(BillQtyInDirect,0))*IssRate AS BillingProcAmount,OnlyDT,VVendRcvdDetail.ProcessID,MasterPONo,TMasters.RecieptID AS MasterRecieptID,MainIssuanceEntryID,LotClearDT,DT AS RcvDT,ReWorkQty,Audited,BillQtyDirect,BillQtyInDirect
+FROM VVendRcvdDetail 
+LEFT OUTER JOIN(SELECT VRD_From_RefID,SUM(SplitQty) AS SplitQtyForRcvdQty FROM LotTransferDetails GROUP BY VRD_From_RefID) TSplitQtyForRcvdQty ON VVendRcvdDetail.EntryID=TSplitQtyForRcvdQty.VRD_From_RefID
+/*INNER JOIN
+(SELECT LotNo,ProcessID,MAX(DT) AS LotClearDT,SUM(BillingProcRcvdQty) AS BillingProcRcvdQty1 FROM(
+SELECT LotNo,VendRcvdDetail.ProcessID,DT,RcvdQty-ISNULL(ReWorkQty,0)-ISNULL(Wastage,0) AS BillingProcRcvdQty FROM VendRcvdDetail INNER JOIN VendReceived ON VendReceived.EntryID=VendRcvdDetail.RefID WHERE (VendID=@MakerID OR @MakerID=0) AND ReqAuth=0
+UNION ALL
+SELECT VRD_From.LotNo,VRD_Lots.ProcessID,VendReceived.DT,VRD_Lots.RcvdQty-ISNULL(VRD_Lots.ReWorkQty,0) AS BillingProcRcvdQty FROM LotTransferDetails
+	INNER JOIN VendRcvdDetail VRD_From ON LotTransferDetails.VRD_From_RefID=VRD_From.EntryID
+	INNER JOIN VendRcvdDetail VRD_To ON LotTransferDetails.VRD_To_RefID=VRD_To.EntryID
+	INNER JOIN VendRcvdDetail VRD_Lots ON VRD_To.LotNo=VRD_Lots.LotNo
+	INNER JOIN VendReceived ON VRD_Lots.RefID=VendReceived.EntryID
+	WHERE VRD_Lots.ReqAuth=0 AND Type=1 --AND VRD_To.ProcessID <> VendRcvdDetail.ProcessID
+	) TBilling GROUP BY LotNo,ProcessID
+) TBillProc ON VVendRcvdDetail.BillingProcessID=TBillProc.ProcessID AND VVendRcvdDetail.LotNo=TBillProc.LotNo*/
+
+INNER JOIN(SELECT LotNo,VendRcvdDetail.ProcessID,MAX(DT) AS LotClearDT,SUM(RcvdQty-ISNULL(ReWorkQty,0)-ISNULL(Wastage,0)) AS BillQtyDirect FROM VendRcvdDetail INNER JOIN VendReceived  ON VendReceived.EntryID=VendRcvdDetail.RefID GROUP BY LotNo,VendRcvdDetail.ProcessID) TBillQtyDirect ON VVendRcvdDetail.LotNo=TBillQtyDirect.LotNo AND VVendRcvdDetail.BillingProcessID=TBillQtyDirect.ProcessID
+LEFT OUTER JOIN(SELECT VRD_From.LotNo,VRD_Lots.ProcessID,SNo,SUM(VRD_Lots.RcvdQty-ISNULL(VRD_Lots.ReWorkQty,0)) AS BillQtyInDirect FROM LotTransferDetails
+	INNER JOIN VendRcvdDetail VRD_From ON LotTransferDetails.VRD_From_RefID=VRD_From.EntryID
+	INNER JOIN VendRcvdDetail VRD_To ON LotTransferDetails.VRD_To_RefID=VRD_To.EntryID
+	INNER JOIN VendRcvdDetail VRD_Lots ON VRD_To.LotNo=VRD_Lots.LotNo
+	INNER JOIN VendReceived ON VRD_Lots.RefID=VendReceived.EntryID
+	INNER JOIN ItemProcesses ON VRD_From.ProcessID=ItemProcesses.ProcessID AND ItemProcesses.ItemID=VRD_From.ItemCode 
+	WHERE VRD_Lots.ReqAuth=0 AND Type=1 GROUP BY VRD_From.LotNo,VRD_Lots.ProcessID,SNo) TBillQtyInDirect ON VVendRcvdDetail.LotNo=TBillQtyInDirect.LotNo AND VVendRcvdDetail.BillingProcessID=TBillQtyInDirect.ProcessID AND (TBillQtyInDirect.SNo>VVendRcvdDetail.ItemSNo)
+
+LEFT OUTER JOIN (SELECT LotNo,MIN(EntryID) AS MinEntryID FROM VendRcvdDetail GROUP BY LotNo) TMinLot ON VVendRcvdDetail.LotNo=TMinLot.LotNo
+LEFT OUTER JOIN (SELECT VendIssued.EntryID AS MainIssuanceEntryID,VendRcvdDetail.EntryID,MasterPONo,VendIssued.RecieptID FROM VendIssued INNER JOIN VendIssdDetail ON VendIssdDetail.RefID=VendIssued.EntryID INNER JOIN VendRcvdDetail ON VendRcvdDetail.Issue_RefID=VendIssdDetail.EntryID) TMasters
+	ON TMinLot.MinEntryID=TMasters.EntryID
+
+WHERE (VendID=@MakerID OR @MakerID=0) AND OnlyDT BETWEEN @DTFrom AND @DTTo  --AND ReWorkLot=0
+			) TabRcvd ON VendIssued.EntryID=TabRcvd.Issuance_RefID AND TabIssd.EntryID=TabRcvd.Issue_RefID
+LEFT OUTER JOIN (SELECT Issuance_RefID,SUM(Amount) AS TempAdvance FROM MakerTemporaryLoans WHERE ISNULL(GroupID,0)=0 OR GroupID IN(SELECT EntryID FROM MakerTemporaryLoansGroup WHERE Active=1) 
+																	GROUP BY Issuance_RefID) TabTemp ON VendIssued.EntryID=TabTemp.Issuance_RefID
+
+LEFT OUTER JOIN (SELECT VRD_RefID_ChargeTo,SUM(Qty) AS WastageQtyFromRepair FROM VMakerRepair_BIlling WHERE ShowInBilling=0 AND ItemSNo>BillingProcessSNo AND BillingProcessSNo IS NOT NULL GROUP BY VRD_RefID_ChargeTo) TMakerWastage ON TabRcvd.EntryID=TMakerWastage.VRD_RefID_ChargeTo
+INNER JOIN Items ON VendIssued.ItemID=Items.ItemID
+INNER JOIN ItemGroups ON Items.GroupID=ItemGroups.ID
+INNER JOIN Makers ON VendIssued.VendID=Makers.VendID
+INNER JOIN Accounts ON Makers.AccNo=Accounts.AccNo
+INNER JOIN Processes ON TabRcvd.ProcessID=Processes.ProcessID
+INNER JOIN #Processes ON #Processes.ProcessID=TabRcvd.ProcessID
+INNER JOIN FCustomerOrders ON TabIssd.OrderNo=FCustomerOrders.OrderNo
+LEFT JOIN (SELECT LotNo,MAX(Description) AS Lot_Current_Process FROM VRunningLots_Simple GROUP BY LotNo) TRunningLots ON TabRcvd.LotNo=TRunningLots.LotNo
+WHERE (VendIssued.VendID=@MakerID OR @MakerID=0) AND Issue_RefID IS NOT NULL
+AND TabRcvd.EntryID NOT IN(SELECT VRD_RefID FROM MakerPostedBillsDetail_Receivings)
+AND Items.CatID IN(SELECT CatID FROM #myTBL)
+AND TabRcvd.EntryID NOT IN(SELECT VRD_RefID FROM MakerBilling_Receivings_Hidden)
+AND TabRcvd.Not_Available_For_Billing=0
+AND ((TabRcvd.MasterPONo LIKE '%'+@MasterPONo+'%') OR @MasterPONo='')
+AND OnlyDT>='12/1/2019'
+--ORDER BY RcvDT
+ORDER BY FCustomerOrders.InternalRefNo
+--ORDER BY (RcvdQty+RcvdQtyUnAuth)/CAST(TabIssd.IssQty AS FLOAT) *100 DESC
+END
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[ProductionOrderReport_WithSet_SP]') AND type IN (N'P'))
+BEGIN
+    DROP PROCEDURE [dbo].[ProductionOrderReport_WithSet_SP];
+END
+GO
+/****** Object:  StoredProcedure [dbo].[ProductionOrderReportPHF_SP]    Script Date: 03/10/2014 09:45:10 ******/
+/*SET ANSI_NULLS OFF
+GO
+SET QUOTED_IDENTIFIER ON
+GO*/
+
+CREATE PROCEDURE [dbo].[ProductionOrderReport_WithSet_SP] (@OrderNo AS VARCHAR(255)) AS
+
+BEGIN
+	SET ANSI_NULLS ON
+	
+	SET ARITHABORT ON
+
+
+	SELECT     dbo.VrptOrders_ForProduction.OrderNo, dbo.VrptOrders_ForProduction.DT, dbo.VrptOrders_ForProduction.TradeTerms, dbo.VrptOrders_ForProduction.CustCode, dbo.VrptOrders_ForProduction.Country, dbo.VrptOrders_ForProduction.PartialShipment, 
+                      dbo.VrptOrders_ForProduction.PaymentTerms, dbo.VrptOrders_ForProduction.TransShipment, dbo.VrptOrders_ForProduction.Packaging, dbo.VrptOrders_ForProduction.DeliveryDT, dbo.VrptOrders_ForProduction.BatchNo, 
+                      dbo.VrptOrders_ForProduction.CompanyRefID, dbo.VrptOrders_ForProduction.StampDT, dbo.VrptOrders_ForProduction.Quality, dbo.VrptOrders_ForProduction.InternalRefNo, dbo.VrptOrders_ForProduction.OrderRcvdVia, 0 AS ID, 
+                      '' AS ItemCode, 0 AS Price, dbo.VrptOrders_ForProduction.Qty, 0 AS InvQty, dbo.VrptOrders_ForProduction.ItemName, dbo.VrptOrders_ForProduction.Description, 
+                      dbo.VrptOrders_ForProduction.ItemID, dbo.VrptOrders_ForProduction.CompItemID, dbo.VrptOrders_ForProduction.Curr, dbo.VrptOrders_ForProduction.Unit, dbo.VrptOrders_ForProduction.Name, dbo.VrptOrders_ForProduction.Address, 
+                      0 AS CustomPrice, dbo.VrptOrders_ForProduction.CustomDescription, dbo.VrptOrders_ForProduction.ItemSize, dbo.VrptOrders_ForProduction.SizeUnit, dbo.VrptOrders_ForProduction.SteelType, dbo.VrptOrders_ForProduction.Gage, 
+                      dbo.VrptOrders_ForProduction.ItemColor, dbo.VrptOrders_ForProduction.BarcodeNo, dbo.VrptOrders_ForProduction.PackingMode, dbo.VrptOrders_ForProduction.MasterCartonL, dbo.VrptOrders_ForProduction.MasterCartonW, 
+                      dbo.VrptOrders_ForProduction.MasterCartonH, dbo.VrptOrders_ForProduction.SmallCartonL, dbo.VrptOrders_ForProduction.SmallCartonW, dbo.VrptOrders_ForProduction.SmallCartonH, dbo.VrptOrders_ForProduction.PolyBag, 
+                      dbo.VrptOrders_ForProduction.SpecialInstructions, dbo.VrptOrders_ForProduction.StampInstructions, dbo.VrptOrders_ForProduction.PackingInstructions, dbo.VrptOrders_ForProduction.UnitItems, dbo.VrptOrders_ForProduction.CustomerColor, 
+                      dbo.VrptOrders_ForProduction.ShippedQty, dbo.VrptOrders_ForProduction.ItemNameUrdu, dbo.VrptOrders_ForProduction.InHand, 0 AS SortNo, dbo.VrptOrders_ForProduction.MaxLotSize, dbo.VrptOrders_ForProduction.FinQuality
+                      ,dbo.VrptOrders_ForProduction.Type, TabPO.RecieptID, TabPO.IssQty, TabAdj.AdjQty
+                      ,TPTC.PTC
+                      ,TProcesses.Processes
+                      ,TPOQty.POQty
+                      ,TPONo.PONos
+                      ,TabPacked.PackQty
+                      ,TCartons.Cartons
+                      ,TabQC.RcvdQtyQC,TabQC.WastageQC,TabQC.ReWorkQtyQC,TabInsp.RcvdQtyInsp,TabInsp.WastageInsp,TabInsp.ReWorkQtyInsp,ReWorkQtyQCBalance,TotalQtyRcvd,TotalTransferred,ReWorkQtyInspBalance
+                      ,TIMR.InitialMakerRcvings
+                      ,'' AS DeliveryDTItem,'' AS DeliveryStatus,'' AS StampsItem,'' AS QualityItem,'' AS Remarks
+					  ,TPOMN.POMakerName
+					  ,VenderName,ReturnDT,'' AS GroupDescription,0 AS GroupID,CompanyName,0 AS FinishedWeight,0 AS SmallBoxPcs,0 AS MasterCartonSmallBoxes
+					  ,0 AS MainItem,ItemsSets.Set_ItemID
+FROM         dbo.VrptOrders_ForProduction WITH (NOLOCK) 
+			LEFT OUTER JOIN Companies WITH (NOLOCK)ON VrptOrders_ForProduction.CompanyRefID=Companies.EntryID 
+			LEFT OUTER JOIN ItemsSets WITH (NOLOCK)ON VrptOrders_ForProduction.ItemID=ItemsSets.ItemID
+			AND VrptOrders_ForProduction.CompItemID=ItemsSets.Set_ItemID
+			LEFT OUTER JOIN
+                          (SELECT     OrderNo, ItemCode, RecieptID, IssQty,VenderName,ReturnDT
+                            FROM          dbo.VVendIssdDetail WITH (NOLOCK) INNER JOIN
+                            (SELECT     MIN(EntryID) AS MINEntryID FROM dbo.VVendIssdDetail WITH (NOLOCK) WHERE OrderNo=@OrderNo AND VendID<>653 GROUP BY OrderNo, ItemCode) TI1 ON dbo.VVendIssdDetail.EntryID=TI1.MinEntryID) TabPO ON dbo.VrptOrders_ForProduction.OrderNo = TabPO.OrderNo AND 
+                      dbo.VrptOrders_ForProduction.CompItemID = TabPO.ItemCode 
+					  
+					  LEFT OUTER JOIN
+                      (SELECT     OrderNo, ItemID, SUM(Qty) AS AdjQty
+                      FROM          StockOrderAdjustments WITH (NOLOCK) WHERE OrderNo=@OrderNo
+                      GROUP BY OrderNo, ItemID) TabAdj ON dbo.VrptOrders_ForProduction.OrderNo = TabAdj.OrderNo AND dbo.VrptOrders_ForProduction.CompItemID = TabAdj.ItemID LEFT OUTER JOIN
+                      (SELECT     OrderNo, ItemCode, SUM(Qty) AS PackQty
+                      FROM          VDispatchListDetail  WITH (NOLOCK) WHERE OrderNo=@OrderNo
+                      GROUP BY OrderNo, ItemCode) TabPacked ON dbo.VrptOrders_ForProduction.OrderNo = TabPacked.OrderNo AND 
+                      dbo.VrptOrders_ForProduction.CompItemID = TabPacked.ItemCode 
+					  
+					  LEFT OUTER JOIN
+                          (SELECT     OrderNo, ItemCode, SUM(RcvdQty) AS RcvdQtyQC, SUM(Wastage + LostQty) AS WastageQC, SUM(VendRcvdDetailReWorkDetail.Qty) AS ReWorkQtyQC, 
+                                                   SUM(VendRcvdDetailReWorkDetail.Qty - VendRcvdDetailReWorkDetail.IssQty) AS ReWorkQtyQCBalance
+                            FROM          VendRcvdDetail  WITH (NOLOCK) LEFT OUTER JOIN
+                                                   VendRcvdDetailReWorkDetail  WITH (NOLOCK) ON VendRcvdDetail.EntryID = VendRcvdDetailReWorkDetail.VRD_RefID
+                            WHERE      ProcessID = 69 AND ReqAuth = 0 AND ReWorkLot=0 AND OrderNo=@OrderNo
+                            GROUP BY OrderNo, ItemCode) TabQC ON dbo.VrptOrders_ForProduction.OrderNo = TabQC.OrderNo AND dbo.VrptOrders_ForProduction.CompItemID = TabQC.ItemCode LEFT OUTER JOIN
+                          (SELECT     OrderNo, ItemCode, SUM(RcvdQty) AS RcvdQtyInsp, SUM(Wastage + LostQty) AS WastageInsp, SUM(VendRcvdDetailReWorkDetail.Qty) AS ReWorkQtyInsp,
+			SUM(VendRcvdDetailReWorkDetail.Qty - VendRcvdDetailReWorkDetail.IssQty) AS ReWorkQtyInspBalance
+                            FROM          VendRcvdDetail  WITH (NOLOCK) LEFT OUTER JOIN
+                                                   VendRcvdDetailReWorkDetail  WITH (NOLOCK) ON VendRcvdDetail.EntryID = VendRcvdDetailReWorkDetail.VRD_RefID
+                            WHERE      ProcessID = 65 AND ReqAuth = 0 AND ReWorkLot=0 AND OrderNo=@OrderNo
+                            GROUP BY OrderNo, ItemCode) TabInsp ON dbo.VrptOrders_ForProduction.OrderNo = TabInsp.OrderNo AND dbo.VrptOrders_ForProduction.CompItemID = TabInsp.ItemCode LEFT OUTER JOIN
+		(SELECT VendRcvdDetail.OrderNo,VendRcvdDetail.ItemCode,SUM(VendRcvdDetail.RcvdQty) AS TotalQtyRcvd FROM VendRcvdDetail  WITH (NOLOCK) LEFT OUTER JOIN VendIssdDetail  WITH (NOLOCK) ON VendRcvdDetail.Issue_RefID=VendIssdDetail.EntryID 
+			WHERE ISNULL(VendIssdDetail.LotNo,'0')='0' AND VendRcvdDetail.OrderNo=@OrderNo--VendRcvdDetail.EntryID IN(SELECT MIN(EntryID) FROM VendRcvdDetail WHERE ReWorkLot=0)  
+			GROUP BY VendRcvdDetail.OrderNo,VendRcvdDetail.ItemCode) TTotalRcvd ON dbo.VrptOrders_ForProduction.OrderNo = TTotalRcvd.OrderNo AND dbo.VrptOrders_ForProduction.CompItemID = TTotalRcvd.ItemCode LEFT OUTER JOIN
+		(SELECT OrderNo,ItemCode,SUM(Qty) AS TotalTransferred FROM TransferredToReadyFinishLotsDetail  WITH (NOLOCK) INNER JOIN VendRcvdDetail  WITH (NOLOCK) ON TransferredToReadyFinishLotsDetail.VRD_RefID=VendRcvdDetail.EntryID WHERE OrderNo=@OrderNo
+			GROUP BY OrderNo,ItemCode) TTTRF ON dbo.VrptOrders_ForProduction.OrderNo = TTTRF.OrderNo AND dbo.VrptOrders_ForProduction.CompItemID = TTTRF.ItemCode 
+			
+			
+		LEFT OUTER JOIN (SELECT DISTINCT OrderNo,ItemCode,
+(STUFF((SELECT ','+LotNo + ' ('+CAST(RcvdQty AS VARCHAR(5)) +')' FROM VendRcvdDetail WITH (NOLOCK) 
+	INNER JOIN (SELECT MAX(EntryID) AS MAXEntryID FROM VendRcvdDetail WITH (NOLOCK) WHERE OrderNo=@OrderNo GROUP BY LotNo) T1 ON VendRcvdDetail.EntryID=T1.MaxEntryID
+	WHERE OrderNo=@OrderNo AND VendRcvdDetail.OrderNo=FOrderItems.OrderNo AND VendRcvdDetail.ItemCode=FOrderItems.CompItemCode  ORDER BY LotNo
+	FOR XML PATH(''), TYPE, ROOT).value('root[1]','nvarchar(max)'),1,1,'')) AS PTC
+	FROM FOrderItems WHERE OrderNo=@OrderNo) TPTC ON VrptOrders_ForProduction.OrderNo=TPTC.OrderNo AND VrptOrders_ForProduction.ItemID=TPTC.ItemCode
+		
+
+LEFT OUTER JOIN (
+SELECT DISTINCT OrderNo,ItemCode,
+(STUFF((SELECT CHAR(13)+Description + + ' (' + CONVERT(VARCHAR(50),DT,5) + ') ('  + CAST(RcvdQty-ISNULL(Wastage,0)-ISNULL(ReWorkQty,0) AS VARCHAR(10)) + ')' FROM VendRcvdDetail WITH (NOLOCK) INNER JOIN VendReceived WITH (NOLOCK) ON VendReceived.EntryID=VendRcvdDetail.RefID 
+	INNER JOIN Processes ON VendReceived.ProcessID=Processes.ProcessID
+	INNER JOIN (SELECT MAX(EntryID) AS MAXEntryID FROM VendRcvdDetail WITH (NOLOCK) WHERE OrderNo=@OrderNo AND VendRcvdDetail.OrderNo=FOrderItems.OrderNo AND VendRcvdDetail.ItemCode=FOrderItems.CompItemCode GROUP BY LotNo) T1 ON VendRcvdDetail.EntryID=T1.MAXEntryID
+	FOR XML PATH(''), TYPE, ROOT).value('root[1]','nvarchar(max)'),1,1,'')) AS Processes
+	FROM FOrderItems WHERE OrderNo=@OrderNo) TProcesses ON VrptOrders_ForProduction.OrderNo=TProcesses.OrderNo AND VrptOrders_ForProduction.ItemID=TProcesses.ItemCode
+
+LEFT OUTER JOIN (
+SELECT DISTINCT OrderNo,ItemCode,	
+(STUFF((SELECT CHAR(13) + CHAR(10)+CAST(IssQty AS VARCHAR(5)) FROM VVendIssdDetail_Simple WITH (NOLOCK) INNER JOIN 
+	(SELECT MIN(EntryID) AS MINEntryID FROM dbo.VVendIssdDetail_Simple WITH (NOLOCK) WHERE OrderNo=@OrderNo AND ProcessID IN(172,212) 
+	AND VVendIssdDetail_Simple.OrderNo=FOrderItems.OrderNo AND VVendIssdDetail_Simple.ItemCode=FOrderItems.CompItemCode GROUP BY OrderNo,ItemCode,ProcessID) T1 ON VVendIssdDetail_Simple.EntryID=T1.MINEntryID
+	FOR XML PATH(''), TYPE, ROOT).value('root[1]','nvarchar(max)'),1,1,'')) AS POQty
+	FROM FOrderItems WHERE OrderNo=@OrderNo) TPOQty ON VrptOrders_ForProduction.OrderNo=TPOQty.OrderNo AND VrptOrders_ForProduction.ItemID=TPOQty.ItemCode
+	
+LEFT OUTER JOIN (
+SELECT DISTINCT OrderNo,ItemCode,	
+(STUFF((SELECT CHAR(13) + CHAR(10)+RecieptID FROM VVendIssdDetail_Simple WITH (NOLOCK) INNER JOIN 
+	(SELECT MIN(EntryID) AS MINEntryID FROM dbo.VVendIssdDetail_Simple WITH (NOLOCK) WHERE OrderNo=@OrderNo AND ProcessID IN(172,212) 
+	AND VVendIssdDetail_Simple.OrderNo=FOrderItems.OrderNo AND VVendIssdDetail_Simple.ItemCode=FOrderItems.CompItemCode GROUP BY OrderNo,ItemCode,ProcessID) T1 ON VVendIssdDetail_Simple.EntryID=T1.MINEntryID
+	FOR XML PATH(''), TYPE, ROOT).value('root[1]','nvarchar(max)'),1,1,'')) AS PONos
+	FROM FOrderItems WHERE OrderNo=@OrderNo) TPONo ON VrptOrders_ForProduction.OrderNo=TPONo.OrderNo AND VrptOrders_ForProduction.ItemID=TPONo.ItemCode
+	
+LEFT OUTER JOIN (
+SELECT DISTINCT OrderNo,FOrderItems.CompItemCode,
+(STUFF((SELECT CHAR(13)+CHAR(10)+CAST(CartonNo AS VARCHAR(10)) + '(' + CAST(SUM(Qty) AS VARCHAR(10)) + ')' FROM VDispatchListDetail_Adv WITH (NOLOCK) WHERE OrderNo=@OrderNo
+	AND VDispatchListDetail_Adv.OrderNo=FOrderItems.OrderNo AND VDispatchListDetail_Adv.ItemCode=FOrderItems.CompItemCode GROUP BY OrderNo,ItemCode,CartonNo
+	FOR XML PATH(''), TYPE, ROOT).value('root[1]','nvarchar(max)'),1,1,'')) AS Cartons
+	FROM FOrderItems WHERE OrderNo=@OrderNo) TCartons ON VrptOrders_ForProduction.OrderNo=TCartons.OrderNo AND VrptOrders_ForProduction.CompItemID=TCartons.CompItemCode
+
+LEFT OUTER JOIN (
+SELECT DISTINCT OrderNo,ItemCode,
+(STUFF((SELECT CHAR(13)+VendRcvdDetail.LotNo+ ' (' + CAST(SUM(VendRcvdDetail.RcvdQty) AS VARCHAR(10)) + ')' FROM VendRcvdDetail WITH (NOLOCK) 
+	INNER JOIN VendIssdDetail ON VendRcvdDetail.Issue_RefID=VendIssdDetail.EntryID WHERE VendIssdDetail.LotNo='0' AND VendRcvdDetail.ReWorkLot=0 AND VendRcvdDetail.EntryID NOT IN(SELECT EntryID FROM LotTransferDetails)
+		AND VendRcvdDetail.OrderNo=@OrderNo	
+		AND VendRcvdDetail.OrderNo=FOrderItems.OrderNo AND VendRcvdDetail.ItemCode=ForderItems.CompItemCode
+		GROUP BY VendRcvdDetail.LotNo
+	FOR XML PATH(''), TYPE, ROOT).value('root[1]','nvarchar(max)'),1,1,'')) AS InitialMakerRcvings
+	FROM FOrderItems WHERE OrderNo=@OrderNo) TIMR ON VrptOrders_ForProduction.OrderNo=TIMR.OrderNo AND VrptOrders_ForProduction.ItemID=TIMR.ItemCode
+	
+LEFT OUTER JOIN (SELECT DISTINCT OrderNo,ItemCode,
+(STUFF((SELECT CHAR(13)+CHAR(10)+VenderName FROM VendIssdDetail WITH (NOLOCK) INNER JOIN VendIssued WITH (NOLOCK) ON VendIssued.EntryID=VendIssdDetail.RefID INNER JOIN Makers WITH (NOLOCK) ON Makers.VendID=VendIssued.VendID INNER JOIN
+	(SELECT MIN(EntryID) MINEntryID FROM dbo.VVendIssdDetail_Simple WITH (NOLOCK) WHERE ProcessID IN(172,212) AND VVendIssdDetail_Simple.OrderNo=@OrderNo AND VVendIssdDetail_Simple.OrderNo=FOrderItems.OrderNo AND VVendIssdDetail_Simple.ItemCode=ForderItems.CompItemCode GROUP BY OrderNo,ItemCode,ProcessID) T1 ON VendIssdDetail.EntryID=T1.MinEntryID
+	FOR XML PATH(''), TYPE, ROOT).value('root[1]','nvarchar(max)'),1,1,'')) AS POMakerName
+	FROM FOrderItems WHERE OrderNo=@OrderNo) TPOMN ON VrptOrders_ForProduction.OrderNo=TPOMN.OrderNo AND VrptOrders_ForProduction.ItemID=TPOMN.ItemCode
+	WHERE VrptOrders_ForProduction.OrderNo=@OrderNo
+
+END
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[PTC_SP]') AND type IN (N'P'))
+BEGIN
+    DROP PROCEDURE [dbo].[PTC_SP];
+END
+GO
+CREATE PROCEDURE [dbo].[PTC_SP] (@LotNo AS VARCHAR(50)) AS
+
+BEGIN
+--SET ANSI_WARNINGS OFF
+
+DECLARE @RepairGeneratedFrom AS VARCHAR(4000),@RepairType AS VARCHAR(255)
+
+
+--IF @Repair=0
+	BEGIN
+	SET @RepairGeneratedFrom=''
+	SET @RepairType=''
+SELECT     TFOrderItems.OrderNo, TFOrderItems.ItemCode, TFOrderItems.Qty, dbo.FCustomerOrders.CustCode, dbo.FCustomerOrders.Country, dbo.FCustomerOrders.DT, 
+                      dbo.Items.ItemName, dbo.Items.ItemSize, dbo.Items.SizeUnit, dbo.Items.Type, dbo.FCustomerOrders.Packaging, dbo.FCustomerOrders.DeliveryDT, 
+                      dbo.ItemProcesses.SNO, dbo.ItemProcesses.ProcessID, dbo.Processes.Description, Tab1.RcvdQty, Tab2.LotNo, Tab1.VendID, dbo.Makers.VenderName, Tab1.RcvDT, 
+                      TabIss.IssDT, TabMin.MinProcessID, Tab1.Wastage, Tab1.PassQty, dbo.Employees.empid, dbo.Employees.name, Tab1.ReWorkQty, TFOrderItems.CompItemCode, 
+                      dbo.Processes.Code, dbo.Processes.ProcessNameUrdu, dbo.Items.ItemNameUrdu, EmpRcv.name AS RcvEmpName, Tab1.Rate, TMasterPO.MasterPONo
+                      ,TSteelBatch.SteelBatchNo
+					  --,TForgeBatch.ForgeBatchNo
+					  ,TSteelBatch.ForgeBatchNo
+					  , TSFRemarks.SFRemarks, TSplit.SplitQty, ISNULL(TSplit.Type, TSplitFrom.SplitTypeFrom) AS SplitType, 
+                      TSplit.ToOrderNo, TSplit.ToLotNo, TSplitFrom.FromOrderNo, TSplitFrom.FromLotNo, TSplitFrom.SplitQtyFrom, TSplit.FromItemCode, TSplit.ToItemCode, 
+                      TMasterPO.RecieptID, TIssFromSF.LotNo AS IssSFLotNo, TIssFromSF.IssSFRemarks, TIssFromSF.IssSFQty, TLastRcv.LotLastEntryID, 
+                      dbo.VFOrderItemsWithShippedQtyItemCodeWise.ShippedQty, ISNULL(dbo.VLotWithPolishingMaker.VenderName, '') AS FromLotPolisher, 
+                      ISNULL(dbo.VLotWithFirstProcessOfIssuance.VenderName, '') AS FromLotOriginator, Tab1.RcvTemperValue, TabIss.IssSpecialInstructions, 
+                      dbo.FCustomerOrders.InternalRefNo, dbo.ProcessGroups.PGReference, Tab1.ReceivedEntryID, dbo.VendReceived_Employees_F(Tab1.ReceivedEntryID) 
+                      AS Employees, TFOrderItems.Quality, dbo.GetAllRepairLots_F(Tab2.LotNo) AS RepairLots, TSplit.LotTransferRemarks, 
+                      TSplitFrom.LotTransferRemarks AS LotTransferRemarksFrom, Tab1.UserName, Tab1.MachineName,ProcessGroupsProcesses.Hub_Name,VI_DT,VLotsWithMasterPONo.Batch_No AS VID_Batch_No,VLotsWithMasterPONo.MasterPODT
+					  ,TIssFromSF.StoreName,TIssFromSF.Location
+					  ,Lots_List.Batch_No AS Lots_List_Batch_No,Lots_List.Reference_LotNo,Lots_List.Mill_Certificate_No,Mill_Certificate_No_From_RM
+					  ,Items.HRC_From,Items.HRC_To
+					  ,Tab_TTRF.TTRFQty
+					  ,Iss_MakerName,Makers.VendID1 
+FROM         (SELECT     OrderNo, ItemCode, CompItemCode, Quality, SUM(Qty) AS Qty
+                       FROM          dbo.VrptOrders_ForProduction_Simple 
+                       GROUP BY OrderNo, ItemCode, CompItemCode, Quality) AS TFOrderItems LEFT OUTER JOIN
+                      dbo.VFOrderItemsWithShippedQtyItemCodeWise ON TFOrderItems.OrderNo = dbo.VFOrderItemsWithShippedQtyItemCodeWise.OrderNo AND 
+                      TFOrderItems.CompItemCode = dbo.VFOrderItemsWithShippedQtyItemCodeWise.CompItemCode INNER JOIN
+                      dbo.Items ON TFOrderItems.CompItemCode = dbo.Items.ItemID INNER JOIN
+                      dbo.ItemProcesses ON dbo.Items.ItemID = dbo.ItemProcesses.ItemID INNER JOIN
+                      dbo.FCustomerOrders ON TFOrderItems.OrderNo = dbo.FCustomerOrders.OrderNo INNER JOIN
+                      dbo.Processes ON dbo.ItemProcesses.ProcessID = dbo.Processes.ProcessID LEFT OUTER JOIN
+                      dbo.ItemProcessGroups ON dbo.Items.ItemID = dbo.ItemProcessGroups.ItemID LEFT OUTER JOIN
+                      dbo.ProcessGroups ON dbo.ItemProcessGroups.PG_RefID = dbo.ProcessGroups.EntryID LEFT OUTER JOIN
+					  ProcessGroupsProcesses ON dbo.ProcessGroups.EntryID=ProcessGroupsProcesses.Group_RefID AND ItemProcesses.ProcessID=ProcessGroupsProcesses.Process_RefID
+					  LEFT OUTER JOIN
+                          (SELECT DISTINCT OrderNo, ItemCode, LotNo
+                             FROM dbo.VendRcvdDetail WHERE LotNo=@LotNo) AS Tab2 ON TFOrderItems.OrderNo = Tab2.OrderNo AND TFOrderItems.CompItemCode = Tab2.ItemCode LEFT OUTER JOIN
+                          (SELECT     VendRcvdDetail_2.ProcessID,VendRcvdDetail_2.LotNo,VendRcvdDetail_2.Rate,dbo.VendReceived.EmpID, 
+                                                   dbo.VendReceived.TemperValue AS RcvTemperValue,VendRcvdDetail_2.RcvdQty,CASE WHEN VendRcvdDetail_2.ReqAuth = 1 THEN 0 ELSE VendRcvdDetail_2.RcvdQty END AS PassQty, 
+                                                   dbo.VendReceived.VendID,dbo.VendReceived.DT AS RcvDT,VendRcvdDetail_2.Wastage,VendRcvdDetail_2.ReWorkQty, 
+                                                   dbo.VendReceived.EntryID AS ReceivedEntryID, dbo.VendReceived.UserName, dbo.VendReceived.MachineName,VendRcvdDetail_2.EntryID AS VRD_EntryID,VendIssued.DT AS VI_DT,VendIssdDetail.Batch_No AS VID_Batch_No
+                             FROM dbo.VendRcvdDetail AS VendRcvdDetail_2 
+							 INNER JOIN dbo.VendReceived ON dbo.VendReceived.EntryID = VendRcvdDetail_2.RefID
+							 LEFT JOIN VendIssdDetail ON VendRcvdDetail_2.Issue_RefID=VendIssdDetail.EntryID
+							 LEFT JOIN VendIssued ON VendIssdDetail.RefID=VendIssued.EntryID
+								WHERE VendRcvdDetail_2.LotNo=@LotNo) AS Tab1 ON Tab2.LotNo = Tab1.LotNo AND 
+                      dbo.ItemProcesses.ProcessID = Tab1.ProcessID LEFT OUTER JOIN
+                          (SELECT     dbo.VendIssued.ProcessID, dbo.VendIssdDetail.LotNo, dbo.VendIssdDetail_MoreDetails.EmpID,
+                                                   dbo.VendIssued.SpecialInstructions AS IssSpecialInstructions, MIN(dbo.VendIssued.DT) AS IssDT,MIN(VendIssued.VendID) AS Iss_VendID,MIN(Makers.VenderName) AS Iss_MakerName
+                             FROM         dbo.VendIssued INNER JOIN
+                                                   dbo.VendIssdDetail ON dbo.VendIssued.EntryID = dbo.VendIssdDetail.RefID LEFT OUTER JOIN
+                                                   dbo.VendIssdDetail_MoreDetails ON dbo.VendIssdDetail.EntryID = dbo.VendIssdDetail_MoreDetails.VID_RefID
+												   INNER JOIN Makers ON dbo.VendIssued.VendID=Makers.VendID
+                             GROUP BY dbo.VendIssued.ProcessID, dbo.VendIssdDetail.LotNo, dbo.VendIssdDetail_MoreDetails.EmpID, dbo.VendIssued.SpecialInstructions) AS TabIss ON 
+                      Tab2.LotNo = TabIss.LotNo AND dbo.ItemProcesses.ProcessID = TabIss.ProcessID LEFT OUTER JOIN
+                          (SELECT     VendRcvdDetail_1.LotNo, MIN(VendReceived_1.ProcessID) AS MinProcessID
+                             FROM         dbo.VendReceived AS VendReceived_1 INNER JOIN
+                                                   dbo.VendRcvdDetail AS VendRcvdDetail_1 ON VendReceived_1.EntryID = VendRcvdDetail_1.RefID  WHERE VendRcvdDetail_1.LotNo=@LotNo
+                             GROUP BY VendRcvdDetail_1.LotNo) AS TabMin ON Tab2.LotNo = TabMin.LotNo LEFT OUTER JOIN
+                      dbo.Makers ON Tab1.VendID = dbo.Makers.VendID LEFT OUTER JOIN
+                      dbo.Employees ON TabIss.EmpID = dbo.Employees.empid LEFT OUTER JOIN
+                      dbo.Employees AS EmpRcv ON Tab1.EmpID = EmpRcv.empid LEFT OUTER JOIN
+                          (SELECT     TNest1.LotNo, VendIssued_2.EntryID, VendIssued_2.MasterPONo, VendIssued_2.RecieptID
+                             FROM         dbo.VendIssued AS VendIssued_2 INNER JOIN
+                                                   dbo.VendIssdDetail AS VendIssdDetail_2 ON VendIssued_2.EntryID = VendIssdDetail_2.RefID INNER JOIN
+                                                       (SELECT     LotNo, MIN(Issue_RefID) AS Issue_RefID
+                                                          FROM         dbo.VendRcvdDetail AS VendRcvdDetail_7 WHERE LotNo=@LotNo
+                                                          GROUP BY LotNo) AS TNest1 ON TNest1.Issue_RefID = VendIssdDetail_2.EntryID) AS TMasterPO ON 
+                      Tab2.LotNo = TMasterPO.LotNo LEFT OUTER JOIN
+                          (SELECT     dbo.RawMaterialIssuance.VI_RefID, MAX(dbo.RawMaterialIssuanceDetail.PORefNo) AS SteelBatchNo,MAX(VendRcvdDetailPO.RcvID) AS ForgeBatchNo
+								,MAX(MaterialLocationwiseStatus.Mill_Certificate_No) AS Mill_Certificate_No_From_RM
+                             FROM         dbo.RawMaterialIssuance INNER JOIN
+                                                   dbo.RawMaterialIssuanceDetail ON dbo.RawMaterialIssuance.IssNo = dbo.RawMaterialIssuanceDetail.IssNo INNER JOIN
+                                                   dbo.RM ON dbo.RawMaterialIssuanceDetail.RMID1 = dbo.RM.RMID1
+												   INNER JOIN RMID_MLS_Details ON RawMaterialIssuanceDetail.EntryID=RMID_MLS_Details.RMID_RefID
+												   INNER JOIN MaterialLocationwiseStatus ON RMID_MLS_Details.MLS_RefID=MaterialLocationwiseStatus.EntryID
+												   INNER JOIN VendRcvdDetailPO ON MaterialLocationwiseStatus.Rcvd_RefID=VendRcvdDetailPO.EntryID
+                             WHERE     (dbo.RM.GroupID = 1)
+                             GROUP BY dbo.RawMaterialIssuance.VI_RefID) AS TSteelBatch ON TMasterPO.EntryID = TSteelBatch.VI_RefID LEFT OUTER JOIN
+                          /*(SELECT     RawMaterialIssuance_1.VI_RefID, MAX(RawMaterialIssuanceDetail_1.PORefNo) AS ForgeBatchNo
+                             FROM         dbo.RawMaterialIssuance AS RawMaterialIssuance_1 INNER JOIN
+                                                   dbo.RawMaterialIssuanceDetail AS RawMaterialIssuanceDetail_1 ON RawMaterialIssuance_1.IssNo = RawMaterialIssuanceDetail_1.IssNo INNER JOIN
+                                                   dbo.RM AS RM_1 ON RawMaterialIssuanceDetail_1.RMID1 = RM_1.RMID1
+                             WHERE     (RM_1.GroupID IN (25, 27, 28, 29, 30))
+                             GROUP BY RawMaterialIssuance_1.VI_RefID) AS TForgeBatch ON TMasterPO.EntryID = TForgeBatch.VI_RefID LEFT OUTER JOIN*/
+						
+                          (SELECT     VendRcvdDetail_6.ProcessID, VendRcvdDetail_6.LotNo, '' AS SFRemarks
+                             FROM         dbo.VendRcvdDetail AS VendRcvdDetail_6 INNER JOIN
+                                                       (SELECT     VID_RefID
+                                                          FROM         dbo.StockOrderOpening_Issuance
+                                                          GROUP BY VID_RefID) AS TSOO_I ON TSOO_I.VID_RefID = VendRcvdDetail_6.Issue_RefID) AS TSFRemarks ON Tab2.LotNo = TSFRemarks.LotNo AND
+                       Tab1.ProcessID = TSFRemarks.ProcessID LEFT OUTER JOIN
+                          (SELECT     VendRcvdDetail_5.LotNo, VendRcvdDetail_5.ProcessID, dbo.LotTransferDetails.SplitQty, dbo.LotTransferDetails.Type, 
+                                                   dbo.LotTransferDetails.ToOrderNo, VendRcvdDetail_1.LotNo AS ToLotNo, dbo.LotTransferDetails.FromItemCode, dbo.LotTransferDetails.ToItemCode, 
+                                                   dbo.LotTransferDetails.LotTransferRemarks
+                             FROM         dbo.LotTransferDetails INNER JOIN
+                                                   dbo.VendRcvdDetail AS VendRcvdDetail_5 ON dbo.LotTransferDetails.VRD_From_RefID = VendRcvdDetail_5.EntryID LEFT OUTER JOIN
+                                                   dbo.VendRcvdDetail AS VendRcvdDetail_1 ON dbo.LotTransferDetails.VRD_To_RefID = VendRcvdDetail_1.EntryID) AS TSplit ON 
+                      Tab2.LotNo = TSplit.LotNo AND Tab1.ProcessID = TSplit.ProcessID LEFT OUTER JOIN
+                          (SELECT     VendRcvdDetail_4.LotNo AS FromLotNo, VendRcvdDetail_4.ProcessID, LotTransferDetails_1.SplitQty AS SplitQtyFrom, 
+                                                   LotTransferDetails_1.Type AS SplitTypeFrom, LotTransferDetails_1.FromOrderNo, VendRcvdDetail_1.LotNo, 
+                                                   LotTransferDetails_1.LotTransferRemarks
+                             FROM         dbo.LotTransferDetails AS LotTransferDetails_1 INNER JOIN
+                                                   dbo.VendRcvdDetail AS VendRcvdDetail_4 ON LotTransferDetails_1.VRD_From_RefID = VendRcvdDetail_4.EntryID INNER JOIN
+                                                   dbo.VendRcvdDetail AS VendRcvdDetail_1 ON LotTransferDetails_1.VRD_To_RefID = VendRcvdDetail_1.EntryID) AS TSplitFrom ON 
+                      Tab2.LotNo = TSplitFrom.LotNo AND Tab1.ProcessID = TSplitFrom.ProcessID LEFT OUTER JOIN
+                          (SELECT     VendIssued_1.ProcessID, VendIssdDetail_1.LotNo, '' AS IssSFRemarks, VendIssdDetail_1.IssQty AS IssSFQty,TSOO_I_1.StoreName,TSOO_I_1.Location
+                             FROM         dbo.VendIssdDetail AS VendIssdDetail_1 INNER JOIN
+                                                       (SELECT     VID_RefID,StoreName,Location
+                                                          FROM         dbo.StockOrderOpening_Issuance AS StockOrderOpening_Issuance_1
+														  LEFT JOIN StockOrderOpening ON StockOrderOpening_Issuance_1.SOO_RefID=StockOrderOpening.EntryID
+														  LEFT JOIN VStoreShelfs ON StockOrderOpening.Shelf_RefID=VStoreShelfs.EntryID
+                                                          GROUP BY VID_RefID,StoreName,Location) AS TSOO_I_1 ON VendIssdDetail_1.EntryID = TSOO_I_1.VID_RefID INNER JOIN
+                                                   dbo.VendIssued AS VendIssued_1 ON VendIssdDetail_1.RefID = VendIssued_1.EntryID) AS TIssFromSF ON Tab2.LotNo = TIssFromSF.LotNo AND 
+                      Tab1.ProcessID = TIssFromSF.ProcessID LEFT OUTER JOIN
+                          (SELECT     LotNo, MAX(EntryID) AS LotLastEntryID
+                             FROM         dbo.VendRcvdDetail AS VendRcvdDetail_3 WHERE LotNo=@LotNo
+                             GROUP BY LotNo) AS TLastRcv ON Tab2.LotNo = TLastRcv.LotNo LEFT OUTER JOIN
+                      dbo.VLotWithPolishingMaker ON TSplitFrom.FromLotNo = dbo.VLotWithPolishingMaker.LotNo LEFT OUTER JOIN
+                      dbo.VLotWithFirstProcessOfIssuance ON TSplitFrom.FromLotNo = dbo.VLotWithFirstProcessOfIssuance.LotNo
+					  LEFT OUTER JOIN VLotsWithMasterPONo ON Tab2.LotNo=VLotsWithMasterPONo.LotNO
+					  LEFT OUTER JOIN Lots_List ON Tab2.LotNo=Lots_List.LotNo
+					  LEFT OUTER JOIN
+                             (SELECT        dbo.VendRcvdDetail.ProcessID, dbo.VendRcvdDetail.LotNo, SUM(dbo.TransferredToReadyFinishLotsDetail.Qty) AS TTRFQty
+                                FROM            dbo.TransferredToReadyFinishLotsDetail INNER JOIN
+                                                         dbo.VendRcvdDetail ON dbo.TransferredToReadyFinishLotsDetail.VRD_RefID = dbo.VendRcvdDetail.EntryID
+                                WHERE VendRcvdDetail.LotNo=@LotNo GROUP BY dbo.VendRcvdDetail.ProcessID, dbo.VendRcvdDetail.LotNo ) AS Tab_TTRF ON Tab1.ProcessID = Tab_TTRF.ProcessID AND Tab2.LotNo = Tab_TTRF.LotNo
+	WHERE Tab2.LotNo=@LotNo
+	
+	END
+/*ELSE
+	BEGIN
+	
+	SET @RepairGeneratedFrom=dbo.RepairLot_OriginalLots_F(@LotNo)
+	SELECT        TFOrderItems.OrderNo, TFOrderItems.ItemCode, TFOrderItems.Qty, dbo.FCustomerOrders.CustCode, dbo.FCustomerOrders.Country, dbo.FCustomerOrders.DT, 
+                         dbo.Items.ItemName, dbo.Items.ItemSize, dbo.Items.SizeUnit, dbo.Items.Type, dbo.FCustomerOrders.Packaging, dbo.FCustomerOrders.DeliveryDT, 
+                         dbo.RepairTypeProcesses.SeqNo AS SNO, dbo.RepairTypeProcesses.ProcessID, dbo.Processes.Description, Tab1.RcvdQty, Tab2.LotNo, Tab1.VendID, 
+                         dbo.Makers.VenderName, Tab1.RcvDT, TabIss.IssDT, TabMin.MinProcessID, Tab1.Wastage, Tab1.PassQty, dbo.Employees.empid, dbo.Employees.name, 
+                         Tab1.ReWorkQty, TFOrderItems.CompItemCode, dbo.Processes.Code, dbo.Processes.ProcessNameUrdu, dbo.Items.ItemNameUrdu, 
+                         EmpRcv.name AS RcvEmpName, Tab1.Rate, TMasterPO.MasterPONo, TSteelBatch.SteelBatchNo, TForgeBatch.ForgeBatchNo, TSFRemarks.SFRemarks, 
+                         TSplit.SplitQty, ISNULL(TSplit.Type, TSplitFrom.SplitTypeFrom) AS SplitType, TSplit.ToOrderNo, TSplit.ToLotNo, TSplitFrom.FromOrderNo, TSplitFrom.FromLotNo, 
+                         TSplitFrom.SplitQtyFrom, @RepairGeneratedFrom AS RepairGeneratedFrom, dbo.RepairTypes.RepairType, TLastRcv.LotLastEntryID, 
+                         Tab_TTRF.TTRFQty, Tab1.ReceivedEntryID, dbo.VendReceived_Employees_F(Tab1.ReceivedEntryID) AS Employees,'' AS IssEmpID,'' AS IssEmpName,dbo.GetMainLots_Repair_F(@LotNo) AS RepairLotsGenerated
+FROM            (SELECT        OrderNo, ItemCode, CompItemCode, SUM(Qty) AS Qty
+                           FROM            dbo.FOrderItems
+                           GROUP BY OrderNo, ItemCode, CompItemCode) AS TFOrderItems INNER JOIN
+                         dbo.Items ON TFOrderItems.CompItemCode = dbo.Items.ItemID INNER JOIN
+                         dbo.FCustomerOrders ON TFOrderItems.OrderNo = dbo.FCustomerOrders.OrderNo LEFT OUTER JOIN
+                             (SELECT DISTINCT OrderNo, ItemCode, LotNo, Repair_RefID
+                                FROM            dbo.VendRcvdDetail WHERE LotNo=@LotNo) AS Tab2 ON TFOrderItems.OrderNo = Tab2.OrderNo AND TFOrderItems.CompItemCode = Tab2.ItemCode INNER JOIN
+                         dbo.RepairTypeProcesses ON dbo.RepairTypeProcesses.Repair_RefID = Tab2.Repair_RefID INNER JOIN
+                         dbo.Processes ON dbo.RepairTypeProcesses.ProcessID = dbo.Processes.ProcessID INNER JOIN
+                         dbo.RepairTypes ON Tab2.Repair_RefID = dbo.RepairTypes.EntryID LEFT OUTER JOIN
+                             (SELECT        VendRcvdDetail_2.ProcessID, VendRcvdDetail_2.LotNo, VendRcvdDetail_2.Rate, dbo.VendReceived.EmpID, VendRcvdDetail_2.RcvdQty, 
+                                                         CASE WHEN ReqAuth = 1 THEN 0 ELSE RcvdQty END AS PassQty, dbo.VendReceived.VendID, dbo.VendReceived.DT AS RcvDT, 
+                                                         VendRcvdDetail_2.Wastage, VendRcvdDetail_2.ReWorkQty, dbo.VendReceived.EntryID AS ReceivedEntryID
+                                FROM            dbo.VendRcvdDetail AS VendRcvdDetail_2 INNER JOIN
+                                                         dbo.VendReceived ON dbo.VendReceived.EntryID = VendRcvdDetail_2.RefID) AS Tab1 ON Tab2.LotNo = Tab1.LotNo AND 
+                         dbo.RepairTypeProcesses.ProcessID = Tab1.ProcessID LEFT OUTER JOIN
+                             (SELECT        dbo.VendIssued.ProcessID, dbo.VendIssdDetail.LotNo, dbo.VendIssdDetail_MoreDetails.EmpID, dbo.VendIssdDetail.Repair_RefID, 
+                                                         MIN(dbo.VendIssued.DT) AS IssDT
+                                FROM            dbo.VendIssued INNER JOIN
+                                                         dbo.VendIssdDetail ON dbo.VendIssued.EntryID = dbo.VendIssdDetail.RefID LEFT OUTER JOIN
+                                                         dbo.VendIssdDetail_MoreDetails ON dbo.VendIssdDetail.EntryID = dbo.VendIssdDetail_MoreDetails.VID_RefID WHERE dbo.VendIssdDetail.LotNo=@LotNo
+                                GROUP BY dbo.VendIssued.ProcessID, dbo.VendIssdDetail.LotNo, dbo.VendIssdDetail_MoreDetails.EmpID, dbo.VendIssdDetail.Repair_RefID) AS TabIss ON 
+                         Tab2.LotNo = TabIss.LotNo AND dbo.RepairTypeProcesses.ProcessID = TabIss.ProcessID LEFT OUTER JOIN
+                             (SELECT        VendRcvdDetail_1.LotNo, MIN(VendReceived_1.ProcessID) AS MinProcessID
+                                FROM            dbo.VendReceived AS VendReceived_1 INNER JOIN
+                                                         dbo.VendRcvdDetail AS VendRcvdDetail_1 ON VendReceived_1.EntryID = VendRcvdDetail_1.RefID WHERE VendRcvdDetail_1.LotNo=@LotNo
+                                GROUP BY VendRcvdDetail_1.LotNo) AS TabMin ON Tab2.LotNo = TabMin.LotNo LEFT OUTER JOIN
+                         dbo.Makers ON Tab1.VendID = dbo.Makers.VendID LEFT OUTER JOIN
+                         dbo.Employees ON TabIss.EmpID = dbo.Employees.empid LEFT OUTER JOIN
+                         dbo.Employees AS EmpRcv ON Tab1.EmpID = EmpRcv.empid LEFT OUTER JOIN
+                             (SELECT        TNest1.LotNo, dbo.VendIssued.EntryID, dbo.VendIssued.MasterPONo
+                                FROM            dbo.VendIssued INNER JOIN
+                                                         dbo.VendIssdDetail ON dbo.VendIssued.EntryID = dbo.VendIssdDetail.RefID INNER JOIN
+                                                             (SELECT        LotNo, MIN(Issue_RefID) AS Issue_RefID
+                                                                FROM            dbo.VendRcvdDetail WHERE LotNo=@LotNo
+                                                                GROUP BY LotNo) AS TNest1 ON TNest1.Issue_RefID = dbo.VendIssdDetail.EntryID) AS TMasterPO ON 
+                         Tab1.LotNo = TMasterPO.LotNo LEFT OUTER JOIN
+                             (SELECT        dbo.RawMaterialIssuance.VI_RefID, MAX(dbo.RawMaterialIssuanceDetail.PORefNo) AS SteelBatchNo
+                                FROM            dbo.RawMaterialIssuance INNER JOIN
+                                                         dbo.RawMaterialIssuanceDetail ON dbo.RawMaterialIssuance.IssNo = dbo.RawMaterialIssuanceDetail.IssNo INNER JOIN
+                                                         dbo.RM ON dbo.RawMaterialIssuanceDetail.RMID1 = dbo.RM.RMID1
+                                WHERE        (dbo.RM.GroupID = 20)
+                                GROUP BY dbo.RawMaterialIssuance.VI_RefID) AS TSteelBatch ON TMasterPO.EntryID = TSteelBatch.VI_RefID LEFT OUTER JOIN
+                             (SELECT        dbo.RawMaterialIssuance.VI_RefID, MAX(dbo.RawMaterialIssuanceDetail.PORefNo) AS ForgeBatchNo
+                                FROM            dbo.RawMaterialIssuance INNER JOIN
+                                                         dbo.RawMaterialIssuanceDetail ON dbo.RawMaterialIssuance.IssNo = dbo.RawMaterialIssuanceDetail.IssNo INNER JOIN
+                                                         dbo.RM ON dbo.RawMaterialIssuanceDetail.RMID1 = dbo.RM.RMID1
+                                WHERE        (dbo.RM.GroupID IN (25, 27, 28, 29, 30))
+                                GROUP BY dbo.RawMaterialIssuance.VI_RefID) AS TForgeBatch ON TMasterPO.EntryID = TForgeBatch.VI_RefID LEFT OUTER JOIN
+                             (SELECT        dbo.VendRcvdDetail.ProcessID, dbo.VendRcvdDetail.LotNo, dbo.StockOrderOpening.Remarks AS SFRemarks
+                                FROM            dbo.StockOrderOpening INNER JOIN
+                                                         dbo.StockOrderOpening_Issuance ON dbo.StockOrderOpening.EntryID = dbo.StockOrderOpening_Issuance.SOO_RefID INNER JOIN
+                                                         dbo.VendRcvdDetail ON dbo.StockOrderOpening_Issuance.VID_RefID = dbo.VendRcvdDetail.Issue_RefID) AS TSFRemarks ON 
+                         Tab2.LotNo = TSFRemarks.LotNo AND Tab1.ProcessID = TSFRemarks.ProcessID LEFT OUTER JOIN
+                             (SELECT        dbo.VendRcvdDetail.LotNo, dbo.VendRcvdDetail.ProcessID, dbo.LotTransferDetails.SplitQty, dbo.LotTransferDetails.Type, 
+                                                         dbo.LotTransferDetails.ToOrderNo, VendRcvdDetail_1.LotNo AS ToLotNo
+                                FROM            dbo.LotTransferDetails INNER JOIN
+                                                         dbo.VendRcvdDetail ON dbo.LotTransferDetails.VRD_From_RefID = dbo.VendRcvdDetail.EntryID INNER JOIN
+                                                         dbo.VendRcvdDetail AS VendRcvdDetail_1 ON dbo.LotTransferDetails.VRD_To_RefID = VendRcvdDetail_1.EntryID) AS TSplit ON 
+                         Tab2.LotNo = TSplit.LotNo AND Tab1.ProcessID = TSplit.ProcessID LEFT OUTER JOIN
+                             (SELECT        dbo.VendRcvdDetail.LotNo AS FromLotNo, dbo.VendRcvdDetail.ProcessID, dbo.LotTransferDetails.SplitQty AS SplitQtyFrom, 
+                                                         dbo.LotTransferDetails.Type AS SplitTypeFrom, dbo.LotTransferDetails.FromOrderNo, VendRcvdDetail_1.LotNo
+                                FROM            dbo.LotTransferDetails INNER JOIN
+                                                         dbo.VendRcvdDetail ON dbo.LotTransferDetails.VRD_From_RefID = dbo.VendRcvdDetail.EntryID INNER JOIN
+                                                         dbo.VendRcvdDetail AS VendRcvdDetail_1 ON dbo.LotTransferDetails.VRD_To_RefID = VendRcvdDetail_1.EntryID) AS TSplitFrom ON 
+                         Tab2.LotNo = TSplitFrom.LotNo AND Tab1.ProcessID = TSplitFrom.ProcessID LEFT OUTER JOIN
+                             (SELECT        LotNo, MAX(EntryID) AS LotLastEntryID
+                                FROM            dbo.VendRcvdDetail WHERE LotNo=@LotNo
+                                GROUP BY LotNo) AS TLastRcv ON Tab2.LotNo = TLastRcv.LotNo LEFT OUTER JOIN
+                             (SELECT        dbo.VendRcvdDetail.ProcessID, dbo.VendRcvdDetail.LotNo, SUM(dbo.TransferredToReadyFinishLotsDetail.Qty) AS TTRFQty
+                                FROM            dbo.TransferredToReadyFinishLotsDetail INNER JOIN
+                                                         dbo.VendRcvdDetail ON dbo.TransferredToReadyFinishLotsDetail.VRD_RefID = dbo.VendRcvdDetail.EntryID
+                                WHERE VendRcvdDetail.LotNo=@LotNo GROUP BY dbo.VendRcvdDetail.ProcessID, dbo.VendRcvdDetail.LotNo ) AS Tab_TTRF ON Tab1.ProcessID = Tab_TTRF.ProcessID AND 
+                         Tab2.LotNo = Tab_TTRF.LotNo
+							WHERE Tab2.LotNo=@LotNo
+		END	*/
+--SET ANSI_WARNINGS ON
+END
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Track_Remaining_Qty_SP]') AND type IN (N'P'))
+BEGIN
+    DROP PROCEDURE [dbo].[Track_Remaining_Qty_SP];
+END
+GO
+-- =============================================
+-- Author:		<Author,,Name>
+-- Create date: <Create Date,,>
+-- Description:	<Description,,>
+-- =============================================
+CREATE PROCEDURE [dbo].[Track_Remaining_Qty_SP] (@OrderNo VARCHAR(50))
+AS
+BEGIN
+	-- SET NOCOUNT ON added to prevent extra result sets from
+	-- interfering with SELECT statements.
+	SET NOCOUNT ON;
+
+SELECT FCO.CustCode,FCO.Country,FCO.OrderNO,FOI.CompItemCode,FOI.ItemCode,VItems.ItemName,FOI.Qty AS OrderQty
+	,TSOA.SOA_Qty,TRcv.Received_Qty,TShipped.Shipped_Qty,FOI.Qty-ISNULL(TShipped.Shipped_Qty,0) AS Remaining_Qty
+	,TMTS.Move_To_Stock_Qty
+	,TRR.Rework_Qty,TRR.Rejection_Qty
+	,FCO.DT AS OrderDT
+	,VItems.InHand
+	,TShipped.Shipped_Qty AS ItemShippedQty
+	FROM FCustomerOrders FCO
+	INNER JOIN FOrderItems FOI ON FCO.OrderNo=FOI.OrderNo
+	INNER JOIN VItems ON FOI.CompItemCode=VItems.ItemID
+
+	LEFT JOIN (SELECT OrderNo,ItemID,SUM(Qty) AS SOA_Qty FROM StockOrderAdjustments WHERE OrderNo=@OrderNo GROUP BY OrderNo,ItemID) TSOA ON FOI.OrderNo=TSOA.OrderNo AND FOI.CompItemCode=TSOA.ItemID
+	LEFT JOIN (SELECT OrderNo,ItemCode,SUM(RcvdQty) AS Received_Qty FROM VendRcvdDetail 
+					INNER JOIN VendReceived ON VendReceived.EntryID=VendRcvdDetail.RefID 
+					INNER JOIN VendIssued ON VendReceived.Issuance_RefID=VendIssued.EntryID
+					WHERE OrderNo=@OrderNo AND MasterPONo IS NULL GROUP BY OrderNo,ItemCode) TRcv ON FOI.OrderNo=TRcv.OrderNo AND FOI.CompItemCode=TRcv.ItemCode
+
+	LEFT JOIN (SELECT OrderNo,ItemID,SUM(Qty) AS Shipped_Qty FROM VCustomInvoiceItems WHERE OrderNo=@OrderNO GROUP BY OrderNo,ItemID) TShipped ON FOI.OrderNo=TShipped.OrderNo AND FOI.CompItemCode=TShipped.ItemID
+	LEFT JOIN (SELECT OrderNo,ItemCode,SUM(TTRFLD.Qty) AS Move_To_Stock_Qty FROM TransferredToReadyFinishLotsDetail TTRFLD
+					INNER JOIN vendRcvdDetail VRD ON TTRFLD.VRD_RefID=VRD.EntryID WHERE OrderNo=@OrderNo GROUP BY OrderNo,ItemCode) TMTS ON FOI.OrderNo=TMTS.OrderNo AND FOI.CompItemCode=TMTS.ItemCode
+	LEFT JOIN (SELECT OrderNo,ItemCode,SUM(ReWorkQty) AS Rework_Qty,SUM(Wastage) AS Rejection_Qty FROM VendRcvdDetail WHERE OrderNo=@OrderNo GROUP BY OrderNo,ItemCode) TRR ON FOI.OrderNo=TRR.OrderNo AND FOI.CompItemCode=TRR.ItemCode
+	WHERE FCO.OrderNo=@OrderNo
+
+
+    
+END
+GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+
+
+-- =====================================================================
+-- Add HalfDayType column to dbo.Leaves (1 = First Half, 2 = Second Half)
+-- =====================================================================
+IF OBJECT_ID('dbo.Leaves', 'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH('dbo.Leaves', 'HalfDayType') IS NULL
+    BEGIN
+        ALTER TABLE [dbo].[Leaves] ADD [HalfDayType] TINYINT NULL;
+    END
+END
+GO
+
+-- =====================================================================
+-- Add AttendanceMachineReadLog table for IFace machine read auditing
+-- =====================================================================
+IF OBJECT_ID('dbo.AttendanceMachineReadLog', 'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[AttendanceMachineReadLog] (
+        [EntryID]          INT IDENTITY(1,1) NOT NULL CONSTRAINT [PK_AttendanceMachineReadLog] PRIMARY KEY,
+        [UserName]         VARCHAR(100) NULL,
+        [ClientIPAddress]  VARCHAR(50)  NULL,
+        [MachineIPAddress] VARCHAR(50)  NULL,
+        [MachineNo]        INT          NULL,
+        [ReadStartTime]    DATETIME     NOT NULL,
+        [ReadEndTime]      DATETIME     NOT NULL,
+        [TotalRecordsRead] INT          NOT NULL CONSTRAINT [DF_AttMachineReadLog_Read] DEFAULT (0),
+        [TotalTransferred] INT          NOT NULL CONSTRAINT [DF_AttMachineReadLog_Trans] DEFAULT (0),
+        [Remarks]          VARCHAR(500) NULL
+    );
+END
+GO

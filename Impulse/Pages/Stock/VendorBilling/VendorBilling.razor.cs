@@ -238,10 +238,13 @@ namespace Impulse.Pages.Stock.VendorBilling
                 return;
             }
 
+            Summary.ShortTermDeduction = Math.Max(0, Summary.ShortTermDeduction);
+            Summary.LongTermDeduction = Math.Max(0, Summary.LongTermDeduction);
+
             decimal selectedValue = (decimal)checkedRows.Sum(r => r.Value);
             decimal materialDed = (decimal)MaterialRows.Sum(r => r.Amount);
             decimal manualDed = ManualRows.Sum(r => r.Amount);
-            decimal amountToPost = Math.Round(selectedValue) - Summary.ShortTermDeduction - Summary.LongTermDeduction - materialDed - manualDed;
+            decimal amountToPost = Math.Round(selectedValue) - manualDed - materialDed;
 
             if (amountToPost <= 0)
             {

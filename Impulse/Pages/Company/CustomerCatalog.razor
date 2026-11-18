@@ -46,32 +46,13 @@
                                            ValueExpression="@(() => selectedCustomer)"
                                            Placeholder="Select Customer"
                                            MaximumSuggestions="500">
-                            <SelectedTemplate Context="c">@c?.Name (@c?.CustCode)</SelectedTemplate>
-                            <ResultTemplate Context="c">@c.Name <small class="text-secondary">(@c.CustCode)</small></ResultTemplate>
-                        </BlazoredTypeahead>
-                    </div>
-
-                    <!-- Country -->
-                    <div class="col-md-2">
-                        <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Country</label>
-                        <BlazoredTypeahead SearchMethod="SearchCountries"
-                                           EnableDropDown="true"
-                                           Data="countries"
-                                           TValue="string"
-                                           TItem="string"
-                                           Value="selectedCountry"
-                                           ValueChanged="OnCountrySelected"
-                                           ValueExpression="@(() => selectedCountry)"
-                                           Placeholder="Select Country"
-                                           Disabled="@(selectedCustomer == null || !countries.Any())"
-                                           MaximumSuggestions="200">
-                            <SelectedTemplate Context="c">@c</SelectedTemplate>
-                            <ResultTemplate Context="c">@c</ResultTemplate>
+                            <SelectedTemplate Context="c">@c?.CustCode</SelectedTemplate>
+                            <ResultTemplate Context="c">@c.CustCode</ResultTemplate>
                         </BlazoredTypeahead>
                     </div>
 
                     <!-- Item Group -->
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">Item Group</label>
                         <BlazoredTypeahead SearchMethod="SearchItemGroups"
                                            EnableDropDown="true"
@@ -82,7 +63,7 @@
                                            ValueChanged="OnItemGroupSelected"
                                            ValueExpression="@(() => selectedItemGroup)"
                                            Placeholder="All Groups"
-                                           Disabled="@(string.IsNullOrEmpty(selectedCountry))"
+                                           Disabled="@(selectedCustomer == null)"
                                            MaximumSuggestions="500">
                             <SelectedTemplate Context="g">@g?.Description</SelectedTemplate>
                             <ResultTemplate Context="g">@g.Description</ResultTemplate>
@@ -90,7 +71,7 @@
                     </div>
 
                     <!-- Catalog Item Quick Search -->
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;"><i class="fas fa-magnifying-glass me-1"></i>Jump to Item</label>
                         <BlazoredTypeahead SearchMethod="SearchCatalogItems"
                                            EnableDropDown="true"
@@ -130,7 +111,7 @@
                                                ValueChanged="(ItemLookupModel val) => selectedUnassignedItem = val"
                                                ValueExpression="@(() => selectedUnassignedItem)"
                                                Placeholder="Select Item to Assign"
-                                               Disabled="@(selectedCustomer == null || string.IsNullOrEmpty(selectedCountry))"
+                                               Disabled="@(selectedCustomer == null)"
                                                MaximumSuggestions="1000">
                                 <SelectedTemplate Context="i">@i?.ItemID</SelectedTemplate>
                                 <ResultTemplate Context="i">@i.ItemName</ResultTemplate>
@@ -139,10 +120,10 @@
                         <button type="button" class="btn btn-outline-primary btn-sm mb-1" @onclick="AssignSelectedItem" disabled="@(selectedUnassignedItem == null)">
                             <i class="fas fa-plus me-1"></i>Assign
                         </button>
-                        <button type="button" class="btn btn-outline-success btn-sm mb-1" @onclick="AssignAllItems" disabled="@(selectedCustomer == null || string.IsNullOrEmpty(selectedCountry))">
+                        <button type="button" class="btn btn-outline-success btn-sm mb-1" @onclick="AssignAllItems" disabled="@(selectedCustomer == null)">
                             <i class="fas fa-check-double me-1"></i>Assign All
                         </button>
-                        <button type="button" class="btn btn-outline-danger btn-sm mb-1" @onclick="UnassignAllItems" disabled="@(selectedCustomer == null || string.IsNullOrEmpty(selectedCountry))">
+                        <button type="button" class="btn btn-outline-danger btn-sm mb-1" @onclick="UnassignAllItems" disabled="@(selectedCustomer == null)">
                             <i class="fas fa-trash-can me-1"></i>UnAssign All
                         </button>
                     </div>
@@ -150,14 +131,14 @@
                     <!-- Toggles & Refresh -->
                     <div class="col-auto d-flex align-items-center gap-3 pb-1">
                         <div class="form-check form-switch mb-0">
-                            <input class="form-check-input" type="checkbox" role="switch" id="chkShowTop" checked="@showTopQuality" @onchange="OnShowTopQualityChanged" disabled="@(string.IsNullOrEmpty(selectedCountry))" />
+                            <input class="form-check-input" type="checkbox" role="switch" id="chkShowTop" checked="@showTopQuality" @onchange="OnShowTopQualityChanged" disabled="@(selectedCustomer == null)" />
                             <label class="form-check-label fw-bold text-dark-emphasis" for="chkShowTop" style="font-size:0.85rem;">Top Quality Prices</label>
                         </div>
                         <div class="form-check form-switch mb-0">
-                            <input class="form-check-input" type="checkbox" role="switch" id="chkShowPicture" checked="@showPicture" @onchange="OnShowPictureChanged" disabled="@(string.IsNullOrEmpty(selectedCountry))" />
+                            <input class="form-check-input" type="checkbox" role="switch" id="chkShowPicture" checked="@showPicture" @onchange="OnShowPictureChanged" disabled="@(selectedCustomer == null)" />
                             <label class="form-check-label fw-bold text-dark-emphasis" for="chkShowPicture" style="font-size:0.85rem;">Show Picture</label>
                         </div>
-                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="RefreshGrid" disabled="@(string.IsNullOrEmpty(selectedCountry))" title="Refresh">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="RefreshGrid" disabled="@(selectedCustomer == null)" title="Refresh">
                             <i class="fas fa-sync-alt"></i>
                         </button>
                     </div>
@@ -220,7 +201,8 @@
                                                     bool isSelected = selectedCatalogItem?.EntryID == item.EntryID;
                                                     string rowColor = counter % 2 == 1 ? "text-primary" : "text-dark";
                                                     counter++;
-                                                    <tr @onclick="() => HighlightItem(currentItem)"
+                                                    <tr id="catalog-row-@item.EntryID"
+                                                        @onclick="() => HighlightItem(currentItem)"
                                                         @oncontextmenu="(e) => OpenRowMenu(e, currentItem)"
                                                         @oncontextmenu:preventDefault="true"
                                                         class="clickable-row @(isSelected ? "table-primary" : "")"

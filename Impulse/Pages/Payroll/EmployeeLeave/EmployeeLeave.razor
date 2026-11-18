@@ -214,6 +214,23 @@
                         </div>
                     </div>
 
+                    @if (Input.DurationMode == "HalfDay")
+                    {
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.85rem;">Half Day Period <span class="text-danger">*</span></label>
+                            <div class="d-flex gap-3 pt-1">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="halfDayType" id="halfFirst" value="1" checked="@((Input.HalfDayType ?? 1) == 1)" @onchange="() => Input.HalfDayType = 1" />
+                                    <label class="form-check-label" for="halfFirst">First Half</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="halfDayType" id="halfSecond" value="2" checked="@(Input.HalfDayType == 2)" @onchange="() => Input.HalfDayType = 2" />
+                                    <label class="form-check-label" for="halfSecond">Second Half</label>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
                     @if (Input.DurationMode == "ShortLeave")
                     {
                         <div class="col-md-3">

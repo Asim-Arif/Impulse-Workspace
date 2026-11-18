@@ -156,6 +156,11 @@ namespace Impulse.Pages.Payroll.EmployeeLeave
         private void SetDurationMode(string mode)
         {
             Input.DurationMode = mode;
+            if (mode == "HalfDay")
+            {
+                Input.HalfDayType ??= 1;
+                Input.ToDate = Input.FromDate;
+            }
         }
 
         private async Task OnFromDateChanged(ChangeEventArgs e)

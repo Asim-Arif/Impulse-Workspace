@@ -23,13 +23,13 @@ namespace DataAccessLibrary.DAC.Stock
         {
             using IDbConnection db = new SqlConnection(_connectionString);
             string sql = @"
-                SELECT m.VendID, 
-                       m.VendID1, 
-                       (m.VendID1 + ' ' + m.VenderName) AS VenderName, 
-                       ISNULL(v.AccNo, m.VendID1) AS AccNo
-                FROM Makers m
-                LEFT JOIN VVendersAndMakers v ON m.VendID = v.VendID
-                ORDER BY m.VendID1";
+                SELECT VendID,
+                       MakerNo AS VendID1,
+                       (ISNULL(MakerNo, '') + ' ' + ISNULL(AccTitle, '')) AS VenderName,
+                       AccNo
+                FROM VVendersAndMakers
+                WHERE ISNULL(Active, 1) = 1
+                ORDER BY MakerNo";
             return await db.QueryAsync<MakerLookupModel>(sql);
         }
 
@@ -72,10 +72,12 @@ namespace DataAccessLibrary.DAC.Stock
             string sql;
             if (isMaker)
             {
-                sql = @"SELECT RMID1, RMName, SUM(Qty) AS Qty 
-                        FROM VRawMaterialIssuance 
-                        WHERE VendID = @VendID AND DT BETWEEN @FromDate AND @ToDate 
-                        GROUP BY RMID1, RMName";
+                sql = @"SELECT v.RMID1, v.RMName, SUM(v.Qty) AS Qty 
+                        FROM VRawMaterialIssuance v
+                        INNER JOIN RawMaterialIssuance rmi ON v.IssNo = rmi.IssNo
+                        LEFT JOIN VVendersAndMakers vm ON rmi.Vendor_AccNo = vm.AccNo
+                        WHERE (v.VendID = @VendID OR vm.VendID = @VendID) AND v.DT BETWEEN @FromDate AND @ToDate 
+                        GROUP BY v.RMID1, v.RMName";
                 return await db.QueryAsync<RMHistoryRowModel>(sql, new { VendID = int.Parse(recipientId), FromDate = fromDate, ToDate = toDate });
             }
             else

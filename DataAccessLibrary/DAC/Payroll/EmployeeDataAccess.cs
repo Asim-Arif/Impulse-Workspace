@@ -61,33 +61,41 @@ namespace DataAccessLibrary.DAC.Payroll
             {
                 using (IDbConnection db = new SqlConnection(_connectionString))
                 {
-                    string sql = "SELECT EmpID, Name, FName, Designation, StartingSalary, JoinDate, Active, TempEmp, Phone1, Phone2, DeptID, DeptName FROM VEmp WHERE EmpID IS NOT NULL";
+                    string sql = @"
+                        SELECT v.EmpID, v.Name, v.FName, v.Designation, v.StartingSalary, v.JoinDate, v.Active, v.TempEmp,
+                               v.Phone1, v.Phone2, v.DeptID, v.DeptName,
+                               ISNULL(e.BankPymt, 0) AS BankPymt,
+                               ISNULL(e.EmpAccNo, '') AS EmpAccNo,
+                               ISNULL(e.TaxAmt, 0) AS TaxAmt
+                        FROM VEmp v
+                        INNER JOIN Employees e ON v.EmpID = e.empid
+                        WHERE v.EmpID IS NOT NULL";
 
                     if (!string.IsNullOrEmpty(deptId) && deptId != "0")
                     {
-                        sql += " AND DeptID = @DeptID";
+                        sql += " AND v.DeptID = @DeptID";
                     }
 
                     if (!showInactive)
                     {
-                        sql += " AND Active = 1";
+                        sql += " AND v.Active = 1";
                     }
 
                     if (tempEmpOnly)
                     {
-                        sql += " AND TempEmp = 1";
+                        sql += " AND v.TempEmp = 1";
                     }
                     else
                     {
-                        sql += " AND TempEmp = 0";
+                        sql += " AND v.TempEmp = 0";
                     }
 
                     if (!string.IsNullOrEmpty(selectedEmpId) && selectedEmpId != "0")
                     {
-                        sql += " AND EmpID = @EmpID";
+                        sql += " AND v.EmpID = @EmpID";
                     }
 
-                    sql += " ORDER BY EmpID";
+                    sql += " ORDER BY v.EmpID";
 
                     var result = await db.QueryAsync<EmployeeListItemModel>(sql, new { DeptID = deptId, EmpID = selectedEmpId });
                     return result.ToList();
@@ -291,10 +299,13 @@ namespace DataAccessLibrary.DAC.Payroll
                 emp.LastEmpDesig, emp.LastEmpReason, emp.JoinDate, emp.Retirement, emp.Salary, emp.PProfit,
                 emp.StartingSalary, emp.OldAge, emp.Social, emp.TaxPayee, emp.Remarks, emp.GInfo, emp.SocialNo,
                 emp.SocialSal, emp.OldAgeNo, emp.OldAgeSal, emp.Status, emp.Active, emp.EmpPic, emp.Bonus,
-                emp.ThumbExp, emp.Transport, emp.ExemptSettings, emp.BloodGroup, emp.ProcessID, emp.BankPymt,
-                emp.ShowInExternal, emp.EmergencyName, emp.EmergencyFName, emp.EmergencyPhone1,
-                emp.EmergencyPhone2, emp.EmergencyAddress, emp.OTByQty, emp.MinQty, emp.UnionFund, emp.Lunch,
-                emp.TaxAmt, emp.InsurableDT, emp.ArmyRetired, emp.EmpAccNo, emp.PerPieceRate, emp.Rate,
+                emp.ThumbExp, emp.Transport, ExemptSettings = emp.ExemptSettings ?? false, emp.BloodGroup, emp.ProcessID,
+                BankPymt = emp.BankPymt ?? false, ShowInExternal = emp.ShowInExternal ?? false,
+                emp.EmergencyName, emp.EmergencyFName, emp.EmergencyPhone1,
+                emp.EmergencyPhone2, emp.EmergencyAddress, OTByQty = emp.OTByQty ?? false, emp.MinQty,
+                UnionFund = emp.UnionFund ?? false, Lunch = emp.Lunch ?? false,
+                emp.TaxAmt, emp.InsurableDT, ArmyRetired = emp.ArmyRetired ?? false, emp.EmpAccNo,
+                PerPieceRate = emp.PerPieceRate ?? false, emp.Rate,
                 emp.MainContractorID, emp.EntryDT, emp.ProbationPeriod, emp.FixAllowance, emp.EOBIAmt,
                 emp.SocialSecurityAmt, emp.EmpLunchAmt, emp.BondPeriod, emp.RelationWithCompEmp,
                 emp.RelativeEmpID, emp.Sr, emp.IntDepartmentId, emp.IntJobTitleId, emp.IntGenderId,
@@ -386,6 +397,42 @@ namespace DataAccessLibrary.DAC.Payroll
 
         private async Task SaveSettingsAsync(IDbConnection db, IDbTransaction trans, EmployeeDto employee)
         {
+            bool isExempt = employee.ExemptSettings ?? false;
+
+            if (!isExempt && !string.IsNullOrEmpty(employee.DeptID))
+            {
+                int hasDeptSettings = await db.ExecuteScalarAsync<int>(
+                    "SELECT COUNT(1) FROM GeneralSettings WHERE DeptID = @DeptID",
+                    new { employee.DeptID },
+                    transaction: trans);
+
+                if (hasDeptSettings > 0)
+                {
+                    await db.ExecuteAsync("DELETE FROM EmpSettings WHERE EmpID = @EmpID", new { employee.EmpID }, transaction: trans);
+                    string copySql = @"
+                        INSERT INTO EmpSettings (
+                            EmpID, EnterTime, ExitTime, LunchTime, AbsAllowed, TotalAbsAllowed,
+                            TimeAllowed, NTimes, OverTime, SocialAmt, DinnerAmt, ShortTermPer,
+                            AdvSalPer, LongTermTime, LongTermLimit, BGHoliday, AGHoliday,
+                            BPHoliday, APHoliday, WorkingHrs, AllowMultiple, DeductAbsents,
+                            DeductLHrs, LunchInTime, LunchOutTime, EmpAttCat_RefID,
+                            FridayBreakStartTime, FridayBreakEndTime, FridayCheckOut
+                        )
+                        SELECT
+                            @EmpID, EnterTime, ExitTime, LunchTime, AbsAllowed, TotalAbsAllowed,
+                            TimeAllowed, NTimes, OverTime, SocialAmt, DinnerAmt, ShortTermPer,
+                            AdvSalPer, LongTermTime, LongTermLimit,
+                            ISNULL(BGHoliday, 0), ISNULL(AGHoliday, 0), ISNULL(BPHoliday, 0), ISNULL(APHoliday, 0),
+                            WorkingHrs, 0, ISNULL(DeductAbsents, 0), ISNULL(DeductLHrs, 0),
+                            LunchInTime, LunchOutTime, EmpAttCat_RefID,
+                            FridayBreakStartTime, FridayBreakEndTime, FridayCheckOut
+                        FROM GeneralSettings
+                        WHERE DeptID = @DeptID";
+                    await db.ExecuteAsync(copySql, new { employee.EmpID, employee.DeptID }, transaction: trans);
+                    return;
+                }
+            }
+
             if (employee.Settings != null)
             {
                 await db.ExecuteAsync("DELETE FROM EmpSettings WHERE EmpID = @EmpID", new { employee.EmpID }, transaction: trans);
@@ -406,14 +453,30 @@ namespace DataAccessLibrary.DAC.Payroll
                 var p = new
                 {
                     employee.EmpID,
-                    employee.Settings.EnterTime, employee.Settings.ExitTime, employee.Settings.LunchTime,
-                    employee.Settings.AbsAllowed, employee.Settings.TotalAbsAllowed, employee.Settings.TimeAllowed,
-                    employee.Settings.NTimes, employee.Settings.OverTime, employee.Settings.SocialAmt,
-                    employee.Settings.DinnerAmt, employee.Settings.ShortTermPer, employee.Settings.AdvSalPer,
-                    employee.Settings.LongTermTime, employee.Settings.LongTermLimit, employee.Settings.BGHoliday,
-                    employee.Settings.AGHoliday, employee.Settings.BPHoliday, employee.Settings.APHoliday,
-                    employee.Settings.WorkingHrs, employee.Settings.AllowMultiple, employee.Settings.DeductAbsents,
-                    employee.Settings.DeductLHrs, employee.Settings.LunchInTime, employee.Settings.LunchOutTime
+                    employee.Settings.EnterTime,
+                    employee.Settings.ExitTime,
+                    employee.Settings.LunchTime,
+                    employee.Settings.AbsAllowed,
+                    employee.Settings.TotalAbsAllowed,
+                    employee.Settings.TimeAllowed,
+                    employee.Settings.NTimes,
+                    employee.Settings.OverTime,
+                    employee.Settings.SocialAmt,
+                    employee.Settings.DinnerAmt,
+                    employee.Settings.ShortTermPer,
+                    employee.Settings.AdvSalPer,
+                    employee.Settings.LongTermTime,
+                    employee.Settings.LongTermLimit,
+                    BGHoliday = employee.Settings.BGHoliday ?? false,
+                    AGHoliday = employee.Settings.AGHoliday ?? false,
+                    BPHoliday = employee.Settings.BPHoliday ?? false,
+                    APHoliday = employee.Settings.APHoliday ?? false,
+                    employee.Settings.WorkingHrs,
+                    AllowMultiple = employee.Settings.AllowMultiple ?? false,
+                    DeductAbsents = employee.Settings.DeductAbsents ?? false,
+                    DeductLHrs = employee.Settings.DeductLHrs ?? false,
+                    employee.Settings.LunchInTime,
+                    employee.Settings.LunchOutTime
                 };
                 await db.ExecuteAsync(sql, p, transaction: trans);
             }
@@ -464,7 +527,16 @@ namespace DataAccessLibrary.DAC.Payroll
             {
                 await db.ExecuteAsync("DELETE FROM EmpMedicalHistory WHERE EmpID = @EmpID", new { employee.EmpID }, transaction: trans);
                 string sql = "INSERT INTO EmpMedicalHistory (EmpID, HBsAg, AntiHcv, BloodSugar, BloodPressure, Allergy, AllergyDescription) VALUES (@EmpID, @HBsAg, @AntiHcv, @BloodSugar, @BloodPressure, @Allergy, @AllergyDescription)";
-                await db.ExecuteAsync(sql, new { employee.EmpID, employee.MedicalHistory.HBsAg, employee.MedicalHistory.AntiHcv, employee.MedicalHistory.BloodSugar, employee.MedicalHistory.BloodPressure, employee.MedicalHistory.Allergy, employee.MedicalHistory.AllergyDescription }, transaction: trans);
+                await db.ExecuteAsync(sql, new
+                {
+                    employee.EmpID,
+                    employee.MedicalHistory.HBsAg,
+                    employee.MedicalHistory.AntiHcv,
+                    employee.MedicalHistory.BloodSugar,
+                    employee.MedicalHistory.BloodPressure,
+                    Allergy = employee.MedicalHistory.Allergy ?? false,
+                    employee.MedicalHistory.AllergyDescription
+                }, transaction: trans);
             }
         }
 
@@ -502,7 +574,23 @@ namespace DataAccessLibrary.DAC.Payroll
                 foreach (var d in employee.Dependants)
                 {
                     string sql = "INSERT INTO EmpDependants (EmpID, Name, Relation, NICNo, MaritalStatus, DOB, Education, Class, Institute, Occupation, Male, Dependent, DOM, DOD) VALUES (@EmpID, @Name, @Relation, @NICNo, @MaritalStatus, @DOB, @Education, @Class, @Institute, @Occupation, @Male, @Dependent, @DOM, @DOD)";
-                    await db.ExecuteAsync(sql, new { employee.EmpID, d.Name, d.Relation, d.NICNo, d.MaritalStatus, d.DOB, d.Education, d.Class, d.Institute, d.Occupation, d.Male, d.Dependent, d.DOM, d.DOD }, transaction: trans);
+                    await db.ExecuteAsync(sql, new
+                    {
+                        employee.EmpID,
+                        d.Name,
+                        d.Relation,
+                        d.NICNo,
+                        d.MaritalStatus,
+                        d.DOB,
+                        d.Education,
+                        d.Class,
+                        d.Institute,
+                        d.Occupation,
+                        Male = d.Male ?? false,
+                        Dependent = d.Dependent ?? false,
+                        d.DOM,
+                        d.DOD
+                    }, transaction: trans);
                 }
             }
         }
@@ -583,16 +671,35 @@ namespace DataAccessLibrary.DAC.Payroll
 
                     if (emp != null)
                     {
+                        emp.ExemptSettings ??= false;
+                        emp.BankPymt ??= false;
+                        emp.ShowInExternal ??= false;
+                        emp.OTByQty ??= false;
+                        emp.UnionFund ??= false;
+                        emp.Lunch ??= false;
+                        emp.ArmyRetired ??= false;
+                        emp.PerPieceRate ??= false;
+                        emp.TempEmp ??= false;
+
                         emp.Qualifications = (await db.QueryAsync<EmpQualificationDto>("SELECT * FROM EmpQualification WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
                         emp.Guarantors = (await db.QueryAsync<EmpGuarantorDto>("SELECT * FROM EmpGuarantors WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
                         emp.MedicalCheckUps = (await db.QueryAsync<EmpMedicalCheckUpDto>("SELECT * FROM EmpMedicalCheckUps WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
                         
                         var medHist = await db.QuerySingleOrDefaultAsync<EmpMedicalHistoryDto>("SELECT * FROM EmpMedicalHistory WHERE EmpID = @EmpID", new { EmpID = empId });
-                        if (medHist != null) emp.MedicalHistory = medHist;
+                        if (medHist != null)
+                        {
+                            medHist.Allergy ??= false;
+                            emp.MedicalHistory = medHist;
+                        }
                         
                         emp.EmploymentHistories = (await db.QueryAsync<EmpEmployementHistoryDto>("SELECT * FROM EmpEmployementHistory WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
                         emp.Jobs = (await db.QueryAsync<EmpJobDto>("SELECT * FROM EmpJobs WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
                         emp.Dependants = (await db.QueryAsync<EmpDependantDto>("SELECT * FROM EmpDependants WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
+                        foreach (var dep in emp.Dependants)
+                        {
+                            dep.Male ??= false;
+                            dep.Dependent ??= false;
+                        }
                         emp.Successions = (await db.QueryAsync<EmpSuccessionDto>("SELECT * FROM EmpSuccessions WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
                         emp.Reviews = (await db.QueryAsync<EmpReviewDto>("SELECT * FROM EmpReviews WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
                         emp.Notices = (await db.QueryAsync<EmpNoticeDto>("SELECT * FROM EmpNotices WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
@@ -600,7 +707,17 @@ namespace DataAccessLibrary.DAC.Payroll
                         emp.Assets = (await db.QueryAsync<EmpAssetDto>("SELECT * FROM EmpAssets WHERE EmpID = @EmpID", new { EmpID = empId })).ToList();
                         
                         var settings = await db.QuerySingleOrDefaultAsync<EmpSettingsDto>("SELECT * FROM EmpSettings WHERE EmpID = @EmpID", new { EmpID = empId });
-                        if (settings != null) emp.Settings = settings;
+                        if (settings != null)
+                        {
+                            settings.BGHoliday ??= false;
+                            settings.AGHoliday ??= false;
+                            settings.BPHoliday ??= false;
+                            settings.APHoliday ??= false;
+                            settings.AllowMultiple ??= false;
+                            settings.DeductAbsents ??= false;
+                            settings.DeductLHrs ??= false;
+                            emp.Settings = settings;
+                        }
                     }
                     return emp;
                 }

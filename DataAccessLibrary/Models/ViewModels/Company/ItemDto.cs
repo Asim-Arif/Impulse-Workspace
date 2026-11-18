@@ -240,7 +240,7 @@ namespace DataAccessLibrary.Models.ViewModels.Company
         public float? SmallCartonH { get; set; }
         public int? SmallBoxPcs { get; set; }
         public int? MasterCartonSmallBoxes { get; set; }
-        public int? MasterCartonTotalPcs { get; set; }
+        public int? MasterCartonTotalPcs { get; set; } = 0;
 
         // ── Descriptions (finish / maker) ────────────────────────────────────
         [StringLength(1000)]

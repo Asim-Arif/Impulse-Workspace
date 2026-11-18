@@ -31,8 +31,10 @@ namespace Impulse.Pages.Payroll.BiometricLedger
         [Inject] private IHttpContextAccessor        HttpContextAccessor        { get; set; } = default!;
 
         // ── State ──────────────────────────────────────────────────────────
-        private bool IsLoading       = false;
-        private bool IsReadingMachine = false;
+        private bool IsLoading            = false;
+        private bool IsReadingMachine     = false;
+        private bool IsReadingAllMachines = false;
+        private string ReadingAllProgressText = string.Empty;
 
         private DateTime SelectedDate { get; set; } = DateTime.Today;
 
@@ -148,6 +150,26 @@ namespace Impulse.Pages.Payroll.BiometricLedger
         }
 
         // ── IFace Machine Reading ─────────────────────────────────────────
+        private async Task<(string UserName, string ClientIp)> GetCurrentUserAndIpAsync()
+        {
+            string userName = "System";
+            try
+            {
+                var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                var user = authState.User;
+                if (user.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(user.Identity.Name))
+                {
+                    userName = user.Identity.Name;
+                }
+            }
+            catch { }
+
+            string clientIp = HttpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString() ?? "127.0.0.1";
+            if (clientIp == "::1") clientIp = "127.0.0.1";
+
+            return (userName, clientIp);
+        }
+
         private async Task ReadFromIFaceMachineAsync()
         {
             if (SelectedMachineId == 0) return;
@@ -159,20 +181,7 @@ namespace Impulse.Pages.Payroll.BiometricLedger
             StateHasChanged();
             try
             {
-                string userName = "System";
-                try
-                {
-                    var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-                    var user = authState.User;
-                    if (user.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(user.Identity.Name))
-                    {
-                        userName = user.Identity.Name;
-                    }
-                }
-                catch { }
-
-                string clientIp = HttpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString() ?? "127.0.0.1";
-                if (clientIp == "::1") clientIp = "127.0.0.1";
+                var (userName, clientIp) = await GetCurrentUserAndIpAsync();
 
                 var (recordsRead, recordsProcessed, message) =
                     await IFaceMachineService.ReadAndProcessAsync(machine.IPAddress, machine.MachineNo, 4370, userName, clientIp, null, machine.Clientkey);
@@ -195,6 +204,89 @@ namespace Impulse.Pages.Payroll.BiometricLedger
             finally
             {
                 IsReadingMachine = false;
+            }
+        }
+
+        private async Task ReadAllIFaceMachinesAsync()
+        {
+            if (!IFaceMachines.Any() || IsReadingMachine || IsReadingAllMachines) return;
+
+            IsReadingAllMachines = true;
+            ReadingAllProgressText = "Starting...";
+            StateHasChanged();
+
+            int totalRead = 0;
+            int totalProcessed = 0;
+            int succeededMachines = 0;
+            var failedMachines = new List<string>();
+
+            try
+            {
+                var (userName, clientIp) = await GetCurrentUserAndIpAsync();
+
+                for (int i = 0; i < IFaceMachines.Count; i++)
+                {
+                    var machine = IFaceMachines[i];
+                    SelectedMachineId = machine.EntryID;
+                    ReadingAllProgressText = $"Reading ({i + 1}/{IFaceMachines.Count}): {machine.IPAddress}...";
+                    StateHasChanged();
+
+                    try
+                    {
+                        var (recordsRead, recordsProcessed, message) =
+                            await IFaceMachineService.ReadAndProcessAsync(machine.IPAddress, machine.MachineNo, 4370, userName, clientIp, null, machine.Clientkey);
+
+                        bool isMachineFailure = recordsRead == 0
+                            && !string.IsNullOrWhiteSpace(message)
+                            && !message.StartsWith("No new punch records", StringComparison.OrdinalIgnoreCase);
+
+                        if (isMachineFailure)
+                        {
+                            failedMachines.Add($"{machine.IPAddress} ({message})");
+                        }
+                        else
+                        {
+                            totalRead += recordsRead;
+                            totalProcessed += recordsProcessed;
+                            succeededMachines++;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        failedMachines.Add($"{machine.IPAddress} ({ex.Message})");
+                    }
+                }
+
+                if (totalProcessed > 0)
+                {
+                    await LoadDataAsync();
+                }
+
+                string summary = $"Machines polled: {succeededMachines}/{IFaceMachines.Count}. Punches read: {totalRead}, processed: {totalProcessed}.";
+                if (failedMachines.Any())
+                {
+                    NotificationService.ShowWarning(
+                        "Read All Machines Completed with Warnings",
+                        $"{summary} Failed ({failedMachines.Count}): {string.Join("; ", failedMachines)}");
+                }
+                else if (totalProcessed > 0)
+                {
+                    NotificationService.ShowSuccess("All Machines Read Complete", summary);
+                }
+                else
+                {
+                    NotificationService.ShowInformation("All Machines Read Complete", summary);
+                }
+            }
+            catch (Exception ex)
+            {
+                NotificationService.ShowError("IFace Machine Error", ex.Message);
+            }
+            finally
+            {
+                IsReadingAllMachines = false;
+                ReadingAllProgressText = string.Empty;
+                StateHasChanged();
             }
         }
 
