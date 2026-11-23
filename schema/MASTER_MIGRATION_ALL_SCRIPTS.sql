@@ -5118,6 +5118,10 @@ IF NOT EXISTS (SELECT 1 FROM [dbo].[WorkflowConfigurations] WHERE [WorkflowCode]
 IF NOT EXISTS (SELECT 1 FROM [dbo].[WorkflowConfigurations] WHERE [WorkflowCode] = 'SkipProcess')
     INSERT INTO [dbo].[WorkflowConfigurations] ([WorkflowCode], [WorkflowName], [Module], [Description], [IsEnabled], [ApproverRole])
     VALUES ('SkipProcess', 'Skip Production Process Approval', 'Production', 'Requires Director approval when non-exempt users request to skip a sequential production process on a lot item.', 1, 'Director');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[WorkflowConfigurations] WHERE [WorkflowCode] = 'VoucherDeletion')
+    INSERT INTO [dbo].[WorkflowConfigurations] ([WorkflowCode], [WorkflowName], [Module], [Description], [IsEnabled], [ApproverRole])
+    VALUES ('VoucherDeletion', 'Voucher Deletion Approval', 'Accounts', 'Requires approval when non-exempt users request deletion of an accounting voucher.', 1, 'Director');
 GO
 
 -- Seed Default Exempt Roles (Direct-Save without approval)
@@ -5141,7 +5145,11 @@ INSERT INTO @ExemptList (Code, RoleName) VALUES
 
     ('SkipProcess', 'Director'),
     ('SkipProcess', 'Admin'),
-    ('SkipProcess', 'Administrator');
+    ('SkipProcess', 'Administrator'),
+
+    ('VoucherDeletion', 'Director'),
+    ('VoucherDeletion', 'Admin'),
+    ('VoucherDeletion', 'Administrator');
 
 INSERT INTO [dbo].[WorkflowExemptRoles] ([WorkflowCode], [RoleName])
 SELECT e.Code, e.RoleName
@@ -5559,6 +5567,39 @@ ELSE
 BEGIN
     UPDATE MenuOptions SET OptionName = 'Approval History', ModuleName = 'Production', FormName = 'ApprovalHistory' WHERE OptionID = 'PrdApprovalHistory';
 END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM MenuOptions WHERE OptionID = 'PrdMakerRateApproval')
+BEGIN
+    INSERT INTO MenuOptions (OptionID, OptionName, ModuleName, FormName)
+    VALUES ('PrdMakerRateApproval', 'Maker Rate Approvals', 'Production', 'MakerRateApproval');
+END
+ELSE
+BEGIN
+    UPDATE MenuOptions SET OptionName = 'Maker Rate Approvals', ModuleName = 'Production', FormName = 'MakerRateApproval' WHERE OptionID = 'PrdMakerRateApproval';
+END
+GO
+
+-- Harmonize Production Issuance List: rename PrdMakerPOList -> 'Issuance List' and migrate legacy PrdIssuanceList
+IF NOT EXISTS (SELECT 1 FROM MenuOptions WHERE OptionID = 'PrdMakerPOList')
+BEGIN
+    INSERT INTO MenuOptions (OptionID, OptionName, ModuleName, FormName)
+    VALUES ('PrdMakerPOList', 'Issuance List', 'Production', 'MakerPOList');
+END
+ELSE
+BEGIN
+    UPDATE MenuOptions SET OptionName = 'Issuance List', ModuleName = 'Production' WHERE OptionID = 'PrdMakerPOList';
+END
+GO
+
+INSERT INTO UserMenuOptions (UserID, OptionID)
+SELECT umo.UserID, 'PrdMakerPOList'
+FROM UserMenuOptions umo
+WHERE umo.OptionID = 'PrdIssuanceList'
+  AND NOT EXISTS (SELECT 1 FROM UserMenuOptions e WHERE e.UserID = umo.UserID AND e.OptionID = 'PrdMakerPOList');
+
+DELETE FROM UserMenuOptions WHERE OptionID = 'PrdIssuanceList';
+DELETE FROM MenuOptions WHERE OptionID = 'PrdIssuanceList';
 GO
 
 -- ====================================================================================================

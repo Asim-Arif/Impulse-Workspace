@@ -439,7 +439,7 @@ namespace Impulse.Pages.Production.ReceiveLot
                     LotNo = string.IsNullOrWhiteSpace(l.LotNo) ? LotHeader.LotNo : l.LotNo,
                     ReWorkLot = l.ReWorkLot,
                     RepairType = l.RepairType,
-                    ProcessID = LotHeader.ProcessID
+                    ProcessID = l.ReturnProcessID > 0 ? l.ReturnProcessID : LotHeader.ProcessID
                 }).ToList();
 
                 long rcvHeaderId = await ReceiveLotService.SaveLotReceivingAsync(headerPayload, linePayloads, userName, userId, machineName);

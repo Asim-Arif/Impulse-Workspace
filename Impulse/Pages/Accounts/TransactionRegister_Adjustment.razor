@@ -191,53 +191,53 @@
 
 @if (ShowModal)
 {
-    <div class="modal fade show d-block" tabindex="-1" role="dialog" style="font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-        <div class="modal-dialog modal-dialog-centered modal-xl" role="document">
-            <div class="modal-content">
-                <!-- Header -->
-                <div class="modal-header text-white rounded-top-4" style="background-color:rgb(7, 44, 96)">
-                    <h5 class="modal-title fw-bold d-flex align-items-center">
-                        <i class="bi bi-bank me-2"></i>
-                        Delete Voucher
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" @onclick="HideModal" aria-label="Close"></button>
+    <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(4px); z-index: 1050; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; font-family: 'Calibri', 'Segoe UI', sans-serif;">
+        <div class="shadow-lg border-0" style="width: 1000px; max-width: 96vw; max-height: 92vh; background: #ffffff; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden;">
+            <!-- Header -->
+            <div class="bg-danger text-white py-2 px-3 d-flex align-items-center justify-content-between" style="flex-shrink: 0;">
+                <h6 class="modal-title fw-bold mb-0" style="font-size: 1.05rem;">
+                    <i class="fas fa-trash-alt me-2"></i>
+                    <span>Delete Voucher</span>
+                    @if (!string.IsNullOrWhiteSpace(SelectedVoucher?.VchrNo))
+                    {
+                        <span class="fw-normal opacity-90 ms-2" style="font-size: 0.95rem;">— #@SelectedVoucher.VchrNo</span>
+                    }
+                </h6>
+                <button type="button" class="btn-close btn-close-white" @onclick="HideModal" aria-label="Close"></button>
+            </div>
+
+            <!-- Body -->
+            <div class="p-3" style="overflow-y: auto; flex-grow: 1;">
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small mb-1">Acc No :</label>
+                        <input class="form-control form-control-sm" @bind="SelectedVoucher.AccNo" readonly />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small mb-1">Acc Title :</label>
+                        <input class="form-control form-control-sm" @bind="SelectedVoucher.AccTitle" readonly />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small mb-1">Voucher # :</label>
+                        <input class="form-control form-control-sm" @bind="SelectedVoucher.VchrNo" readonly />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small mb-1">Date :</label>
+                        <input class="form-control form-control-sm" @bind="SelectedVoucher.VDate" @bind:format="yyyy-MM-dd" readonly />
+                    </div>
+
+                    <div class="col-md-8">
+                        <label class="form-label fw-semibold small mb-1">Description</label>
+                        <input class="form-control form-control-sm" @bind="SelectedVoucher.Description" readonly />
+                    </div>
                 </div>
 
-                <div class="modal-body">
-                    <div class="row" style="font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-
-                        <div class="col-md-4 mb-2">
-                            <label class="fw-semibold">Acc No :</label>
-                            <input class="form-control" @bind="SelectedVoucher.AccNo" readonly />
-                        </div>
-
-                        <div class="col-md-4 mb-2">
-                            <label class="fw-semibold">Acc Title :</label>
-                            <input class="form-control" @bind="SelectedVoucher.AccTitle" readonly />
-                        </div>
-
-                        <div class="col-md-4 mb-2">
-                            <label class="fw-semibold">Voucher # :</label>
-                            <input class="form-control" @bind="SelectedVoucher.VchrNo" readonly />
-                        </div>
-
-                        <div class="col-md-4 mb-2">
-                            <label class="fw-semibold">Date :</label>
-                            <input class="form-control" @bind="SelectedVoucher.VDate"
-                                   @bind:format="yyyy-MM-dd" / readonly>
-                        </div>
-
-                        <div class="col-md-8 mb-2">
-                            <label class="fw-semibold">Description</label>
-                            <input class="form-control" @bind="SelectedVoucher.Description" readonly />
-                        </div>
-
-@* --------------------------------- *@
-                <div style="width: 100%">
-                    <table class="table table-bordered table-hover align-middle mb-2 mt-2"
-                           style="font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 8pt;">
-
-                        <thead class="theme-color">
+                <div class="table-responsive mt-3">
+                    <table class="table table-bordered table-hover table-sm align-middle mb-2" style="font-size: 0.85rem;">
+                        <thead class="table-light text-secondary" style="font-size: 0.78rem; text-transform: uppercase;">
                             <tr>
                                 <th style="width: 20%;">Acc #</th>
                                 <th style="width: 50%;">AccTitle</th>
@@ -245,57 +245,67 @@
                                 <th style="width: 15%;" class="text-end">Credit</th>
                             </tr>
                         </thead>
-
-                                <tbody style="font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size:8pt;">
-                        @foreach (var ledger in LedgerDatafromDB_temp)
-                         { 
-                             <tr>
-                                <td>@ledger.AccNo</td>
-                                <td>@ledger.AccTitle</td>
-                                <td class="text-end">@ledger.Debit</td>
-                                <td class="text-end">@ledger.Credit</td>
-                            </tr>
-                         }
+                        <tbody>
+                            @foreach (var ledger in LedgerDatafromDB_temp)
+                            {
+                                <tr>
+                                    <td>@ledger.AccNo</td>
+                                    <td>@ledger.AccTitle</td>
+                                    <td class="text-end">@ledger.Debit</td>
+                                    <td class="text-end">@ledger.Credit</td>
+                                </tr>
+                            }
                         </tbody>
                     </table>
                 </div>
-@* END FOR TABLE *@
 
-                    <div class="row ">
-                            <div class="col-md-4 mb-2">
-
-                            </div>
-
-                            <div class="col-md-4 mb-2">
-                                <label class="fw-semibold">User Name</label>
-                                <input class="form-control" @bind="SelectedVoucher.GeneratedBy" readonly />
-                            </div>
-
-                            <div class="col-md-4 mb-2">
-                                <label class="fw-semibold">Computer</label>
-                                <input class="form-control" @bind="SelectedVoucher.MachineName" readonly />
-                            </div>
-                        </div>
+                <div class="row g-2 mt-1">
+                    <div class="col-md-4"></div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small mb-1">User Name</label>
+                        <input class="form-control form-control-sm" @bind="SelectedVoucher.GeneratedBy" readonly />
                     </div>
-                    <div class="row">
-                        <div class="col-md-12 mb-2">
-                            <div class="alert alert-warning py-2 px-3 mb-2 small d-flex align-items-center">
-                                <i class="fas fa-info-circle me-2 fs-5 text-warning"></i>
-                                <span>Submitting this request will generate a task for the <strong>Director</strong> role. The voucher will only be deleted once approved by a Director.</span>
-                            </div>
-                            <label class="fw-semibold">Reason for Deletion <span class="text-danger">*</span> :</label>
-                            <textarea class="form-control" rows="2" @bind="SelectedVoucher.DeleteReason" placeholder="Enter detailed reason for deletion for Director review..."></textarea>
-                        </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small mb-1">Computer</label>
+                        <input class="form-control form-control-sm" @bind="SelectedVoucher.MachineName" readonly />
                     </div>
-
-                    <div class="mt-3 text-end d-flex justify-content-end gap-2">
-                        <button class="btn btn-secondary btn-sm" @onclick="HideModal">Cancel</button>
-                        <button class="btn btn-danger btn-sm text-white fw-bold" @onclick="DeleteVoucher">
-                            <i class="fas fa-paper-plane me-1"></i> Submit Deletion Request
-                        </button>
-                    </div>
-
                 </div>
+
+                <div class="mt-3">
+                    @if (IsApprovalRequiredForDelete)
+                    {
+                        <div class="alert alert-warning py-2 px-3 mb-2 small d-flex align-items-center">
+                            <i class="fas fa-info-circle me-2 fs-5 text-warning"></i>
+                            <span>Submitting this request will generate a task for the <strong>@VoucherDeleteApproverRole</strong> role. The voucher will only be deleted once approved.</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-danger py-2 px-3 mb-2 small d-flex align-items-center">
+                            <i class="fas fa-exclamation-triangle me-2 fs-5 text-danger"></i>
+                            <span>You are authorized to delete this voucher directly. Confirming will permanently remove Voucher <strong>#@SelectedVoucher?.VchrNo</strong>.</span>
+                        </div>
+                    }
+                    <label class="form-label fw-semibold text-secondary small mb-1">Reason for Deletion <span class="text-danger">*</span> :</label>
+                    <textarea class="form-control form-control-sm" rows="2" @bind="SelectedVoucher.DeleteReason" placeholder="@(IsApprovalRequiredForDelete ? $"Enter detailed reason for deletion for {VoucherDeleteApproverRole} review..." : "Enter reason for deletion...")"></textarea>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="modal-footer border-top py-2 px-3 bg-light d-flex justify-content-end gap-2" style="flex-shrink: 0;">
+                <button type="button" class="btn btn-secondary btn-sm px-3" @onclick="HideModal">
+                    <i class="fas fa-times me-1"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-danger btn-sm px-3 fw-bold" @onclick="DeleteVoucher">
+                    @if (IsApprovalRequiredForDelete)
+                    {
+                        <i class="fas fa-paper-plane me-1"></i> <span>Submit Deletion Request</span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-trash-alt me-1"></i> <span>Delete Voucher</span>
+                    }
+                </button>
             </div>
         </div>
     </div>

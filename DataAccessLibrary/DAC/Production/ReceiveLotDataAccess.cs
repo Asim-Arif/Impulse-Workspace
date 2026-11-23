@@ -30,7 +30,7 @@ namespace DataAccessLibrary.DAC.Production
             using IDbConnection db = new SqlConnection(ConnectionString);
             string sql = @"SELECT TOP 1 VI.EntryID, VID.LotNo, ISNULL(VI.RecieptID, '') AS RecieptID, VI.VendID,
                                   ISNULL(M.VenderName, 'N/A') AS VendorName, ISNULL(M.VendID1, '') AS VendID1,
-                                  VI.ProcessID, ISNULL(P.Description, 'N/A') AS ProcessName, ISNULL(VI.ItemID, '') AS ItemID, VI.DT,
+                                  CASE WHEN ISNULL(VID.RcvProcessID, 0) > 0 THEN VID.RcvProcessID ELSE VI.ProcessID END AS ProcessID, ISNULL(P.Description, 'N/A') AS ProcessName, ISNULL(VI.ItemID, '') AS ItemID, VI.DT,
                                   VI.Authorized, ISNULL(VI.Closed, 0) AS Closed, ISNULL(VI.IssEmpID, '') AS IssEmpID,
                                   ISNULL(E.Name, '') AS IssEmpName, ISNULL(E.Designation, '') AS IssEmpDesignation,
                                    CASE WHEN M.VenderName LIKE '%FACTORY%' OR M.VendID1 LIKE '%FAC%' OR M.VendID = 79 OR M.VendID = 129 OR M.VendID = (SELECT TOP 1 CAST(DataValue AS BIGINT) FROM GeneralData WHERE DataName = 'FactoryMaker') THEN 1 ELSE 0 END AS IsFactoryMaker,
@@ -45,7 +45,7 @@ namespace DataAccessLibrary.DAC.Production
                             FROM VendIssdDetail VID
                            INNER JOIN VendIssued VI ON VI.EntryID = VID.RefID
                            LEFT JOIN VMakers M ON VI.VendID = M.VendID
-                           LEFT JOIN Processes P ON VI.ProcessID = P.ProcessID
+                           LEFT JOIN Processes P ON P.ProcessID = CASE WHEN ISNULL(VID.RcvProcessID, 0) > 0 THEN VID.RcvProcessID ELSE VI.ProcessID END
                            LEFT JOIN Employees E ON VI.IssEmpID = E.EmpID
                            WHERE VID.EntryID = (SELECT MAX(EntryID) FROM VendIssdDetail WHERE LotNo = @LotNo)";
 

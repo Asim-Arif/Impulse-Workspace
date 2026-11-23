@@ -57,6 +57,7 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
         public string? EffectiveOrderNo => !string.IsNullOrWhiteSpace(OrderNo) ? OrderNo : QueryOrderNo;
 
         public bool IsPlannedOrderMode { get; set; } = false;
+        public bool IsProcessLocked => IsPlannedOrderMode || Header.IssuanceByLotNo;
         public List<PlannedSFLotAllocationModel> PlannedAllocations { get; set; } = new();
         public PlannedSFLotAllocationModel? SelectedPlannedAllocation { get; set; }
         public int TotalPlannedRemaining => PlannedAllocations.Sum(p => p.RemainingToIssue);
@@ -72,6 +73,7 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
         public CreateSFIssuanceHeaderModel Header { get; set; } = new CreateSFIssuanceHeaderModel();
 
         public List<ProcessPOLookupModel> Processes { get; set; } = new List<ProcessPOLookupModel>();
+        public List<ProcessPOLookupModel> ReturnProcesses { get; set; } = new List<ProcessPOLookupModel>();
         private ProcessPOLookupModel? _selectedProcess;
         public ProcessPOLookupModel? SelectedProcess
         {
@@ -295,11 +297,13 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
 
             // 2. Process
             _selectedProcess = Processes.FirstOrDefault(p => p.ProcessID == alloc.ProcessID);
-            _selectedReturnProcess = _selectedProcess;
+            await LoadReturnProcessesForItemAsync(alloc.ItemID);
+            _selectedReturnProcess = ReturnProcesses.FirstOrDefault(p => p.ProcessID == alloc.ProcessID) ?? _selectedProcess;
             if (_selectedProcess != null)
             {
                 Header.ProcessID = _selectedProcess.ProcessID;
-                Makers = await MakerPOService.GetMakersForProcessAsync(_selectedProcess.ProcessID);
+                Header.ReturnProcessID = _selectedReturnProcess?.ProcessID ?? _selectedProcess.ProcessID;
+                Makers = await MakerPOService.GetMakersForProcessAsync(Header.ReturnProcessID);
             }
 
             // 3. Stock Location - restrict strictly to the planned lot & store
@@ -349,6 +353,7 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
             try
             {
                 Processes = await SFIssuanceService.GetAllProcessesAsync();
+                ReturnProcesses = new List<ProcessPOLookupModel>(Processes);
                 Employees = await MakerPOService.GetEmployeesAsync();
                 AvailableSFItems = await SFIssuanceService.GetAvailableSFItemsAsync();
             }
@@ -362,6 +367,20 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
                     Duration = 5000
                 });
             }
+        }
+
+        private async Task LoadReturnProcessesForItemAsync(string? itemId)
+        {
+            if (string.IsNullOrWhiteSpace(itemId))
+            {
+                ReturnProcesses = new List<ProcessPOLookupModel>(Processes);
+                return;
+            }
+
+            var itemProcesses = await SFIssuanceService.GetReturnProcessesForItemAsync(itemId);
+            ReturnProcesses = itemProcesses.Any()
+                ? itemProcesses
+                : new List<ProcessPOLookupModel>(Processes);
         }
 
         public async Task HandleLotSearchKeyUp(KeyboardEventArgs e)
@@ -401,11 +420,24 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
                     return;
                 }
 
-                // Auto-set process & item
-                SelectedProcess = Processes.FirstOrDefault(p => p.ProcessID == lotResult.ProcessID);
-                SelectedReturnProcess = SelectedProcess;
-                SelectedItem = AvailableSFItems.FirstOrDefault(i => i.ItemID.Equals(lotResult.ItemCode, StringComparison.OrdinalIgnoreCase))
+                // Auto-set process & item without triggering fire-and-forget setter races
+                _selectedProcess = Processes.FirstOrDefault(p => p.ProcessID == lotResult.ProcessID);
+                Header.ProcessID = _selectedProcess?.ProcessID ?? lotResult.ProcessID;
+
+                await LoadReturnProcessesForItemAsync(lotResult.ItemCode);
+                _selectedReturnProcess = ReturnProcesses.FirstOrDefault(p => p.ProcessID == lotResult.ProcessID) ?? _selectedProcess;
+                Header.ReturnProcessID = _selectedReturnProcess?.ProcessID ?? Header.ProcessID;
+
+                _selectedMaker = null;
+                MakerBalances.Clear();
+                MakerHistory.Clear();
+                Makers = Header.ReturnProcessID > 0
+                    ? await MakerPOService.GetMakersForProcessAsync(Header.ReturnProcessID)
+                    : new List<MakerPOLookupModel>();
+
+                _selectedItem = AvailableSFItems.FirstOrDefault(i => i.ItemID.Equals(lotResult.ItemCode, StringComparison.OrdinalIgnoreCase))
                                ?? new SFStockItemLookupModel { ItemID = lotResult.ItemCode, ItemName = lotResult.ItemName };
+                Header.ItemID = _selectedItem.ItemID;
 
                 OpeningLocations = await SFIssuanceService.GetStockOpeningLocationsForItemAsync(lotResult.ItemCode, lotResult.ProcessID);
                 SelectedLocation = OpeningLocations.FirstOrDefault(l => l.EntryID == lotResult.SOO_RefID)
@@ -420,6 +452,7 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
                 LineIssQty = lotResult.SplitQty;
                 LineRemarks = lotResult.Remarks;
                 await RefreshLineRateAsync();
+                await InvokeAsync(StateHasChanged);
 
                 NotificationService.Notify(new Radzen.NotificationMessage
                 {
@@ -474,7 +507,16 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
 
         private async Task OnReturnProcessChangedAsync(ProcessPOLookupModel? returnProcess)
         {
-            if (!IsPlannedOrderMode)
+            int targetProcId = returnProcess?.ProcessID ?? SelectedProcess?.ProcessID ?? 0;
+            Header.ReturnProcessID = targetProcId;
+            _selectedMaker = null;
+            MakerBalances.Clear();
+            MakerHistory.Clear();
+            Makers = targetProcId > 0
+                ? await MakerPOService.GetMakersForProcessAsync(targetProcId)
+                : new List<MakerPOLookupModel>();
+
+            if (!IsPlannedOrderMode && !Header.IssuanceByLotNo)
             {
                 int procId = SelectedProcess?.ProcessID ?? 0;
                 long vendId = SelectedMaker?.VendID ?? 0;
@@ -491,7 +533,7 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
             MakerBalances.Clear();
             MakerHistory.Clear();
 
-            if (!IsPlannedOrderMode)
+            if (!IsPlannedOrderMode && !Header.IssuanceByLotNo)
             {
                 SelectedItem = null;
             }
@@ -503,7 +545,7 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
                 MakerHistory = await MakerPOService.GetMakerIssuanceHistoryAsync(maker.VendID);
             }
 
-            if (!IsPlannedOrderMode)
+            if (!IsPlannedOrderMode && !Header.IssuanceByLotNo)
             {
                 int procId = SelectedProcess?.ProcessID ?? 0;
                 long vendId = SelectedMaker?.VendID ?? 0;
@@ -524,6 +566,14 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
             {
                 Header.ItemID = item.ItemID;
                 int procId = SelectedProcess?.ProcessID ?? 0;
+
+                await LoadReturnProcessesForItemAsync(item.ItemID);
+                if (_selectedReturnProcess == null || !ReturnProcesses.Any(p => p.ProcessID == _selectedReturnProcess.ProcessID))
+                {
+                    _selectedReturnProcess = ReturnProcesses.FirstOrDefault(p => p.ProcessID == procId)
+                                             ?? ReturnProcesses.FirstOrDefault();
+                    Header.ReturnProcessID = _selectedReturnProcess?.ProcessID ?? procId;
+                }
 
                 if (IsPlannedOrderMode)
                 {
@@ -552,6 +602,10 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
                 {
                     SelectedOrder = UnshippedOrders.First();
                 }
+            }
+            else
+            {
+                ReturnProcesses = new List<ProcessPOLookupModel>(Processes);
             }
 
             await RefreshLineRateAsync();
@@ -588,6 +642,15 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
 
             return Task.FromResult<IEnumerable<ProcessPOLookupModel>>(
                 Processes.Where(p => p.Description.Contains(searchText, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        public Task<IEnumerable<ProcessPOLookupModel>> SearchReturnProcesses(string searchText)
+        {
+            if (string.IsNullOrWhiteSpace(searchText))
+                return Task.FromResult<IEnumerable<ProcessPOLookupModel>>(ReturnProcesses);
+
+            return Task.FromResult<IEnumerable<ProcessPOLookupModel>>(
+                ReturnProcesses.Where(p => p.Description.Contains(searchText, StringComparison.OrdinalIgnoreCase)));
         }
 
         public Task<IEnumerable<MakerPOLookupModel>> SearchMakers(string searchText)
@@ -755,6 +818,7 @@ namespace Impulse.Pages.Production.MakerIssuanceFromSF
                 SelectedItem = null;
                 SelectedLocation = null;
                 SelectedOrder = null;
+                ReturnProcesses = new List<ProcessPOLookupModel>(Processes);
                 Header = new CreateSFIssuanceHeaderModel();
             }
             else if (SelectedPlannedAllocation != null)

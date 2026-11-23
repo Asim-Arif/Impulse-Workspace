@@ -14,6 +14,7 @@ namespace Impulse.Pages.Stock
         [Inject] private IDBHelperService DbHelper { get; set; } = null!;
         [Inject] private INotificationService NotificationService { get; set; } = null!;
         [Inject] private IReportNavigationService ReportNavigation { get; set; } = null!;
+        [Inject] private IReportManagerService ReportManager { get; set; } = null!;
         [Inject] private IBlazorContextMenuService BlazorContextMenuService { get; set; } = null!;
         [Inject] private NavigationManager NavigationManager { get; set; } = null!;
         [Inject] private DataAccessLibrary.Interface.Stock.IRMDataAccess RMDataAccess { get; set; } = null!;
@@ -595,6 +596,15 @@ namespace Impulse.Pages.Stock
         {
             string sel = selectedGroup != null ? $"{{Material.GroupID}}={selectedGroup.ID}" : "";
             await PrintReport("RMRateHistory.rpt", sel);
+        }
+
+        // Legacy mnuStockReportDateRange_Click -> MaterialStatusPeriodwise.rpt via MainLayout DateRangeModal
+        private void PrintStockReportDateRange(ItemClickEventArgs? e = null)
+        {
+            ReportManager.RequestReport("material-status-periodwise", new Dictionary<string, object>
+            {
+                { "groupId", (long)(selectedGroup?.ID ?? 0) }
+            });
         }
     }
 

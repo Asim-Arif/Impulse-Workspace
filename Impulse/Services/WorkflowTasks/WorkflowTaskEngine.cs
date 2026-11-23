@@ -660,6 +660,9 @@ namespace Impulse.Services.WorkflowTasks
                 DateTime vDate = voucherSummary != null ? Convert.ToDateTime(voucherSummary.VDate) : DateTime.Today;
                 decimal totalAmount = voucherSummary != null ? Convert.ToDecimal(voucherSummary.TotalAmount) : 0m;
 
+                var wfConfig = await _workflowConfigData.GetWorkflowConfigByCodeAsync("VoucherDeletion");
+                string approverRole = !string.IsNullOrWhiteSpace(wfConfig?.ApproverRole) ? wfConfig.ApproverRole : "Director";
+
                 string title = $"⚠️ Voucher Deletion Request: #{vchrNo}";
                 string desc = $"Requested by {originatorUserName} | Reason: {deleteReason} | Amount: PKR {totalAmount:N2} | Date: {vDate:yyyy-MM-dd}";
 
@@ -667,7 +670,7 @@ namespace Impulse.Services.WorkflowTasks
                 {
                     SourceEntityType = "VoucherDeletion",
                     SourceEntityRefId = vchrNo,
-                    TargetRole = "Director",
+                    TargetRole = approverRole,
                     Title = title,
                     Description = desc,
                     ActionUrl = $"/accounts/voucher-approval?vchrNo={vchrNo}",
@@ -736,8 +739,10 @@ namespace Impulse.Services.WorkflowTasks
                 // 3. Mark role task completed
                 if (task != null)
                 {
-                    await CompleteRoleTaskAsync("VoucherDeletion", vchrNo, "Director", approvedByDirectorUserName, 
-                        $"Voucher deletion approved and permanently removed by Director {approvedByDirectorUserName}." + 
+                    var wfConfig = await _workflowConfigData.GetWorkflowConfigByCodeAsync("VoucherDeletion");
+                    string approverRole = !string.IsNullOrWhiteSpace(wfConfig?.ApproverRole) ? wfConfig.ApproverRole : "Director";
+                    await CompleteRoleTaskAsync("VoucherDeletion", vchrNo, approverRole, approvedByDirectorUserName,
+                        $"Voucher deletion approved and permanently removed by Director {approvedByDirectorUserName}." +
                         (!string.IsNullOrWhiteSpace(directorRemarks) ? $" Remarks: {directorRemarks}" : ""));
                 }
 
@@ -789,7 +794,9 @@ namespace Impulse.Services.WorkflowTasks
                 string originator = task?.AssignedBy ?? "Unknown";
 
                 // 2. Reject the role task
-                await RejectRoleTaskAsync("VoucherDeletion", vchrNo, "Director", rejectedByDirectorUserName, 
+                var wfConfig = await _workflowConfigData.GetWorkflowConfigByCodeAsync("VoucherDeletion");
+                string approverRole = !string.IsNullOrWhiteSpace(wfConfig?.ApproverRole) ? wfConfig.ApproverRole : "Director";
+                await RejectRoleTaskAsync("VoucherDeletion", vchrNo, approverRole, rejectedByDirectorUserName,
                     $"Voucher deletion request rejected by Director {rejectedByDirectorUserName}. Reason: {rejectionReason}");
 
                 // 3. Send real-time notification + web push back to originator

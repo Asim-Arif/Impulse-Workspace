@@ -188,17 +188,17 @@
                         <div class="col-md-3">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
                                 Process <span class="text-danger">*</span>
-                                @if (IsPlannedOrderMode)
+                                @if (IsProcessLocked)
                                 {
-                                    <small class="text-primary ms-1"><i class="fas fa-lock fa-xs"></i> (Planned Process)</small>
+                                    <small class="text-primary ms-1"><i class="fas fa-lock fa-xs"></i> @(IsPlannedOrderMode ? "(Planned Process)" : "(Lot Process)")</small>
                                 }
                             </label>
-                            <div class="@(IsPlannedOrderMode ? "disabled-typeahead-wrapper" : "")">
+                            <div class="@(IsProcessLocked ? "disabled-typeahead-wrapper" : "")">
                                 <BlazoredTypeahead SearchMethod="SearchProcesses"
                                                    @bind-Value="SelectedProcess"
                                                    Placeholder="Select Process..."
                                                    EnableDropDown="true"
-                                                   Disabled="IsPlannedOrderMode"
+                                                   Disabled="IsProcessLocked"
                                                    MaximumSuggestions="1000">
                                     <SelectedTemplate Context="p">
                                         @p.Description
@@ -215,7 +215,7 @@
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
                                 Return Process <span class="text-danger">*</span>
                             </label>
-                            <BlazoredTypeahead SearchMethod="SearchProcesses"
+                            <BlazoredTypeahead SearchMethod="SearchReturnProcesses"
                                                @bind-Value="SelectedReturnProcess"
                                                Placeholder="Select Return Process..."
                                                EnableDropDown="true"
@@ -234,12 +234,12 @@
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.82rem;">
                                 Maker / Contractor <span class="text-danger">*</span>
                             </label>
-                            <div class="@(SelectedProcess == null ? "disabled-typeahead-wrapper" : "")">
+                            <div class="@((SelectedProcess == null && SelectedReturnProcess == null) ? "disabled-typeahead-wrapper" : "")">
                                 <BlazoredTypeahead SearchMethod="SearchMakers"
                                                    @bind-Value="SelectedMaker"
                                                    Placeholder="Select Maker..."
                                                    EnableDropDown="true"
-                                                   Disabled="SelectedProcess == null"
+                                                   Disabled="SelectedProcess == null && SelectedReturnProcess == null"
                                                    MaximumSuggestions="1000">
                                     <SelectedTemplate Context="m">
                                         @m.DisplayText

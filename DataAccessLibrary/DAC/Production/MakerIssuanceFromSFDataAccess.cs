@@ -35,6 +35,18 @@ namespace DataAccessLibrary.DAC.Production
             return (await db.QueryAsync<ProcessPOLookupModel>(sql)).ToList();
         }
 
+        public async Task<List<ProcessPOLookupModel>> GetReturnProcessesForItemAsync(string itemId)
+        {
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            string sql = @"SELECT P.ProcessID, P.Description, CAST(ISNULL(IP.SNO, 0) AS INT) AS SNO
+                           FROM Processes P
+                           INNER JOIN ItemProcesses IP ON P.ProcessID = IP.ProcessID
+                           WHERE IP.ItemID = @ItemId
+                           ORDER BY IP.SNO";
+
+            return (await db.QueryAsync<ProcessPOLookupModel>(sql, new { ItemId = itemId })).ToList();
+        }
+
         public async Task<SFLotLookupResultModel?> LookupLotNoAsync(string lotNo)
         {
             using IDbConnection db = new SqlConnection(ConnectionString);

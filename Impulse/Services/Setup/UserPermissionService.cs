@@ -248,8 +248,9 @@ namespace Impulse.Services.Setup
             ["PrdMakerPO"] = new[] { "MakerPO" },
             ["MakerPO"] = new[] { "PrdMakerPO" },
 
-            ["PrdMakerPOList"] = new[] { "MakerPOList" },
-            ["MakerPOList"] = new[] { "PrdMakerPOList" },
+            ["PrdMakerPOList"] = new[] { "MakerPOList", "PrdIssuanceList" },
+            ["MakerPOList"] = new[] { "PrdMakerPOList", "PrdIssuanceList" },
+            ["PrdIssuanceList"] = new[] { "PrdMakerPOList", "MakerPOList" },
 
             ["PrdMakerRework"] = new[] { "PrdReWorkIssuance", "ReWorkIssuance" },
             ["PrdReWorkIssuance"] = new[] { "PrdMakerRework", "ReWorkIssuance" },
@@ -328,6 +329,9 @@ namespace Impulse.Services.Setup
 
             ["PrdApprovalHistory"] = new[] { "ApprovalHistory", "WorkflowApprovalHistory" },
             ["ApprovalHistory"] = new[] { "PrdApprovalHistory" },
+
+            ["PrdMakerRateApproval"] = new[] { "MakerRateApproval" },
+            ["MakerRateApproval"] = new[] { "PrdMakerRateApproval" },
 
             // ==========================================
             // Export Aliases
@@ -918,7 +922,7 @@ namespace Impulse.Services.Setup
             ["production/maker-issuance-from-sf"] = ("Production", "PrdMakerIssuanceSF"),
             ["production/maker-item-assignment"] = ("Production", "PrdMakerItemAssign"),
             ["production/maker-orders"] = ("Production", "PrdMakerOrders"),
-            ["production/maker-rate-approval"] = ("Production", "PrdMakerItemAssign"),
+            ["production/maker-rate-approval"] = ("Production", "PrdMakerRateApproval"),
             ["production/maker-list"] = ("Production", "AccMakerList"),
             ["production/maker-po"] = ("Production", "PrdMakerPO"),
             ["production/maker-po-list"] = ("Production", "PrdMakerPOList"),
@@ -1203,7 +1207,7 @@ namespace Impulse.Services.Setup
                 new() { OptionID = "PrdReceiveLot", OptionName = "Receive Lot", ModuleName = "Production" },
                 new() { OptionID = "PrdReceivingList", OptionName = "Receiving List", ModuleName = "Production" },
                 new() { OptionID = "PrdMakerPO", OptionName = "Maker PO", ModuleName = "Production" },
-                new() { OptionID = "PrdMakerPOList", OptionName = "Maker PO List", ModuleName = "Production" },
+                new() { OptionID = "PrdMakerPOList", OptionName = "Issuance List", ModuleName = "Production" },
                 new() { OptionID = "PrdReWorkIssuance", OptionName = "Re-Work Issuance", ModuleName = "Production" },
                 new() { OptionID = "PrdAuthorizeReceived", OptionName = "Authorize Received Lots", ModuleName = "Production" },
                 new() { OptionID = "PrdMakerIssuanceFromSF", OptionName = "Maker Issuance From SF", ModuleName = "Production" },
@@ -1226,6 +1230,7 @@ namespace Impulse.Services.Setup
                 new() { OptionID = "PrdSkipProcessApproval", OptionName = "Skip Process Approvals", ModuleName = "Production", FormName = "SkipProcessApproval" },
                 new() { OptionID = "PrdLotDeletionApproval", OptionName = "Lot Deletion Approvals", ModuleName = "Production", FormName = "LotDeletionApproval" },
                 new() { OptionID = "PrdApprovalHistory", OptionName = "Approval History", ModuleName = "Production", FormName = "ApprovalHistory" },
+                new() { OptionID = "PrdMakerRateApproval", OptionName = "Maker Rate Approvals", ModuleName = "Production", FormName = "MakerRateApproval" },
 
                 // Export
                 new() { OptionID = "ExpCustomer", OptionName = "Foreign Customers", ModuleName = "Export" },

@@ -7,6 +7,7 @@ namespace Impulse.Services.Production
     public interface IMakerIssuanceFromSFService
     {
         Task<List<ProcessPOLookupModel>> GetAllProcessesAsync();
+        Task<List<ProcessPOLookupModel>> GetReturnProcessesForItemAsync(string itemId);
         Task<SFLotLookupResultModel?> LookupLotNoAsync(string lotNo);
         Task<List<SFStockItemLookupModel>> GetAvailableSFItemsAsync(int processId = 0, long vendId = 0, int returnProcessId = 0);
         Task<List<SFStockOpeningLocationModel>> GetStockOpeningLocationsForItemAsync(string itemId, int processId);

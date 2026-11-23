@@ -119,9 +119,18 @@ namespace Impulse.Pages.Accounts
 
             if (user.Identity?.IsAuthenticated == true)
             {
-                // Check Director role membership
-                var directorUsers = await UserRoleDataAccess.GetUsersByRoleAsync("Director");
-                IsDirector = directorUsers.Any(u => string.Equals(u.UserName, CurrentUserName, StringComparison.OrdinalIgnoreCase)) ||
+                var wfConfig = await WorkflowTaskEngine.GetWorkflowConfigAsync("VoucherDeletion");
+                string approverRole = !string.IsNullOrWhiteSpace(wfConfig?.ApproverRole) ? wfConfig.ApproverRole : "Director";
+
+                // Check configured ApproverRole (plus Director/Admin fallback)
+                var approverUsers = await UserRoleDataAccess.GetUsersByRoleAsync(approverRole);
+                var directorUsers = string.Equals(approverRole, "Director", StringComparison.OrdinalIgnoreCase)
+                    ? approverUsers
+                    : await UserRoleDataAccess.GetUsersByRoleAsync("Director");
+
+                IsDirector = approverUsers.Any(u => string.Equals(u.UserName, CurrentUserName, StringComparison.OrdinalIgnoreCase)) ||
+                             directorUsers.Any(u => string.Equals(u.UserName, CurrentUserName, StringComparison.OrdinalIgnoreCase)) ||
+                             user.IsInRole(approverRole) ||
                              user.IsInRole("Director") ||
                              user.IsInRole("Admin") ||
                              user.IsInRole("Administrator");

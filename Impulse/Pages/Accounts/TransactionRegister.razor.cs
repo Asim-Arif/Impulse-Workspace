@@ -64,6 +64,8 @@ namespace Impulse.Pages.Accounts
         private bool IsCRV = true;
         private bool IsBRV = true;
         private string userName;
+        private bool IsApprovalRequiredForDelete = false;
+        private string VoucherDeleteApproverRole = "Director";
         [Parameter] public string? p_VchrNo { get; set; }
         private string? pVoucherNo;
         protected override async Task OnInitializedAsync()
@@ -242,6 +244,14 @@ namespace Impulse.Pages.Accounts
                     UserName = userName
                 };
 
+                var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                IsApprovalRequiredForDelete = await WorkflowTaskEngine.IsApprovalRequiredAsync("VoucherDeletion", userName, authState.User);
+                if (IsApprovalRequiredForDelete)
+                {
+                    var wfConfig = await WorkflowTaskEngine.GetWorkflowConfigAsync("VoucherDeletion");
+                    VoucherDeleteApproverRole = !string.IsNullOrWhiteSpace(wfConfig?.ApproverRole) ? wfConfig.ApproverRole : "Director";
+                }
+
                 ShowModal = true;
                 IsEdit = true;
             }
@@ -269,14 +279,28 @@ namespace Impulse.Pages.Accounts
                     return;
                 }
 
-                // Create task for Director approval instead of deleting directly
-                await WorkflowTaskEngine.RequestVoucherDeletionAsync(
-                    CurrentVoucher.VchrNo, 
-                    userName, 
-                    SelectedVoucher.DeleteReason, 
-                    SelectedVoucher.MachineName);
+                var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                bool requiresApproval = await WorkflowTaskEngine.IsApprovalRequiredAsync("VoucherDeletion", userName, authState.User);
 
-                NotificationService.ShowSuccess("Request Submitted", $"Deletion request for Voucher #{CurrentVoucher.VchrNo} has been submitted to the Directors for approval.");
+                if (requiresApproval)
+                {
+                    // Create task for approver role instead of deleting directly
+                    await WorkflowTaskEngine.RequestVoucherDeletionAsync(
+                        CurrentVoucher.VchrNo,
+                        userName,
+                        SelectedVoucher.DeleteReason,
+                        SelectedVoucher.MachineName);
+
+                    NotificationService.ShowSuccess("Request Submitted", $"Deletion request for Voucher #{CurrentVoucher.VchrNo} has been submitted for approval.");
+                }
+                else
+                {
+                    SelectedVoucher.UserName = userName;
+                    SelectedVoucher.MachineName = string.IsNullOrWhiteSpace(SelectedVoucher.MachineName) ? Environment.MachineName : SelectedVoucher.MachineName;
+                    await AccountReportingAccess.DeleteVoucher(SelectedVoucher, CurrentVoucher.VchrNo, false);
+
+                    NotificationService.ShowSuccess("Voucher Deleted", $"Voucher #{CurrentVoucher.VchrNo} has been deleted successfully.");
+                }
 
                 ShowModal = false;
                 CurrentVoucher = null;

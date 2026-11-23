@@ -192,6 +192,29 @@
 
         switch (key.ToLower())
         {
+            case "material-status-periodwise":
+                res = await rangeModal.Show("Stock Report (Date Range)");
+                if (res.Success)
+                {
+                    string strDateRange = $"'{res.DateFrom:dd-MMM-yyyy} to {res.DateTo:dd-MMM-yyyy}'";
+                    long groupId = GetArg<long>("groupId", 0);
+                    req = new ReportRequest
+                    {
+                        ReportName = "MaterialStatusPeriodwise.rpt",
+                        Parameters = new Dictionary<string, object>
+                        {
+                            { "@DTFrom", res.DateFrom },
+                            { "@DTTo", res.DateTo },
+                            { "@GroupID", groupId }
+                        },
+                        FormulaValues = new Dictionary<string, object>
+                        {
+                            { "DateRange", strDateRange }
+                        }
+                    };
+                    await ReportService.PrintReportAsync(req);
+                }
+                break;
             case "vouchers-deleted":
                 res = await rangeModal.Show();
                 if (res.Success)

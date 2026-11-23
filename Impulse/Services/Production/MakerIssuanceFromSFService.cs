@@ -19,6 +19,11 @@ namespace Impulse.Services.Production
             return _dataAccess.GetAllProcessesAsync();
         }
 
+        public Task<List<ProcessPOLookupModel>> GetReturnProcessesForItemAsync(string itemId)
+        {
+            return _dataAccess.GetReturnProcessesForItemAsync(itemId);
+        }
+
         public Task<SFLotLookupResultModel?> LookupLotNoAsync(string lotNo)
         {
             return _dataAccess.LookupLotNoAsync(lotNo);

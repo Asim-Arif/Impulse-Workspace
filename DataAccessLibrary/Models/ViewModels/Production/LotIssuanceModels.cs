@@ -27,6 +27,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public int ReqAuth { get; set; }
         public string CountedBy { get; set; } = string.Empty;
         public string CustCode { get; set; } = string.Empty;
+        public DateTime ReturnDT { get; set; } = DateTime.Today;
     }
 
     public class LotIssuanceLookupResultModel

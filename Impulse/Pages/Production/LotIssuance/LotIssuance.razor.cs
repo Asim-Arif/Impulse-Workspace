@@ -52,6 +52,8 @@ namespace Impulse.Pages.Production.LotIssuance
         public bool RequireCountedBy { get; set; } = false;
 
         public bool IsDirectorOrAdmin { get; set; } = false;
+        public bool HasChangeRateOnIssuance { get; set; } = false;
+        public bool CanViewOrEditRate => IsDirectorOrAdmin || HasChangeRateOnIssuance;
         public string CurrentUserName { get; set; } = "System";
         private long _factoryMakerVendId = 0;
 
@@ -116,12 +118,12 @@ namespace Impulse.Pages.Production.LotIssuance
 
         public string FormatRate(decimal rate)
         {
-            return IsDirectorOrAdmin ? rate.ToString("N2") : "*";
+            return CanViewOrEditRate ? rate.ToString("N2") : "*";
         }
 
         public string FormatValue(decimal value)
         {
-            return IsDirectorOrAdmin ? value.ToString("N2") : "*";
+            return CanViewOrEditRate ? value.ToString("N2") : "*";
         }
 
         protected override async Task OnInitializedAsync()
@@ -150,20 +152,22 @@ namespace Impulse.Pages.Production.LotIssuance
                     bool isRoleMatch = user.IsInRole("Director") || user.IsInRole("Admin") || user.IsInRole("Administrator") || user.IsInRole("SuperAdmin");
                     bool isNameMatch = string.Equals(CurrentUserName, "admin", StringComparison.OrdinalIgnoreCase) || string.Equals(CurrentUserName, "administrator", StringComparison.OrdinalIgnoreCase);
 
+                    var dbUser = await UserDataAccess.GetUserByUserNameAsync(CurrentUserName);
+                    if (dbUser != null)
+                    {
+                        HasChangeRateOnIssuance = dbUser.ChangeRateonIssuance;
+                    }
+
                     if (isRoleMatch || isNameMatch)
                     {
                         IsDirectorOrAdmin = true;
                     }
-                    else
+                    else if (dbUser != null)
                     {
-                        var dbUser = await UserDataAccess.GetUserByUserNameAsync(CurrentUserName);
-                        if (dbUser != null)
+                        var userRoles = await UserRoleDataAccess.GetRolesByUserIdAsync(dbUser.UserID);
+                        if (userRoles != null && userRoles.Any(r => r.Equals("Director", StringComparison.OrdinalIgnoreCase) || r.Equals("Admin", StringComparison.OrdinalIgnoreCase) || r.Equals("Administrator", StringComparison.OrdinalIgnoreCase)))
                         {
-                            var userRoles = await UserRoleDataAccess.GetRolesByUserIdAsync(dbUser.UserID);
-                            if (userRoles != null && userRoles.Any(r => r.Equals("Director", StringComparison.OrdinalIgnoreCase) || r.Equals("Admin", StringComparison.OrdinalIgnoreCase) || r.Equals("Administrator", StringComparison.OrdinalIgnoreCase)))
-                            {
-                                IsDirectorOrAdmin = true;
-                            }
+                            IsDirectorOrAdmin = true;
                         }
                     }
                 }
@@ -572,7 +576,7 @@ namespace Impulse.Pages.Production.LotIssuance
                     LotNo = i.LotNo,
                     BatchNo = BatchNo,
                     RcvProcessID = i.ReturnProcessID > 0 ? i.ReturnProcessID : SelectedProcessID,
-                    ReturnDT = DateTime.Today,
+                    ReturnDT = i.ReturnDT,
                     Priority = i.Priority,
                     ReWorkLot = i.ReWorkLot,
                     RepairType = i.RepairType,
