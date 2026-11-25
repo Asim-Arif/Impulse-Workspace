@@ -396,11 +396,18 @@
 
     private string GetTotalInWords()
     {
+        string rawCurrency = Order?.Currency?.Trim() ?? string.Empty;
+        var (suffix, subUnit) = rawCurrency.ToUpperInvariant() switch
+        {
+            "" or "USD" or "US$" or "US $" or "$" => ("Dollars", "Cents"),
+            "EUR" or "EURO" or "€" => ("Euros", "Cents"),
+            "GBP" or "POUND" or "POUNDS" or "£" => ("Pounds", "Pence"),
+            "PKR" or "RS" or "RS." or "RUPEES" => ("Rupees", "Paisa"),
+            _ => (rawCurrency, "Cents")
+        };
+
         decimal amount = GetTotalAmount();
-        if (amount <= 0) return "Zero Dollars Only";
-        
-        string currency = Order?.Currency ?? "USD";
-        string suffix = currency == "USD" ? "Dollars" : (currency == "EUR" ? "Euros" : "Pounds");
+        if (amount <= 0) return $"Zero {suffix} Only";
 
         long integral = (long)Math.Truncate(amount);
         int fractional = (int)Math.Round((amount - integral) * 100);
@@ -408,7 +415,7 @@
         string word = NumberToWords(integral) + " " + suffix;
         if (fractional > 0)
         {
-            word += " and Cents " + NumberToWords(fractional);
+            word += $" and {subUnit} " + NumberToWords(fractional);
         }
         return word + " Only";
     }

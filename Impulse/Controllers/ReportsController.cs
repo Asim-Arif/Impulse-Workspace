@@ -77,13 +77,19 @@ namespace Impulse.Controllers
                 }
                 else if (fmt == "excel" || fmt == "xlsx")
                 {
+                    contentType = "application/vnd.ms-excel";
+                }
+                else if (fmt == "excel-data")
+                {
                     contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
                 }
 
                 if (string.IsNullOrEmpty(fileName))
                 {
                     if (fmt == "excel" || fmt == "xlsx")
-                        fileName = baseName + ".xlsx";
+                        fileName = baseName + ".xls";
+                    else if (fmt == "excel-data")
+                        fileName = baseName + "_Data.xlsx";
                     else if (fmt == "word" || fmt == "doc" || fmt == "docx")
                         fileName = baseName + ".doc";
                     else

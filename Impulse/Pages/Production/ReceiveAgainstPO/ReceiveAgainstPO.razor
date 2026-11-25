@@ -287,16 +287,18 @@
                                             <td class="text-end text-muted" style="width: 75px;">@line.PrevRcvdQty.ToString("N0")</td>
                                             <td class="text-end fw-bold text-danger" style="width: 75px;">@line.PendingQty.ToString("N0")</td>
                                             <td class="text-end" style="width: 95px;">
-                                                <input type="number" class="form-control form-control-sm text-end fw-bold text-success border-success"
+                                                <input type="number" class="form-control form-control-sm text-end fw-bold @(line.IsFullyReceived ? "text-muted bg-light" : "text-success border-success")"
                                                        @bind="line.ReceivingQty"
                                                        placeholder="0"
                                                        min="0"
+                                                       disabled="@line.IsFullyReceived"
                                                        max="@line.GetMaxAllowedQty(MasterPO?.ExcessQtyPercentage ?? 50f)"
-                                                       title="Max Allowed: @line.GetMaxAllowedQty(MasterPO?.ExcessQtyPercentage ?? 50f).ToString("N0") (includes @(MasterPO?.ExcessQtyPercentage ?? 50f)% excess)" />
+                                                       title="@(line.IsFullyReceived ? "Completed — ordered quantity already met" : $"Max Allowed: {line.GetMaxAllowedQty(MasterPO?.ExcessQtyPercentage ?? 50f):N0} (includes {MasterPO?.ExcessQtyPercentage ?? 50f}% excess)")" />
                                             </td>
                                             <td class="text-end" style="width: 105px;">
                                                 <input type="number" step="any" min="0" class="form-control form-control-sm text-end fw-semibold"
                                                        @bind="line.ReceivingWeight"
+                                                       disabled="@line.IsFullyReceived"
                                                        placeholder="0.00" />
                                             </td>
                                             <td style="width: 250px; min-width: 220px;" class="table-typeahead py-1">

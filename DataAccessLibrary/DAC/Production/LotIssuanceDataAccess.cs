@@ -473,15 +473,7 @@ namespace DataAccessLibrary.DAC.Production
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
 
-            // 1. Check if Factory Maker via GeneralData ('FactoryMaker')
-            const string factoryMakerSql = "SELECT TOP 1 DataValue FROM GeneralData WHERE DataName = 'FactoryMaker'";
-            string? factoryMakerVal = await db.ExecuteScalarAsync<string>(factoryMakerSql);
-            if (!string.IsNullOrWhiteSpace(factoryMakerVal) && long.TryParse(factoryMakerVal, out long factoryMakerId) && factoryMakerId == vendId)
-            {
-                return 0m;
-            }
-
-            // 2. Fetch rate from VendAssItems for selected maker, process & item
+            // Fetch rate from VendAssItems for selected maker, process & item
             bool isCustWise = await IsCustomerWiseRatesEnabledAsync(db);
             string rateSql;
             if (isCustWise && !string.IsNullOrWhiteSpace(custCode))

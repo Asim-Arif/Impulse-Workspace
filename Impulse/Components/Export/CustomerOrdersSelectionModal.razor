@@ -1,0 +1,159 @@
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.ViewModels.Export
+
+@if (IsVisible)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(4px); z-index: 1055;">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; font-family: 'Calibri', 'Segoe UI', sans-serif;">
+                <div class="modal-header border-bottom py-2 px-3 bg-light" style="border-radius: 12px 12px 0 0;">
+                    <h6 class="modal-title fw-bold mb-0 text-dark">
+                        <i class="fas fa-project-diagram text-primary me-2"></i>Select Customer &amp; Orders — Planning Report
+                    </h6>
+                    <button type="button" class="btn-close shadow-none" aria-label="Close" @onclick="Cancel"></button>
+                </div>
+
+                <div class="modal-body p-3">
+                    <div class="row g-2 mb-3 filter-row-stack">
+                        <div class="col-md-7">
+                            <label class="form-label small fw-bold mb-1">Customer <span class="text-danger">*</span></label>
+                            <BlazoredTypeahead TItem="CustomerLookupModel"
+                                               TValue="CustomerLookupModel"
+                                               SearchMethod="SearchCustomers"
+                                               Value="SelectedCustomer"
+                                               ValueChanged="OnCustomerChanged"
+                                               ValueExpression="@(() => SelectedCustomer)"
+                                               EnableDropDown="true"
+                                               ShowDropDownOnFocus="true"
+                                               MaximumSuggestions="1000"
+                                               Placeholder="Search customer...">
+                                <SelectedTemplate Context="c">
+                                    @(c != null ? $"{c.CustCode} — {c.Name}" : "")
+                                </SelectedTemplate>
+                                <ResultTemplate Context="c">
+                                    <span class="fw-semibold">@c.CustCode</span> — @c.Name
+                                </ResultTemplate>
+                            </BlazoredTypeahead>
+                        </div>
+
+                        <div class="col-md-5">
+                            <label class="form-label small fw-bold mb-1">Country <span class="text-danger">*</span></label>
+                            <select class="form-select form-select-sm" value="@SelectedCountry" @onchange="OnCountryChanged" disabled="@(!Countries.Any() || IsLoadingOrders)">
+                                @if (!Countries.Any())
+                                {
+                                    <option value="">-- Select Customer First --</option>
+                                }
+                                else
+                                {
+                                    @foreach (var country in Countries)
+                                    {
+                                        <option value="@country">@country</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="SelectAll" disabled="@(!FilteredOrders.Any() || IsLoadingOrders)">
+                                <i class="fas fa-check-square me-1"></i> Select All
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ClearAll" disabled="@(!SelectedOrderNos.Any() || IsLoadingOrders)">
+                                <i class="fas fa-square me-1"></i> Clear All
+                            </button>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                                Selected: @SelectedOrderNos.Count / @Orders.Count
+                            </span>
+                        </div>
+                        <div style="width: 220px;">
+                            <input type="text" class="form-control form-control-sm" placeholder="Filter Order # or Int. Ref..." @bind="OrderSearchText" @bind:event="oninput" />
+                        </div>
+                    </div>
+
+                    <div class="border rounded-3 table-container-stack" style="max-height: 320px; overflow-y: auto;">
+                        <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.86rem;">
+                            <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+                                <tr>
+                                    <th class="text-center" style="width: 40px;">
+                                        <input type="checkbox" class="form-check-input"
+                                               checked="@(FilteredOrders.Any() && FilteredOrders.All(o => SelectedOrderNos.Contains(o.OrderNo)))"
+                                               @onchange="ToggleSelectAllFiltered" />
+                                    </th>
+                                    <th>Order No</th>
+                                    <th>Internal Ref No.</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (IsLoadingOrders)
+                                {
+                                    <tr>
+                                        <td colspan="3" class="text-center py-4 text-muted">
+                                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                                            Loading unshipped orders...
+                                        </td>
+                                    </tr>
+                                }
+                                else if (!FilteredOrders.Any())
+                                {
+                                    <tr>
+                                        <td colspan="3" class="text-center py-4 text-muted">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            @(SelectedCustomer == null ? "Select a customer to view unshipped orders." : "No unshipped orders found for this customer and country.")
+                                        </td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    @foreach (var ord in FilteredOrders)
+                                    {
+                                        var current = ord;
+                                        bool isChecked = SelectedOrderNos.Contains(current.OrderNo);
+                                        <tr style="cursor: pointer;" @onclick="@(() => ToggleOrder(current.OrderNo, !isChecked))">
+                                            <td class="text-center" @onclick:stopPropagation="true">
+                                                <input type="checkbox" class="form-check-input"
+                                                       checked="@isChecked"
+                                                       @onchange="@((e) => ToggleOrder(current.OrderNo, e.Value is bool b && b))" />
+                                            </td>
+                                            <td class="fw-semibold text-primary">@current.OrderNo</td>
+                                            <td class="text-muted">@(string.IsNullOrWhiteSpace(current.InternalRefNo) ? "-" : current.InternalRefNo)</td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="modal-footer border-top py-2 px-3 bg-light" style="border-radius: 0 0 12px 12px;">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="Cancel">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary fw-semibold px-3" @onclick="Confirm" disabled="@IsLoadingOrders">
+                        <i class="fas fa-print me-1"></i> Generate Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .filter-row-stack {
+            position: relative !important;
+            z-index: 9999 !important;
+        }
+        .table-container-stack {
+            position: relative !important;
+            z-index: 1 !important;
+        }
+        ::deep .blazored-typeahead {
+            height: 35px !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
+        }
+        ::deep .blazored-typeahead__controls {
+            height: 35px !important;
+            min-height: 35px !important;
+        }
+    </style>
+}

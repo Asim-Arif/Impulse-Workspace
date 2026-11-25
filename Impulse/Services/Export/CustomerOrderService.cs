@@ -48,6 +48,8 @@ namespace Impulse.Services.Export
         public async Task<bool> UpdateOrderFinalStatusAsync(string orderNo, string custCode, string country, int cancelledStatus, string remarks, string userName, string machineName) =>
             await _dac.UpdateOrderFinalStatusAsync(orderNo, custCode, country, cancelledStatus, remarks, userName, machineName);
         public async Task<bool> DeleteOrderFinalStatusAsync(string orderNo) => await _dac.DeleteOrderFinalStatusAsync(orderNo);
+        public async Task<List<UnshippedOrderOptionModel>> GetUnshippedOrdersForCustomerAsync(string custCode, string country) =>
+            await _dac.GetUnshippedOrdersForCustomerAsync(custCode, country);
 
         public async Task<bool> ClearExcelImportTableAsync() => await _dac.ClearExcelImportTableAsync();
         public async Task<bool> InsertExcelImportRowAsync(string itemId, string itemName, decimal qty, string unit, decimal rate, decimal weight, string steelType, string udms) =>

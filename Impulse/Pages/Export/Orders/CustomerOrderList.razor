@@ -5,6 +5,7 @@
 @attribute [Authorize]
 @using DataAccessLibrary.Models.ViewModels.Export
 @using Impulse.Services
+@using Impulse.Components.Export
 @using Blazored.Typeahead
 @using BlazorContextMenu
 
@@ -536,6 +537,9 @@
     <Item class="win11-menu-item" OnClick="@(() => PrintOrderStatusLogReport(true))">
         <i class="fas fa-calendar-check fa-fw win11-icon"></i> Order Status Log (New/Extended)
     </Item>
+    <Item class="win11-menu-item" OnClick="@(() => OpenPlanningReportModal())">
+        <i class="fas fa-project-diagram fa-fw win11-icon text-primary"></i> Planning Report
+    </Item>
     <Item class="win11-menu-item" OnClick="@(() => PrintPlanningPurchaseLogReport())">
         <i class="fas fa-shopping-basket fa-fw win11-icon"></i> Planning Purchase Log Sheet
     </Item>
@@ -552,6 +556,7 @@
 
 <!-- ── Attachment Quick-Access Modal ── -->
 <AttachmentModal @ref="attachmentModalRef" />
+<CustomerOrdersSelectionModal @ref="planningOrdersModalRef" />
 
 <style>
     .clickable-row:hover {

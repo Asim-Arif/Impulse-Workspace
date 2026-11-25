@@ -31,117 +31,36 @@ namespace DataAccessLibrary.DAC.Production
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
 
-            // If a specific lot number is entered, it overrides all other filters (mirrors legacy txtLotNo override)
-            string whereClause;
+            DateTime dtFrom = f.DtFrom;
+            DateTime dtTo = f.DtTo;
+            if (f.DateRangeMode == 1) { dtFrom = DateTime.Today; dtTo = DateTime.Today.AddDays(15); }
+            else if (f.DateRangeMode == 2) { dtFrom = DateTime.Today; dtTo = DateTime.Today.AddDays(30); }
+            else if (f.DateRangeMode == 3) { dtFrom = DateTime.Today; dtTo = DateTime.Today.AddDays(45); }
+
             var p = new DynamicParameters();
+            p.Add("LotNo", string.IsNullOrWhiteSpace(f.LotNo) ? null : f.LotNo.Trim());
+            p.Add("DateRangeMode", f.DateRangeMode);
+            p.Add("DtFrom", f.DateRangeMode != 0 ? dtFrom : (DateTime?)null);
+            p.Add("DtTo", f.DateRangeMode != 0 ? dtTo : (DateTime?)null);
+            p.Add("CustCode", string.IsNullOrEmpty(f.CustCode) || f.CustCode == "0" ? null : f.CustCode);
+            p.Add("Country", string.IsNullOrEmpty(f.Country) || f.Country == "0" ? null : f.Country);
+            p.Add("GroupID", int.TryParse(f.ItemGroupId, out int gid) ? gid : 0);
+            p.Add("OrderNo", string.IsNullOrEmpty(f.OrderNo) || f.OrderNo == "0" ? null : f.OrderNo);
+            p.Add("ProcessID", int.TryParse(f.ProcessId, out int pid) ? pid : 0);
+            p.Add("VendID", int.TryParse(f.MakerId, out int vid) ? vid : 0);
+            p.Add("ItemCode", string.IsNullOrEmpty(f.ItemCode) || f.ItemCode == "0" ? null : f.ItemCode);
+            p.Add("ShowRepairLots", f.ShowRepairLots);
+            p.Add("ShowRegularLots", f.ShowRegularLots);
+            p.Add("ShowLotsOnly", f.ShowLotsOnly);
+            p.Add("ShowNotYetStarted", f.ShowNotYetStarted);
+            p.Add("Hub", string.IsNullOrEmpty(f.Hub) || f.Hub == "0" ? null : f.Hub);
 
-            if (!string.IsNullOrWhiteSpace(f.LotNo))
-            {
-                whereClause = "WHERE LotNo = @LotNo";
-                p.Add("LotNo", f.LotNo.Trim());
-            }
-            else
-            {
-                var sb = new StringBuilder("WHERE 1=1");
+            var results = await db.QueryAsync<ProductionItemListItem>(
+                "SP_GetProductionItemList",
+                p,
+                commandType: CommandType.StoredProcedure,
+                commandTimeout: 120);
 
-                // Date range (only applied when mode != 0 = All)
-                if (f.DateRangeMode != 0)
-                {
-                    DateTime dtFrom = f.DtFrom;
-                    DateTime dtTo = f.DtTo;
-                    if (f.DateRangeMode == 1) { dtFrom = DateTime.Today; dtTo = DateTime.Today.AddDays(15); }
-                    else if (f.DateRangeMode == 2) { dtFrom = DateTime.Today; dtTo = DateTime.Today.AddDays(30); }
-                    else if (f.DateRangeMode == 3) { dtFrom = DateTime.Today; dtTo = DateTime.Today.AddDays(45); }
-                    // mode 4 = Custom — use f.DtFrom / f.DtTo as-is
-
-                    sb.Append(" AND DT BETWEEN @DtFrom AND @DtTo");
-                    p.Add("DtFrom", dtFrom);
-                    p.Add("DtTo", dtTo);
-                }
-
-                // Customer
-                if (!string.IsNullOrEmpty(f.CustCode) && f.CustCode != "0")
-                {
-                    sb.Append(" AND CustCode = @CustCode");
-                    p.Add("CustCode", f.CustCode);
-                }
-
-                // Country
-                if (!string.IsNullOrEmpty(f.Country) && f.Country != "0")
-                {
-                    sb.Append(" AND Country = @Country");
-                    p.Add("Country", f.Country);
-                }
-
-                // Item Group
-                if (!string.IsNullOrEmpty(f.ItemGroupId) && f.ItemGroupId != "0")
-                {
-                    sb.Append(" AND GroupID = @GroupID");
-                    p.Add("GroupID", int.Parse(f.ItemGroupId));
-                }
-
-                // Order No
-                if (!string.IsNullOrEmpty(f.OrderNo) && f.OrderNo != "0")
-                {
-                    sb.Append(" AND OrderNo = @OrderNo");
-                    p.Add("OrderNo", f.OrderNo);
-                }
-
-                // Process
-                if (!string.IsNullOrEmpty(f.ProcessId) && f.ProcessId != "0")
-                {
-                    sb.Append(" AND ProcessID = @ProcessID");
-                    p.Add("ProcessID", int.Parse(f.ProcessId));
-                }
-
-                // Maker (VendID)
-                if (!string.IsNullOrEmpty(f.MakerId) && f.MakerId != "0")
-                {
-                    sb.Append(" AND VendID = @VendID");
-                    p.Add("VendID", int.Parse(f.MakerId));
-                }
-
-                // Item Code
-                if (!string.IsNullOrEmpty(f.ItemCode) && f.ItemCode != "0")
-                {
-                    sb.Append(" AND ItemCode = @ItemCode");
-                    p.Add("ItemCode", f.ItemCode);
-                }
-
-                // Repair Lots toggle (ReWorkLot=1 means repair)
-                if (!f.ShowRepairLots)
-                    sb.Append(" AND ReWorkLot = 0");
-                if (!f.ShowRegularLots)
-                    sb.Append(" AND ReWorkLot = 1");
-
-                // Lots Only vs Not Yet Started logic (EntryType=0 means lot, EntryType=1 means not-yet-started order item)
-                if (f.ShowLotsOnly && f.ShowNotYetStarted)
-                {
-                    sb.Append(" AND ((EntryType <> 0 AND ISNULL(DispatchQty, 0) < OrderQty) OR EntryType <> 1)");
-                }
-                else
-                {
-                    if (!f.ShowLotsOnly)
-                        sb.Append(" AND (EntryType <> 0 AND ISNULL(DispatchQty, 0) < OrderQty)");
-                    if (!f.ShowNotYetStarted)
-                        sb.Append(" AND EntryType <> 1");
-                }
-
-                // Hub
-                if (!string.IsNullOrEmpty(f.Hub) && f.Hub != "0")
-                {
-                    sb.Append(" AND Hub_Name = @Hub");
-                    p.Add("Hub", f.Hub);
-                }
-
-                // Always filter out zero-qty rows
-                sb.Append(" AND Qty > 0");
-
-                whereClause = sb.ToString();
-            }
-
-            string sql = $"SELECT * FROM VRunningLots_POI WITH (NOLOCK) {whereClause} ORDER BY StartDT DESC";
-            var results = await db.QueryAsync<ProductionItemListItem>(sql, p, commandTimeout: 120);
             return results.ToList();
         }
 
@@ -215,7 +134,7 @@ namespace DataAccessLibrary.DAC.Production
         public async Task<List<LookupItemString>> GetItemsAsync()
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
-            const string sql = "SELECT ItemID AS Id, ItemID + ' ' + ItemName AS Name FROM VItems ORDER BY ItemID";
+            const string sql = "SELECT ItemID AS Id, ItemID + ' ' + ItemName AS Name FROM Items ORDER BY ItemID";
             return (await db.QueryAsync<LookupItemString>(sql)).ToList();
         }
 

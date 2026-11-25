@@ -260,6 +260,11 @@ namespace Impulse.Services.Setup
             ["PrdAuthorizeReceived"] = new[] { "PrdAuthReceived", "AuthorizeReceived" },
             ["AuthorizeReceived"] = new[] { "PrdAuthReceived", "PrdAuthorizeReceived" },
 
+            ["PrdAuthRejection"] = new[] { "PrdAuthorizeRejection", "AuthRejection", "RejectionAuthorization" },
+            ["PrdAuthorizeRejection"] = new[] { "PrdAuthRejection", "AuthRejection", "RejectionAuthorization" },
+            ["AuthRejection"] = new[] { "PrdAuthRejection", "PrdAuthorizeRejection", "RejectionAuthorization" },
+            ["RejectionAuthorization"] = new[] { "PrdAuthRejection", "PrdAuthorizeRejection", "AuthRejection" },
+
             ["PrdMakerIssuanceSF"] = new[] { "PrdMakerIssuanceFromSF", "MakerIssuanceFromSF" },
             ["PrdMakerIssuanceFromSF"] = new[] { "PrdMakerIssuanceSF", "MakerIssuanceFromSF" },
             ["MakerIssuanceFromSF"] = new[] { "PrdMakerIssuanceSF", "PrdMakerIssuanceFromSF" },
@@ -481,6 +486,10 @@ namespace Impulse.Services.Setup
             ["PayAttendanceMonthly"] = new[] { "PrlEditAttendance", "PrlMonthlyAttendance", "TakeAttendance" },
             ["PrlEditAttendance"] = new[] { "PayAttendanceMonthly" },
             ["PrlMonthlyAttendance"] = new[] { "PayAttendanceMonthly" },
+
+            ["PrlAttendanceApproval"] = new[] { "PayAttendanceApproval", "AttendanceApproval" },
+            ["PayAttendanceApproval"] = new[] { "PrlAttendanceApproval" },
+            ["AttendanceApproval"] = new[] { "PrlAttendanceApproval" },
 
             // ==========================================
             // Gate Management Aliases
@@ -900,13 +909,14 @@ namespace Impulse.Services.Setup
             ["payroll/policies"] = ("Payroll", "PrlPayrollPolicies"),
             ["payroll/post-fine"] = ("Payroll", "PayPostFine"),
             ["payroll/reports"] = ("Payroll", "PayReports"),
-            ["payroll/attendance-approval"] = ("Payroll", "PayAttendanceMonthly"),
+            ["payroll/attendance-approval"] = ("Payroll", "PrlAttendanceApproval"),
             ["payroll/salary-history"] = ("Payroll", "PaySalaryCalculation"),
             ["payroll/salary-sheet"] = ("Payroll", "PaySalarySheet"),
             ["payroll/settings"] = ("Payroll", "PaySettings"),
             ["payroll/short-term-sheet"] = ("Payroll", "PayAdvances"),
             ["payroll/social-security"] = ("Payroll", "PrlSocialSecurity"),
             ["production/authorize-received"] = ("Production", "PrdAuthReceived"),
+            ["production/auth-rejection"] = ("Production", "PrdAuthRejection"),
             ["production/create-dispatch-list"] = ("Production", "PrdCreateDispatchList"),
             ["production/customer-order-list"] = ("Production", "PrdCustOrderList"),
             ["production/dispatch-list"] = ("Production", "PrdDispatchList"),
@@ -1210,6 +1220,7 @@ namespace Impulse.Services.Setup
                 new() { OptionID = "PrdMakerPOList", OptionName = "Issuance List", ModuleName = "Production" },
                 new() { OptionID = "PrdReWorkIssuance", OptionName = "Re-Work Issuance", ModuleName = "Production" },
                 new() { OptionID = "PrdAuthorizeReceived", OptionName = "Authorize Received Lots", ModuleName = "Production" },
+                new() { OptionID = "PrdAuthRejection", OptionName = "Auth. Rejection", ModuleName = "Production" },
                 new() { OptionID = "PrdMakerIssuanceFromSF", OptionName = "Maker Issuance From SF", ModuleName = "Production" },
                 new() { OptionID = "PrdMakerItemAssignment", OptionName = "Maker Item Assignment", ModuleName = "Production" },
                 new() { OptionID = "PrdNewMaker", OptionName = "New Maker Setup", ModuleName = "Production" },
@@ -1296,6 +1307,7 @@ namespace Impulse.Services.Setup
                 new() { OptionID = "PayAttendanceAuto", OptionName = "Auto Attendance", ModuleName = "Payroll" },
                 new() { OptionID = "PayDailyActivity", OptionName = "Daily Activity", ModuleName = "Payroll" },
                 new() { OptionID = "PrlMonthlyAttendance", OptionName = "Monthly Attendance Processing", ModuleName = "Payroll" },
+                new() { OptionID = "PrlAttendanceApproval", OptionName = "Attendance Approvals", ModuleName = "Payroll" },
                 new() { OptionID = "PrlSalarySheet", OptionName = "Monthly Salary Sheet", ModuleName = "Payroll" },
                 new() { OptionID = "PrlSalaryHistory", OptionName = "Salary History Ledger", ModuleName = "Payroll" },
                 new() { OptionID = "PrlEmployeeLeave", OptionName = "Employee Leave Management", ModuleName = "Payroll" },

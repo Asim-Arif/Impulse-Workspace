@@ -203,15 +203,6 @@ namespace Impulse.Pages.Production.LotIssuance
             if (SelectedMaker == null || !StagedItems.Any())
                 return;
 
-            if (IsFactoryMaker)
-            {
-                foreach (var item in StagedItems)
-                {
-                    item.Rate = 0m;
-                }
-                return;
-            }
-
             foreach (var item in StagedItems)
             {
                 int procId = item.TargetProcessID > 0 ? item.TargetProcessID : SelectedProcessID;

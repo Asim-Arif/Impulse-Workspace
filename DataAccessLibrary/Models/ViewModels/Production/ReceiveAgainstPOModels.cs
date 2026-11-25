@@ -33,8 +33,14 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public decimal IssQty { get; set; }
         public decimal PrevRcvdQty { get; set; }
         public decimal PendingQty => IssQty - PrevRcvdQty;
+        public bool IsFullyReceived => PrevRcvdQty >= IssQty;
         public decimal GetMaxAllowedQty(float excessQtyPercentage)
         {
+            if (IsFullyReceived)
+            {
+                return 0;
+            }
+
             decimal excessTolerance = 1m + ((decimal)excessQtyPercentage / 100m);
             decimal maxAllowed = (IssQty * excessTolerance) - PrevRcvdQty;
             return maxAllowed > 0 ? maxAllowed : 0;

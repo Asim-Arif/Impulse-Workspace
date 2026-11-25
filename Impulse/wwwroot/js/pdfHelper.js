@@ -89,6 +89,29 @@ window.openReportViewer = (base64, request) => {
             opacity: 0.7;
             cursor: wait;
         }
+        .btn-export-excel-data {
+            background-color: #0d9488;
+            color: #ffffff;
+            border: none;
+            padding: 6px 13px;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-export-excel-data:hover:not(:disabled) {
+            background-color: #0f766e;
+            transform: translateY(-1px);
+            color: #ffffff;
+        }
+        .btn-export-excel-data:disabled {
+            opacity: 0.7;
+            cursor: wait;
+        }
         .btn-export-word {
             background-color: #185abd;
             color: #ffffff;
@@ -190,9 +213,13 @@ window.openReportViewer = (base64, request) => {
         </div>
 
         <div class="d-flex align-items-center gap-2">
-            <button id="btnExcel" class="btn-export-excel" onclick="triggerExport('excel')" title="Export to Microsoft Excel (.xlsx)">
+            <button id="btnExcel" class="btn-export-excel" onclick="triggerExport('excel')" title="Export to Microsoft Excel (.xls)">
                 <i class="fas fa-file-excel"></i>
                 <span>Export to Excel</span>
+            </button>
+            <button id="btnExcelData" class="btn-export-excel-data" onclick="triggerExport('excel-data')" title="Export to Excel Data-Only (.xlsx) — flat rows for sorting &amp; filtering">
+                <i class="fas fa-table"></i>
+                <span>Excel (Data)</span>
             </button>
             <button id="btnWord" class="btn-export-word" onclick="triggerExport('word')" title="Export to Microsoft Word (.docx)">
                 <i class="fas fa-file-word"></i>
@@ -241,11 +268,13 @@ window.openReportViewer = (base64, request) => {
         }
 
         async function triggerExport(format) {
+            const isExcelData = (format === 'excel-data');
             const isExcel = (format === 'excel' || format === 'xlsx');
-            const btn = document.getElementById(isExcel ? 'btnExcel' : 'btnWord');
+            const btn = document.getElementById(isExcelData ? 'btnExcelData' : (isExcel ? 'btnExcel' : 'btnWord'));
+            const label = isExcelData ? 'Excel (Data)' : (isExcel ? 'Excel' : 'Word');
             const originalHtml = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = '<i class=\"fas fa-spinner fa-spin\"></i> <span>Generating ' + (isExcel ? 'Excel' : 'Word') + '...</span>';
+            btn.innerHTML = '<i class=\"fas fa-spinner fa-spin\"></i> <span>Generating ' + label + '...</span>';
 
             try {
                 const reqBody = {
@@ -269,7 +298,7 @@ window.openReportViewer = (base64, request) => {
                 }
 
                 const blob = await response.blob();
-                const ext = isExcel ? '.xlsx' : '.doc';
+                const ext = isExcelData ? '.xlsx' : (isExcel ? '.xls' : '.doc');
                 let downloadFileName = baseFileName + ext;
                 const disposition = response.headers.get('content-disposition');
                 if (disposition && disposition.indexOf('filename=') !== -1) {

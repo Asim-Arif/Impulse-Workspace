@@ -811,5 +811,18 @@ namespace DataAccessLibrary.DAC.Export
             await db.ExecuteAsync(sql, new { OrderNo = orderNo });
             return true;
         }
+
+        public async Task<List<UnshippedOrderOptionModel>> GetUnshippedOrdersForCustomerAsync(string custCode, string country)
+        {
+            using IDbConnection db = new SqlConnection(_connectionString);
+            const string sql = @"
+                SELECT OrderNo, ISNULL(InternalRefNo, '') AS InternalRefNo
+                FROM FCustomerOrders
+                WHERE CustCode = @CustCode
+                  AND Country = @Country
+                  AND OrderNo IN (SELECT OrderNo FROM VUnshippedOrderList)
+                ORDER BY DT DESC, OrderNo DESC";
+            return (await db.QueryAsync<UnshippedOrderOptionModel>(sql, new { CustCode = custCode, Country = country })).ToList();
+        }
     }
 }

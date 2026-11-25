@@ -1,0 +1,190 @@
+@using DataAccessLibrary.Models.ViewModels.Production
+
+<div class="table-responsive rounded-3 shadow-sm border" style="position: relative !important; z-index: 1 !important; max-height: 55vh;">
+    <table class="table table-hover table-sm align-middle mb-0" style="font-size: 0.88rem;">
+        <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
+            <tr>
+                <th class="text-center" style="width: 38px;">
+                    <input type="checkbox" class="form-check-input"
+                           checked="@(Items.Any() && CheckedIds.Count == Items.Count)"
+                           @onchange="OnToggleAll" />
+                </th>
+                <th style="width: 45px;">S. #</th>
+                <th>PO #</th>
+                <th>Date</th>
+                <th>Item ID</th>
+                <th>Item Name</th>
+                <th>Process</th>
+                <th class="text-center">Qty</th>
+                <th class="text-center" style="width: 130px; min-width: 130px; max-width: 130px;">Rate</th>
+                <th class="text-end">Wastage Amt</th>
+                <th>Lot No.</th>
+                <th class="text-center">Lot Qty</th>
+                <th>Maker</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (IsLoading)
+            {
+                <tr>
+                    <td colspan="13" class="text-center py-4 text-muted">
+                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                        Loading pending rejections...
+                    </td>
+                </tr>
+            }
+            else if (!Items.Any())
+            {
+                <tr>
+                    <td colspan="13" class="text-center py-4 text-muted">
+                        <i class="fas fa-check-circle text-success me-1"></i> No pending rejection entries found for the selected filters.
+                    </td>
+                </tr>
+            }
+            else
+            {
+                int rowNo = 1;
+                @foreach (var item in Items)
+                {
+                    var current = item;
+                    bool isChecked = CheckedIds.Contains(current.EntryID);
+                    string rowColorClass = current.FromVendID == FactoryMakerId ? "text-danger" : "text-primary";
+
+                    <tr class="@rowColorClass">
+                        <td class="text-center">
+                            <input type="checkbox" class="form-check-input"
+                                   checked="@isChecked"
+                                   @onchange="@((e) => OnToggleCheck.InvokeAsync((current.EntryID, e.Value is bool b && b)))" />
+                        </td>
+                        <td class="text-muted">@(rowNo++)</td>
+                        <td class="fw-semibold">@current.RecieptID</td>
+                        <td>@(current.DT?.ToString("dd-MMM-yyyy") ?? "-")</td>
+                        <td class="font-monospace">@current.ItemCode</td>
+                        <td>@current.ItemName</td>
+                        <td>@current.Description</td>
+                        <td class="text-center fw-semibold">@current.Qty.ToString("N0")</td>
+                        <td class="text-center" style="width: 130px; max-width: 130px;">
+                            @if (EditingEntryId == current.EntryID)
+                            {
+                                <div class="d-inline-flex align-items-center justify-content-center gap-1" style="width: 120px;">
+                                    <input type="number" class="form-control form-control-sm text-center"
+                                           style="width: 66px !important; flex: 0 0 66px !important; min-width: 0 !important; padding: 2px 4px !important; height: 26px !important; font-size: 0.84rem !important;"
+                                           @bind="EditingRate"
+                                           @onkeydown="@(e => HandleRateKeyDown(e, current.EntryID))" />
+                                    <button type="button" class="btn btn-sm btn-success px-1 py-0" style="height: 26px; line-height: 1;" title="Save Rate" @onclick="@(() => SaveRate(current.EntryID))">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary px-1 py-0" style="height: 26px; line-height: 1;" title="Cancel" @onclick="CancelEditRate">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="d-inline-flex align-items-center gap-1" style="cursor: pointer;" title="Click to edit rate"
+                                      @onclick="@(() => StartEditRate(current))">
+                                    <span>@current.Rate.ToString("N0")</span>
+                                    <i class="fas fa-pencil-alt text-muted" style="font-size: 0.7rem;"></i>
+                                </span>
+                            }
+                        </td>
+                        <td class="text-end fw-bold">@current.WastageAmt.ToString("N0")</td>
+                        <td class="font-monospace">@current.LotNo</td>
+                        <td class="text-center">@current.RcvdQty.ToString("N0")</td>
+                        <td>@current.VenderName</td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="OnSelectAll" disabled="@(IsLoading || IsProcessing || !Items.Any())">
+            <i class="fas fa-check-square me-1"></i> Select All
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="OnClearAll" disabled="@(IsLoading || IsProcessing || !CheckedIds.Any())">
+            <i class="fas fa-square me-1"></i> Clear All
+        </button>
+        <button type="button" class="btn btn-sm btn-success fw-semibold px-3" @onclick="OnDeductSelected" disabled="@(IsLoading || IsProcessing || !CheckedIds.Any())">
+            <i class="fas fa-check me-1"></i> Deduct
+        </button>
+        <button type="button" class="btn btn-sm btn-warning fw-semibold px-3" @onclick="OnIgnoreSelected" disabled="@(IsLoading || IsProcessing || !CheckedIds.Any())">
+            <i class="fas fa-ban me-1"></i> Ignore
+        </button>
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-light text-dark border px-3 py-2" style="font-size: 0.85rem;">
+            Selected: <strong>@CheckedIds.Count</strong> / @Items.Count
+        </span>
+        <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-2" style="font-size: 0.85rem;">
+            Selected Amount: <strong>@SelectedTotalAmount.ToString("N0")</strong>
+        </span>
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<RejectionAuthItemModel> Items { get; set; } = new();
+    [Parameter] public HashSet<int> CheckedIds { get; set; } = new();
+    [Parameter] public int FactoryMakerId { get; set; }
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public bool IsProcessing { get; set; }
+    [Parameter] public EventCallback OnSelectAll { get; set; }
+    [Parameter] public EventCallback OnClearAll { get; set; }
+    [Parameter] public EventCallback<(int EntryId, bool IsChecked)> OnToggleCheck { get; set; }
+    [Parameter] public EventCallback OnDeductSelected { get; set; }
+    [Parameter] public EventCallback OnIgnoreSelected { get; set; }
+    [Parameter] public EventCallback<(int EntryId, int NewRate)> OnRateUpdated { get; set; }
+
+    private int? EditingEntryId { get; set; }
+    private int EditingRate { get; set; }
+
+    private decimal SelectedTotalAmount => Items
+        .Where(i => CheckedIds.Contains(i.EntryID))
+        .Sum(i => i.WastageAmt);
+
+    private async Task OnToggleAll(ChangeEventArgs e)
+    {
+        bool isChecked = e.Value is bool b && b;
+        if (isChecked)
+        {
+            await OnSelectAll.InvokeAsync();
+        }
+        else
+        {
+            await OnClearAll.InvokeAsync();
+        }
+    }
+
+    private void StartEditRate(RejectionAuthItemModel item)
+    {
+        EditingEntryId = item.EntryID;
+        EditingRate = item.Rate;
+    }
+
+    private void CancelEditRate()
+    {
+        EditingEntryId = null;
+    }
+
+    private async Task SaveRate(int entryId)
+    {
+        int newRate = EditingRate;
+        EditingEntryId = null;
+        await OnRateUpdated.InvokeAsync((entryId, newRate));
+    }
+
+    private async Task HandleRateKeyDown(KeyboardEventArgs e, int entryId)
+    {
+        if (e.Key == "Enter")
+        {
+            await SaveRate(entryId);
+        }
+        else if (e.Key == "Escape")
+        {
+            CancelEditRate();
+        }
+    }
+}

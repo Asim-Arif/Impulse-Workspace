@@ -1621,7 +1621,6 @@ namespace Impulse.Pages.Production.ReceivingList
 
         public async Task PrintRejectionReportDetailChargeTo(ItemClickEventArgs args)
         {
-            ResolveRowItem(args);
             string dateRangeStr = $"{Filter.DtFrom:dd-MMM-yyyy} to {Filter.DtTo:dd-MMM-yyyy}";
 
             var conditions = new List<string>
@@ -1629,10 +1628,10 @@ namespace Impulse.Pages.Production.ReceivingList
                 $"{{VMakerRepair.DT}} in Date({Filter.DtFrom.Year}, {Filter.DtFrom.Month}, {Filter.DtFrom.Day}) to Date({Filter.DtTo.Year}, {Filter.DtTo.Month}, {Filter.DtTo.Day})"
             };
 
-            int vendId = SelectedItem?.VendID ?? (Filter.MakerIds?.FirstOrDefault() ?? 0);
-            if (vendId > 0)
+            var selectedMakerIds = Filter.MakerIds?.Where(id => id > 0).Distinct().ToList();
+            if (selectedMakerIds != null && selectedMakerIds.Any())
             {
-                conditions.Add($"{{VMakerRepair.VendID}} = {vendId}");
+                conditions.Add($"{{VMakerRepair.VendID}} in [{string.Join(",", selectedMakerIds)}]");
             }
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
@@ -1706,6 +1705,8 @@ namespace Impulse.Pages.Production.ReceivingList
             if (Filter.RepairLots) parts.Add("Repair Lots");
             if (Filter.RejectionLots) parts.Add("Rejection Lots");
             if (Filter.PendingFinalTransferOnly) parts.Add("Pending (Dispatch/Trf)");
+            if (Filter.BilledOnly) parts.Add("Billed Entries");
+            if (Filter.NonBilledOnly) parts.Add("Non-Billed Entries");
 
             return string.Join(" | ", parts);
         }
@@ -1799,7 +1800,7 @@ namespace Impulse.Pages.Production.ReceivingList
             }
             else if (Filter.RepairLots)
             {
-                conditions.Add("{VVendReceivingList.ReWorkQty} > 0");
+                conditions.Add("({VVendReceivingList.ReWorkQty} > 0 or {VVendReceivingList.ReWorkLot} = true)");
             }
             else if (Filter.RejectionLots)
             {
@@ -1810,6 +1811,51 @@ namespace Impulse.Pages.Production.ReceivingList
             if (Filter.PendingFinalTransferOnly)
             {
                 conditions.Add("(isnull({VVendReceivingList.NextProcessID}) or {VVendReceivingList.NextProcessID} = 0) and {VVendReceivingList.IsLotClosed} = false and (({VVendReceivingList.RcvdQty} - (if isnull({VVendReceivingList.Wastage}) then 0 else {VVendReceivingList.Wastage}) - (if isnull({VVendReceivingList.LostQty}) then 0 else {VVendReceivingList.LostQty})) > ({VVendReceivingList.DispatchQty} + {VVendReceivingList.StoreTransferQty}))");
+            }
+
+            // 9. Item Group
+            if (Filter.ItemGroupIds != null && Filter.ItemGroupIds.Any())
+            {
+                conditions.Add($"{{VVendReceivingList.GroupID}} in [{string.Join(",", Filter.ItemGroupIds)}]");
+            }
+
+            // 10. Order No
+            if (!string.IsNullOrWhiteSpace(Filter.OrderNo))
+            {
+                conditions.Add($"{{VVendReceivingList.OrderNo}} = '{Filter.OrderNo.Trim().Replace("'", "''")}'");
+            }
+
+            // 11. Master PO No / Show Master PO Only
+            if (!string.IsNullOrWhiteSpace(Filter.MasterPONo))
+            {
+                conditions.Add($"{{VVendReceivingList.MasterPONo}} = '{Filter.MasterPONo.Trim().Replace("'", "''")}'");
+            }
+            if (Filter.ShowMasterPOOnly)
+            {
+                conditions.Add("not IsNull({VVendReceivingList.MasterPONo}) and {VVendReceivingList.MasterPONo} <> ''");
+            }
+
+            // 12. Regular Lots Only
+            if (Filter.RegularLotsOnly)
+            {
+                conditions.Add("(IsNull({VVendReceivingList.ReWorkLot}) or {VVendReceivingList.ReWorkLot} = false)");
+            }
+
+            // 13. In-Active Days
+            if (int.TryParse(Filter.InActiveDays, out int inActiveDays) && inActiveDays > 0)
+            {
+                DateTime inActiveDate = now.AddDays(-inActiveDays);
+                conditions.Add($"({{VVendReceivingList.LotNo}} <> '0' and {{VVendReceivingList.OnlyDT}} <= Date({inActiveDate.Year}, {inActiveDate.Month}, {inActiveDate.Day}) and {{VVendReceivingList.IssQty}} = 0)");
+            }
+
+            // 14. Billed / Non-Billed
+            if (Filter.BilledOnly)
+            {
+                conditions.Add("(not IsNull({VVendReceivingList.MPB_D_EntryID}) and {VVendReceivingList.MPB_D_EntryID} > 0)");
+            }
+            else if (Filter.NonBilledOnly)
+            {
+                conditions.Add("(IsNull({VVendReceivingList.MPB_D_EntryID}) or {VVendReceivingList.MPB_D_EntryID} = 0)");
             }
 
             return conditions.Any() ? string.Join(" and ", conditions) : string.Empty;

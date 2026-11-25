@@ -1,0 +1,92 @@
+@namespace Impulse.Shared.Components
+
+@if (IsVisible)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0, 0, 0, 0.5); z-index: 1050; font-family: 'Calibri', 'Segoe UI', sans-serif;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; overflow: hidden;">
+                <div class="modal-header bg-primary text-white py-2 px-3 d-flex align-items-center justify-content-between">
+                    <h6 class="modal-title fw-bold mb-0">
+                        <i class="fas fa-warehouse me-2"></i>@Title
+                    </h6>
+                    <button type="button" class="btn-close btn-close-white" @onclick="Cancel" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body p-3">
+                    <div class="mb-2">
+                        <input type="text"
+                               class="form-control form-control-sm"
+                               placeholder="Search stores..."
+                               @bind="SearchText"
+                               @bind:event="oninput" />
+                    </div>
+
+                    <div class="border rounded p-2 bg-light-subtle mb-2" style="max-height: 360px; overflow-y: auto;">
+                        <div class="form-check py-1 border-bottom mb-1">
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   id="chkAllStoresOption"
+                                   checked="@SelectAllStores"
+                                   @onchange="OnAllStoresChanged" />
+                            <label class="form-check-label fw-bold text-primary" for="chkAllStoresOption" style="font-size: 0.88rem;">
+                                &lt;All Stores&gt;
+                            </label>
+                        </div>
+
+                        @if (IsLoadingStores)
+                        {
+                            <div class="text-center py-3 text-muted small">
+                                <span class="spinner-border spinner-border-sm me-1"></span> Loading stores...
+                            </div>
+                        }
+                        else if (!FilteredStores.Any())
+                        {
+                            <div class="text-center py-3 text-muted small">No matching stores found.</div>
+                        }
+                        else
+                        {
+                            @foreach (var store in FilteredStores)
+                            {
+                                var isChecked = SelectedIds.Contains(store.EntryID);
+                                var inputId = $"chkStore_{store.EntryID}";
+                                <div class="form-check py-1">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           id="@inputId"
+                                           checked="@isChecked"
+                                           @onchange="e => OnStoreCheckedChanged(store.EntryID, e)" />
+                                    <label class="form-check-label" for="@inputId" style="font-size: 0.86rem;">
+                                        @store.StoreName
+                                    </label>
+                                </div>
+                            }
+                        }
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="CheckAll">
+                                <i class="fas fa-check-double me-1"></i> Check All
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="UncheckAll">
+                                <i class="fas fa-square me-1"></i> Uncheck All
+                            </button>
+                        </div>
+                        <small class="text-muted">
+                            @(SelectAllStores ? "All Stores selected" : $"{SelectedIds.Count} store(s) selected")
+                        </small>
+                    </div>
+                </div>
+
+                <div class="modal-footer border-top py-2 px-3 bg-light d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" @onclick="Cancel">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm px-3 fw-bold" @onclick="Submit">
+                        <i class="fas fa-print me-1"></i> Print Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

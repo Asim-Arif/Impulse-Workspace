@@ -74,21 +74,15 @@ namespace Impulse.Pages.Accounts
 
         private async Task PrintCashBookReport()
         {
-            string reportName = "TransRptCashnBank.rpt"; 
-            
-            var formulaValues = new Dictionary<string, object>
-            {
-                { "Company", "'CurrentCompany'" },
-                { "FromTo", $"'{DTFrom:dd-MMM-yyyy} To {DTTo:dd-MMM-yyyy}'" },
-                { "DTFrom", $"#{DTFrom:yyyy-MM-dd}#" },
-                { "DTTo", $"#{DTTo:yyyy-MM-dd}#" }
-            };
-
             var request = new ReportRequest
             {
-                ReportName = reportName,
-                SelectionFormula = "", 
-                FormulaValues = formulaValues
+                ReportName = "CashBookReport.rpt",
+                SelectionFormula = string.Empty,
+                Parameters = new Dictionary<string, object>
+                {
+                    { "@DTFrom", DTFrom },
+                    { "@DTTo", DTTo }
+                }
             };
 
             await ReportNavigationService.PrintReportAsync(request);

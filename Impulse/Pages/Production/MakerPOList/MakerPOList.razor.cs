@@ -1600,6 +1600,46 @@ namespace Impulse.Pages.Production.MakerPOList
             });
         }
 
+        public async Task PrintSelectedList(ItemClickEventArgs args)
+        {
+            var selectedIds = FilteredItems
+                .Where(i => CheckedIds.Contains(i.EntryID))
+                .Select(i => i.EntryID)
+                .Distinct()
+                .ToList();
+
+            if (!selectedIds.Any())
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "No Rows Selected",
+                    Detail = "Please tick at least one checkbox to print.",
+                    Duration = 3000
+                });
+                return;
+            }
+
+            string filtersStr = BuildFiltersString();
+            filtersStr = string.IsNullOrWhiteSpace(filtersStr)
+                ? $"Selected Only ({selectedIds.Count})"
+                : $"{filtersStr} | Selected Only ({selectedIds.Count})";
+
+            BuildSelectionFormula(out string dateRangeStr);
+            string selectionFormula = $"{{VVendIssued.EntryID}} in [{string.Join(",", selectedIds)}]";
+
+            await ReportNavigationService.PrintReportAsync(new ReportRequest
+            {
+                ReportName = "IssuanceList_Selected.rpt",
+                SelectionFormula = selectionFormula,
+                FormulaValues = new Dictionary<string, object>
+                {
+                    { "Filters", $"'{filtersStr.Replace("'", "''")}'" },
+                    { "DateRange", $"'{dateRangeStr}'" }
+                }
+            });
+        }
+
         public async Task PrintBatchWiseList(ItemClickEventArgs args)
         {
             string filtersStr = BuildFiltersString();
@@ -1647,6 +1687,48 @@ namespace Impulse.Pages.Production.MakerPOList
                 FormulaValues = new Dictionary<string, object>
                 {
                     { "Filters", $"'{filtersStr.Replace("'", "''")}'" },
+                    { "DateRange", $"'{dateRangeStr}'" }
+                }
+            });
+        }
+
+        public async Task PrintMakerPerformanceReport(ItemClickEventArgs args)
+        {
+            DateTime now = DateTime.Today;
+            DateTime dtFrom = Filter.DtFrom;
+            DateTime dtTo = Filter.DtTo;
+
+            switch (Filter.DateRangeIndex)
+            {
+                case 0: dtFrom = now; dtTo = now; break;
+                case 1: dtFrom = now.AddDays(-15); dtTo = now; break;
+                case 2: dtFrom = now.AddDays(-30); dtTo = now; break;
+                case 3: dtFrom = now.AddDays(-60); dtTo = now; break;
+                case 4: dtFrom = now.AddDays(-90); dtTo = now; break;
+                case 5:
+                    dtFrom = Filter.DtFrom;
+                    dtTo = Filter.DtTo;
+                    break;
+            }
+
+            string dateRangeStr = $"{dtFrom:dd-MMM-yyyy} to {dtTo:dd-MMM-yyyy}";
+            var conditions = new List<string>
+            {
+                $"{{VendIssued.DT}} in Date({dtFrom.Year}, {dtFrom.Month}, {dtFrom.Day}) to Date({dtTo.Year}, {dtTo.Month}, {dtTo.Day})"
+            };
+
+            var selectedMakerIds = Filter.MakerIds?.Where(id => id > 0).Distinct().ToList();
+            if (selectedMakerIds != null && selectedMakerIds.Any())
+            {
+                conditions.Add($"{{VendIssued.VendID}} in [{string.Join(",", selectedMakerIds)}]");
+            }
+
+            await ReportNavigationService.PrintReportAsync(new ReportRequest
+            {
+                ReportName = "Maker_Performance_Report.rpt",
+                SelectionFormula = string.Join(" AND ", conditions),
+                FormulaValues = new Dictionary<string, object>
+                {
                     { "DateRange", $"'{dateRangeStr}'" }
                 }
             });

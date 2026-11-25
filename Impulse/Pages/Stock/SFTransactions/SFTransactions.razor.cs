@@ -3,6 +3,7 @@ using DataAccessLibrary.Models.ViewModels.Company;
 using DataAccessLibrary.Models.ViewModels.Stock;
 using Impulse.Constants;
 using Impulse.Services;
+using Impulse.Shared.Components;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using System;
@@ -36,6 +37,7 @@ namespace Impulse.Pages.Stock.SFTransactions
         private int SelectedProcessId { get; set; } = 0;
 
         private List<SFTransactionModel> Transactions = new();
+        private StoreSelectionModal? storeSelectionModal;
 
         protected override async Task OnInitializedAsync()
         {
@@ -197,19 +199,28 @@ namespace Impulse.Pages.Stock.SFTransactions
             }
         }
 
-        private async Task PrintLocationWiseReport()
+        private async Task PrintShelfWiseReportAsync(string reportName, string modalTitle)
         {
             try
             {
-                string formula = "{VItemsWithShelfWiseStock.Qty} > 0";
+                if (storeSelectionModal == null) return;
+                var result = await storeSelectionModal.ShowAsync(modalTitle);
+                if (!result.Confirmed) return;
+
+                string formula = "{VItemsWithShelfWiseStock.Qty}>0";
+                if (!result.AllStores && result.SelectedStoreIds.Any())
+                {
+                    string strStoreIDs = string.Join(",", result.SelectedStoreIds);
+                    formula += $" AND {{VStoreShelfs.Store_RefID}} IN[{strStoreIDs}]";
+                }
                 if (SelectedArticle != null && SelectedArticle.ItemID != "0")
                 {
-                    formula += $" and {{VItems.ItemID}} = '{SelectedArticle.ItemID}'";
+                    formula += $" AND {{VItems.ItemID}}='{SelectedArticle.ItemID}'";
                 }
 
                 var req = new ReportRequest
                 {
-                    ReportName = ReportNames.Stock.BinWiseSFStockStatus,
+                    ReportName = reportName,
                     SelectionFormula = formula
                 };
 
@@ -220,30 +231,12 @@ namespace Impulse.Pages.Stock.SFTransactions
                 NotificationService.ShowError("Report Error", ex.Message);
             }
         }
+
+        private async Task PrintLocationWiseReport()
+            => await PrintShelfWiseReportAsync(ReportNames.Stock.BinWiseSFStockStatus, "Select Stores — Location Wise Stock");
 
         private async Task PrintRackWiseReport()
-        {
-            try
-            {
-                string formula = "{VItemsWithShelfWiseStock.Qty} > 0";
-                if (SelectedArticle != null && SelectedArticle.ItemID != "0")
-                {
-                    formula += $" and {{VItems.ItemID}} = '{SelectedArticle.ItemID}'";
-                }
-
-                var req = new ReportRequest
-                {
-                    ReportName = ReportNames.Stock.RackWiseSFStockStatus,
-                    SelectionFormula = formula
-                };
-
-                await ReportNavigation.PrintReportAsync(req);
-            }
-            catch (Exception ex)
-            {
-                NotificationService.ShowError("Report Error", ex.Message);
-            }
-        }
+            => await PrintShelfWiseReportAsync(ReportNames.Stock.RackWiseSFStockStatus, "Select Stores — Rack Wise Stock");
 
         private async Task OnContextPrintSlip(ItemClickEventArgs e)
         {

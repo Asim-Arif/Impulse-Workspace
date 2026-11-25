@@ -93,6 +93,8 @@ namespace Impulse.Constants
 
 
             public const string AbsentLeaveSummary     = Folder + "rptAbsentLeaveSummary.rpt";
+            public const string AbsentLeaveDetail      = Folder + "rptAbsentLeaveDetail.rpt";
+            public const string EmpAbsentSheetSummary  = Folder + "rptEmpAbsentSheetSummary.rpt";
             public const string LeavesList             = Folder + "LeavesList.rpt";
             public const string LateComers             = Folder + "LateComers.rpt";
             public const string PresentEmpList         = Folder + "rptPresentEmpList.rpt";
@@ -141,6 +143,7 @@ namespace Impulse.Constants
             public const string CombinedOrderItemwise = Folder + "CombinedOrderReportItemwise.rpt";
             public const string PartShippedOrders = Folder + "rptPartiallyShippedOrders.rpt";
             public const string ProductionExportCost = Folder + "OrderwiseProductionExportCost.rpt";
+            public const string OrderPlanningMultipleOrders = Folder + "Order_Planning_Report_Multiple_Orders.rpt";
             public const string FOrderList = Folder + "rptFOrderList.rpt";
             public const string PTCQEL = Folder + "PTCQEL.rpt";
             public const string PTC = Folder + "PTC.rpt";

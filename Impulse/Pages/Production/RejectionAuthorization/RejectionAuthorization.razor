@@ -1,0 +1,225 @@
+@page "/production/auth-rejection"
+@using Blazored.Typeahead
+@using DataAccessLibrary.Models.ViewModels.Production
+@using Impulse.Pages.Production.RejectionAuthorization.Components
+
+<div class="container-fluid py-2" style="font-family: 'Calibri', 'Segoe UI', sans-serif;">
+    <div class="card border-0 shadow-sm" style="background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); border-radius: 12px;">
+        <div class="card-body">
+            <!-- Header -->
+            <div class="d-flex flex-wrap align-items-end justify-content-between pb-2 mb-3 border-bottom gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-danger-subtle text-danger" style="width: 38px; height: 38px;">
+                        <i class="fas fa-ban"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark">Rejection Authorization</h5>
+                        <small class="text-muted">Authorize or ignore maker/employee rejection deductions before billing</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="PrintReportAsync" disabled="@IsLoading">
+                        <i class="fas fa-print me-1"></i> Print
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary" @onclick="RefreshAsync" disabled="@IsLoading">
+                        <i class="fas fa-sync-alt me-1 @(IsLoading ? "fa-spin" : "")"></i> Refresh
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="GoBack">
+                        <i class="fas fa-times me-1"></i> Close
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filter Bar -->
+            <div class="row g-2 align-items-end mb-3 pb-2 border-bottom filter-stack-row">
+                <div class="col-md-4">
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <label class="form-label small fw-semibold mb-0">
+                            @(Filter.ShowEmployees ? "Employee" : "Maker")
+                        </label>
+                        <div class="form-check form-check-inline mb-0">
+                            <input class="form-check-input" type="checkbox" id="chkShowEmployees"
+                                   checked="@Filter.ShowEmployees" @onchange="OnShowEmployeesChanged" />
+                            <label class="form-check-label small fw-semibold" for="chkShowEmployees">Employees</label>
+                        </div>
+                    </div>
+
+                    @if (Filter.ShowEmployees)
+                    {
+                        <BlazoredTypeahead TItem="RejectionAuthEmployeeLookup"
+                                           TValue="RejectionAuthEmployeeLookup"
+                                           SearchMethod="SearchEmployees"
+                                           Value="SelectedEmployee"
+                                           ValueChanged="OnEmployeeChanged"
+                                           ValueExpression="@(() => SelectedEmployee)"
+                                           EnableDropDown="true"
+                                           ShowDropDownOnFocus="true"
+                                           MaximumSuggestions="1000"
+                                           Placeholder="Select employee...">
+                            <SelectedTemplate Context="emp">
+                                @if (emp != null)
+                                {
+                                    @if (emp.EmpID != "0")
+                                    {
+                                        <text>[@emp.EmpID] </text>
+                                    }
+                                    @emp.Name
+                                }
+                            </SelectedTemplate>
+                            <ResultTemplate Context="emp">
+                                @if (emp.EmpID != "0")
+                                {
+                                    <text>[@emp.EmpID] </text>
+                                }
+                                @emp.Name
+                                @if (!string.IsNullOrWhiteSpace(emp.Designation))
+                                {
+                                    <small class="text-muted ms-1">(@emp.Designation)</small>
+                                }
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    }
+                    else
+                    {
+                        <BlazoredTypeahead TItem="RejectionAuthMakerLookup"
+                                           TValue="RejectionAuthMakerLookup"
+                                           SearchMethod="SearchMakers"
+                                           Value="SelectedMaker"
+                                           ValueChanged="OnMakerChanged"
+                                           ValueExpression="@(() => SelectedMaker)"
+                                           EnableDropDown="true"
+                                           ShowDropDownOnFocus="true"
+                                           MaximumSuggestions="1000"
+                                           Placeholder="Select maker...">
+                            <SelectedTemplate Context="maker">
+                                @(maker?.DisplayName ?? "<Show All>")
+                            </SelectedTemplate>
+                            <ResultTemplate Context="maker">
+                                @maker.DisplayName
+                            </ResultTemplate>
+                        </BlazoredTypeahead>
+                    }
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold mb-1">Date Range</label>
+                    <select class="form-select form-select-sm" value="@Filter.DateRangeIndex" @onchange="OnDateRangeChanged">
+                        <option value="0">Today</option>
+                        <option value="1">Last 15 Days</option>
+                        <option value="2">Last 30 Days</option>
+                        <option value="3">Last 60 Days</option>
+                        <option value="4">Last 90 Days</option>
+                        <option value="5">Custom</option>
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold mb-1">From Date</label>
+                    <input type="date" class="form-control form-control-sm"
+                           @bind="Filter.DtFrom"
+                           disabled="@(Filter.DateRangeIndex != 5)" />
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold mb-1">To Date</label>
+                    <input type="date" class="form-control form-control-sm"
+                           @bind="Filter.DtTo"
+                           disabled="@(Filter.DateRangeIndex != 5)" />
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold mb-1">Lot No.</label>
+                    <input type="text" class="form-control form-control-sm text-center"
+                           placeholder="Lot No..."
+                           @bind="Filter.LotNo" />
+                </div>
+
+                <div class="col-md-3 position-relative">
+                    <label class="form-label small fw-semibold mb-1">Categories</label>
+                    <button type="button" class="btn btn-sm btn-outline-secondary w-100 d-flex align-items-center justify-content-between"
+                            @onclick="ToggleCategoryDropdown">
+                        <span class="text-truncate">@CategorySummaryText</span>
+                        <i class="fas fa-chevron-down ms-1"></i>
+                    </button>
+                    @if (IsCategoryDropdownOpen)
+                    {
+                        <div class="card shadow position-absolute start-0 mt-1 w-100 p-2" style="z-index: 10000; max-height: 260px; overflow-y: auto; border-radius: 8px;">
+                            <div class="form-check mb-1 pb-1 border-bottom">
+                                <input class="form-check-input" type="checkbox" id="chkAllCats"
+                                       checked="@(!Filter.CategoryIds.Any())"
+                                       @onchange="ToggleAllCategories" />
+                                <label class="form-check-label small fw-bold" for="chkAllCats">&lt;All Categories&gt;</label>
+                            </div>
+                            @foreach (var cat in Categories)
+                            {
+                                var c = cat;
+                                bool isCatChecked = Filter.CategoryIds.Contains(c.CatID);
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="@($"cat_{c.CatID}")"
+                                           checked="@isCatChecked"
+                                           @onchange="@((e) => ToggleCategory(c.CatID, e.Value is bool b && b))" />
+                                    <label class="form-check-label small" for="@($"cat_{c.CatID}")">@c.Description</label>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <ul class="nav nav-tabs mb-3">
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(ActiveTab == 0 ? "active fw-bold" : "")" @onclick="@(() => ActiveTab = 0)">
+                        <i class="fas fa-list-check me-1"></i> Rejections
+                        <span class="badge bg-danger ms-1">@PendingItems.Count</span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button type="button" class="nav-link @(ActiveTab == 1 ? "active fw-bold" : "")" @onclick="@(() => ActiveTab = 1)">
+                        <i class="fas fa-history me-1"></i> History
+                        <span class="badge bg-secondary ms-1">@HistoryItems.Count</span>
+                    </button>
+                </li>
+            </ul>
+
+            @if (ActiveTab == 0)
+            {
+                <RejectionsTab Items="PendingItems"
+                               CheckedIds="CheckedIds"
+                               FactoryMakerId="FactoryMakerId"
+                               IsLoading="IsLoading"
+                               IsProcessing="IsProcessing"
+                               OnSelectAll="SelectAllRows"
+                               OnClearAll="ClearAllRows"
+                               OnToggleCheck="ToggleRowCheck"
+                               OnDeductSelected="DeductSelectedAsync"
+                               OnIgnoreSelected="IgnoreSelectedAsync"
+                               OnRateUpdated="UpdateRateAsync" />
+            }
+            else
+            {
+                <RejectionHistoryTab Items="HistoryItems"
+                                     FactoryMakerId="FactoryMakerId"
+                                     IsLoading="IsLoading" />
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .filter-stack-row {
+        position: relative !important;
+        z-index: 9999 !important;
+    }
+
+    ::deep .blazored-typeahead {
+        height: 35px !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+
+    ::deep .blazored-typeahead__controls {
+        height: 35px !important;
+        min-height: 35px !important;
+    }
+</style>

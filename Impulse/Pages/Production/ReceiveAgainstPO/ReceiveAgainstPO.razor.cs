@@ -149,8 +149,23 @@ namespace Impulse.Pages.Production.ReceiveAgainstPO
                     return;
                 }
 
+                var fetchedLines = await ReceiveService.GetMasterPOLinesAsync(searchResult.EntryID);
+                if (fetchedLines.Any() && fetchedLines.All(l => l.IsFullyReceived))
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Warning,
+                        Summary = "Order Already Received",
+                        Detail = $"Master PO [{searchResult.RecieptID}] has already met its ordered quantity and cannot receive additional items.",
+                        Duration = 5000
+                    });
+                    MasterPO = null;
+                    Lines.Clear();
+                    return;
+                }
+
                 MasterPO = searchResult;
-                Lines = await ReceiveService.GetMasterPOLinesAsync(MasterPO.EntryID);
+                Lines = fetchedLines;
 
                 // Auto-fill ReceivingQty to PendingQty by default for user convenience
                 foreach (var line in Lines)
@@ -295,6 +310,18 @@ namespace Impulse.Pages.Production.ReceiveAgainstPO
             float excessPct = MasterPO?.ExcessQtyPercentage ?? 50f;
             foreach (var line in activeReceivingLines)
             {
+                if (line.IsFullyReceived)
+                {
+                    NotificationService.Notify(new Radzen.NotificationMessage
+                    {
+                        Severity = Radzen.NotificationSeverity.Warning,
+                        Summary = "Order Quantity Already Met",
+                        Detail = $"Item [{line.ItemCode}] has already met its issued quantity ({line.PrevRcvdQty:N0} / {line.IssQty:N0}) and cannot receive additional items.",
+                        Duration = 5000
+                    });
+                    return;
+                }
+
                 decimal maxAllowed = line.GetMaxAllowedQty(excessPct);
                 if (line.ReceivingQty > maxAllowed)
                 {

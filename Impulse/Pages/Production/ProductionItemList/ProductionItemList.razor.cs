@@ -48,9 +48,14 @@ namespace Impulse.Pages.Production.ProductionItemList
         {
             try
             {
-                Lookups = await ItemListService.GetInitialLookupsAsync();
-                Countries = await ItemListService.GetCountriesByCustomerAsync("0");
-                Orders = await ItemListService.GetOrdersByCustomerAsync("0");
+                var lookupsTask = ItemListService.GetInitialLookupsAsync();
+                var countriesTask = ItemListService.GetCountriesByCustomerAsync("0");
+                var ordersTask = ItemListService.GetOrdersByCustomerAsync("0");
+                await Task.WhenAll(lookupsTask, countriesTask, ordersTask);
+
+                Lookups = lookupsTask.Result;
+                Countries = countriesTask.Result;
+                Orders = ordersTask.Result;
 
                 await LoadDataAsync();
             }
@@ -80,6 +85,7 @@ namespace Impulse.Pages.Production.ProductionItemList
                 {
                     Items[i].SNo = i + 1;
                 }
+                CurrentPage = 1;
             }
             catch (Exception ex)
             {
@@ -91,6 +97,64 @@ namespace Impulse.Pages.Production.ProductionItemList
                 IsLoading = false;
                 StateHasChanged();
             }
+        }
+
+        // ── Pagination & Quick Search ────────────────────────────────────────
+        private string _quickSearch = string.Empty;
+        public string QuickSearch
+        {
+            get => _quickSearch;
+            set
+            {
+                if (_quickSearch != value)
+                {
+                    _quickSearch = value;
+                    CurrentPage = 1;
+                }
+            }
+        }
+
+        public int CurrentPage { get; set; } = 1;
+        public int PageSize { get; set; } = 100;
+
+        public List<ProductionItemListItem> FilteredItems =>
+            string.IsNullOrWhiteSpace(QuickSearch)
+                ? Items
+                : Items.Where(i =>
+                    (!string.IsNullOrEmpty(i.LotNo) && i.LotNo.Contains(QuickSearch, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrEmpty(i.ItemCode) && i.ItemCode.Contains(QuickSearch, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrEmpty(i.ItemName) && i.ItemName.Contains(QuickSearch, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrEmpty(i.OrderNo) && i.OrderNo.Contains(QuickSearch, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrEmpty(i.Description) && i.Description.Contains(QuickSearch, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrEmpty(i.Hub_Name) && i.Hub_Name.Contains(QuickSearch, StringComparison.OrdinalIgnoreCase))).ToList();
+
+        public int TotalPages => Math.Max(1, (int)Math.Ceiling((double)FilteredItems.Count / PageSize));
+
+        public IEnumerable<ProductionItemListItem> PagedItems =>
+            FilteredItems.Skip((CurrentPage - 1) * PageSize).Take(PageSize);
+
+        public void OnPageSizeChanged(ChangeEventArgs e)
+        {
+            if (int.TryParse(e.Value?.ToString(), out int size) && size > 0)
+            {
+                PageSize = size;
+                CurrentPage = 1;
+            }
+        }
+
+        public void PrevPage()
+        {
+            if (CurrentPage > 1) CurrentPage--;
+        }
+
+        public void NextPage()
+        {
+            if (CurrentPage < TotalPages) CurrentPage++;
+        }
+
+        public void GoToPage(int page)
+        {
+            CurrentPage = Math.Clamp(page, 1, TotalPages);
         }
 
         // ── Filter Cascade ───────────────────────────────────────────────────
@@ -273,15 +337,16 @@ namespace Impulse.Pages.Production.ProductionItemList
         }
 
         // ── Print Actions ────────────────────────────────────────────────────
-        // The print reports use SQLQueryString against the Crystal report.
-        // We pass the active filter as selection formula to the Blazor report API.
+        // ProductionItemList.rpt is backed by SP_GetProductionItemList, so we pass
+        // all active filters as stored procedure parameters.
 
         public async Task PrintListAsync(ItemClickEventArgs args)
         {
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "ProductionItemList.rpt",
-                SelectionFormula = BuildCrystalSelectionFormula()
+                Parameters = BuildStoredProcedureParameters(),
+                SelectionFormula = string.Empty
             });
         }
 
@@ -298,6 +363,7 @@ namespace Impulse.Pages.Production.ProductionItemList
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
                 ReportName = "ProductionItemList.rpt",
+                Parameters = BuildStoredProcedureParameters(),
                 SelectionFormula = formula
             });
         }
@@ -324,60 +390,36 @@ namespace Impulse.Pages.Production.ProductionItemList
 
         // ── Helpers ──────────────────────────────────────────────────────────
         /// <summary>
-        /// Builds a Crystal Reports selection formula that mirrors the current active filters.
+        /// Builds the 16 stored procedure parameters for SP_GetProductionItemList
+        /// matching the currently active UI filters.
         /// </summary>
-        private string BuildCrystalSelectionFormula()
+        private Dictionary<string, object> BuildStoredProcedureParameters()
         {
-            var parts = new List<string> { "{VRunningLots_POI.Qty} > 0" };
+            DateTime dtFrom = Filters.DtFrom;
+            DateTime dtTo = Filters.DtTo;
+            if (Filters.DateRangeMode == 1) { dtFrom = DateTime.Today; dtTo = DateTime.Today.AddDays(15); }
+            else if (Filters.DateRangeMode == 2) { dtFrom = DateTime.Today; dtTo = DateTime.Today.AddDays(30); }
+            else if (Filters.DateRangeMode == 3) { dtFrom = DateTime.Today; dtTo = DateTime.Today.AddDays(45); }
 
-            if (!string.IsNullOrWhiteSpace(Filters.LotNo))
+            return new Dictionary<string, object>
             {
-                parts.Clear();
-                parts.Add($"{{VRunningLots_POI.LotNo}} = '{Filters.LotNo}'");
-                return string.Join(" AND ", parts);
-            }
-
-            if (Filters.DateRangeMode != 0)
-            {
-                DateTime dtFrom = Filters.DtFrom;
-                DateTime dtTo = Filters.DtTo;
-                if (Filters.DateRangeMode == 1) { dtFrom = DateTime.Today; dtTo = DateTime.Today.AddDays(15); }
-                else if (Filters.DateRangeMode == 2) { dtFrom = DateTime.Today; dtTo = DateTime.Today.AddDays(30); }
-                else if (Filters.DateRangeMode == 3) { dtFrom = DateTime.Today; dtTo = DateTime.Today.AddDays(45); }
-                parts.Add($"{{VRunningLots_POI.DT}} in Date({dtFrom.Year}, {dtFrom.Month}, {dtFrom.Day}) to Date({dtTo.Year}, {dtTo.Month}, {dtTo.Day})");
-            }
-
-            if (!string.IsNullOrEmpty(Filters.CustCode) && Filters.CustCode != "0")
-                parts.Add($"{{VRunningLots_POI.CustCode}} = '{Filters.CustCode}'");
-
-            if (!string.IsNullOrEmpty(Filters.Country) && Filters.Country != "0")
-                parts.Add($"{{VRunningLots_POI.Country}} = '{Filters.Country}'");
-
-            if (!string.IsNullOrEmpty(Filters.OrderNo) && Filters.OrderNo != "0")
-                parts.Add($"{{VRunningLots_POI.OrderNo}} = '{Filters.OrderNo}'");
-
-            if (!string.IsNullOrEmpty(Filters.ItemGroupId) && Filters.ItemGroupId != "0")
-                parts.Add($"{{VRunningLots_POI.GroupID}} = {Filters.ItemGroupId}");
-
-            if (!string.IsNullOrEmpty(Filters.Hub) && Filters.Hub != "0")
-                parts.Add($"{{VRunningLots_POI.Hub_Name}} = '{Filters.Hub}'");
-
-            if (!Filters.ShowRepairLots) parts.Add("{VRunningLots_POI.ReWorkLot} = 0");
-            if (!Filters.ShowRegularLots) parts.Add("{VRunningLots_POI.ReWorkLot} = 1");
-
-            if (Filters.ShowLotsOnly && Filters.ShowNotYetStarted)
-            {
-                parts.Add("(({VRunningLots_POI.EntryType} <> 0 AND (IsNull({VRunningLots_POI.DispatchQty}) OR {VRunningLots_POI.DispatchQty} < {VRunningLots_POI.OrderQty})) OR {VRunningLots_POI.EntryType} <> 1)");
-            }
-            else
-            {
-                if (!Filters.ShowLotsOnly)
-                    parts.Add("({VRunningLots_POI.EntryType} <> 0 AND (IsNull({VRunningLots_POI.DispatchQty}) OR {VRunningLots_POI.DispatchQty} < {VRunningLots_POI.OrderQty}))");
-                if (!Filters.ShowNotYetStarted)
-                    parts.Add("{VRunningLots_POI.EntryType} <> 1");
-            }
-
-            return string.Join(" AND ", parts);
+                { "@LotNo", string.IsNullOrWhiteSpace(Filters.LotNo) ? "" : Filters.LotNo.Trim() },
+                { "@DateRangeMode", Filters.DateRangeMode },
+                { "@DtFrom", dtFrom },
+                { "@DtTo", dtTo },
+                { "@CustCode", string.IsNullOrWhiteSpace(Filters.CustCode) ? "0" : Filters.CustCode },
+                { "@Country", string.IsNullOrWhiteSpace(Filters.Country) ? "0" : Filters.Country },
+                { "@GroupID", int.TryParse(Filters.ItemGroupId, out int gid) ? gid : 0 },
+                { "@OrderNo", string.IsNullOrWhiteSpace(Filters.OrderNo) ? "0" : Filters.OrderNo },
+                { "@ProcessID", int.TryParse(Filters.ProcessId, out int pid) ? pid : 0 },
+                { "@VendID", int.TryParse(Filters.MakerId, out int vid) ? vid : 0 },
+                { "@ItemCode", string.IsNullOrWhiteSpace(Filters.ItemCode) ? "0" : Filters.ItemCode },
+                { "@ShowRepairLots", Filters.ShowRepairLots },
+                { "@ShowRegularLots", Filters.ShowRegularLots },
+                { "@ShowLotsOnly", Filters.ShowLotsOnly },
+                { "@ShowNotYetStarted", Filters.ShowNotYetStarted },
+                { "@Hub", string.IsNullOrWhiteSpace(Filters.Hub) ? "0" : Filters.Hub }
+            };
         }
 
         /// <summary>

@@ -47,19 +47,19 @@ namespace DataAccessLibrary.DAC.Production
                 case 5: break; // custom — use filter values as-is
             }
 
-            parameters.Add("@DtFrom", dtFrom);
-            parameters.Add("@DtTo", dtTo);
+            parameters.Add("@DtFrom", dtFrom.Date);
+            parameters.Add("@DtToExclusive", dtTo.Date.AddDays(1));
 
             string whereClause;
 
             // If Lot No or Order No entered, ignore date range (legacy behaviour)
             if (!string.IsNullOrWhiteSpace(filter.LotNo) || !string.IsNullOrWhiteSpace(filter.OrderNo))
             {
-                whereClause = " WHERE OnlyDT BETWEEN '1901-01-01' AND '2090-01-01'";
+                whereClause = " WHERE 1 = 1";
             }
             else
             {
-                whereClause = " WHERE OnlyDT BETWEEN @DtFrom AND @DtTo";
+                whereClause = " WHERE DT >= @DtFrom AND DT < @DtToExclusive";
             }
 
             // Always exclude stock openings

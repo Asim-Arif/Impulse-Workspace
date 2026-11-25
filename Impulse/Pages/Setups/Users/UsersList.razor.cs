@@ -406,7 +406,6 @@ namespace Impulse.Pages.Setups.Users
                 }
 
                 var userOptions = new List<GenericDropDownModel>();
-                userOptions.Add(new GenericDropDownModel { DropDownValue_ID = "", DropDownValue_Description = "<All Users>" });
 
                 var distinctUsers = AllUsers
                     .Where(u => !string.IsNullOrWhiteSpace(u.UserName))
@@ -430,6 +429,18 @@ namespace Impulse.Pages.Setups.Users
                 var result = await userActivityModal.Show(userOptions, "User Activity Report");
                 if (result.Success)
                 {
+                    if (string.IsNullOrWhiteSpace(result.SelectedValue))
+                    {
+                        NotificationService.Notify(new NotificationMessage
+                        {
+                            Severity = NotificationSeverity.Warning,
+                            Summary = "User Required",
+                            Detail = "Please select a user name to generate the User Activity Report.",
+                            Duration = 3500
+                        });
+                        return;
+                    }
+
                     var req = new ReportRequest
                     {
                         ReportName = "User_Activity.rpt",
@@ -437,7 +448,7 @@ namespace Impulse.Pages.Setups.Users
                         {
                             { "@DTFrom", result.DateFrom },
                             { "@DTTo", result.DateTo },
-                            { "@UserName", result.SelectedValue ?? "" }
+                            { "@UserName", result.SelectedValue }
                         }
                     };
 

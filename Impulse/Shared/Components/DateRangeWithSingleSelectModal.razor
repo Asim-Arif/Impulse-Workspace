@@ -1,4 +1,4 @@
-﻿@using DataAccessLibrary.Models.ReportModels
+@using DataAccessLibrary.Models.ReportModels
 @using DataAccessLibrary.Models.ViewModels
 @using Blazored.Typeahead
 
@@ -18,7 +18,13 @@
 
                 <div class="modal-body p-4">
                     <div class="mb-4">
-                        <label class="mb-1 fw-bold" style="font-size: 0.85rem;">@LabelText</label>
+                        <label class="mb-1 fw-bold" style="font-size: 0.85rem;">
+                            @LabelText
+                            @if (RequireSelection)
+                            {
+                                <span class="text-danger ms-1">*</span>
+                            }
+                        </label>
                         <BlazoredTypeahead SearchMethod="SearchData" EnableDropDown="true"
                                            Data="LocalOptions"
                                            TValue="GenericDropDownModel"
@@ -26,7 +32,7 @@
                                            Value="SelectedOption"
                                            ValueChanged="SelectedResultChanged_AccountHead"
                                            ValueExpression="@(() => SelectedOption)"
-                                           Placeholder="Search Account ..."
+                                           Placeholder="@Placeholder"
                                            MaximumSuggestions="1000">
                             <SelectedTemplate Context="selectedcard">
                                 @SelectedOption?.DropDownValue_Description
@@ -35,6 +41,12 @@
                                 @result.DropDownValue_Description
                             </ResultTemplate>
                         </BlazoredTypeahead>
+                        @if (!string.IsNullOrEmpty(ValidationMessage))
+                        {
+                            <div class="text-danger mt-1 small">
+                                <i class="fas fa-exclamation-circle me-1"></i>@ValidationMessage
+                            </div>
+                        }
                     </div>
 
                     <div class="cip-rpt-date-display text-center mb-4">
@@ -79,13 +91,16 @@
 @code {
     [Parameter] public string Title { get; set; } = "Select Parameters";
     [Parameter] public string LabelText { get; set; } = "Select Account:";
+    [Parameter] public string Placeholder { get; set; } = "Search Account ...";
+    [Parameter] public bool RequireSelection { get; set; } = false;
 
     private bool IsVisible { get; set; }
     private DateTime DateFrom { get; set; } = DateTime.Today.AddDays(-30);
     private DateTime DateTo { get; set; } = DateTime.Today;
 
     private List<GenericDropDownModel> LocalOptions { get; set; } = new();
-    private GenericDropDownModel SelectedOption { get; set; }
+    private GenericDropDownModel? SelectedOption { get; set; }
+    private string? ValidationMessage { get; set; }
 
     private TaskCompletionSource<DateRangeSingleSelectionResult> _tcs;
 
@@ -93,7 +108,8 @@
     {
         LocalOptions = dataOptions;
         Title = title;
-        SelectedOption = LocalOptions.FirstOrDefault();
+        SelectedOption = RequireSelection ? null : LocalOptions.FirstOrDefault();
+        ValidationMessage = null;
         IsVisible = true;
         _tcs = new TaskCompletionSource<DateRangeSingleSelectionResult>();
         StateHasChanged();
@@ -106,12 +122,20 @@
             .Where(x => x.DropDownValue_Description.Contains(searchText, StringComparison.OrdinalIgnoreCase))
             .ToList());
     }
-    private async Task SelectedResultChanged_AccountHead(GenericDropDownModel? selectedValue)
+    private Task SelectedResultChanged_AccountHead(GenericDropDownModel? selectedValue)
     {
         SelectedOption = selectedValue;
+        ValidationMessage = null;
+        return Task.CompletedTask;
     }
     private void Submit()
     {
+        if (RequireSelection && (SelectedOption == null || string.IsNullOrWhiteSpace(SelectedOption.DropDownValue_ID)))
+        {
+            ValidationMessage = "Please select a valid option before generating the report.";
+            return;
+        }
+
         IsVisible = false;
         // Using the new record from your DataAccessLibrary
         _tcs.SetResult(new DateRangeSingleSelectionResult(true, DateFrom, DateTo, SelectedOption?.DropDownValue_ID));

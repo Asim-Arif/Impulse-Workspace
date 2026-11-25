@@ -443,8 +443,9 @@ namespace Impulse.Pages.Export.Orders
                 Order.OrderItems.Add(line);
             }
 
-            // Reset inputs
-            NewItemInput = new();
+            // Reset inputs (preserve DeliveryDT so user doesn't have to re-select it for each line)
+            var keptDeliveryDt = NewItemInput.DeliveryDT;
+            NewItemInput = new() { DeliveryDT = keptDeliveryDt };
             SelectedCatalogItem = null;
         }
 

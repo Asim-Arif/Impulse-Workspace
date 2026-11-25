@@ -630,6 +630,12 @@ namespace Impulse.Services.WorkflowTasks
             }
         }
 
+        private async Task<string> GetApproverRoleAsync(string workflowCode)
+        {
+            var wfConfig = await _workflowConfigData.GetWorkflowConfigByCodeAsync(workflowCode);
+            return !string.IsNullOrWhiteSpace(wfConfig?.ApproverRole) ? wfConfig.ApproverRole.Trim() : "Director";
+        }
+
         public async Task<int> RequestVoucherDeletionAsync(string vchrNo, string originatorUserName, string deleteReason, string? machineName = null)
         {
             try
@@ -907,7 +913,7 @@ namespace Impulse.Services.WorkflowTasks
                 {
                     SourceEntityType = "AttendanceWorkflow",
                     SourceEntityRefId = entityRefId,
-                    TargetRole = "Director",
+                    TargetRole = await GetApproverRoleAsync("AttendanceApproval"),
                     Title = title,
                     Description = desc,
                     ActionUrl = "/payroll/attendance-approval",
@@ -991,7 +997,7 @@ namespace Impulse.Services.WorkflowTasks
                                      (request.AttendanceDate.HasValue ? $"_{request.AttendanceDate.Value:dd}" : "");
 
                 // Mark task complete
-                await CompleteRoleTaskAsync("AttendanceWorkflow", entityRefId, "Director", approvedByDirectorUserName,
+                await CompleteRoleTaskAsync("AttendanceWorkflow", entityRefId, await GetApproverRoleAsync("AttendanceApproval"), approvedByDirectorUserName,
                     $"Attendance change approved and applied by Director {approvedByDirectorUserName}." +
                     (!string.IsNullOrWhiteSpace(directorRemarks) ? $" Remarks: {directorRemarks}" : ""));
 
@@ -1039,7 +1045,7 @@ namespace Impulse.Services.WorkflowTasks
                 string entityRefId = $"{request.ActionType}_{request.EmpID}_{request.Year:D4}{request.Month:D2}" +
                                      (request.AttendanceDate.HasValue ? $"_{request.AttendanceDate.Value:dd}" : "");
 
-                await RejectRoleTaskAsync("AttendanceWorkflow", entityRefId, "Director", rejectedByDirectorUserName,
+                await RejectRoleTaskAsync("AttendanceWorkflow", entityRefId, await GetApproverRoleAsync("AttendanceApproval"), rejectedByDirectorUserName,
                     $"Attendance change request rejected by Director {rejectedByDirectorUserName}. Reason: {rejectionReason}");
 
                 // Notify originator
@@ -1152,7 +1158,7 @@ namespace Impulse.Services.WorkflowTasks
                 {
                     SourceEntityType = "MakerItemRateWorkflow",
                     SourceEntityRefId = entityRefId,
-                    TargetRole = "Director",
+                    TargetRole = await GetApproverRoleAsync("MakerRateChange"),
                     Title = title,
                     Description = desc,
                     ActionUrl = $"/production/maker-rate-approval/{0}",
@@ -1209,7 +1215,7 @@ namespace Impulse.Services.WorkflowTasks
                 string entityRefId = request.EntryID.ToString();
 
                 // Mark task complete
-                await CompleteRoleTaskAsync("MakerItemRateWorkflow", entityRefId, "Director", approvedByDirectorUserName,
+                await CompleteRoleTaskAsync("MakerItemRateWorkflow", entityRefId, await GetApproverRoleAsync("MakerRateChange"), approvedByDirectorUserName,
                     $"Rate change approved and applied by Director {approvedByDirectorUserName}." +
                     (!string.IsNullOrWhiteSpace(directorRemarks) ? $" Remarks: {directorRemarks}" : ""));
 
@@ -1256,7 +1262,7 @@ namespace Impulse.Services.WorkflowTasks
 
                 string entityRefId = request.EntryID.ToString();
 
-                await RejectRoleTaskAsync("MakerItemRateWorkflow", entityRefId, "Director", rejectedByDirectorUserName,
+                await RejectRoleTaskAsync("MakerItemRateWorkflow", entityRefId, await GetApproverRoleAsync("MakerRateChange"), rejectedByDirectorUserName,
                     $"Rate change request rejected by Director {rejectedByDirectorUserName}. Reason: {rejectionReason}");
 
                 // Notify originator
@@ -1357,7 +1363,7 @@ namespace Impulse.Services.WorkflowTasks
                 {
                     SourceEntityType = "DeleteLotAuthorization",
                     SourceEntityRefId = requestId.ToString(),
-                    TargetRole = "Director",
+                    TargetRole = await GetApproverRoleAsync("DeleteLotAuthorization"),
                     Title = title,
                     Description = desc,
                     ActionUrl = $"/production/lot-deletion-approval/{0}",
@@ -1577,7 +1583,7 @@ namespace Impulse.Services.WorkflowTasks
                 {
                     SourceEntityType = "DeleteProductionIssuance",
                     SourceEntityRefId = requestId.ToString(),
-                    TargetRole = "Director",
+                    TargetRole = await GetApproverRoleAsync("DeleteProductionIssuance"),
                     Title = title,
                     Description = desc,
                     ActionUrl = $"/production/issuance-deletion-approval/{0}",
@@ -1799,7 +1805,7 @@ namespace Impulse.Services.WorkflowTasks
                 {
                     SourceEntityType = "SkipProcess",
                     SourceEntityRefId = requestId.ToString(),
-                    TargetRole = "Director",
+                    TargetRole = await GetApproverRoleAsync("SkipProcess"),
                     Title = title,
                     Description = desc,
                     ActionUrl = $"/production/skip-process-approval/{0}",

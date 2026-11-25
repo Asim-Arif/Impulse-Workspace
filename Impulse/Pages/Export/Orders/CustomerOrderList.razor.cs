@@ -886,17 +886,78 @@ namespace Impulse.Pages.Export.Orders
 
         private async Task PrintOrderList(bool balanceListOnly = false)
         {
+            string dateField = filterByDeliveryDT ? "DeliveryDT" : "DT";
+            var conditions = new List<string>
+            {
+                $"{{VFOrderList.{dateField}}} in Date({dtFrom.Year}, {dtFrom.Month}, {dtFrom.Day}) to Date({dtTo.Year}, {dtTo.Month}, {dtTo.Day})"
+            };
+
+            string? custCode = selectedCustomerFilter?.CustCode;
+            if (!string.IsNullOrEmpty(custCode) && custCode != "0")
+            {
+                conditions.Add($"{{VFOrderList.CustCode}} = '{custCode.Replace("'", "''")}'");
+            }
+
+            if (!string.IsNullOrEmpty(selectedCountryFilter) && selectedCountryFilter != "<All Countries>")
+            {
+                conditions.Add($"{{VFOrderList.Country}} = '{selectedCountryFilter.Replace("'", "''")}'");
+            }
+
+            int compRefId = selectedCompanyFilter?.EntryID ?? 0;
+            if (compRefId > 0)
+            {
+                conditions.Add($"{{VFOrderList.CompanyRefID}} = {compRefId}");
+            }
+
+            if (!string.IsNullOrEmpty(selectedOrderType) && selectedOrderType != "<All Types>")
+            {
+                conditions.Add($"{{VFOrderList.OrderType}} = '{selectedOrderType.Replace("'", "''")}'");
+            }
+
+            if (ViewType == 1)
+            {
+                conditions.Add("not ({VFOrderList.CustCode} in ['Parts', 'Stock'])");
+            }
+            else if (ViewType == 2)
+            {
+                conditions.Add("{VFOrderList.CustCode} in ['Parts', 'Stock']");
+            }
+
+            switch (selectedStatusFilter)
+            {
+                case 0: // Unshipped
+                    conditions.Add("not IsNull({VFOrderList.UnshippedOrderNo})");
+                    break;
+                case 1: // Shipped
+                    conditions.Add("(IsNull({VFOrderList.UnshippedOrderNo}) and {VFOrderList.Cancelled} = 0)");
+                    break;
+                case 2: // Cancelled
+                    conditions.Add("{VFOrderList.Cancelled} = 1");
+                    break;
+                case 3: // Hold
+                    conditions.Add("{VFOrderList.Cancelled} = 2");
+                    break;
+            }
+
+            if (balanceListOnly)
+            {
+                conditions.Add("{VFOrderList.TotalBalanceQty} > 0");
+            }
+
+            string forCustomer = $"{selectedCustomerFilter?.Name ?? "<All Customers>"} {selectedCountryFilter}".Trim();
+            string forFromTo = $"{dtFrom:dd-MMM-yyyy} to {dtTo:dd-MMM-yyyy}";
+
             var formulaValues = new Dictionary<string, object>
             {
-                { "ForCustomer", $"'{selectedCustomerFilter?.Name ?? "<All Customers>"} {selectedCountryFilter}'" },
-                { "ForFromTo", $"'{dtFrom:dd-MMM-yyyy} to {dtTo:dd-MMM-yyyy}'" },
-                { "OrderType", $"'{selectedOrderType}'" }
+                { "ForCustomer", $"'{forCustomer.Replace("'", "''")}'" },
+                { "ForFromTo", $"'{forFromTo.Replace("'", "''")}'" },
+                { "OrderType", $"'{selectedOrderType.Replace("'", "''")}'" }
             };
 
             var request = new ReportRequest
             {
                 ReportName = ReportNames.Export.FOrderList,
-                SelectionFormula = string.Empty,
+                SelectionFormula = string.Join(" and ", conditions),
                 FormulaValues = formulaValues
             };
             await ReportNavigation.PrintReportAsync(request);
@@ -961,6 +1022,39 @@ namespace Impulse.Pages.Export.Orders
             {
                 request.Parameters.Add("@DeliveryDTFilter", filterByDeliveryDT);
             }
+            await ReportNavigation.PrintReportAsync(request);
+        }
+
+        private Impulse.Components.Export.CustomerOrdersSelectionModal? planningOrdersModalRef;
+
+        private async Task OpenPlanningReportModal()
+        {
+            if (planningOrdersModalRef == null) return;
+
+            string? ordersList = await planningOrdersModalRef.ShowAsync(selectedCustomerFilter, selectedCountryFilter);
+            if (string.IsNullOrWhiteSpace(ordersList)) return;
+
+            var request = new ReportRequest
+            {
+                ReportName = ReportNames.Export.OrderPlanningMultipleOrders,
+                SelectionFormula = "{@QtyToPurchase}>0",
+                Parameters = new Dictionary<string, object>
+                {
+                    { "@OrderNo", "" },
+                    { "@FromItems", false },
+                    { "@DTFrom", dtFrom },
+                    { "@DTTo", dtTo },
+                    { "@CustCode", "" },
+                    { "@Country", "" },
+                    { "@NoDelivery", false },
+                    { "@Both", false },
+                    { "@ItemCode", "0" },
+                    { "@Urgent", false },
+                    { "@GroupID", 0 },
+                    { "@TempList_RefID", 0 },
+                    { "@OrdersList", ordersList }
+                }
+            };
             await ReportNavigation.PrintReportAsync(request);
         }
 
