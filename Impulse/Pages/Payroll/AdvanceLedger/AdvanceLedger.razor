@@ -2,6 +2,7 @@
 @using DataAccessLibrary.Models.ViewModels.Payroll
 @using Impulse.Services.Payroll
 @using Impulse.Services
+@using BlazorContextMenu
 @attribute [Authorize]
 
 <PageTitle>Loan & Advance Register</PageTitle>
@@ -14,6 +15,12 @@
     .blazored-typeahead          { height: 35px !important; min-height: 35px !important; padding: 0 !important; box-sizing: border-box !important; }
     .blazored-typeahead__controls{ min-height: 35px !important; height: 35px !important; }
     .blazored-typeahead__input   { height: 33px !important; }
+
+    /* Context menu cutoff guard */
+    #rowContextMenu, #optionsBarMenu {
+        max-height: 40vh;
+        overflow-y: auto;
+    }
 
     /* Metric cards */
     .kpi-card {
@@ -45,6 +52,12 @@
                     }
                 </h4>
                 <div class="d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-outline-primary btn-sm px-3 shadow-sm"
+                            @onclick="OpenPrintOptions">
+                        <i class="fas fa-print me-1"></i>
+                        <span>Print</span>
+                        <i class="fas fa-caret-down ms-1"></i>
+                    </button>
                     <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm"
                             @onclick="RefreshAsync" disabled="@IsLoading">
                         <i class="fas fa-sync-alt me-1 @(IsLoading ? "fa-spin" : "")"></i>
@@ -210,7 +223,7 @@
                         {
                             @foreach (var item in FilteredLedgerItems)
                             {
-                                <tr>
+                                <ContextMenuTrigger MenuId="rowContextMenu" Data="@item" WrapperTag="tr">
                                     <td class="fw-semibold text-secondary">@item.DT.ToString("dd-MMM-yyyy")</td>
                                     <td>
                                         <div class="fw-bold text-dark">[@item.EmpID] @item.EmpName</div>
@@ -246,7 +259,7 @@
                                             <span class="badge bg-danger" style="font-size:0.73rem;"><i class="fas fa-clock me-1"></i>Active</span>
                                         }
                                     </td>
-                                </tr>
+                                </ContextMenuTrigger>
                             }
                         }
                     </tbody>
@@ -260,3 +273,28 @@
         </div>
     </div>
 </div>
+
+<!-- ── BlazorContextMenu: Header Print Options Menu ── -->
+<ContextMenu Id="optionsBarMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    <div class="win11-section-header">Loan &amp; Advance Reports</div>
+    <Item class="win11-menu-item" OnClick="@(() => PrintShortTermLedgerAsync())">
+        <i class="fas fa-file-invoice-dollar fa-fw win11-icon text-warning"></i> Short Term Loan Ledger
+    </Item>
+    <Item class="win11-menu-item" OnClick="@(() => PrintLongTermLedgerAsync())">
+        <i class="fas fa-book-open fa-fw win11-icon text-primary"></i> Long Term Loan Ledger
+    </Item>
+</ContextMenu>
+
+<!-- ── BlazorContextMenu: Row Right-Click Menu ── -->
+<ContextMenu Id="rowContextMenu" UseDefaultEventHandlers="true" Template="Win11Style">
+    @if (context.Data is AdvanceLedgerItemModel rowItem)
+    {
+        <div class="win11-section-header">[@rowItem.EmpID] @rowItem.EmpName</div>
+        <Item class="win11-menu-item" OnClick="@(() => PrintShortTermLedgerAsync(rowItem.EmpID))">
+            <i class="fas fa-file-invoice-dollar fa-fw win11-icon text-warning"></i> Print Short Term Loan Ledger
+        </Item>
+        <Item class="win11-menu-item" OnClick="@(() => PrintLongTermLedgerAsync(rowItem.EmpID))">
+            <i class="fas fa-book-open fa-fw win11-icon text-primary"></i> Print Long Term Loan Ledger
+        </Item>
+    }
+</ContextMenu>

@@ -97,6 +97,9 @@ namespace DataAccessLibrary.DAC.Stock
 
         public async Task SavePlacementAsync(PlacementSaveRequest request, string userName, string machineName)
         {
+            if (request.QtyPlaced <= 0)
+                throw new InvalidOperationException("Quantity to place must be greater than zero.");
+
             using (IDbConnection db = new SqlConnection(_connectionString))
             {
                 db.Open();
@@ -104,21 +107,46 @@ namespace DataAccessLibrary.DAC.Stock
                 {
                     try
                     {
+                        // Lock receiving row and validate remaining placeable qty (excluding movement destination rows)
+                        string checkSql = @"
+                            SELECT
+                                CAST(ISNULL(vrdp.QtyRcvd, 0) AS DECIMAL(18, 4))
+                                - CAST(ISNULL((SELECT SUM(r.QtyRejected) FROM VendRcvdDetailPO_Rejection_Detail r WHERE r.VRDPO_RefID = vrdp.EntryID), 0) AS DECIMAL(18, 4))
+                                + CAST(ISNULL(vrdp.ExtraQtyRcvd, 0) AS DECIMAL(18, 4)) AS QtyPassed,
+                                CAST(ISNULL((
+                                    SELECT SUM(ISNULL(m.QtyPlaced, 0))
+                                    FROM MaterialLocationwiseStatus m WITH (UPDLOCK, HOLDLOCK)
+                                    WHERE m.Rcvd_RefID = vrdp.EntryID
+                                      AND NOT EXISTS (SELECT 1 FROM MaterialMovements mm WHERE mm.MLS_To_RefID = m.EntryID)
+                                ), 0) AS DECIMAL(18, 4)) AS AlreadyPlaced
+                            FROM VendRcvdDetailPO vrdp WITH (UPDLOCK, HOLDLOCK)
+                            WHERE vrdp.EntryID = @Rcvd_RefID";
+
+                        var status = await db.QueryFirstOrDefaultAsync<(decimal QtyPassed, decimal AlreadyPlaced)>(
+                            checkSql, new { request.Rcvd_RefID }, transaction);
+
+                        decimal remaining = Math.Round(status.QtyPassed - status.AlreadyPlaced, 4);
+                        if (request.QtyPlaced > remaining + 0.001m)
+                        {
+                            throw new InvalidOperationException(
+                                $"Over-placement blocked: Only {Math.Max(0m, remaining):0.####} remaining to place for this receipt (Passed: {status.QtyPassed:0.####}, Already Placed: {status.AlreadyPlaced:0.####}).");
+                        }
+
                         string sqlMaster = @"
                             INSERT INTO MaterialLocationwiseStatus
-                            (Rcvd_RefID, Shelf_RefID, QtyPlaced, UserName, MachineName, BatchNo, LotNo) 
+                            (Rcvd_RefID, Shelf_RefID, QtyPlaced, QtyIssued, UserName, MachineName, BatchNo, LotNo) 
                             VALUES
-                            (@Rcvd_RefID, @Shelf_RefID, @QtyPlaced, @UserName, @MachineName, @BatchNo, @LotNo)";
+                            (@Rcvd_RefID, @Shelf_RefID, @QtyPlaced, 0, @UserName, @MachineName, @BatchNo, @LotNo)";
 
                         await db.ExecuteAsync(sqlMaster, new
                         {
                             request.Rcvd_RefID,
                             request.Shelf_RefID,
                             request.QtyPlaced,
-                            UserName = userName,
-                            MachineName = machineName,
-                            request.BatchNo,
-                            request.LotNo
+                            UserName = userName ?? "",
+                            MachineName = machineName ?? "",
+                            BatchNo = request.BatchNo ?? "",
+                            LotNo = request.LotNo ?? ""
                         }, transaction);
 
                         if (request.IsCCItem && request.RISD_RefID > 0)

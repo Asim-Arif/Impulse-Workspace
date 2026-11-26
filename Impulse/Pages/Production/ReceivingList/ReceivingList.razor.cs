@@ -49,6 +49,8 @@ namespace Impulse.Pages.Production.ReceivingList
         }
         public string LastReportSql { get; set; } = string.Empty;
         public bool IsLoading { get; set; } = false;
+        public bool HasPendingFilterChanges { get; set; } = false;
+        private long _loadVersion = 0;
         public MakerRcvListItem? SelectedItem { get; set; } = null;
 
         // Paging Parameters
@@ -152,7 +154,7 @@ namespace Impulse.Pages.Production.ReceivingList
             {
                 _selectedMakers = value ?? new List<LookupItemInt>();
                 Filter.MakerIds = _selectedMakers.Select(m => m.Id).ToHashSet();
-                _ = OnFilterChanged();
+                MarkFiltersDirty();
             }
         }
 
@@ -164,7 +166,7 @@ namespace Impulse.Pages.Production.ReceivingList
             {
                 _selectedCategories = value ?? new List<LookupItemString>();
                 Filter.ItemCatIds = _selectedCategories.Select(c => c.Id).ToHashSet();
-                _ = OnFilterChanged();
+                MarkFiltersDirty();
             }
         }
 
@@ -176,7 +178,7 @@ namespace Impulse.Pages.Production.ReceivingList
             {
                 _selectedGroups = value ?? new List<LookupItemInt>();
                 Filter.ItemGroupIds = _selectedGroups.Select(g => g.Id).ToHashSet();
-                _ = OnFilterChanged();
+                MarkFiltersDirty();
             }
         }
 
@@ -188,7 +190,7 @@ namespace Impulse.Pages.Production.ReceivingList
             {
                 _selectedProcesses = value ?? new List<LookupItemInt>();
                 Filter.ProcessIds = _selectedProcesses.Select(p => p.Id).ToHashSet();
-                _ = OnFilterChanged();
+                MarkFiltersDirty();
             }
         }
 
@@ -200,7 +202,7 @@ namespace Impulse.Pages.Production.ReceivingList
             {
                 _selectedCustomers = value ?? new List<LookupItemString>();
                 Filter.CustomerCodes = _selectedCustomers.Select(c => c.Id).ToHashSet();
-                _ = OnFilterChanged();
+                MarkFiltersDirty();
             }
         }
 
@@ -212,7 +214,7 @@ namespace Impulse.Pages.Production.ReceivingList
             {
                 _selectedArticle = value;
                 Filter.ItemId = value?.Id ?? "0";
-                _ = OnFilterChanged();
+                MarkFiltersDirty();
             }
         }
 
@@ -251,7 +253,8 @@ namespace Impulse.Pages.Production.ReceivingList
                     (i.MasterPONo != null && i.MasterPONo.ToLower().Contains(term)) ||
                     (i.OrderNo != null && i.OrderNo.ToLower().Contains(term)) ||
                     (i.InternalRefNo != null && i.InternalRefNo.ToLower().Contains(term)) ||
-                    (i.BillNo != null && i.BillNo.ToLower().Contains(term))
+                    (i.BillNo != null && i.BillNo.ToLower().Contains(term)) ||
+                    (!string.IsNullOrEmpty(i.LotStatus) && i.LotStatus.ToLower().Contains(term))
                 ).ToList();
             }
         }
@@ -299,12 +302,16 @@ namespace Impulse.Pages.Production.ReceivingList
 
         public async Task LoadDataAsync()
         {
+            long requestId = ++_loadVersion;
+            HasPendingFilterChanges = false;
             IsLoading = true;
             StateHasChanged();
 
             try
             {
                 var result = await RcvListService.GetListAsync(Filter);
+                if (requestId != _loadVersion) return;
+
                 AllItems = result.Items;
                 LastReportSql = result.ReportSql;
                 currentPage = 1;
@@ -312,6 +319,7 @@ namespace Impulse.Pages.Production.ReceivingList
                 try
                 {
                     var pendingIds = await ProductionDeletionDataAccess.GetActivePendingVRDEntryIdsAsync();
+                    if (requestId != _loadVersion) return;
                     PendingDeletionVrdEntryIds = new HashSet<long>(pendingIds);
                 }
                 catch
@@ -321,6 +329,7 @@ namespace Impulse.Pages.Production.ReceivingList
             }
             catch (Exception ex)
             {
+                if (requestId != _loadVersion) return;
                 NotificationService.Notify(new Radzen.NotificationMessage
                 {
                     Severity = Radzen.NotificationSeverity.Error,
@@ -331,14 +340,44 @@ namespace Impulse.Pages.Production.ReceivingList
             }
             finally
             {
-                IsLoading = false;
-                StateHasChanged();
+                if (requestId == _loadVersion)
+                {
+                    IsLoading = false;
+                    StateHasChanged();
+                }
             }
         }
 
-        public async Task OnFilterChanged()
+        public void MarkFiltersDirty()
         {
-            await LoadDataAsync();
+            HasPendingFilterChanges = true;
+        }
+
+        public void OnDateRangeChanged()
+        {
+            DateTime now = DateTime.Today;
+            switch (Filter.DateRangeIndex)
+            {
+                case 0: Filter.DtFrom = now; Filter.DtTo = now; break;
+                case 1: Filter.DtFrom = now.AddDays(-15); Filter.DtTo = now; break;
+                case 2: Filter.DtFrom = now.AddDays(-30); Filter.DtTo = now; break;
+                case 3: Filter.DtFrom = now.AddDays(-60); Filter.DtTo = now; break;
+                case 4: Filter.DtFrom = now.AddDays(-90); Filter.DtTo = now; break;
+            }
+            MarkFiltersDirty();
+        }
+
+        public async Task OnFilterKeyDown(KeyboardEventArgs e)
+        {
+            if (e.Key == "Enter")
+            {
+                await LoadDataAsync();
+            }
+        }
+
+        public void OnFilterChanged()
+        {
+            MarkFiltersDirty();
         }
 
         // ─────────────────────────────────────────────────────────────
@@ -395,28 +434,28 @@ namespace Impulse.Pages.Production.ReceivingList
         // ─────────────────────────────────────────────────────────────
         // Checkbox Handlers
         // ─────────────────────────────────────────────────────────────
-        public async Task OnRepairLotsChanged()
+        public void OnRepairLotsChanged()
         {
             if (Filter.RepairLots) Filter.RegularLotsOnly = false;
-            await LoadDataAsync();
+            MarkFiltersDirty();
         }
 
-        public async Task OnRegularLotsOnlyChanged()
+        public void OnRegularLotsOnlyChanged()
         {
             if (Filter.RegularLotsOnly) Filter.RepairLots = false;
-            await LoadDataAsync();
+            MarkFiltersDirty();
         }
 
-        public async Task OnBilledChanged()
+        public void OnBilledChanged()
         {
             if (Filter.BilledOnly) Filter.NonBilledOnly = false;
-            await LoadDataAsync();
+            MarkFiltersDirty();
         }
 
-        public async Task OnNonBilledChanged()
+        public void OnNonBilledChanged()
         {
             if (Filter.NonBilledOnly) Filter.BilledOnly = false;
-            await LoadDataAsync();
+            MarkFiltersDirty();
         }
 
         public async Task OnRefreshClicked()
@@ -1087,6 +1126,9 @@ namespace Impulse.Pages.Production.ReceivingList
                         ChangeOrderModel.ToItemCode = SelectedItem.ItemCode;
                     }
 
+                    bool isAuthorized = await SecurityService.VerifyActionAsync("Split_PTC");
+                    if (!isAuthorized) return;
+
                     bool success = await RcvListService.ChangeOrderNoAsync(ChangeOrderModel);
                     if (success)
                     {
@@ -1147,6 +1189,9 @@ namespace Impulse.Pages.Production.ReceivingList
                         });
                         return;
                     }
+
+                    bool isAuthorized = await SecurityService.VerifyActionAsync("Split_PTC");
+                    if (!isAuthorized) return;
 
                     string newLotNo = await RcvListService.SplitLotAsync(SplitLotModel);
                     NotificationService.Notify(new Radzen.NotificationMessage

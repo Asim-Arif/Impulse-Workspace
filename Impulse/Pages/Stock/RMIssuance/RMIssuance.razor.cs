@@ -173,10 +173,36 @@ namespace Impulse.Pages.Stock.RMIssuance
                     {
                         CurrentUnit = details.Unit;
                         CurrentPrice = details.Rate ?? 0;
-                        TotalQtyInStock = details.QtyInStock ?? 0;
+                        double queuedForMaterial = Request.Rows
+                            .Where(r => r.RMID == SelectedMaterial.RMID)
+                            .Sum(r => r.Qty);
+                        TotalQtyInStock = Math.Max(0, Math.Round((details.QtyInStock ?? 0) - queuedForMaterial, 4));
                     }
-                    var locs = await RMIssuanceService.GetMaterialLocationsAsync(SelectedMaterial.RMID);
-                    AvailableLocations = locs.ToList();
+
+                    var locs = (await RMIssuanceService.GetMaterialLocationsAsync(SelectedMaterial.RMID)).ToList();
+                    var adjustedLocs = new List<RMLocationModel>();
+                    foreach (var loc in locs)
+                    {
+                        string locBatch = loc.BatchNo ?? "";
+                        string locLot = loc.LotNo ?? "";
+                        double queuedOnLoc = Request.Rows
+                            .Where(r => r.RMID == SelectedMaterial.RMID
+                                     && r.Shelf_RefID == loc.Shelf_RefID
+                                     && string.Equals(r.BatchNo ?? "", locBatch, StringComparison.OrdinalIgnoreCase)
+                                     && string.Equals(r.LotNo ?? "", locLot, StringComparison.OrdinalIgnoreCase))
+                            .Sum(r => r.Qty);
+
+                        double remaining = Math.Round(loc.ShelfQty - queuedOnLoc, 4);
+                        if (remaining > 0.0001)
+                        {
+                            loc.ShelfQty = remaining;
+                            loc.Display = string.IsNullOrWhiteSpace(locBatch)
+                                ? $"{loc.Store} ({loc.ShelfQty})"
+                                : $"Batch:{locBatch} Lot:{locLot} {loc.Store} ({loc.ShelfQty})";
+                            adjustedLocs.Add(loc);
+                        }
+                    }
+                    AvailableLocations = adjustedLocs;
                 }
                 catch (Exception ex)
                 {
@@ -198,7 +224,7 @@ namespace Impulse.Pages.Stock.RMIssuance
         {
             if (SelectedMaterial == null || SelectedLocation == null || QtyToIssue <= 0) return;
 
-            if (QtyToIssue > SelectedLocation.ShelfQty)
+            if (QtyToIssue > SelectedLocation.ShelfQty + 0.0001)
             {
                 NotificationService.ShowWarning("Insufficient Stock", $"Cannot issue {QtyToIssue}. Only {SelectedLocation.ShelfQty} available in this location.");
                 return;
@@ -217,16 +243,16 @@ namespace Impulse.Pages.Stock.RMIssuance
                 Shelf_RefID = SelectedLocation.Shelf_RefID,
                 Qty = QtyToIssue,
                 Rate = CurrentPrice,
-                BatchNo = SelectedLocation.BatchNo,
-                LotNo = SelectedLocation.LotNo,
-                TotalQtyInStock = SelectedLocation.ShelfQty
+                BatchNo = SelectedLocation.BatchNo ?? "",
+                LotNo = SelectedLocation.LotNo ?? "",
+                TotalQtyInStock = TotalQtyInStock
             };
 
             Request.Rows.Add(newRow);
 
             // Deduct locally from total and location so user can't double-issue beyond capacity
-            SelectedLocation.ShelfQty -= QtyToIssue;
-            TotalQtyInStock -= QtyToIssue;
+            SelectedLocation.ShelfQty = Math.Max(0, Math.Round(SelectedLocation.ShelfQty - QtyToIssue, 4));
+            TotalQtyInStock = Math.Max(0, Math.Round(TotalQtyInStock - QtyToIssue, 4));
 
             // Reset selection for next item
             SelectedMaterial = null; // triggers OnMaterialSelected reset
@@ -237,6 +263,10 @@ namespace Impulse.Pages.Stock.RMIssuance
         private void RemoveItem(RMIssuanceDetailRow row)
         {
             Request.Rows.Remove(row);
+            if (SelectedMaterial != null && SelectedMaterial.RMID == row.RMID)
+            {
+                _ = OnMaterialSelected();
+            }
         }
 
         private async Task LoadHistoryAsync()
@@ -263,6 +293,8 @@ namespace Impulse.Pages.Stock.RMIssuance
 
         private async Task SaveAsync(bool saveAndNew)
         {
+            if (IsSaving) return;
+
             if (!Request.Rows.Any())
             {
                 NotificationService.ShowWarning("Validation", "No items added to issue.");

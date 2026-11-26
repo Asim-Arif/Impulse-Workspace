@@ -1027,6 +1027,33 @@ namespace Impulse.Pages.Export.Orders
 
         private Impulse.Components.Export.CustomerOrdersSelectionModal? planningOrdersModalRef;
 
+        private async Task PrintProductionPlanningReport(string orderNo)
+        {
+            if (string.IsNullOrWhiteSpace(orderNo)) return;
+
+            var request = new ReportRequest
+            {
+                ReportName = ReportNames.Export.OrderPlanningReport,
+                Parameters = new Dictionary<string, object>
+                {
+                    { "@OrderNo", orderNo },
+                    { "@FromItems", false },
+                    { "@DTFrom", dtFrom },
+                    { "@DTTo", dtTo },
+                    { "@CustCode", "" },
+                    { "@Country", "" },
+                    { "@NoDelivery", false },
+                    { "@Both", false },
+                    { "@ItemCode", "0" },
+                    { "@Urgent", false },
+                    { "@GroupID", 0 },
+                    { "@TempList_RefID", 0 },
+                    { "@OrdersList", "" }
+                }
+            };
+            await ReportNavigation.PrintReportAsync(request);
+        }
+
         private async Task OpenPlanningReportModal()
         {
             if (planningOrdersModalRef == null) return;

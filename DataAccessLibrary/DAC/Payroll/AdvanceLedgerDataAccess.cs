@@ -73,5 +73,24 @@ namespace DataAccessLibrary.DAC.Payroll
             var result = await db.QueryAsync<AdvanceLedgerItemModel>(sql, parameters);
             return result.ToList();
         }
+
+        public async Task<decimal> GetLongTermOpeningBalanceAsync(string empId, DateTime fromDate)
+        {
+            if (string.IsNullOrWhiteSpace(empId) || empId == "0")
+                return 0m;
+
+            using IDbConnection db = new SqlConnection(_connectionString);
+
+            const string sql = @"
+                SELECT
+                    ISNULL((SELECT SUM(CAST(Amount AS DECIMAL(18, 2))) FROM Advances WHERE EmpID = @EmpID AND Type = 1 AND DT < @FromDate), 0)
+                  - ISNULL((SELECT SUM(CAST(AmtClrd AS DECIMAL(18, 2))) FROM AmtCleared WHERE EmpID = @EmpID AND DT < @FromDate), 0)";
+
+            return await db.ExecuteScalarAsync<decimal>(sql, new
+            {
+                EmpID = empId,
+                FromDate = fromDate.Date
+            });
+        }
     }
 }

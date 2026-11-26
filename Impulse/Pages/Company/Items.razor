@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @using Blazored.Typeahead
 @using Impulse.Pages.Company
+@using Impulse.Shared.Components
 @using BlazorContextMenu
 
 <PageTitle>Company Items</PageTitle>
@@ -383,7 +384,12 @@
     <Item class="win11-menu-item" OnClick="@PrintSFStock">
         <i class="fas fa-industry fa-fw win11-icon"></i> Print Semi-Finished Stock
     </Item>
+    <Item class="win11-menu-item" OnClick="@PrintStorewiseStatus">
+        <i class="fas fa-warehouse fa-fw win11-icon"></i> Print Storewise Status
+    </Item>
 </ContextMenu>
+
+<StoreSelectionModal @ref="storeSelectionModal" />
 
 <style>
     /* Keep typeaheads aligned with .form-control-sm (Agents.md §11) */

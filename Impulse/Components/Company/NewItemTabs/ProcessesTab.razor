@@ -54,7 +54,8 @@
             <thead class="table-light text-secondary sticky-top" style="font-size: 0.78rem; text-transform: uppercase; z-index: 2; box-shadow: 0 1px 0 #dee2e6;">
                 <tr>
                     <th>Process</th>
-                    <th style="width: 80px;" class="text-center">Sort No.</th>
+                    <th style="width: 115px;" class="text-end">Standard Rate</th>
+                    <th style="width: 95px;" class="text-center">Sort No.</th>
                     <th style="width: 45px;" class="text-center">Action</th>
                 </tr>
             </thead>
@@ -62,7 +63,7 @@
                 @if (Item.Processes == null || !Item.Processes.Any())
                 {
                     <tr>
-                        <td colspan="3" class="text-center text-muted py-5" style="font-style: italic;">
+                        <td colspan="4" class="text-center text-muted py-5" style="font-style: italic;">
                             No production processes assigned. Select a Process Group or Process above and click Seq. No. to add.
                         </td>
                     </tr>
@@ -71,7 +72,7 @@
                 {
                     @foreach (var proc in Item.Processes.OrderBy(p => p.SNO))
                     {
-                        <tr>
+                        <tr @key="proc.ProcessID">
                             <td class="fw-semibold text-dark">
                                 @proc.Description
                                 @if (!string.IsNullOrEmpty(proc.Code))
@@ -79,8 +80,30 @@
                                     <span class="text-muted fw-normal ms-1">(@proc.Code)</span>
                                 }
                             </td>
+                            <td class="text-end">
+                                <input type="number"
+                                       step="any"
+                                       min="0"
+                                       class="form-control form-control-sm text-end ms-auto"
+                                       style="width: 95px !important;"
+                                       placeholder="0.00"
+                                       @bind="proc.Rate" />
+                            </td>
                             <td class="text-center fw-bold text-secondary">
-                                @proc.SNO
+                                @if (!IsFamilyAttached)
+                                {
+                                    <input type="number"
+                                           step="any"
+                                           min="0"
+                                           class="form-control form-control-sm text-center fw-bold mx-auto"
+                                           style="width: 72px !important;"
+                                           @bind="proc.SNO"
+                                           @bind:after="UpdateNextSeqNo" />
+                                }
+                                else
+                                {
+                                    @proc.SNO
+                                }
                             </td>
                             <td class="text-center">
                                 <button type="button" class="btn btn-link text-danger p-0"

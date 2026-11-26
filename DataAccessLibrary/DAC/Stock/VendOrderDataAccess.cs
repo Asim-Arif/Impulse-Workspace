@@ -323,6 +323,14 @@ namespace DataAccessLibrary.DAC.Stock
 
             try
             {
+                // Guard: prevent deleting a PO that already has receivings (would orphan VStockRcvd/ledger references)
+                string checkRcvSql = "SELECT COUNT(*) FROM VendRcvdDetailPO WHERE PORefNo = @orderNo";
+                int rcvCount = await connection.ExecuteScalarAsync<int>(checkRcvSql, new { orderNo }, transaction);
+                if (rcvCount > 0)
+                {
+                    throw new InvalidOperationException($"Cannot delete Purchase Order '{orderNo}' because {rcvCount} receiving entry(s) already exist against it.");
+                }
+
                 string sqlDeleteDetails = "DELETE FROM VendOrderDetail WHERE OrderNo = @orderNo";
                 await connection.ExecuteAsync(sqlDeleteDetails, new { orderNo }, transaction);
 

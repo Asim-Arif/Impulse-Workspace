@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Impulse.Services;
 using Impulse.Constants;
+using Impulse.Shared.Components;
 using BlazorContextMenu;
 using DataAccessLibrary.Models.ViewModels.Company;
 
@@ -39,6 +40,7 @@ namespace Impulse.Pages.Company
         private CompanyItemModel? highlightedItem = null;
 
         private string itemPicBase64 = string.Empty;
+        private StoreSelectionModal? storeSelectionModal;
 
         // Paging Parameters
         private int currentPage = 1;
@@ -595,6 +597,34 @@ namespace Impulse.Pages.Company
                 {
                     ReportName = "BinWiseSemiFinishStockStatus.rpt",
                     SelectionFormula = "{VItemsWithShelfWiseStock.Qty}>0"
+                };
+                await ReportNavigation.PrintReportAsync(request);
+            }
+            catch (Exception ex)
+            {
+                NotificationService.ShowError("Print Error", ex.Message);
+            }
+        }
+
+        private async Task PrintStorewiseStatus(ItemClickEventArgs? e = null)
+        {
+            if (storeSelectionModal == null) return;
+
+            try
+            {
+                var result = await storeSelectionModal.ShowAsync("Select Stores — Storewise Status");
+                if (!result.Confirmed) return;
+
+                string selection = "{VItemsWithShelfWiseStock.NetQty}>0";
+                if (!result.AllStores && result.SelectedStoreIds.Any())
+                {
+                    selection += $" AND {{VStoreShelfs.Store_RefID}} IN[{string.Join(",", result.SelectedStoreIds)}]";
+                }
+
+                var request = new ReportRequest
+                {
+                    ReportName = "BinWiseStockStatusOfItems.rpt",
+                    SelectionFormula = selection
                 };
                 await ReportNavigation.PrintReportAsync(request);
             }

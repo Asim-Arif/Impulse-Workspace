@@ -70,6 +70,11 @@ namespace Impulse.Pages.Payroll.ManualAttendance
 
                 Employees = await AttendanceService.GetActiveEmployeesAsync();
                 await CheckSalaryLockAsync();
+
+                if (NavigationManager.Uri.Contains("/payroll/recalculate-attendance", StringComparison.OrdinalIgnoreCase))
+                {
+                    ShowReCalcModal = true;
+                }
             }
             catch (Exception ex)
             {

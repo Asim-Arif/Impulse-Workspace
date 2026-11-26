@@ -1,7 +1,10 @@
+using BlazorContextMenu;
 using DataAccessLibrary.Models.ViewModels.Payroll;
+using Impulse.Constants;
 using Impulse.Services;
 using Impulse.Services.Payroll;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Radzen;
 using System;
 using System.Collections.Generic;
@@ -13,10 +16,12 @@ namespace Impulse.Pages.Payroll.AdvanceLedger
     public partial class AdvanceLedger : ComponentBase
     {
         // ── Injected Services ─────────────────────────────────────────────────
-        [Inject] private IAdvanceLedgerService   _ledgerService       { get; set; } = null!;
-        [Inject] private IEmployeeService        _employeeService     { get; set; } = null!;
-        [Inject] private INotificationService    _notificationService { get; set; } = null!;
-        [Inject] private NavigationManager       _navManager          { get; set; } = null!;
+        [Inject] private IAdvanceLedgerService      _ledgerService       { get; set; } = null!;
+        [Inject] private IEmployeeService           _employeeService     { get; set; } = null!;
+        [Inject] private INotificationService       _notificationService { get; set; } = null!;
+        [Inject] private IReportNavigationService   _reportNavigation    { get; set; } = null!;
+        [Inject] private IBlazorContextMenuService  _contextMenuService  { get; set; } = null!;
+        [Inject] private NavigationManager          _navManager          { get; set; } = null!;
 
         // ── Query Parameters ──────────────────────────────────────────────────
         [Parameter][SupplyParameterFromQuery] public string? returnUrl   { get; set; }
@@ -203,6 +208,79 @@ namespace Impulse.Pages.Payroll.AdvanceLedger
                             (e.Designation ?? "").Contains(search, StringComparison.OrdinalIgnoreCase))
                 .Take(100);
             return Task.FromResult(results);
+        }
+
+        // ── Printing & Reports ────────────────────────────────────────────────
+
+        private async Task OpenPrintOptions(MouseEventArgs e)
+        {
+            await _contextMenuService.ShowMenu("optionsBarMenu", (int)e.ClientX, (int)e.ClientY + 15);
+        }
+
+        private async Task PrintShortTermLedgerAsync(string? overrideEmpId = null)
+        {
+            try
+            {
+                string empId = !string.IsNullOrWhiteSpace(overrideEmpId) ? overrideEmpId : (Filter.EmpID ?? "0");
+                string fromDate = $"Date({Filter.FromDate.Year},{Filter.FromDate.Month},{Filter.FromDate.Day})";
+                string toDate = $"Date({Filter.ToDate.Year},{Filter.ToDate.Month},{Filter.ToDate.Day})";
+
+                string selection = $"{{VAdvances.DT}}>={fromDate} AND {{VAdvances.DT}}<={toDate} AND {{VAdvances.Type}}=0";
+
+                if (!string.IsNullOrWhiteSpace(empId) && empId != "0")
+                {
+                    selection += $" AND {{VAdvances.EmpID}}='{empId.Replace("'", "''")}'";
+                }
+                else if (!string.IsNullOrWhiteSpace(Filter.DeptID) && Filter.DeptID != "0")
+                {
+                    selection += $" AND {{VAdvances.DeptID}}='{Filter.DeptID.Replace("'", "''")}'";
+                }
+
+                await _reportNavigation.PrintReportAsync(new ReportRequest
+                {
+                    ReportName = ReportNames.Payroll.ShortTermLoanLedger,
+                    SelectionFormula = selection
+                });
+            }
+            catch (Exception ex)
+            {
+                _notificationService.ShowError("Print Error", ex.Message);
+            }
+        }
+
+        private async Task PrintLongTermLedgerAsync(string? overrideEmpId = null)
+        {
+            try
+            {
+                string empId = !string.IsNullOrWhiteSpace(overrideEmpId) ? overrideEmpId : (Filter.EmpID ?? "0");
+                if (string.IsNullOrWhiteSpace(empId) || empId == "0")
+                {
+                    _notificationService.ShowWarning("Employee Required", "Please select an Employee first to print the Long Term Loan Ledger.");
+                    return;
+                }
+
+                decimal openBalance = await _ledgerService.GetLongTermOpeningBalanceAsync(empId, Filter.FromDate);
+                string fromDate = $"Date({Filter.FromDate.Year},{Filter.FromDate.Month},{Filter.FromDate.Day})";
+                string toDate = $"Date({Filter.ToDate.Year},{Filter.ToDate.Month},{Filter.ToDate.Day})";
+                string subHeading = $"'{Filter.FromDate:dd-MMM-yyyy} to {Filter.ToDate:dd-MMM-yyyy}'";
+
+                string selection = $"{{VLoanLedger.empid}}='{empId.Replace("'", "''")}' AND {{VLoanLedger.Amount}}<>0 AND {{VLoanLedger.DT}}>={fromDate} AND {{VLoanLedger.DT}}<={toDate}";
+
+                await _reportNavigation.PrintReportAsync(new ReportRequest
+                {
+                    ReportName = ReportNames.Payroll.EmployeeLoanLedger,
+                    SelectionFormula = selection,
+                    FormulaValues = new Dictionary<string, object>
+                    {
+                        { "OpenBalance", openBalance },
+                        { "SubHeading", subHeading }
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _notificationService.ShowError("Print Error", ex.Message);
+            }
         }
 
         // ── Navigation ────────────────────────────────────────────────────────

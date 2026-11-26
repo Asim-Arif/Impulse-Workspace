@@ -62,7 +62,7 @@ namespace DataAccessLibrary.DAC.Stock
         public async Task<RMDetailsModel> GetRMDetailsAsync(int rmid)
         {
             using IDbConnection db = new SqlConnection(_connectionString);
-            string sql = "SELECT MinLevel, Rate, Unit, QtyInStock FROM RM WHERE RMID = @RMID";
+            string sql = "SELECT MinLevel, Rate, Unit, ISNULL(QtyInStock, 0) AS QtyInStock FROM VRM WHERE RMID = @RMID";
             return await db.QueryFirstOrDefaultAsync<RMDetailsModel>(sql, new { RMID = rmid });
         }
 
@@ -148,7 +148,7 @@ namespace DataAccessLibrary.DAC.Stock
                     request.IssdToEmpID,
                     request.AuthorizedByEmpID,
                     VO_OrderNo = "", // Legacy used it optionally for chkRMPOs
-                    request.Remarks,
+                    Remarks = request.Remarks ?? "",
                     request.Entry_Type,
                     Vendor_AccNo = request.Vendor_AccNo ?? "",
                     Vendor_PO_No = request.Vendor_PO_No ?? "",
@@ -158,6 +158,9 @@ namespace DataAccessLibrary.DAC.Stock
                 // 3. Insert Details & Update stock
                 foreach (var row in request.Rows)
                 {
+                    string batchNo = row.BatchNo ?? "";
+                    string lotNo = row.LotNo ?? "";
+
                     string detailSql = @"
                         INSERT INTO RawMaterialIssuanceDetail (IssNo, RMID1, Qty, InHand, StoreName, Price, Shelf_RefID, Sheets, BatchNo, LotNo)
                         VALUES (@IssNo, @RMID1, @Qty, @InHand, @StoreName, @Price, @Shelf_RefID, 0, @BatchNo, @LotNo);
@@ -168,33 +171,33 @@ namespace DataAccessLibrary.DAC.Stock
                         IssNo = newIssNo,
                         row.RMID1,
                         row.Qty,
-                        InHand = row.TotalQtyInStock - row.Qty,
-                        StoreName = row.Store,
+                        InHand = Math.Round(row.TotalQtyInStock - row.Qty, 4),
+                        StoreName = row.Store ?? "",
                         Price = row.Rate,
                         row.Shelf_RefID,
-                        row.BatchNo,
-                        row.LotNo
+                        BatchNo = batchNo,
+                        LotNo = lotNo
                     }, transaction);
 
                     // Update RM QtyInStock
                     string updateRmSql = "UPDATE RM SET QtyInStock = ISNULL(QtyInStock, 0) - @Qty WHERE RMID = @RMID";
                     await db.ExecuteAsync(updateRmSql, new { row.Qty, row.RMID }, transaction);
 
-                    // Update Material Location via SP
+                    // Update Material Location via hardened SP (throws 51001 and rolls back if shelf stock is insufficient)
                     await db.ExecuteAsync("UpdateMaterialLocation", new
                     {
                         MaterialID = row.RMID1,
                         LocationID = row.Shelf_RefID,
                         Qty = row.Qty,
-                        Access = (bool?)null,
-                        NewLocationID = (int?)null,
-                        UserName = request.UserName,
-                        MachineName = request.MachineName,
+                        Access = false,
+                        NewLocationID = 0,
+                        UserName = request.UserName ?? "",
+                        MachineName = request.MachineName ?? "",
                         Sheets = 0,
                         PORefNo = "",
                         DetailEntryID = detailEntryId,
-                        BatchNo = row.BatchNo,
-                        LotNo = row.LotNo
+                        BatchNo = batchNo,
+                        LotNo = lotNo
                     }, transaction, commandType: CommandType.StoredProcedure);
                 }
 

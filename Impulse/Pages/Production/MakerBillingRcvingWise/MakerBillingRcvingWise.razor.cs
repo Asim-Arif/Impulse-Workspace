@@ -25,7 +25,9 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
         public MakerBillingFilter Filter { get; set; } = new MakerBillingFilter();
 
         // Customer & Internal Ref Filters
-        public string SelectedCustCode { get; set; } = string.Empty;
+        public HashSet<string> SelectedCustCodes { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        public bool ShowCustDropdown { get; set; } = false;
+        public string CustSearchText { get; set; } = string.Empty;
         public string SelectedInternalRefNo { get; set; } = string.Empty;
 
         // 6 Tab Datasets
@@ -104,7 +106,9 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
         {
             SelectedMaker = maker;
             Filter.VendID = maker?.Id ?? 0;
-            SelectedCustCode = string.Empty;
+            SelectedCustCodes.Clear();
+            ShowCustDropdown = false;
+            CustSearchText = string.Empty;
             SelectedInternalRefNo = string.Empty;
             await LoadAllDataAsync();
         }
@@ -165,8 +169,57 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
                    .Distinct(StringComparer.OrdinalIgnoreCase)
                    .OrderBy(c => c);
 
+        public IEnumerable<string> FilteredAvailableCustomerCodes =>
+            string.IsNullOrWhiteSpace(CustSearchText)
+                ? AvailableCustomerCodes
+                : AvailableCustomerCodes.Where(c => c.Contains(CustSearchText.Trim(), StringComparison.OrdinalIgnoreCase));
+
+        public string SelectedCustDisplay =>
+            SelectedCustCodes.Count == 0
+                ? "<All Customers>"
+                : SelectedCustCodes.Count <= 2
+                    ? string.Join(", ", SelectedCustCodes.OrderBy(c => c))
+                    : $"{SelectedCustCodes.Count} Customers";
+
+        public void ToggleCustDropdown()
+        {
+            ShowCustDropdown = !ShowCustDropdown;
+            if (ShowCustDropdown)
+            {
+                CustSearchText = string.Empty;
+            }
+        }
+
+        public void CloseCustDropdown()
+        {
+            ShowCustDropdown = false;
+        }
+
+        public void ToggleCustomerCode(string custCode)
+        {
+            if (string.IsNullOrWhiteSpace(custCode)) return;
+            if (!SelectedCustCodes.Add(custCode))
+            {
+                SelectedCustCodes.Remove(custCode);
+            }
+            OnCustomerFilterChanged();
+        }
+
+        public void ClearCustomerSelection()
+        {
+            SelectedCustCodes.Clear();
+            ShowCustDropdown = false;
+            OnCustomerFilterChanged();
+        }
+
+        public void SelectAllCustomerCodes()
+        {
+            SelectedCustCodes = new HashSet<string>(AvailableCustomerCodes, StringComparer.OrdinalIgnoreCase);
+            OnCustomerFilterChanged();
+        }
+
         public IEnumerable<string> AvailableInternalRefNos =>
-            AllLots.Where(x => string.IsNullOrWhiteSpace(SelectedCustCode) || x.CustCode.Equals(SelectedCustCode, StringComparison.OrdinalIgnoreCase))
+            AllLots.Where(x => SelectedCustCodes.Count == 0 || SelectedCustCodes.Contains(x.CustCode))
                    .Select(x => x.InternalRefNo)
                    .Where(r => !string.IsNullOrWhiteSpace(r))
                    .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -190,7 +243,7 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
         public void ApplyLocalLotFilter()
         {
             Lots = AllLots.Where(x =>
-                (string.IsNullOrWhiteSpace(SelectedCustCode) || x.CustCode.Equals(SelectedCustCode, StringComparison.OrdinalIgnoreCase)) &&
+                (SelectedCustCodes.Count == 0 || SelectedCustCodes.Contains(x.CustCode)) &&
                 (string.IsNullOrWhiteSpace(SelectedInternalRefNo) || x.InternalRefNo.Equals(SelectedInternalRefNo, StringComparison.OrdinalIgnoreCase))
             ).ToList();
             StateHasChanged();
@@ -215,6 +268,7 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
             try
             {
                 AllLots = await BillingService.GetMakerBillingLotsAsync(Filter);
+                SelectedCustCodes.IntersectWith(AvailableCustomerCodes);
                 ApplyLocalLotFilter();
                 RepairItems = await BillingService.GetRepairWastageItemsAsync(Filter);
                 MaterialDedItems = await BillingService.GetMaterialDeductionsAsync(Filter.VendID, Filter.MasterPONo);

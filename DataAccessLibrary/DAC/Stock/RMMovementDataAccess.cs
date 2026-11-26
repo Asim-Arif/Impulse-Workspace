@@ -54,6 +54,9 @@ namespace DataAccessLibrary.DAC.Stock
 
         public async Task SaveMovementAsync(RMMovementSaveRequest request, string userName, string machineName)
         {
+            if (request.QtyMoved <= 0)
+                throw new InvalidOperationException("Quantity to move must be greater than zero.");
+
             using (IDbConnection db = new SqlConnection(_connectionString))
             {
                 db.Open();
@@ -61,29 +64,44 @@ namespace DataAccessLibrary.DAC.Stock
                 {
                     try
                     {
+                        // 0. Lock source shelf row and verify available balance
+                        string checkSql = @"
+                            SELECT ROUND(CAST(ISNULL(QtyPlaced, 0) AS FLOAT) - CAST(ISNULL(QtyIssued, 0) AS FLOAT), 4)
+                            FROM MaterialLocationwiseStatus WITH (UPDLOCK, HOLDLOCK)
+                            WHERE EntryID = @EntryID";
+
+                        double? availableQty = await db.QuerySingleOrDefaultAsync<double?>(
+                            checkSql, new { EntryID = request.From_MLS_RefID }, transaction);
+
+                        if (!availableQty.HasValue || request.QtyMoved > availableQty.Value + 0.001)
+                        {
+                            throw new InvalidOperationException(
+                                $"Insufficient stock on source shelf. Requested: {request.QtyMoved:0.####}, Available: {Math.Max(0, availableQty ?? 0):0.####}.");
+                        }
+
                         // 1. Insert new MaterialLocationwiseStatus for the TO location
                         string insertSql = @"
                             INSERT INTO MaterialLocationwiseStatus
-                            (Rcvd_RefID, Shelf_RefID, QtyPlaced, UserName, MachineName, BatchNo, LotNo) 
+                            (Rcvd_RefID, Shelf_RefID, QtyPlaced, QtyIssued, UserName, MachineName, BatchNo, LotNo) 
                             OUTPUT INSERTED.EntryID
                             VALUES
-                            (@Rcvd_RefID, @Shelf_RefID, @QtyPlaced, @UserName, @MachineName, @BatchNo, @LotNo)";
+                            (@Rcvd_RefID, @Shelf_RefID, @QtyPlaced, 0, @UserName, @MachineName, @BatchNo, @LotNo)";
 
                         int newMlsRefId = await db.QuerySingleAsync<int>(insertSql, new
                         {
                             request.Rcvd_RefID,
                             Shelf_RefID = request.To_Shelf_RefID,
                             QtyPlaced = request.QtyMoved,
-                            UserName = userName,
-                            MachineName = machineName,
-                            request.BatchNo,
-                            request.LotNo
+                            UserName = userName ?? "",
+                            MachineName = machineName ?? "",
+                            BatchNo = request.BatchNo ?? "",
+                            LotNo = request.LotNo ?? ""
                         }, transaction);
 
                         // 3. Update the QtyIssued on the FROM location
                         string updateSql = @"
                             UPDATE MaterialLocationwiseStatus 
-                            SET QtyIssued = ISNULL(QtyIssued, 0) + @QtyMoved 
+                            SET QtyIssued = ROUND(ISNULL(QtyIssued, 0) + @QtyMoved, 4)
                             WHERE EntryID = @EntryID";
 
                         await db.ExecuteAsync(updateSql, new
@@ -103,8 +121,8 @@ namespace DataAccessLibrary.DAC.Stock
                         {
                             request.From_MLS_RefID,
                             To_MLS_RefID = newMlsRefId,
-                            UserName = userName,
-                            MachineName = machineName,
+                            UserName = userName ?? "",
+                            MachineName = machineName ?? "",
                             request.QtyMoved
                         }, transaction);
 

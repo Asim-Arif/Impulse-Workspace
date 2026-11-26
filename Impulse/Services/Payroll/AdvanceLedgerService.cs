@@ -1,5 +1,6 @@
 using DataAccessLibrary.Interface.Payroll;
 using DataAccessLibrary.Models.ViewModels.Payroll;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -17,6 +18,11 @@ namespace Impulse.Services.Payroll
         public async Task<List<AdvanceLedgerItemModel>> GetAdvanceLedgerAsync(AdvanceLedgerFilterDto filter)
         {
             return await _dataAccess.GetAdvanceLedgerAsync(filter);
+        }
+
+        public async Task<decimal> GetLongTermOpeningBalanceAsync(string empId, DateTime fromDate)
+        {
+            return await _dataAccess.GetLongTermOpeningBalanceAsync(empId, fromDate);
         }
     }
 }

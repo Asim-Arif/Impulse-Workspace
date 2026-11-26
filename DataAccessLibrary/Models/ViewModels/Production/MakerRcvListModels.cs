@@ -92,6 +92,32 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public decimal TotalFinalQty => StoreTransferQty + DispatchQty;
         public decimal BalanceQty => (RcvdQty - Wastage - LostQty) - TotalFinalQty;
 
+        // Lot / Dispatch / Store Status (from VVendReceivingList)
+        public string? DispatchListNo { get; set; }
+        public int? TTRFD_EntryID { get; set; }
+        public string? StoreName { get; set; }
+        public string? RackNo { get; set; }
+        public string? Lot_Current_Process { get; set; }
+
+        public string LotStatus
+        {
+            get
+            {
+                bool hasDispatch = !string.IsNullOrWhiteSpace(DispatchListNo);
+                bool hasStore = TTRFD_EntryID.HasValue && TTRFD_EntryID.Value > 0;
+
+                if (hasDispatch && hasStore)
+                    return "Dispatch+Store";
+                if (hasDispatch)
+                    return "Dispatch";
+                if (hasStore)
+                    return $"Store - {StoreName ?? string.Empty} {RackNo ?? string.Empty}".Trim();
+                if (string.IsNullOrWhiteSpace(Lot_Current_Process))
+                    return Description ?? string.Empty;
+                return Lot_Current_Process;
+            }
+        }
+
         // Extra
         public string Employees { get; set; } = string.Empty;
         public string Empoloyees

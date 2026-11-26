@@ -34,8 +34,8 @@
                     {
                         <span class="badge bg-light text-secondary border" style="font-size:0.75rem;">@FilteredItems.Count() records</span>
                     }
-                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="OnRefreshClicked" disabled="@IsLoading">
-                        <i class="fas fa-sync-alt me-1"></i> Refresh
+                    <button type="button" class="btn btn-sm @(HasPendingFilterChanges ? "btn-primary fw-bold shadow-sm" : "btn-outline-primary")" @onclick="OnRefreshClicked" disabled="@IsLoading">
+                        <i class="fas fa-sync-alt me-1"></i> Refresh@(HasPendingFilterChanges ? " *" : "")
                     </button>
                     <button type="button" id="btnOptionsMenu" class="btn btn-sm btn-dark text-white fw-bold shadow-sm px-3" @onclick="ShowOptionsMenu" disabled="@IsLoading">
                         <i class="fas fa-ellipsis-v me-1"></i> Options
@@ -96,7 +96,7 @@
                     </div>
                     <div class="col-md-2">
                         <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Date Range</label>
-                        <select class="form-select form-select-sm" @bind="Filter.DateRangeIndex" @bind:after="OnFilterChanged">
+                        <select class="form-select form-select-sm" @bind="Filter.DateRangeIndex" @bind:after="OnDateRangeChanged">
                             <option value="0">Today</option>
                             <option value="1">Last 15 Days</option>
                             <option value="2">Last 30 Days</option>
@@ -107,11 +107,11 @@
                     </div>
                     <div class="col-md-2">
                         <label class="form-label form-label-sm mb-1 fw-bold text-secondary">From Date</label>
-                        <input type="date" class="form-control form-control-sm" @bind="Filter.DtFrom" @bind:after="OnFilterChanged" disabled="@(Filter.DateRangeIndex != 5)" />
+                        <input type="date" class="form-control form-control-sm" @bind="Filter.DtFrom" @bind:after="MarkFiltersDirty" @onkeydown="OnFilterKeyDown" disabled="@(Filter.DateRangeIndex != 5)" />
                     </div>
                     <div class="col-md-2">
                         <label class="form-label form-label-sm mb-1 fw-bold text-secondary">To Date</label>
-                        <input type="date" class="form-control form-control-sm" @bind="Filter.DtTo" @bind:after="OnFilterChanged" disabled="@(Filter.DateRangeIndex != 5)" />
+                        <input type="date" class="form-control form-control-sm" @bind="Filter.DtTo" @bind:after="MarkFiltersDirty" @onkeydown="OnFilterKeyDown" disabled="@(Filter.DateRangeIndex != 5)" />
                     </div>
                 </div>
 
@@ -119,26 +119,26 @@
                 <div class="row g-2 mb-2 align-items-end">
                     <div class="col-md-2">
                         <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Lot No.</label>
-                        <input type="text" class="form-control form-control-sm" @bind="Filter.LotNo" @bind:event="oninput" @bind:after="OnFilterChanged" placeholder="Search Lot..." />
+                        <input type="text" class="form-control form-control-sm" @bind="Filter.LotNo" @bind:after="MarkFiltersDirty" @onkeydown="OnFilterKeyDown" placeholder="Search Lot..." />
                     </div>
                     <div class="col-md-2">
                         <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Order No.</label>
-                        <input type="text" class="form-control form-control-sm" @bind="Filter.OrderNo" @bind:event="oninput" @bind:after="OnFilterChanged" placeholder="Order No..." />
+                        <input type="text" class="form-control form-control-sm" @bind="Filter.OrderNo" @bind:after="MarkFiltersDirty" @onkeydown="OnFilterKeyDown" placeholder="Order No..." />
                     </div>
                     <div class="col-md-2">
                         <label class="form-label form-label-sm mb-1 fw-bold text-secondary">Master PO No.</label>
-                        <input type="text" class="form-control form-control-sm" @bind="Filter.MasterPONo" @bind:event="oninput" @bind:after="OnFilterChanged" placeholder="Master PO..." />
+                        <input type="text" class="form-control form-control-sm" @bind="Filter.MasterPONo" @bind:after="MarkFiltersDirty" @onkeydown="OnFilterKeyDown" placeholder="Master PO..." />
                     </div>
                     <div class="col-md-2">
                         <label class="form-label form-label-sm mb-1 fw-bold text-secondary">In-Active Days</label>
-                        <input type="text" class="form-control form-control-sm" @bind="Filter.InActiveDays" placeholder="e.g. 30" />
+                        <input type="text" class="form-control form-control-sm" @bind="Filter.InActiveDays" @bind:after="MarkFiltersDirty" @onkeydown="OnFilterKeyDown" placeholder="e.g. 30" />
                     </div>
                 </div>
 
                 <!-- Row 4: Checkboxes -->
                 <div class="d-flex flex-wrap gap-3 pt-1 border-top align-items-center" style="font-size: 0.83rem;">
                     <div class="form-check form-check-inline mb-0">
-                        <input class="form-check-input" type="checkbox" id="chkShowMasterPOOnly" @bind="Filter.ShowMasterPOOnly" @bind:after="OnFilterChanged" />
+                        <input class="form-check-input" type="checkbox" id="chkShowMasterPOOnly" @bind="Filter.ShowMasterPOOnly" @bind:after="MarkFiltersDirty" />
                         <label class="form-check-label fw-semibold text-secondary" for="chkShowMasterPOOnly">Master PO Only</label>
                     </div>
                     <div class="form-check form-check-inline mb-0">
@@ -146,7 +146,7 @@
                         <label class="form-check-label fw-semibold text-danger" for="chkRepairLots">Repair Lots</label>
                     </div>
                     <div class="form-check form-check-inline mb-0">
-                        <input class="form-check-input" type="checkbox" id="chkRejectionLots" @bind="Filter.RejectionLots" @bind:after="OnFilterChanged" />
+                        <input class="form-check-input" type="checkbox" id="chkRejectionLots" @bind="Filter.RejectionLots" @bind:after="MarkFiltersDirty" />
                         <label class="form-check-label fw-semibold text-warning" for="chkRejectionLots">Rejection Lots</label>
                     </div>
                     <div class="form-check form-check-inline mb-0">
@@ -154,7 +154,7 @@
                         <label class="form-check-label fw-semibold text-secondary" for="chkRegularLotsOnly">Regular Lots Only</label>
                     </div>
                     <div class="form-check form-check-inline mb-0">
-                        <input class="form-check-input" type="checkbox" id="chkRcvdButNotIssued" @bind="Filter.RcvdButNotIssued" @bind:after="OnFilterChanged" />
+                        <input class="form-check-input" type="checkbox" id="chkRcvdButNotIssued" @bind="Filter.RcvdButNotIssued" @bind:after="MarkFiltersDirty" />
                         <label class="form-check-label fw-semibold text-primary" for="chkRcvdButNotIssued">Rcvd but not Issued</label>
                     </div>
                     <div class="form-check form-check-inline mb-0">
@@ -166,11 +166,11 @@
                         <label class="form-check-label fw-semibold text-danger" for="chkNonBilledOnly">Non-Billed Entries</label>
                     </div>
                     <div class="form-check form-check-inline mb-0">
-                        <input class="form-check-input" type="checkbox" id="chkShowLastOnly" @bind="Filter.ShowLastOnly" @bind:after="OnFilterChanged" />
+                        <input class="form-check-input" type="checkbox" id="chkShowLastOnly" @bind="Filter.ShowLastOnly" @bind:after="MarkFiltersDirty" />
                         <label class="form-check-label fw-semibold text-info" for="chkShowLastOnly">Last Process Done</label>
                     </div>
                     <div class="form-check form-check-inline mb-0">
-                        <input class="form-check-input" type="checkbox" id="chkPendingFinalTransfer" @bind="Filter.PendingFinalTransferOnly" @bind:after="OnFilterChanged" />
+                        <input class="form-check-input" type="checkbox" id="chkPendingFinalTransfer" @bind="Filter.PendingFinalTransferOnly" @bind:after="MarkFiltersDirty" />
                         <label class="form-check-label fw-semibold text-warning" for="chkPendingFinalTransfer">Pending (Dispatch/Trf)</label>
                     </div>
                 </div>
@@ -252,6 +252,7 @@
                             <th class="text-end">Wastage</th>
                             <th class="text-end">Re-Work</th>
                             <th class="text-center" style="min-width: 140px;">Dispatch/Trf</th>
+                            <th class="text-center">Auth. Status</th>
                             <th class="text-center">Status</th>
                             <th>Lot No.</th>
                             <th>Master PO</th>
@@ -263,7 +264,7 @@
                         @if (IsLoading)
                         {
                             <tr>
-                                <td colspan="17" class="text-center py-4 text-muted">
+                                <td colspan="18" class="text-center py-4 text-muted">
                                     <div class="spinner-border spinner-border-sm text-success me-2" role="status"></div> Loading Receiving List...
                                 </td>
                             </tr>
@@ -271,7 +272,7 @@
                         else if (!FilteredItems.Any())
                         {
                             <tr>
-                                <td colspan="17" class="text-center py-4 text-muted">
+                                <td colspan="18" class="text-center py-4 text-muted">
                                     <i class="fas fa-info-circle me-1"></i> No receiving records found matching filters.
                                 </td>
                             </tr>
@@ -356,6 +357,28 @@
                                         else
                                         {
                                             <span class="badge bg-success"><i class="fas fa-check me-1"></i>Authorized</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        @if (currentItem.LotStatus == "Dispatch+Store")
+                                        {
+                                            <span class="badge bg-primary">@currentItem.LotStatus</span>
+                                        }
+                                        else if (currentItem.LotStatus == "Dispatch")
+                                        {
+                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">@currentItem.LotStatus</span>
+                                        }
+                                        else if (currentItem.LotStatus.StartsWith("Store -"))
+                                        {
+                                            <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">@currentItem.LotStatus</span>
+                                        }
+                                        else if (!string.IsNullOrWhiteSpace(currentItem.LotStatus))
+                                        {
+                                            <span class="badge bg-light text-dark border">@currentItem.LotStatus</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
                                         }
                                     </td>
                                     <td>

@@ -129,6 +129,7 @@ namespace Impulse.Services.Setup
             ["PaySocialSecurity"] = ("Social Security", "/payroll/social-security?returnUrl=/payroll", "Payroll", "fas fa-shield-alt"),
             ["PrlAbsentSheet"] = ("Absent Sheet", "/payroll/absent-sheet?returnUrl=/payroll", "Payroll", "fas fa-user-slash"),
             ["PrlTakeAttendanceEx"] = ("Manual Attendance", "/payroll/manual-attendance", "Payroll", "fas fa-clock"),
+            ["PrlReCalculateAttendance"] = ("Re-Calculate Attendance", "/payroll/recalculate-attendance?returnUrl=/payroll", "Payroll", "fas fa-sync-alt"),
             ["PrlEOBI"] = ("EOBI Sheet", "/payroll/eobi?returnUrl=/payroll", "Payroll", "fas fa-building-user"),
             ["PrlPayrollPolicies"] = ("Payroll Policies", "/payroll/policies?returnUrl=/payroll", "Payroll", "fas fa-file-contract"),
             ["PrlSocialSecurity"] = ("Social Security", "/payroll/social-security?returnUrl=/payroll", "Payroll", "fas fa-shield-alt"),

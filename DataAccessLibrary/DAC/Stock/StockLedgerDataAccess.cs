@@ -70,14 +70,14 @@ namespace DataAccessLibrary.DAC.Stock
                     FROM VStockLedger
                     WHERE MaterialID = @MaterialId 
                       AND TransactionDate >= @FromDate 
-                      AND TransactionDate <= @ToDate
+                      AND TransactionDate < @ToDateExclusive
                     ORDER BY TransactionDate, TransactionID";
 
                 var results = await db.QueryAsync<StockLedgerTransactionModel>(sql, new 
                 { 
                     MaterialId = materialId, 
                     FromDate = fromDate.Date, 
-                    ToDate = toDate.Date 
+                    ToDateExclusive = toDate.Date.AddDays(1) 
                 });
 
                 return results.AsList();

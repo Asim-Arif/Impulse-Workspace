@@ -132,6 +132,10 @@ namespace Impulse.Constants
             // Designation Reports
             public const string DesignationsList        = Folder + "Designations.rpt";
             public const string DesignationDetail      = Folder + "Designation.rpt";
+
+            // Loan & Advance Ledger Reports
+            public const string ShortTermLoanLedger     = Folder + "ShortTermLoanLedger.rpt";
+            public const string EmployeeLoanLedger      = Folder + "EmployeeLoanLedger.rpt";
         }
 
 
@@ -143,6 +147,7 @@ namespace Impulse.Constants
             public const string CombinedOrderItemwise = Folder + "CombinedOrderReportItemwise.rpt";
             public const string PartShippedOrders = Folder + "rptPartiallyShippedOrders.rpt";
             public const string ProductionExportCost = Folder + "OrderwiseProductionExportCost.rpt";
+            public const string OrderPlanningReport = Folder + "OrderPlanningReport.rpt";
             public const string OrderPlanningMultipleOrders = Folder + "Order_Planning_Report_Multiple_Orders.rpt";
             public const string FOrderList = Folder + "rptFOrderList.rpt";
             public const string PTCQEL = Folder + "PTCQEL.rpt";

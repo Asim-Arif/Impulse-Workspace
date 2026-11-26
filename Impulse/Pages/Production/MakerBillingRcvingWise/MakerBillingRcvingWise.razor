@@ -47,7 +47,7 @@
             </div>
 
             <!-- Filter Controls Panel -->
-            <div class="p-3 bg-light rounded-3 border mb-3">
+            <div class="p-3 bg-light rounded-3 border mb-3" style="position: relative; z-index: 100;">
                 <!-- Row 1: Core Lookups -->
                 <div class="row g-2 align-items-end mb-2">
                     <!-- Maker Selector -->
@@ -156,18 +156,63 @@
                         <input type="date" class="form-control form-control-sm px-1" @bind="Filter.DtTo" @bind:after="LoadAllDataAsync" disabled="@(Filter.DateRangeIndex != 8)" />
                     </div>
 
-                    <!-- Customer Code Filter -->
-                    <div class="col-xl-2 col-md-2">
+                    <!-- Customer Code Filter (Multi-Select) -->
+                    <div class="col-xl-2 col-md-2" style="position: relative;">
                         <label class="form-label form-label-sm mb-1 fw-bold text-secondary">
                             <i class="fas fa-user-tag text-primary me-1"></i> Customer Code
                         </label>
-                        <select class="form-select form-select-sm" @bind="SelectedCustCode" @bind:after="OnCustomerFilterChanged">
-                            <option value="">&lt;All Customers&gt;</option>
-                            @foreach (var custCode in AvailableCustomerCodes)
-                            {
-                                <option value="@custCode">@custCode</option>
-                            }
-                        </select>
+                        <button type="button"
+                                class="form-select form-select-sm text-start text-truncate bg-white"
+                                style="cursor: pointer;"
+                                title="@SelectedCustDisplay"
+                                @onclick="ToggleCustDropdown">
+                            @SelectedCustDisplay
+                        </button>
+
+                        @if (ShowCustDropdown)
+                        {
+                            <div style="position: fixed; inset: 0; z-index: 9998;" @onclick="CloseCustDropdown"></div>
+                            <div class="card shadow border mt-1 p-2 bg-white"
+                                 style="position: absolute; top: 100%; left: 0; min-width: 220px; width: 100%; z-index: 9999; border-radius: 8px;">
+                                <div class="mb-1">
+                                    <input type="text"
+                                           class="form-control form-control-sm"
+                                           placeholder="Search customer..."
+                                           @bind="CustSearchText"
+                                           @bind:event="oninput" />
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center pb-1 mb-1 border-bottom" style="font-size: 0.78rem;">
+                                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold" @onclick="ClearCustomerSelection">
+                                        &lt;All Customers&gt;
+                                    </button>
+                                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-secondary" @onclick="SelectAllCustomerCodes">
+                                        Select All
+                                    </button>
+                                </div>
+                                <div style="max-height: 210px; overflow-y: auto;">
+                                    @if (!FilteredAvailableCustomerCodes.Any())
+                                    {
+                                        <div class="text-muted small text-center py-2">No customers</div>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var custCode in FilteredAvailableCustomerCodes)
+                                        {
+                                            var cust = custCode;
+                                            bool isChecked = SelectedCustCodes.Contains(cust);
+                                            <div class="form-check py-1 px-2 mb-0 rounded" style="cursor: pointer; font-size: 0.85rem;" @onclick="@(() => ToggleCustomerCode(cust))">
+                                                <input class="form-check-input ms-0 me-2"
+                                                       type="checkbox"
+                                                       checked="@isChecked"
+                                                       @onclick:stopPropagation="true"
+                                                       @onchange="@(() => ToggleCustomerCode(cust))" />
+                                                <label class="form-check-label" style="cursor: pointer;">@cust</label>
+                                            </div>
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        }
                     </div>
 
                     <!-- Internal Ref # Filter -->

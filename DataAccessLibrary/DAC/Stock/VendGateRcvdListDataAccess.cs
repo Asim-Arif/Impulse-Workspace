@@ -84,19 +84,50 @@ namespace DataAccessLibrary.DAC.Stock
         public async Task DeleteReceivingAsync(string rcvId)
         {
             using IDbConnection connection = new SqlConnection(_config.GetConnectionString("DefaultConnection"));
-            
-            // Check for issuance first (MaterialLocationwiseStatus)
-            string checkSql = "SELECT COUNT(*) FROM VMaterialLocationwiseStatus WHERE RcvID = @RcvID AND QtyIssued > 0";
-            int issuedCount = await connection.ExecuteScalarAsync<int>(checkSql, new { RcvID = rcvId });
-            
-            if (issuedCount > 0)
+            connection.Open();
+            using var transaction = connection.BeginTransaction();
+
+            try
             {
-                throw new Exception("Can't Delete, Material Issued.");
+                // Lock placements and check if any material from this receiving has been issued
+                string checkSql = @"
+                    SELECT COUNT(*)
+                    FROM MaterialLocationwiseStatus mls WITH (UPDLOCK, HOLDLOCK)
+                    INNER JOIN VendRcvdDetailPO vrdp ON mls.Rcvd_RefID = vrdp.EntryID
+                    WHERE vrdp.RcvID = @RcvID
+                      AND ISNULL(mls.QtyIssued, 0) > 0";
+
+                int issuedCount = await connection.ExecuteScalarAsync<int>(checkSql, new { RcvID = rcvId }, transaction);
+                if (issuedCount > 0)
+                {
+                    throw new Exception("Can't Delete, Material Issued.");
+                }
+
+                // Reverse RM.QtyInStock for checked receivings before cascading delete
+                string reverseRmSql = @"
+                    UPDATE rm
+                    SET rm.QtyInStock = ISNULL(rm.QtyInStock, 0) - Agg.NetQty
+                    FROM RM rm
+                    INNER JOIN (
+                        SELECT MaterialID,
+                               SUM(ISNULL(QtyRcvd, 0) - ISNULL(QtyReturned, 0) + ISNULL(ExtraQtyRcvd, 0)) AS NetQty
+                        FROM VendRcvdDetailPO
+                        WHERE RcvID = @RcvID AND ISNULL(Checked, 0) = 1
+                        GROUP BY MaterialID
+                    ) Agg ON rm.RMID1 = Agg.MaterialID";
+                await connection.ExecuteAsync(reverseRmSql, new { RcvID = rcvId }, transaction);
+
+                // Delete header (cascades VendRcvdDetailPO and unissued MaterialLocationwiseStatus)
+                string deleteSql = "DELETE FROM VendRcvd WHERE RcvID = @RcvID";
+                await connection.ExecuteAsync(deleteSql, new { RcvID = rcvId }, transaction);
+
+                transaction.Commit();
             }
-            
-            // Delete if not issued
-            string deleteSql = "DELETE FROM VendRcvd WHERE RcvID = @RcvID";
-            await connection.ExecuteAsync(deleteSql, new { RcvID = rcvId });
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
     }
 }
