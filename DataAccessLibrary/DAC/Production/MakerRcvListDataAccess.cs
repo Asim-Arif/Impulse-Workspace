@@ -789,19 +789,23 @@ namespace DataAccessLibrary.DAC.Production
                     new { EntryID = request.EntryID }, tx);
                 int notAvailableForBilling = billCount > 0 ? 1 : 0;
 
-                await db.ExecuteAsync(
-                    "UPDATE VendRcvdDetail SET RcvdQty = RcvdQty - @SplitQty WHERE EntryID = @EntryID",
+                int updatedSourceRows = await db.ExecuteAsync(
+                    "UPDATE VendRcvdDetail SET RcvdQty = RcvdQty - @SplitQty WHERE EntryID = @EntryID AND RcvdQty >= @SplitQty",
                     new { SplitQty = request.SplitQty, EntryID = request.EntryID }, tx);
 
-                await db.ExecuteAsync(@"
+                if (updatedSourceRows == 0)
+                {
+                    throw new InvalidOperationException($"Cannot split Lot #{request.OriginalLotNo}: insufficient remaining quantity. Please refresh.");
+                }
+
+                long newVrRefId = await db.ExecuteScalarAsync<long>(@"
                     INSERT INTO VendReceived (VendID, DT, RecieptID, UserID, ProcessID, Issuance_RefID, EmpID)
                     SELECT VendID, DT, '', UserID, ProcessID, Issuance_RefID, EmpID
-                    FROM VendReceived WHERE EntryID = @VR_EntryID",
+                    FROM VendReceived WHERE EntryID = @VR_EntryID;
+                    SELECT CAST(SCOPE_IDENTITY() AS BIGINT);",
                     new { VR_EntryID = request.VR_EntryID }, tx);
 
-                long newVrRefId = await db.ExecuteScalarAsync<long>("SELECT MAX(EntryID) FROM VendReceived", transaction: tx);
-
-                await db.ExecuteAsync(@"
+                long newVrdEntryId = await db.ExecuteScalarAsync<long>(@"
                     INSERT INTO VendRcvdDetail (
                         RefID, ItemCode, RecieptID, RcvdQty, Wastage, IssQty, Rate, LotNo, ReqAuth,
                         NextProcessID, LostQty, OrderNo, CountedBy, Issue_RefID, ProcessID, RcvdWeight,
@@ -811,7 +815,8 @@ namespace DataAccessLibrary.DAC.Production
                         @NewVrRefId, @SplitItemCode, '', @SplitQty, 0, 0, Rate, @NewLotNo, ReqAuth,
                         NextProcessID, 0, @SplitOrderNo, '', Issue_RefID, ProcessID, 0,
                         Opening_RefID, ReWorkLot, Repair_RefID, @NotAvailableForBilling
-                    FROM VendRcvdDetail WHERE EntryID = @EntryID",
+                    FROM VendRcvdDetail WHERE EntryID = @EntryID;
+                    SELECT CAST(SCOPE_IDENTITY() AS BIGINT);",
                     new
                     {
                         NewVrRefId = newVrRefId,
@@ -822,8 +827,6 @@ namespace DataAccessLibrary.DAC.Production
                         NotAvailableForBilling = notAvailableForBilling,
                         EntryID = request.EntryID
                     }, tx);
-
-                long newVrdEntryId = await db.ExecuteScalarAsync<long>("SELECT MAX(EntryID) FROM VendRcvdDetail", transaction: tx);
 
                 await db.ExecuteAsync(@"
                     INSERT INTO Lots_List (LotNo, ItemID, Lot_Type, Reference_LotNo, Batch_No, Mill_Certificate_No, Forge_Batch_No)

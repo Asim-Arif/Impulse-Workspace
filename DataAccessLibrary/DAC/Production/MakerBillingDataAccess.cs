@@ -1,5 +1,7 @@
 using Dapper;
+using DataAccessLibrary.Interface.Accounts;
 using DataAccessLibrary.Interface.Production;
+using DataAccessLibrary.Models.ViewModels.Accounts;
 using DataAccessLibrary.Models.ViewModels.Production;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
@@ -14,11 +16,16 @@ namespace DataAccessLibrary.DAC.Production
     public class MakerBillingDataAccess : IMakerBillingDataAccess
     {
         private readonly IConfiguration _config;
+        private readonly IVouchersDataAccess _vouchersDataAccess;
 
-        public MakerBillingDataAccess(IConfiguration config)
+        public MakerBillingDataAccess(IConfiguration config, IVouchersDataAccess vouchersDataAccess)
         {
             _config = config;
+            _vouchersDataAccess = vouchersDataAccess;
         }
+
+        private static int RoundToInt(decimal value) =>
+            Convert.ToInt32(Math.Round(value, 0, MidpointRounding.AwayFromZero));
 
         private string ConnectionString => _config.GetConnectionString("DefaultConnection")
             ?? _config.GetConnectionString("ImpulseConnection")
@@ -115,6 +122,9 @@ namespace DataAccessLibrary.DAC.Production
                 long viEntryId = dict.ContainsKey("EntryID") && dict["EntryID"] != null
                     ? Convert.ToInt64(dict["EntryID"]) : 0;
 
+                long mainIssuanceEntryId = dict.ContainsKey("MainIssuanceEntryID") && dict["MainIssuanceEntryID"] != null
+                    ? Convert.ToInt64(dict["MainIssuanceEntryID"]) : 0;
+
                 long issDetailRefId = dict.ContainsKey("Issue_RefID") && dict["Issue_RefID"] != null
                     ? Convert.ToInt64(dict["Issue_RefID"]) : 0;
 
@@ -156,6 +166,7 @@ namespace DataAccessLibrary.DAC.Production
                 {
                     EntryID = rcvDetailEntryId,
                     VI_EntryID = viEntryId,
+                    MainIssuanceEntryID = mainIssuanceEntryId,
                     IssDetail_RefID = issDetailRefId,
                     RcvReceiptID = rcvReceiptId,
                     DT = dt,
@@ -187,22 +198,43 @@ namespace DataAccessLibrary.DAC.Production
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
             const string sql = @"
-                SELECT ISNULL(SUM(Amount - ISNULL(AmountCleared, 0)), 0)
+                SELECT ISNULL(SUM(ISNULL(Amount, 0) - ISNULL(AmountCleared, 0)), 0)
                 FROM VMakerAdvancesShortDeduction
                 INNER JOIN Makers ON VMakerAdvancesShortDeduction.AccNo = Makers.AccNo
                 WHERE Makers.VendID = @VendID";
-            return await db.ExecuteScalarAsync<decimal>(sql, new { VendID = vendId });
+            decimal result = await db.ExecuteScalarAsync<decimal>(sql, new { VendID = vendId });
+            return Math.Max(0m, result);
         }
 
         public async Task<decimal> GetLongTermBalanceAsync(int vendId)
         {
+            var info = await GetLongTermLoanInfoAsync(vendId);
+            return info.RemainingBalance;
+        }
+
+        public async Task<MakerLongTermLoanInfo> GetLongTermLoanInfoAsync(int vendId)
+        {
             using IDbConnection db = new SqlConnection(ConnectionString);
             const string sql = @"
-                SELECT ISNULL(SUM(TotalAmountTaken - ISNULL(TotalAmountCleared, 0)), 0)
+                SELECT
+                    ISNULL(SUM(ISNULL(ActualDeductionAmount, 0)), 0) AS ActualDeductionAmount,
+                    ISNULL(SUM(ISNULL(TotalAmountTaken, 0) - ISNULL(TotalAmountCleared, 0)), 0) AS RemainingBalance
                 FROM VMakerAdvancesDeduction
                 INNER JOIN Makers ON VMakerAdvancesDeduction.AccNo = Makers.AccNo
                 WHERE Makers.VendID = @VendID";
-            return await db.ExecuteScalarAsync<decimal>(sql, new { VendID = vendId });
+            var raw = await db.QueryFirstOrDefaultAsync<MakerLongTermLoanInfo>(sql, new { VendID = vendId });
+            if (raw == null)
+            {
+                return new MakerLongTermLoanInfo();
+            }
+
+            decimal remaining = Math.Max(0m, raw.RemainingBalance);
+            decimal actual = Math.Max(0m, Math.Min(raw.ActualDeductionAmount, remaining));
+            return new MakerLongTermLoanInfo
+            {
+                ActualDeductionAmount = actual,
+                RemainingBalance = remaining
+            };
         }
 
         public async Task<List<MakerRepairItem>> GetRepairWastageItemsAsync(MakerBillingFilter filter)
@@ -212,19 +244,36 @@ namespace DataAccessLibrary.DAC.Production
             using IDbConnection db = new SqlConnection(ConnectionString);
 
             string sql1 = @"
-                SELECT EntryID, RecieptID, DT, ItemCode, Qty, Rate,
-                       0 AS RepairAmt, (Qty * Rate) AS WastageAmt, LotNo, Description AS Process
-                FROM VMakerRepair
-                WHERE VendID = @VendID AND VchrNo IS NULL
-                  AND (ShowInBilling = 0 OR (ShowInBilling = 1 AND DeductFromBilling = 1))
-                  AND DT >= @DtFrom AND DT <= @DtTo";
+                SELECT mr.EntryID, mr.RecieptID, mr.DT, mr.ItemCode, mr.Qty, mr.Rate,
+                       0 AS RepairAmt, (mr.Qty * mr.Rate) AS WastageAmt, mr.LotNo, mr.Description AS Process,
+                       ISNULL(STUFF((
+                           SELECT DISTINCT ', ' + wt.WastageName
+                           FROM dbo.VendRcvdDetailWastageDetail wd
+                           INNER JOIN dbo.WastageTypes wt ON wt.EntryID = wd.Wastage_RefID
+                           WHERE wd.VRD_RefID = mr.Rcvd_RefID
+                             AND (wd.VendID = mr.VendID OR ISNULL(wd.VendID, 0) = 0)
+                           FOR XML PATH(''), TYPE
+                       ).value('.', 'NVARCHAR(MAX)'), 1, 2, ''), '') AS WastageType,
+                       CAST(0 AS BIT) AS IsFromWastageToDeduct
+                FROM VMakerRepair mr
+                WHERE mr.VendID = @VendID AND mr.VchrNo IS NULL
+                  AND (mr.ShowInBilling = 0 OR (mr.ShowInBilling = 1 AND mr.DeductFromBilling = 1))
+                  AND mr.DT >= @DtFrom AND mr.DT <= @DtTo";
 
             string sql2 = @"
-                SELECT EntryID, RecieptID, DT, ItemCode, Wastage AS Qty, IssRate AS Rate,
-                       0 AS RepairAmt, (Wastage * IssRate) AS WastageAmt, LotNo, '' AS Process
-                FROM VMakerBilling_WastageToDeduct
-                WHERE VendID = @VendID
-                  AND DT >= @DtFrom AND DT <= @DtTo";
+                SELECT w.EntryID, w.RecieptID, w.DT, w.ItemCode, w.Wastage AS Qty, w.IssRate AS Rate,
+                       0 AS RepairAmt, (w.Wastage * w.IssRate) AS WastageAmt, w.LotNo, '' AS Process,
+                       ISNULL(STUFF((
+                           SELECT DISTINCT ', ' + wt.WastageName
+                           FROM dbo.VendRcvdDetailWastageDetail wd
+                           INNER JOIN dbo.WastageTypes wt ON wt.EntryID = wd.Wastage_RefID
+                           WHERE wd.VRD_RefID = w.EntryID
+                           FOR XML PATH(''), TYPE
+                       ).value('.', 'NVARCHAR(MAX)'), 1, 2, ''), '') AS WastageType,
+                       CAST(1 AS BIT) AS IsFromWastageToDeduct
+                FROM VMakerBilling_WastageToDeduct w
+                WHERE w.VendID = @VendID
+                  AND w.DT >= @DtFrom AND w.DT <= @DtTo";
 
             var p = new DynamicParameters();
             p.Add("@VendID", filter.VendID);
@@ -237,7 +286,7 @@ namespace DataAccessLibrary.DAC.Production
             var combined = list1.Concat(list2).ToList();
             foreach (var item in combined)
             {
-                item.IsSelected = true;
+                item.IsSelected = false;
             }
             return combined;
         }
@@ -270,7 +319,7 @@ namespace DataAccessLibrary.DAC.Production
             var list = (await db.QueryAsync<MakerMaterialDedItem>(sql, p)).ToList();
             foreach (var item in list)
             {
-                item.IsSelected = true;
+                item.IsSelected = false;
             }
             return list;
         }
@@ -389,36 +438,121 @@ namespace DataAccessLibrary.DAC.Production
             return null;
         }
 
-        public async Task<PostMakerBillResult> SaveMakerPostedBillTransactionAsync(PostMakerBillRequest request, string voucherNo)
+        public async Task<PostMakerBillResult> SaveMakerPostedBillTransactionAsync(PostMakerBillRequest request, string makerCode)
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
             db.Open();
             using var tx = db.BeginTransaction();
             try
             {
+                // 0. Guard against duplicate posting of any selected receiving row (VRD_RefID)
+                var selectedVrdIds = request.SelectedLots.Select(x => x.EntryID).Distinct().ToList();
+                long? alreadyPostedVrdId = await db.QueryFirstOrDefaultAsync<long?>(@"
+                    SELECT TOP 1 VRD_RefID
+                    FROM MakerPostedBillsDetail_Receivings WITH (UPDLOCK, HOLDLOCK)
+                    WHERE VRD_RefID IN @Ids",
+                    new { Ids = selectedVrdIds }, tx);
+
+                if (alreadyPostedVrdId.HasValue)
+                {
+                    tx.Rollback();
+                    var dupLot = request.SelectedLots.FirstOrDefault(x => x.EntryID == alreadyPostedVrdId.Value);
+                    string lotDesc = dupLot != null ? $"Lot #{dupLot.LotNo} (Receipt Detail #{dupLot.EntryID})" : $"Receipt Detail #{alreadyPostedVrdId.Value}";
+                    return new PostMakerBillResult
+                    {
+                        Success = false,
+                        Message = $"{lotDesc} has already been posted in another Maker Bill. Please refresh the list."
+                    };
+                }
+
                 long nextBillNo = await db.ExecuteScalarAsync<long>(@"
                     SELECT ISNULL(MAX(BillNo), 0) + 1
-                    FROM MakerPostedBills
+                    FROM MakerPostedBills WITH (UPDLOCK, HOLDLOCK)
                     WHERE BillNo IS NOT NULL AND VendID = @VendID",
                     new { VendID = request.VendID }, tx);
 
-                decimal totalValue = request.SelectedLots.Sum(x => x.Value);
-                decimal repairRelax = request.RejectionRelaxation ? (totalValue / 100m) * 2m : 0;
-                decimal repairAmtToDeduct = Math.Max(0, request.RepairAmount - repairRelax);
+                decimal totalValue = Math.Round(request.SelectedLots.Sum(x => x.Value), 0, MidpointRounding.AwayFromZero);
+                decimal repairRelax = request.RejectionRelaxation
+                    ? Math.Round((totalValue / 100m) * 2m, 0, MidpointRounding.AwayFromZero)
+                    : 0m;
+                decimal totalRepairAmt = Math.Round(request.RepairAmount, 0, MidpointRounding.AwayFromZero);
+                decimal repairAmtToDeduct = Math.Max(0m, totalRepairAmt - repairRelax);
+                decimal manualDedAmt = Math.Round(request.ManualDeductionAmount, 0, MidpointRounding.AwayFromZero);
+                decimal materialDedAmt = Math.Round(request.MaterialDeductionAmount, 0, MidpointRounding.AwayFromZero);
 
-                // 1. Insert MakerPostedBills Header
+                decimal dAmtToPost = totalValue - manualDedAmt - materialDedAmt - repairAmtToDeduct;
+                if (dAmtToPost <= 0)
+                {
+                    tx.Rollback();
+                    return new PostMakerBillResult
+                    {
+                        Success = false,
+                        Message = "Invalid Amount to Post. Deductions exceed or equal total bill value."
+                    };
+                }
+
+                // 1. Atomic JV Posting inside the SAME database transaction
+                string desc = $"Computer Bill No. {makerCode} / {nextBillNo} - {request.PostingDate.Year}";
+                string nextVchrNo = await _vouchersDataAccess.GetNextVchrNo(request.PostingDate, "JV");
+                long sNo = await _vouchersDataAccess.GetNextSNo(request.PostingDate, "Vouchers", db, tx);
+
+                var voucher = new VoucherViewModel
+                {
+                    VchrNo = nextVchrNo,
+                    DT = request.PostingDate,
+                    UserName = request.UserName,
+                    MachineName = request.MachineName,
+                    Notes = desc,
+                    LineItems = new List<VoucherLineItemViewModel>
+                    {
+                        new VoucherLineItemViewModel
+                        {
+                            SNo = sNo,
+                            VDate = request.PostingDate,
+                            AccNo = request.DebitHeadAccNo,
+                            Description = desc,
+                            Debit = dAmtToPost,
+                            Credit = 0,
+                            Balance = 0,
+                            CSNo = 0
+                        },
+                        new VoucherLineItemViewModel
+                        {
+                            SNo = sNo + 1,
+                            VDate = request.PostingDate,
+                            AccNo = request.MakerAccNo,
+                            Description = desc,
+                            Debit = 0,
+                            Credit = dAmtToPost,
+                            Balance = 0,
+                            CSNo = 0
+                        }
+                    }
+                };
+
+                string voucherNo = await _vouchersDataAccess.ExecuteVoucherSave(voucher, db, tx);
+
+                // 2. Insert MakerPostedBills Header & capture identity via SCOPE_IDENTITY()
                 const string billSql = @"
                     INSERT INTO MakerPostedBills (
                         VendID, DT, VchrNo, UserName, MachineName, BillNo,
-                        TempAdvance, STDeduction, LTDeduction, MaterialDedAmt, ManualDedAmt,
-                        DTFrom, DTTo, WastageAmtRelaxation, TotalWastageAmt, BalanceOrderValue, UnAuthValue
+                        TempAdvance, BalanceOrderValue, UnAuthValue,
+                        RepairVchrNo, RepairAmt, WastageAmt, ManualDedAmt,
+                        STDeduction, LTDeduction, MaterialDedAmt,
+                        DTFrom, DTTo, WastageAmtRelaxation, TotalWastageAmt
                     ) VALUES (
                         @VendID, @DT, @VchrNo, @UserName, @MachineName, @BillNo,
-                        0, @STDeduction, @LTDeduction, @MaterialDedAmt, @ManualDedAmt,
-                        @DTFrom, @DTTo, @WastageAmtRelaxation, @TotalWastageAmt, 0, 0
-                    )";
+                        0, 0, 0,
+                        '', 0, @WastageAmt, @ManualDedAmt,
+                        @STDeduction, @LTDeduction, @MaterialDedAmt,
+                        @DTFrom, @DTTo, @WastageAmtRelaxation, @TotalWastageAmt
+                    );
+                    SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
 
-                await db.ExecuteAsync(billSql, new
+                int stDedInt = RoundToInt(request.ShortTermDeduction);
+                int ltDedInt = RoundToInt(request.LongTermDeduction);
+
+                long billEntryId = await db.ExecuteScalarAsync<long>(billSql, new
                 {
                     VendID = request.VendID,
                     DT = request.PostingDate,
@@ -426,19 +560,18 @@ namespace DataAccessLibrary.DAC.Production
                     UserName = request.UserName,
                     MachineName = request.MachineName,
                     BillNo = (int)nextBillNo,
-                    STDeduction = (int)request.ShortTermDeduction,
-                    LTDeduction = (int)request.LongTermDeduction,
-                    MaterialDedAmt = (int)request.MaterialDeductionAmount,
-                    ManualDedAmt = (int)request.ManualDeductionAmount,
+                    WastageAmt = RoundToInt(repairAmtToDeduct),
+                    ManualDedAmt = RoundToInt(manualDedAmt),
+                    STDeduction = stDedInt,
+                    LTDeduction = ltDedInt,
+                    MaterialDedAmt = RoundToInt(materialDedAmt),
                     DTFrom = request.DtFrom.Date,
                     DTTo = request.DtTo.Date,
-                    WastageAmtRelaxation = (int)repairRelax,
-                    TotalWastageAmt = (int)request.RepairAmount
+                    WastageAmtRelaxation = RoundToInt(repairRelax),
+                    TotalWastageAmt = RoundToInt(totalRepairAmt)
                 }, tx);
 
-                long billEntryId = await db.ExecuteScalarAsync<long>("SELECT MAX(EntryID) FROM MakerPostedBills", transaction: tx);
-
-                // 2. Insert Details & Receivings mapping
+                // 3. Insert Details & Receivings mapping
                 foreach (var lot in request.SelectedLots)
                 {
                     const string detailSql = @"
@@ -446,16 +579,21 @@ namespace DataAccessLibrary.DAC.Production
                             RefID, Iss_RefID, TempAdvance, RepairAmt, RcvdValue,
                             UnAuthValue, BalanceValue, RcvdPercentage, RcvdQty, IssDetail_RefID
                         ) VALUES (
-                            @RefID, @Iss_RefID, 0, 0, @RcvdValue,
-                            0, 0, 0, @RcvdQty, @IssDetail_RefID
+                            @RefID, @Iss_RefID, @TempAdvance, @RepairAmt, @RcvdValue,
+                            @UnAuthValue, @BalanceValue, @RcvdPercentage, @RcvdQty, @IssDetail_RefID
                         )";
 
                     await db.ExecuteAsync(detailSql, new
                     {
                         RefID = billEntryId,
                         Iss_RefID = lot.VI_EntryID,
-                        RcvdValue = (int)lot.Value,
-                        RcvdQty = (int)lot.Qty,
+                        TempAdvance = RoundToInt(lot.TempAdvance),
+                        RepairAmt = RoundToInt(lot.RepairAmt),
+                        RcvdValue = RoundToInt(lot.Value),
+                        UnAuthValue = RoundToInt(lot.UnAuthValue),
+                        BalanceValue = RoundToInt(lot.BalValue),
+                        RcvdPercentage = (float)Math.Round(lot.PercentRcvd, 2),
+                        RcvdQty = RoundToInt(lot.Qty),
                         IssDetail_RefID = lot.IssDetail_RefID
                     }, tx);
 
@@ -470,13 +608,13 @@ namespace DataAccessLibrary.DAC.Production
                     {
                         MPB_RefID = billEntryId,
                         VRD_RefID = lot.EntryID,
-                        Qty = (int)lot.Qty,
+                        Qty = RoundToInt(lot.Qty),
                         Rate = (float)lot.Rate,
-                        Main_VI_EntryID = lot.VI_EntryID
+                        Main_VI_EntryID = lot.MainIssuanceEntryID > 0 ? lot.MainIssuanceEntryID : lot.VI_EntryID
                     }, tx);
                 }
 
-                // 3. Insert Material Deductions
+                // 4. Insert Material Deductions
                 if (request.SelectedMaterialDeductions != null)
                 {
                     foreach (var mat in request.SelectedMaterialDeductions)
@@ -494,7 +632,7 @@ namespace DataAccessLibrary.DAC.Production
                     }
                 }
 
-                // 4. Insert Manual Deductions
+                // 5. Insert Manual Deductions
                 if (request.ManualDeductions != null)
                 {
                     foreach (var man in request.ManualDeductions)
@@ -507,9 +645,73 @@ namespace DataAccessLibrary.DAC.Production
                         {
                             MPB_RefID = billEntryId,
                             Description = man.Description,
-                            Amount = (int)man.Amount
+                            Amount = RoundToInt(man.Amount)
                         }, tx);
                     }
+                }
+
+                // 6. Clear Selected Repair / Wastage Items
+                if (request.SelectedRepairItems != null)
+                {
+                    foreach (var rep in request.SelectedRepairItems)
+                    {
+                        if (!rep.IsFromWastageToDeduct)
+                        {
+                            const string updateRepairSql = @"
+                                UPDATE MakerRepair
+                                SET VchrNo = @VchrNo
+                                WHERE EntryID = @EntryID AND VchrNo IS NULL";
+
+                            await db.ExecuteAsync(updateRepairSql, new
+                            {
+                                VchrNo = voucherNo,
+                                EntryID = rep.EntryID
+                            }, tx);
+                        }
+                        else
+                        {
+                            const string insertWastageSql = @"
+                                INSERT INTO MakerPostedBills_Wastage (MPB_RefID, MBD_RefID)
+                                VALUES (@MPB_RefID, @MBD_RefID)";
+
+                            await db.ExecuteAsync(insertWastageSql, new
+                            {
+                                MPB_RefID = billEntryId,
+                                MBD_RefID = rep.EntryID
+                            }, tx);
+                        }
+                    }
+                }
+
+                // 7. Clear Long-Term Loan Deduction (MakerAmtCleared)
+                if (ltDedInt > 0 && !string.IsNullOrWhiteSpace(request.MakerAccNo))
+                {
+                    const string ltSql = @"
+                        INSERT INTO MakerAmtCleared (AccNo, DT, AmtClrd, VchrNo)
+                        VALUES (@AccNo, @DT, @AmtClrd, @VchrNo)";
+
+                    await db.ExecuteAsync(ltSql, new
+                    {
+                        AccNo = request.MakerAccNo,
+                        DT = request.PostingDate.Date,
+                        AmtClrd = ltDedInt,
+                        VchrNo = voucherNo
+                    }, tx);
+                }
+
+                // 8. Clear Short-Term Loan Deduction (MakerPostedBills_STDeductions)
+                if (stDedInt > 0 && !string.IsNullOrWhiteSpace(request.MakerAccNo))
+                {
+                    const string stSql = @"
+                        INSERT INTO MakerPostedBills_STDeductions (MPB_RefID, Amount, AccNo)
+                        VALUES (@MPB_RefID, @Amount, @AccNo)";
+
+                    await db.ExecuteAsync(stSql, new
+                    {
+                        MPB_RefID = billEntryId,
+                        Amount = stDedInt,
+                        AccNo = request.MakerAccNo
+                    }, tx);
                 }
 
                 tx.Commit();

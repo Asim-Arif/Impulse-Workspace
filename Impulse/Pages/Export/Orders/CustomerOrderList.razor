@@ -204,7 +204,7 @@
                                             {
                                                 <th>Country</th>
                                             }
-                                            @if (!IsProductionMode)
+                                            @if (ShowOrderNoColumn)
                                             {
                                                 <th>Order #</th>
                                             }
@@ -231,7 +231,7 @@
                                         @if (!allOrders.Any())
                                         {
                                             <tr>
-                                                <td colspan="@(IsProductionMode ? (isDirector ? 16 : 15) : (isDirector ? 19 : 18))" class="text-center text-muted py-4">No customer orders found matching these filters.</td>
+                                                <td colspan="@TableColumnCount" class="text-center text-muted py-4">No customer orders found matching these filters.</td>
                                             </tr>
                                         }
                                         else
@@ -253,7 +253,7 @@
                                                     {
                                                         <td>@order.Country</td>
                                                     }
-                                                    @if (!IsProductionMode)
+                                                    @if (ShowOrderNoColumn)
                                                     {
                                                         <td class="fw-semibold">@order.OrderNo</td>
                                                     }

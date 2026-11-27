@@ -102,6 +102,127 @@ namespace DataAccessLibrary.DAC.Production
             return (await db.QueryAsync<MakerPOLookupModel>(sql)).ToList();
         }
 
+        public async Task<List<LotProcessHistoryItemModel>> GetLotProcessHistoryAsync(string lotNo, long upToVrdEntryId)
+        {
+            if (string.IsNullOrWhiteSpace(lotNo)) return new List<LotProcessHistoryItemModel>();
+
+            using IDbConnection db = new SqlConnection(ConnectionString);
+            const string sql = @"
+                IF OBJECT_ID('dbo.GetAllLots_F') IS NOT NULL
+                BEGIN
+                    SELECT VRD.EntryID,
+                           ISNULL(VRD.LotNo, '') AS LotNo,
+                           ISNULL(P.Code, '') AS ProcessCode,
+                           ISNULL(P.Description, '') AS ProcessName,
+                           ISNULL(VR.VendID, 0) AS VendID,
+                           ISNULL(M.VenderName, '') AS VenderName
+                    FROM VendRcvdDetail VRD
+                    INNER JOIN VendReceived VR ON VR.EntryID = VRD.RefID
+                    LEFT JOIN Processes P ON P.ProcessID = VRD.ProcessID
+                    LEFT JOIN Makers M ON M.VendID = VR.VendID
+                    WHERE VRD.LotNo IN (SELECT LotNo FROM dbo.GetAllLots_F(@LotNo))
+                      AND VRD.EntryID <= @UpToEntryID
+                    ORDER BY VRD.EntryID;
+                END
+                ELSE
+                BEGIN
+                    SELECT VRD.EntryID,
+                           ISNULL(VRD.LotNo, '') AS LotNo,
+                           ISNULL(P.Code, '') AS ProcessCode,
+                           ISNULL(P.Description, '') AS ProcessName,
+                           ISNULL(VR.VendID, 0) AS VendID,
+                           ISNULL(M.VenderName, '') AS VenderName
+                    FROM VendRcvdDetail VRD
+                    INNER JOIN VendReceived VR ON VR.EntryID = VRD.RefID
+                    LEFT JOIN Processes P ON P.ProcessID = VRD.ProcessID
+                    LEFT JOIN Makers M ON M.VendID = VR.VendID
+                    WHERE VRD.LotNo = @LotNo
+                      AND VRD.EntryID <= @UpToEntryID
+                    ORDER BY VRD.EntryID;
+                END";
+
+            return (await db.QueryAsync<LotProcessHistoryItemModel>(sql, new { LotNo = lotNo.Trim(), UpToEntryID = upToVrdEntryId })).ToList();
+        }
+
+        private static int RoundToInt(decimal value) =>
+            Convert.ToInt32(Math.Round(value, 0, MidpointRounding.AwayFromZero));
+
+        private sealed class LotProcessChargeRow
+        {
+            public long EntryID { get; set; }
+            public long VendID { get; set; }
+            public long Issue_RefID { get; set; }
+            public decimal Rate { get; set; }
+        }
+
+        private sealed class ResolvedWastageEntry
+        {
+            public decimal Qty { get; set; }
+            public int WastageType { get; set; }
+            public long TargetVendID { get; set; }
+            public long ReturnToVrdRefID { get; set; }
+            public string TargetEmpID { get; set; } = string.Empty;
+        }
+
+        private static async Task<long> UpsertVendIssdDetailMoreDetailsAsync(IDbConnection db, IDbTransaction trans, long vendIssdDetailId, int wastageQty)
+        {
+            if (vendIssdDetailId <= 0 || wastageQty <= 0) return 0;
+
+            long existingMdId = await db.QueryFirstOrDefaultAsync<long?>(
+                "SELECT TOP 1 EntryID FROM VendIssdDetail_MoreDetails WHERE VID_RefID = @VID_RefID",
+                new { VID_RefID = vendIssdDetailId }, trans) ?? 0;
+
+            int issRcvBalance = 0;
+            try
+            {
+                decimal? bal = await db.QueryFirstOrDefaultAsync<decimal?>(
+                    @"SELECT CAST(ISNULL(IssQty, 0) - ISNULL(RcvdQty, 0) - ISNULL(IssRcvBalance, 0) - ISNULL(UnAuthRcvdQty, 0) + ISNULL(Wastage_Return, 0) AS DECIMAL(18, 4))
+                      FROM VMakerIssItems
+                      WHERE EntryID = @VID_RefID",
+                    new { VID_RefID = vendIssdDetailId }, trans);
+                if (bal.HasValue)
+                {
+                    issRcvBalance = RoundToInt(bal.Value);
+                }
+            }
+            catch
+            {
+                issRcvBalance = 0;
+            }
+
+            if (existingMdId == 0)
+            {
+                const string insertMdSql = @"
+                    INSERT INTO VendIssdDetail_MoreDetails (VID_RefID, EmpID, Wastage_Return, IssRcvBalance)
+                    VALUES (@VID_RefID, '', @WastageReturn, @IssRcvBalance);
+                    SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
+
+                return await db.ExecuteScalarAsync<long>(insertMdSql, new
+                {
+                    VID_RefID = vendIssdDetailId,
+                    WastageReturn = wastageQty,
+                    IssRcvBalance = issRcvBalance
+                }, trans);
+            }
+            else
+            {
+                const string updateMdSql = @"
+                    UPDATE VendIssdDetail_MoreDetails
+                    SET Wastage_Return = ISNULL(Wastage_Return, 0) + @WastageReturn,
+                        IssRcvBalance = @IssRcvBalance
+                    WHERE EntryID = @EntryID";
+
+                await db.ExecuteAsync(updateMdSql, new
+                {
+                    WastageReturn = wastageQty,
+                    IssRcvBalance = issRcvBalance,
+                    EntryID = existingMdId
+                }, trans);
+
+                return existingMdId;
+            }
+        }
+
         public async Task<bool> SaveAuthorizationAsync(List<PendingAuthorizeReceivedItemModel> items, string inspectorEmpId, string userName, string machineName, int userId)
         {
             using IDbConnection db = new SqlConnection(ConnectionString);
@@ -115,7 +236,7 @@ namespace DataAccessLibrary.DAC.Production
                     decimal totalWastage = item.WastageBreakdowns.Any() ? item.WastageBreakdowns.Sum(w => w.Qty) : item.Wastage;
                     decimal totalReWork = item.ReWorkBreakdowns.Any() ? item.ReWorkBreakdowns.Sum(r => r.Qty) : item.ReWorkQty;
 
-                    // 1. Update VendRcvdDetail
+                    // 1. Update VendRcvdDetail (atomic guard: only authorize rows still pending ReqAuth = 1)
                     string updateVrdSql = @"UPDATE VendRcvdDetail 
                                             SET ReqAuth = 0, 
                                                 Wastage = @Wastage, 
@@ -123,9 +244,9 @@ namespace DataAccessLibrary.DAC.Production
                                                 LostQty = 0, 
                                                 ReWorkQty = @ReWorkQty, 
                                                 Insp_EmpID = @InspEmpID 
-                                            WHERE EntryID = @EntryID";
+                                            WHERE EntryID = @EntryID AND ReqAuth = 1";
 
-                    await db.ExecuteAsync(updateVrdSql, new
+                    int updatedRows = await db.ExecuteAsync(updateVrdSql, new
                     {
                         Wastage = totalWastage,
                         RepairAmt = item.RepairAmt,
@@ -133,6 +254,12 @@ namespace DataAccessLibrary.DAC.Production
                         InspEmpID = inspectorEmpId ?? "",
                         EntryID = item.EntryID
                     }, trans);
+
+                    if (updatedRows == 0)
+                    {
+                        throw new InvalidOperationException(
+                            $"Lot #{item.LotNo} (Receipt Detail #{item.EntryID}) has already been authorized. Please refresh the list.");
+                    }
 
                     // 2. Insert Rework Details
                     var reworkList = item.ReWorkBreakdowns?.ToList() ?? new List<ReWorkBreakdownItemModel>();
@@ -175,24 +302,28 @@ namespace DataAccessLibrary.DAC.Production
                         }
                     }
 
-                    // 3. Insert Wastage Details & MakerRepair Ledger
+                    // 3. Insert Wastage Details & Resolve Charge Targets (Exact Legacy frmAuthorizeIssRcvAdv.frm Parity)
                     decimal wastageCh2Vendor = 0;
                     decimal wastageCh2Originator = 0;
                     decimal wastageCh2Selection = 0;
+                    var resolvedWastageEntries = new List<ResolvedWastageEntry>();
 
                     var wastageList = item.WastageBreakdowns?.ToList() ?? new List<WastageBreakdownItemModel>();
                     if (!wastageList.Any() && totalWastage > 0)
                     {
-                        long defaultWastageId = await db.ExecuteScalarAsync<long>(
-                            "SELECT TOP 1 EntryID FROM WastageTypes WHERE ISNULL(Closed, 0) = 0 ORDER BY EntryID", transaction: trans);
-                        if (defaultWastageId > 0)
+                        var defaultWt = await db.QueryFirstOrDefaultAsync<WastageTypeLookupModel>(
+                            "SELECT TOP 1 EntryID, WastageName AS Description, ISNULL(WastageType, 1) AS WastageType FROM WastageTypes WHERE ISNULL(Closed, 0) = 0 ORDER BY EntryID",
+                            transaction: trans);
+                        if (defaultWt != null && defaultWt.EntryID > 0)
                         {
                             wastageList.Add(new WastageBreakdownItemModel
                             {
                                 VRD_RefID = item.EntryID,
-                                Wastage_RefID = defaultWastageId,
+                                Wastage_RefID = defaultWt.EntryID,
                                 Qty = totalWastage,
-                                WastageType = 1,
+                                WastageType = defaultWt.WastageType,
+                                SelectionTargetMode = 0,
+                                ReturnTo_VRD_RefID = defaultWt.WastageType == 3 ? item.EntryID : 0,
                                 VendID = item.VendID
                             });
                         }
@@ -202,24 +333,57 @@ namespace DataAccessLibrary.DAC.Production
                     {
                         foreach (var w in wastageList)
                         {
-                            long targetVendId = item.VendID;
-                            if (w.WastageType == 2)
+                            int resolvedWastageType = w.WastageType;
+                            if (resolvedWastageType <= 0 && w.Wastage_RefID > 0)
                             {
-                                wastageCh2Originator += w.Qty;
-                                string origVendSql = @"SELECT ISNULL(VR.VendID, 0) 
-                                                       FROM VendReceived VR 
-                                                       INNER JOIN VendRcvdDetail VRD ON VR.EntryID = VRD.RefID 
-                                                       WHERE VRD.EntryID = (SELECT MIN(EntryID) FROM VendRcvdDetail WHERE LotNo = @LotNo)";
-                                targetVendId = await db.ExecuteScalarAsync<long?>(origVendSql, new { LotNo = item.LotNo }, trans) ?? item.VendID;
+                                resolvedWastageType = await db.QueryFirstOrDefaultAsync<int?>(
+                                    "SELECT ISNULL(WastageType, 0) FROM WastageTypes WHERE EntryID = @EntryID",
+                                    new { EntryID = w.Wastage_RefID }, trans) ?? 0;
                             }
-                            else if (w.WastageType == 3)
-                            {
-                                wastageCh2Selection += w.Qty;
-                                targetVendId = w.VendID > 0 ? w.VendID : item.VendID;
-                            }
-                            else
+
+                            long targetVendId = 0;
+                            long returnToVrdRefId = 0;
+                            string targetEmpId = string.Empty;
+
+                            if (resolvedWastageType == 1)
                             {
                                 wastageCh2Vendor += w.Qty;
+                                targetVendId = item.VendID;
+                            }
+                            else if (resolvedWastageType == 2)
+                            {
+                                wastageCh2Originator += w.Qty;
+                                const string origVendSql = @"
+                                    SELECT TOP 1 ISNULL(VR.VendID, 0)
+                                    FROM VendReceived VR
+                                    INNER JOIN VendRcvdDetail VRD ON VR.EntryID = VRD.RefID
+                                    WHERE VRD.EntryID = (SELECT MIN(EntryID) FROM VendRcvdDetail WHERE LotNo = @LotNo)";
+                                targetVendId = await db.ExecuteScalarAsync<long?>(origVendSql, new { LotNo = item.LotNo }, trans) ?? item.VendID;
+                            }
+                            else if (resolvedWastageType == 3)
+                            {
+                                wastageCh2Selection += w.Qty;
+                                if (w.SelectionTargetMode == 2)
+                                {
+                                    // Company / No Charge
+                                    targetVendId = 0;
+                                    returnToVrdRefId = 0;
+                                    targetEmpId = string.Empty;
+                                }
+                                else if (w.SelectionTargetMode == 1 || (!string.IsNullOrWhiteSpace(w.EmpID) && w.VendID == 0))
+                                {
+                                    // Charge to Employee
+                                    targetVendId = 0;
+                                    returnToVrdRefId = 0;
+                                    targetEmpId = w.EmpID?.Trim() ?? string.Empty;
+                                }
+                                else
+                                {
+                                    // Charge to Selected Vendor / Lot Process
+                                    targetVendId = w.VendID > 0 ? w.VendID : item.VendID;
+                                    returnToVrdRefId = w.ReturnTo_VRD_RefID;
+                                    targetEmpId = string.Empty;
+                                }
                             }
 
                             string insertWastageSql = @"INSERT INTO VendRcvdDetailWastageDetail (
@@ -233,38 +397,202 @@ namespace DataAccessLibrary.DAC.Production
                                 VRD_RefID = item.EntryID,
                                 Wastage_RefID = w.Wastage_RefID,
                                 Qty = w.Qty,
-                                WastageType = w.WastageType,
-                                ReturnTo_VRD_RefID = w.ReturnTo_VRD_RefID,
+                                WastageType = resolvedWastageType,
+                                ReturnTo_VRD_RefID = returnToVrdRefId,
                                 VendID = targetVendId,
-                                EmpID = w.EmpID ?? ""
+                                EmpID = targetEmpId
                             }, trans);
+
+                            resolvedWastageEntries.Add(new ResolvedWastageEntry
+                            {
+                                Qty = w.Qty,
+                                WastageType = resolvedWastageType,
+                                TargetVendID = targetVendId,
+                                ReturnToVrdRefID = returnToVrdRefId,
+                                TargetEmpID = targetEmpId
+                            });
                         }
                     }
 
-                    // 4. MakerRepair Ledger Insertions
+                    // 4. MakerRepair Ledger Insertions (All 3 Wastage Types — Legacy frmAuthorizeIssRcvAdv.frm L2246-L2386)
+                    const string insertMrFullSql = @"
+                        INSERT INTO MakerRepair (
+                            VendID, DT, Rcvd_RefID, Qty, Rate, UserName, MachineName,
+                            VendIssdDetail_RefID, RepairAmt, Wastage_Originator, ShowInBilling,
+                            VRD_RefID_ChargeTo, EmpID, VRD_RefID
+                        ) VALUES (
+                            @VendID, CAST(GETDATE() AS DATE), @Rcvd_RefID, @Qty, @Rate, @UserName, @MachineName,
+                            @VendIssdDetail_RefID, @RepairAmt, @WastageOriginator, @ShowInBilling,
+                            @VRD_RefID_ChargeTo, @EmpID, @VRD_RefID
+                        );
+                        SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
+
+                    // 4A. WastageType = 1 (Charge to Current Vendor) or RepairAmt > 0
                     if ((wastageCh2Vendor > 0 || item.RepairAmt > 0) && item.EntryID > 0)
                     {
-                        string issueRateSql = @"SELECT ISNULL(Rate, 0) FROM VVendIssdDetail WHERE EntryID = @IssueRefID";
-                        double issueRate = await db.ExecuteScalarAsync<double?>(issueRateSql, new { IssueRefID = item.Issue_RefID }, trans) ?? (double)item.Rate;
+                        decimal issueRate = await db.QueryFirstOrDefaultAsync<decimal?>(
+                            "SELECT CAST(ISNULL(Rate, 0) AS DECIMAL(18, 4)) FROM VendIssdDetail WHERE EntryID = @IssueRefID",
+                            new { IssueRefID = item.Issue_RefID }, trans) ?? item.Rate;
 
-                        string insertMrSql = @"INSERT INTO MakerRepair (
-                                                   VendID, DT, Rcvd_RefID, Qty, Rate, UserName, MachineName, VendIssdDetail_RefID, RepairAmt, VRD_RefID_ChargeTo
-                                               ) VALUES (
-                                                   @VendID, GETDATE(), @Rcvd_RefID, @Qty, @Rate, @UserName, @MachineName, @VendIssdDetail_RefID, @RepairAmt, @VRD_RefID_ChargeTo
-                                               )";
-
-                        await db.ExecuteAsync(insertMrSql, new
+                        await db.ExecuteScalarAsync<long>(insertMrFullSql, new
                         {
                             VendID = item.VendID,
                             Rcvd_RefID = item.EntryID,
-                            Qty = wastageCh2Vendor,
-                            Rate = issueRate,
+                            Qty = RoundToInt(wastageCh2Vendor),
+                            Rate = RoundToInt(issueRate),
                             UserName = userName,
                             MachineName = machineName,
                             VendIssdDetail_RefID = item.Issue_RefID,
-                            RepairAmt = item.RepairAmt,
-                            VRD_RefID_ChargeTo = item.EntryID
+                            RepairAmt = RoundToInt(item.RepairAmt),
+                            WastageOriginator = false,
+                            ShowInBilling = false,
+                            VRD_RefID_ChargeTo = item.EntryID,
+                            EmpID = string.Empty,
+                            VRD_RefID = item.EntryID
                         }, trans);
+                    }
+
+                    // 4B. WastageType = 2 (Charge to Originator)
+                    if (wastageCh2Originator > 0 && !string.IsNullOrWhiteSpace(item.LotNo))
+                    {
+                        var origRow = await db.QueryFirstOrDefaultAsync<LotProcessChargeRow>(@"
+                            SELECT TOP 1
+                                   VRD.EntryID,
+                                   ISNULL(VR.VendID, 0) AS VendID,
+                                   ISNULL(VRD.Issue_RefID, 0) AS Issue_RefID,
+                                   CAST(COALESCE(NULLIF(VRD.Rate, 0), VID.Rate, 0) AS DECIMAL(18, 4)) AS Rate
+                            FROM VendRcvdDetail VRD
+                            INNER JOIN VendReceived VR ON VR.EntryID = VRD.RefID
+                            LEFT JOIN VendIssdDetail VID ON VID.EntryID = VRD.Issue_RefID
+                            WHERE VRD.LotNo = @LotNo
+                            ORDER BY VRD.EntryID ASC",
+                            new { LotNo = item.LotNo }, trans);
+
+                        if (origRow != null && origRow.EntryID > 0)
+                        {
+                            int billedCnt = await db.ExecuteScalarAsync<int>(
+                                "SELECT COUNT(VRD_RefID) FROM MakerPostedBillsDetail_Receivings WHERE VRD_RefID = @VRD_RefID",
+                                new { VRD_RefID = origRow.EntryID }, trans);
+
+                            int qtyOrigInt = RoundToInt(wastageCh2Originator);
+                            long mrOrigId = await db.ExecuteScalarAsync<long>(insertMrFullSql, new
+                            {
+                                VendID = origRow.VendID,
+                                Rcvd_RefID = item.EntryID,
+                                Qty = qtyOrigInt,
+                                Rate = RoundToInt(origRow.Rate),
+                                UserName = userName,
+                                MachineName = machineName,
+                                VendIssdDetail_RefID = item.Issue_RefID,
+                                RepairAmt = 0,
+                                WastageOriginator = true,
+                                ShowInBilling = billedCnt > 0,
+                                VRD_RefID_ChargeTo = origRow.EntryID,
+                                EmpID = string.Empty,
+                                VRD_RefID = origRow.EntryID
+                            }, trans);
+
+                            long mdOrigId = await UpsertVendIssdDetailMoreDetailsAsync(db, trans, origRow.Issue_RefID, qtyOrigInt);
+                            if (mrOrigId > 0 && mdOrigId > 0)
+                            {
+                                await db.ExecuteAsync(
+                                    "INSERT INTO MakerRepair_VID_MD_Details (MR_RefID, VIS_MD_RefID, Qty) VALUES (@MR_RefID, @VIS_MD_RefID, @Qty)",
+                                    new { MR_RefID = mrOrigId, VIS_MD_RefID = mdOrigId, Qty = qtyOrigInt }, trans);
+                            }
+                        }
+                    }
+
+                    // 4C. WastageType = 3 (Charge to Selected Vendor / Employee across Lot Processes up to current VRD)
+                    if (wastageCh2Selection > 0 && !string.IsNullOrWhiteSpace(item.LotNo))
+                    {
+                        var lotProcessRows = (await db.QueryAsync<LotProcessChargeRow>(@"
+                            SELECT VRD.EntryID,
+                                   ISNULL(VR.VendID, 0) AS VendID,
+                                   ISNULL(VRD.Issue_RefID, 0) AS Issue_RefID,
+                                   CAST(COALESCE(NULLIF(VRD.Rate, 0), VID.Rate, 0) AS DECIMAL(18, 4)) AS Rate
+                            FROM VendRcvdDetail VRD
+                            INNER JOIN VendReceived VR ON VR.EntryID = VRD.RefID
+                            LEFT JOIN VendIssdDetail VID ON VID.EntryID = VRD.Issue_RefID
+                            WHERE VRD.LotNo = @LotNo
+                              AND VRD.EntryID <= @CurrentVrdEntryID
+                            ORDER BY VRD.EntryID ASC",
+                            new { LotNo = item.LotNo, CurrentVrdEntryID = item.EntryID }, trans)).ToList();
+
+                        foreach (var sel in resolvedWastageEntries.Where(x => x.WastageType == 3 && x.Qty > 0))
+                        {
+                            // Skip MakerRepair posting when explicitly marked Company / No Charge (VendID = 0 & EmpID = '')
+                            if (sel.TargetVendID <= 0 && string.IsNullOrWhiteSpace(sel.TargetEmpID))
+                            {
+                                continue;
+                            }
+
+                            int selQtyInt = RoundToInt(sel.Qty);
+                            long mdSelId = 0;
+
+                            if (sel.ReturnToVrdRefID > 0)
+                            {
+                                long retIssueRefId = await db.QueryFirstOrDefaultAsync<long?>(
+                                    "SELECT ISNULL(Issue_RefID, 0) FROM VendRcvdDetail WHERE EntryID = @EntryID",
+                                    new { EntryID = sel.ReturnToVrdRefID }, trans) ?? 0;
+
+                                mdSelId = await UpsertVendIssdDetailMoreDetailsAsync(db, trans, retIssueRefId, selQtyInt);
+                            }
+
+                            long matchedMrEntryId = 0;
+                            foreach (var procRow in lotProcessRows)
+                            {
+                                int billedCnt = await db.ExecuteScalarAsync<int>(
+                                    "SELECT COUNT(VRD_RefID) FROM MakerPostedBillsDetail_Receivings WHERE VRD_RefID = @VRD_RefID",
+                                    new { VRD_RefID = procRow.EntryID }, trans);
+
+                                bool showInBilling = billedCnt > 0;
+                                long chargeToEntryId;
+
+                                if (sel.TargetVendID > 0 && procRow.VendID == sel.TargetVendID)
+                                {
+                                    chargeToEntryId = procRow.EntryID;
+                                }
+                                else
+                                {
+                                    chargeToEntryId = 0;
+                                    showInBilling = true;
+                                }
+
+                                if (!string.IsNullOrWhiteSpace(sel.TargetEmpID))
+                                {
+                                    chargeToEntryId = 0;
+                                }
+
+                                long mrEntryId = await db.ExecuteScalarAsync<long>(insertMrFullSql, new
+                                {
+                                    VendID = sel.TargetVendID,
+                                    Rcvd_RefID = item.EntryID,
+                                    Qty = selQtyInt,
+                                    Rate = RoundToInt(procRow.Rate),
+                                    UserName = userName,
+                                    MachineName = machineName,
+                                    VendIssdDetail_RefID = item.Issue_RefID,
+                                    RepairAmt = 0,
+                                    WastageOriginator = false,
+                                    ShowInBilling = showInBilling,
+                                    VRD_RefID_ChargeTo = chargeToEntryId,
+                                    EmpID = sel.TargetEmpID,
+                                    VRD_RefID = procRow.EntryID
+                                }, trans);
+
+                                if (sel.ReturnToVrdRefID > 0 && procRow.EntryID == sel.ReturnToVrdRefID)
+                                {
+                                    matchedMrEntryId = mrEntryId;
+                                }
+                            }
+
+                            if (matchedMrEntryId > 0 && mdSelId > 0)
+                            {
+                                await db.ExecuteAsync(
+                                    "INSERT INTO MakerRepair_VID_MD_Details (MR_RefID, VIS_MD_RefID, Qty) VALUES (@MR_RefID, @VIS_MD_RefID, @Qty)",
+                                    new { MR_RefID = matchedMrEntryId, VIS_MD_RefID = mdSelId, Qty = selQtyInt }, trans);
+                            }
+                        }
                     }
 
                     // 5. Insert Audit Log

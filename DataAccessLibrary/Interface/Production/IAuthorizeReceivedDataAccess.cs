@@ -12,6 +12,7 @@ namespace DataAccessLibrary.Interface.Production
         Task<List<EmployeeLookupModel>> GetInspectorsAsync();
         Task<List<ProcessPOLookupModel>> GetProcessesAsync();
         Task<List<MakerPOLookupModel>> GetMakersAsync();
+        Task<List<LotProcessHistoryItemModel>> GetLotProcessHistoryAsync(string lotNo, long upToVrdEntryId);
         Task<bool> SaveAuthorizationAsync(List<PendingAuthorizeReceivedItemModel> items, string inspectorEmpId, string userName, string machineName, int userId);
     }
 }

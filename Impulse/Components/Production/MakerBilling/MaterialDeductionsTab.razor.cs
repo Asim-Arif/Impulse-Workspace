@@ -22,7 +22,12 @@ namespace Impulse.Components.Production.MakerBilling
         [Parameter] public EventCallback<MakerMaterialDedItem> OnHideRM { get; set; }
         [Parameter] public EventCallback OnPrintReport { get; set; }
 
-        public bool IsAllSelected { get; set; } = true;
+        public bool IsAllSelected { get; set; } = false;
+
+        protected override void OnParametersSet()
+        {
+            IsAllSelected = Items.Any() && Items.All(x => x.IsSelected);
+        }
         public long EditingItemId { get; set; } = 0;
         public decimal EditingPrice { get; set; } = 0;
         public MakerMaterialDedItem? ContextRowItem { get; set; } = null;

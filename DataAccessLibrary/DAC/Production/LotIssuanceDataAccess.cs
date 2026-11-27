@@ -22,6 +22,12 @@ namespace DataAccessLibrary.DAC.Production
             _sequenceDataAccess = sequenceDataAccess;
         }
 
+        private sealed class VrdIssuableState
+        {
+            public decimal IssuableQty { get; set; }
+            public bool ReqAuth { get; set; }
+        }
+
         private string ConnectionString => _config.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("DefaultConnection string is not configured.");
 
@@ -278,6 +284,34 @@ namespace DataAccessLibrary.DAC.Production
                 // 2. Process Lines
                 foreach (var line in lines)
                 {
+                    // Concurrency guard: lock source VendRcvdDetail and verify remaining issuable qty inside transaction
+                    if (line.IssueRefID > 0)
+                    {
+                        const string lockVrdSql = @"
+                            SELECT CAST(ISNULL(RcvdQty, 0) - ISNULL(Wastage, 0) - ISNULL(RcvRepairQty, 0) - ISNULL(IssQty, 0) AS DECIMAL(18, 4)) AS IssuableQty,
+                                   CAST(ISNULL(ReqAuth, 0) AS BIT) AS ReqAuth
+                            FROM VendRcvdDetail WITH (UPDLOCK, ROWLOCK)
+                            WHERE EntryID = @IssueRefID";
+
+                        var vrdState = await db.QueryFirstOrDefaultAsync<VrdIssuableState>(
+                            lockVrdSql, new { IssueRefID = line.IssueRefID }, trans);
+
+                        if (vrdState != null)
+                        {
+                            if (vrdState.ReqAuth)
+                            {
+                                throw new InvalidOperationException(
+                                    $"Cannot issue Lot #{line.LotNo}: the previous receipt is still pending authorization.");
+                            }
+
+                            if (line.IssQty > vrdState.IssuableQty)
+                            {
+                                throw new InvalidOperationException(
+                                    $"Cannot issue {line.IssQty:N0} pcs for Lot #{line.LotNo}: only {Math.Max(0m, vrdState.IssuableQty):N0} pcs remain issuable (already issued by another session). Please refresh.");
+                            }
+                        }
+                    }
+
                     string subLotNo = line.LotNo;
                     if (string.IsNullOrWhiteSpace(subLotNo))
                     {

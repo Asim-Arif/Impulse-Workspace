@@ -1,5 +1,6 @@
 using DataAccessLibrary.Models.ViewModels.Production;
 using Microsoft.AspNetCore.Components;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -12,34 +13,47 @@ namespace Impulse.Components.Production.MakerBilling
         [Parameter] public bool IsLoading { get; set; } = false;
         [Parameter] public EventCallback<decimal> OnRepairAmountChanged { get; set; }
 
-        public bool IsAllSelected { get; set; } = true;
+        public string SearchLotText { get; set; } = string.Empty;
+
+        public IEnumerable<MakerRepairItem> FilteredItems => string.IsNullOrWhiteSpace(SearchLotText)
+            ? Items
+            : Items.Where(x =>
+                (x.LotNo?.Contains(SearchLotText.Trim(), StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (x.ItemCode?.Contains(SearchLotText.Trim(), StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (x.RecieptID?.Contains(SearchLotText.Trim(), StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (x.Process?.Contains(SearchLotText.Trim(), StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (x.WastageType?.Contains(SearchLotText.Trim(), StringComparison.OrdinalIgnoreCase) ?? false));
+
+        public bool IsAllSelected => FilteredItems.Any() && FilteredItems.All(x => x.IsSelected);
 
         public decimal TotalSelectedRepairAmount => Items.Where(x => x.IsSelected).Sum(x => x.WastageAmt);
 
+        public void ClearSearch()
+        {
+            SearchLotText = string.Empty;
+        }
+
         public void SelectAll()
         {
-            foreach (var item in Items) item.IsSelected = true;
-            IsAllSelected = true;
+            foreach (var item in FilteredItems) item.IsSelected = true;
             OnRepairAmountChanged.InvokeAsync(TotalSelectedRepairAmount);
         }
 
         public void UnselectAll()
         {
-            foreach (var item in Items) item.IsSelected = false;
-            IsAllSelected = false;
+            foreach (var item in FilteredItems) item.IsSelected = false;
             OnRepairAmountChanged.InvokeAsync(TotalSelectedRepairAmount);
         }
 
         public void ToggleSelectAll(ChangeEventArgs e)
         {
-            IsAllSelected = (bool)(e.Value ?? false);
-            foreach (var item in Items) item.IsSelected = IsAllSelected;
+            bool select = (bool)(e.Value ?? false);
+            foreach (var item in FilteredItems) item.IsSelected = select;
             OnRepairAmountChanged.InvokeAsync(TotalSelectedRepairAmount);
         }
 
         public void OnSelectionChanged()
         {
-            IsAllSelected = Items.Any() && Items.All(x => x.IsSelected);
             OnRepairAmountChanged.InvokeAsync(TotalSelectedRepairAmount);
         }
     }

@@ -25,6 +25,8 @@ namespace Impulse.Services.Setup
         public int CurrentUserId => _currentUserModel?.UserID ?? 0;
         public string CurrentUserName => _currentUserName;
         public bool ShowCustomerOrderNo => IsAdministrator || (_currentUserModel != null && _currentUserModel.Show_Customer_Order_No);
+        public bool CanPostMakerBill => IsAdministrator || (_currentUserModel != null && _currentUserModel.PostMakerBill);
+        public bool CanEditMakerBillRate => IsAdministrator || (_currentUserModel != null && _currentUserModel.MakerBill_EditRate);
 
         public UserPermissionService(
             IUserPermissionDataAccess permissionData,

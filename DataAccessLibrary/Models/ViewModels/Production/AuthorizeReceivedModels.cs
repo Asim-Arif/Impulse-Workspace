@@ -57,12 +57,26 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public long Wastage_RefID { get; set; }
         public string WastageTypeName { get; set; } = string.Empty;
         public decimal Qty { get; set; }
-        public int WastageType { get; set; } // 1=Vendor, 2=Originator, 3=Selection
+        public int WastageType { get; set; } // 0=None, 1=Vendor, 2=Originator, 3=Selection
+        public int SelectionTargetMode { get; set; } = 0; // For WastageType=3: 0=Lot Process/Vendor, 1=Employee, 2=Company/No Charge
         public long ReturnTo_VRD_RefID { get; set; }
         public long VendID { get; set; }
         public string VendName { get; set; } = string.Empty;
         public string EmpID { get; set; } = string.Empty;
         public string EmpName { get; set; } = string.Empty;
+    }
+
+    public class LotProcessHistoryItemModel
+    {
+        public long EntryID { get; set; }
+        public string LotNo { get; set; } = string.Empty;
+        public string ProcessCode { get; set; } = string.Empty;
+        public string ProcessName { get; set; } = string.Empty;
+        public long VendID { get; set; }
+        public string VenderName { get; set; } = string.Empty;
+        public string DisplayText => string.IsNullOrWhiteSpace(ProcessCode)
+            ? $"{ProcessName} — {VenderName}"
+            : $"[{ProcessCode}] {ProcessName} — {VenderName}";
     }
 
     public class ReWorkBreakdownItemModel

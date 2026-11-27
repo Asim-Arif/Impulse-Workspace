@@ -3,6 +3,7 @@ using DataAccessLibrary.Models.ViewModels.Production;
 using Impulse.Components.Production.MakerBilling;
 using Impulse.Services;
 using Impulse.Services.Production;
+using Impulse.Services.Setup;
 using Microsoft.AspNetCore.Components;
 using Radzen;
 using System;
@@ -17,6 +18,11 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
         [Inject] private IMakerBillingService BillingService { get; set; } = default!;
         [Inject] private Radzen.NotificationService NotificationService { get; set; } = default!;
         [Inject] private IReportNavigationService ReportNavigationService { get; set; } = default!;
+        [Inject] private IUserPermissionService PermissionService { get; set; } = default!;
+        [Inject] private IAuditService AuditService { get; set; } = default!;
+
+        public bool CanPostMakerBill => PermissionService.CanPostMakerBill;
+        public bool CanEditMakerBillRate => PermissionService.CanEditMakerBillRate;
 
         // Lookups & Filters
         public MakerBillingLookups Lookups { get; set; } = new MakerBillingLookups();
@@ -41,7 +47,9 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
 
         // Deduction Balances
         public decimal ShortTermDeduction { get; set; } = 0;
+        public decimal MaxShortTermDeduction { get; set; } = 0;
         public decimal LongTermDeduction { get; set; } = 0;
+        public decimal MaxLongTermDeduction { get; set; } = 0;
 
         // UI State
         public MakerBillingTab? billingTab;
@@ -50,14 +58,78 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
         public bool IsPosting { get; set; } = false;
 
         // Computed Properties
+        public int AuditedLotsCount => Lots.Count(x => x.Audited);
+        public int SelectedLotsCount => Lots.Count(x => x.IsSelected);
+        public decimal TotalSelectedQty => Lots.Where(x => x.IsSelected).Sum(x => x.Qty);
+        public decimal TotalSelectedValue => Lots.Where(x => x.IsSelected).Sum(x => x.Value);
+
         public decimal CalculatedRepairAmount => RepairItems.Where(x => x.IsSelected).Sum(x => x.WastageAmt);
+        public decimal RejectionRelaxAmount => Filter.RejectionRelaxation ? (TotalSelectedValue / 100m) * 2m : 0m;
+        public decimal EffectiveRepairDeduction => Math.Max(0m, CalculatedRepairAmount - RejectionRelaxAmount);
         public decimal CalculatedMaterialDeductionAmount => MaterialDedItems.Where(x => x.IsSelected).Sum(x => x.Amount);
         public decimal CalculatedManualDeductionAmount => ManualDedItems.Sum(x => x.Amount);
+
+        public decimal NetPayableAmount => TotalSelectedValue
+            - ShortTermDeduction
+            - LongTermDeduction
+            - CalculatedMaterialDeductionAmount
+            - CalculatedManualDeductionAmount
+            - EffectiveRepairDeduction;
+
+        public void OnDeductionChanged()
+        {
+            if (ShortTermDeduction < 0)
+            {
+                ShortTermDeduction = 0;
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Invalid S.T Deduction",
+                    Detail = "Short-Term Deduction cannot be negative.",
+                    Duration = 3500
+                });
+            }
+            else if (ShortTermDeduction > MaxShortTermDeduction)
+            {
+                ShortTermDeduction = MaxShortTermDeduction;
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Invalid S.T Deduction",
+                    Detail = $"Invalid Amount, Max. Short-Term Deduction Amount can be {MaxShortTermDeduction:N2}.",
+                    Duration = 4000
+                });
+            }
+
+            if (LongTermDeduction < 0)
+            {
+                LongTermDeduction = 0;
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Invalid L.T Deduction",
+                    Detail = "Long-Term Deduction cannot be negative.",
+                    Duration = 3500
+                });
+            }
+            else if (LongTermDeduction > MaxLongTermDeduction)
+            {
+                LongTermDeduction = MaxLongTermDeduction;
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Invalid L.T Deduction",
+                    Detail = $"Invalid Amount, Max. Long-Term Deduction Amount can be {MaxLongTermDeduction:N2}.",
+                    Duration = 4000
+                });
+            }
+        }
 
         protected override async Task OnInitializedAsync()
         {
             try
             {
+                await PermissionService.InitializeAsync();
                 Lookups = await BillingService.GetLookupsAsync();
 
                 Filter.DateRangeIndex = 0;
@@ -102,7 +174,7 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
                 h.Id.Contains(searchText, StringComparison.OrdinalIgnoreCase)));
         }
 
-        public async Task OnMakerChanged(LookupItemInt? maker)
+        public void OnMakerChanged(LookupItemInt? maker)
         {
             SelectedMaker = maker;
             Filter.VendID = maker?.Id ?? 0;
@@ -110,7 +182,18 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
             ShowCustDropdown = false;
             CustSearchText = string.Empty;
             SelectedInternalRefNo = string.Empty;
-            await LoadAllDataAsync();
+
+            // Clear previously loaded maker data without auto-fetching; user clicks Refresh manually
+            AllLots.Clear();
+            Lots.Clear();
+            RepairItems.Clear();
+            MaterialDedItems.Clear();
+            HiddenLots.Clear();
+            HiddenRMItems.Clear();
+            ShortTermDeduction = 0;
+            MaxShortTermDeduction = 0;
+            LongTermDeduction = 0;
+            MaxLongTermDeduction = 0;
         }
 
         public void OnDebitHeadChanged(LookupItemString? head)
@@ -119,7 +202,7 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
             Filter.DebitHeadAccNo = head?.Id ?? string.Empty;
         }
 
-        public async Task OnDateRangeChanged()
+        public void OnDateRangeChanged()
         {
             switch (Filter.DateRangeIndex)
             {
@@ -159,8 +242,6 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
                     // Custom range
                     break;
             }
-
-            await LoadAllDataAsync();
         }
 
         public IEnumerable<string> AvailableCustomerCodes =>
@@ -260,7 +341,17 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
                 HiddenLots.Clear();
                 HiddenRMItems.Clear();
                 ShortTermDeduction = 0;
+                MaxShortTermDeduction = 0;
                 LongTermDeduction = 0;
+                MaxLongTermDeduction = 0;
+
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Select Maker",
+                    Detail = "Please select a Maker before refreshing.",
+                    Duration = 3000
+                });
                 return;
             }
 
@@ -275,8 +366,13 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
                 HiddenLots = await BillingService.GetHiddenLotsAsync(Filter.VendID);
                 HiddenRMItems = await BillingService.GetHiddenRMItemsAsync(Filter.VendID);
 
-                ShortTermDeduction = await BillingService.GetShortTermDeductionAsync(Filter.VendID);
-                LongTermDeduction = await BillingService.GetLongTermBalanceAsync(Filter.VendID);
+                var stBalance = await BillingService.GetShortTermDeductionAsync(Filter.VendID);
+                MaxShortTermDeduction = stBalance;
+                ShortTermDeduction = stBalance;
+
+                var ltInfo = await BillingService.GetLongTermLoanInfoAsync(Filter.VendID);
+                MaxLongTermDeduction = ltInfo.RemainingBalance;
+                LongTermDeduction = ltInfo.ActualDeductionAmount;
             }
             catch (Exception ex)
             {
@@ -409,6 +505,18 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
         // ── Context Menu Actions ──────────────────────────────────────────
         public void ContextEditRate(ItemClickEventArgs args)
         {
+            if (!CanEditMakerBillRate)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Permission Denied",
+                    Detail = "You do not have permission to edit rates in Maker Billing.",
+                    Duration = 3500
+                });
+                return;
+            }
+
             if (args.Data is MakerBillingLotItem lot)
             {
                 billingTab?.StartRateEdit(lot);
@@ -508,6 +616,9 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
             }
 
             string selectionFormula = $"{{MakerPostedBillsDetail.RcvDetailEntryID}} in [{string.Join(",", selectedIds)}]";
+            string safeUserName = (AuditService.GetCurrentUserName() ?? string.Empty).Replace("'", "''");
+            string safeMachineName = (AuditService.GetClientIpAddress() ?? string.Empty).Replace("'", "''");
+            decimal selectedRepairTotal = CalculatedRepairAmount;
 
             await ReportNavigationService.PrintReportAsync(new ReportRequest
             {
@@ -521,6 +632,20 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
                     { "@CatID", string.IsNullOrWhiteSpace(Filter.CatIDs) ? "0" : Filter.CatIDs },
                     { "@ProcessID", 0 },
                     { "@MasterPONo", Filter.MasterPONo ?? string.Empty }
+                },
+                FormulaValues = new Dictionary<string, object>
+                {
+                    { "ShowMaker", true },
+                    { "UserName", $"'{safeUserName}'" },
+                    { "ComputerName", $"'{safeMachineName}'" },
+                    { "ShortTermLoan", ShortTermDeduction },
+                    { "LongTermDeduction", LongTermDeduction },
+                    { "STDeduction", ShortTermDeduction },
+                    { "LTDeduction", LongTermDeduction },
+                    { "OtherRejectionAmt", selectedRepairTotal },
+                    { "MaterialDeduction", CalculatedMaterialDeductionAmount },
+                    { "ManualDeduction", CalculatedManualDeductionAmount },
+                    { "RepairTotal", selectedRepairTotal }
                 }
             });
         }
@@ -536,6 +661,18 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
 
         public async Task PostMakerBill()
         {
+            if (!CanPostMakerBill)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Permission Denied",
+                    Detail = "You do not have permission to post Maker Bills.",
+                    Duration = 4000
+                });
+                return;
+            }
+
             var selectedLots = Lots.Where(x => x.IsSelected).ToList();
             if (!selectedLots.Any())
             {
@@ -561,6 +698,30 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
                 return;
             }
 
+            if (ShortTermDeduction < 0 || ShortTermDeduction > MaxShortTermDeduction)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Invalid S.T Deduction",
+                    Detail = $"Invalid Short-Term Deduction. Max allowed is {MaxShortTermDeduction:N2}.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            if (LongTermDeduction < 0 || LongTermDeduction > MaxLongTermDeduction)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Invalid L.T Deduction",
+                    Detail = $"Invalid Long-Term Deduction. Max allowed is {MaxLongTermDeduction:N2}.",
+                    Duration = 4000
+                });
+                return;
+            }
+
             IsPosting = true;
             try
             {
@@ -578,6 +739,7 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
                     MaterialDeductionAmount = CalculatedMaterialDeductionAmount,
                     ManualDeductionAmount = CalculatedManualDeductionAmount,
                     SelectedLots = selectedLots,
+                    SelectedRepairItems = RepairItems.Where(x => x.IsSelected).ToList(),
                     SelectedMaterialDeductions = MaterialDedItems.Where(x => x.IsSelected).ToList(),
                     ManualDeductions = ManualDedItems
                 };
@@ -586,6 +748,8 @@ namespace Impulse.Pages.Production.MakerBillingRcvingWise
 
                 if (result.Success)
                 {
+                    ManualDedItems.Clear();
+
                     NotificationService.Notify(new Radzen.NotificationMessage
                     {
                         Severity = Radzen.NotificationSeverity.Success,

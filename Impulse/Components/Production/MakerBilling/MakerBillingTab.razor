@@ -52,7 +52,11 @@
 
         <div class="d-flex align-items-center gap-2">
             <span class="badge bg-white text-secondary border px-2 py-1 shadow-sm small d-none d-md-inline-block" title="Keyboard Navigation Enabled">
-                <i class="fas fa-keyboard text-primary me-1"></i> <kbd class="bg-light text-dark border">↑</kbd> <kbd class="bg-light text-dark border">↓</kbd> Move &bull; <kbd class="bg-light text-dark border">Space</kbd> Check &bull; <kbd class="bg-light text-dark border">Enter</kbd> Rate
+                <i class="fas fa-keyboard text-primary me-1"></i> <kbd class="bg-light text-dark border">↑</kbd> <kbd class="bg-light text-dark border">↓</kbd> Move &bull; <kbd class="bg-light text-dark border">Space</kbd> Check
+                @if (CanEditRate)
+                {
+                    <text> &bull; <kbd class="bg-light text-dark border">Enter</kbd> Rate</text>
+                }
             </span>
             <div class="input-group input-group-sm" style="width: 220px;">
                 <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
@@ -136,7 +140,7 @@
                             </td>
                             <td class="text-center fw-bold">@lot.IssQty.ToString("N0")</td>
                             <td class="text-end" @onclick:stopPropagation="true">
-                                @if (EditingLotId == lot.EntryID)
+                                @if (CanEditRate && EditingLotId == lot.EntryID)
                                 {
                                     <div class="input-group input-group-sm" style="min-width: 110px;">
                                         <input type="number" class="form-control form-control-sm text-end fw-bold py-0" @bind="EditingRate" @onkeydown="@(e => OnRateKeyDown(e, lot))" @onkeydown:stopPropagation="true" autofocus />
@@ -144,9 +148,15 @@
                                         <button class="btn btn-sm btn-secondary py-0 px-1" @onclick="CancelRateEdit"><i class="fas fa-times"></i></button>
                                     </div>
                                 }
-                                else
+                                else if (CanEditRate)
                                 {
                                     <span class="text-primary fw-bold text-decoration-underline" style="cursor: pointer;" @onclick="() => StartRateEdit(lot)" title="Click to edit rate">
+                                        @lot.Rate.ToString("N2")
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="fw-bold text-dark" title="You do not have permission to edit rates">
                                         @lot.Rate.ToString("N2")
                                     </span>
                                 }
@@ -182,62 +192,4 @@
             </div>
         </div>
     }
-
-    <!-- Financial Summary & Deductions Strip -->
-    <div class="p-3 bg-light rounded-3 border">
-        <div class="row g-2 text-center align-items-center mb-3">
-            <div class="col-md-2">
-                <div class="text-muted small fw-bold text-uppercase">Total Lots</div>
-                <div class="fs-5 fw-bold text-dark">@Lots.Count</div>
-            </div>
-            <div class="col-md-2">
-                <div class="text-muted small fw-bold text-uppercase">Audited Lots</div>
-                <div class="fs-5 fw-bold text-primary">@AuditedLotsCount</div>
-            </div>
-            <div class="col-md-2">
-                <div class="text-muted small fw-bold text-uppercase">Selected Lots</div>
-                <div class="fs-5 fw-bold text-success">@SelectedLots.Count</div>
-            </div>
-            <div class="col-md-3">
-                <div class="text-muted small fw-bold text-uppercase">Selected Qty</div>
-                <div class="fs-5 fw-bold text-dark">@TotalSelectedQty.ToString("N0") Pcs</div>
-            </div>
-            <div class="col-md-3">
-                <div class="text-muted small fw-bold text-uppercase">Selected Value</div>
-                <div class="fs-5 fw-bold text-success">@TotalSelectedValue.ToString("N2")</div>
-            </div>
-        </div>
-
-        <hr class="my-2" />
-
-        <!-- Deductions & Net Posting Row -->
-        <div class="row g-2 align-items-end">
-            <div class="col-md-2">
-                <label class="form-label form-label-sm mb-1 text-muted small fw-bold">S.T Deduction</label>
-                <input type="number" class="form-control form-control-sm text-end fw-bold text-danger" @bind="ShortTermDeduction" @bind:after="OnDeductionChanged" />
-            </div>
-            <div class="col-md-2">
-                <label class="form-label form-label-sm mb-1 text-muted small fw-bold">L.T Ded.</label>
-                <input type="number" class="form-control form-control-sm text-end fw-bold text-danger" @bind="LongTermDeduction" @bind:after="OnDeductionChanged" />
-            </div>
-            <div class="col-md-2">
-                <label class="form-label form-label-sm mb-1 text-muted small fw-bold">Repair Amount</label>
-                <input type="text" class="form-control form-control-sm text-end fw-bold text-danger bg-white" value="@EffectiveRepairDeduction.ToString("N2")" readonly />
-            </div>
-            <div class="col-md-2">
-                <label class="form-label form-label-sm mb-1 text-muted small fw-bold">Material Ded.</label>
-                <input type="text" class="form-control form-control-sm text-end fw-bold text-danger bg-white" value="@MaterialDeductionAmount.ToString("N2")" readonly />
-            </div>
-            <div class="col-md-2">
-                <label class="form-label form-label-sm mb-1 text-muted small fw-bold">Manual Ded.</label>
-                <input type="text" class="form-control form-control-sm text-end fw-bold text-danger bg-white" value="@ManualDeductionAmount.ToString("N2")" readonly />
-            </div>
-            <div class="col-md-2 text-end">
-                <div class="text-muted small fw-bold text-uppercase">Net Payable (Value)</div>
-                <div class="fs-4 fw-bold @(NetPayableAmount > 0 ? "text-success" : "text-danger")">
-                    @NetPayableAmount.ToString("N2")
-                </div>
-            </div>
-        </div>
-    </div>
 </div>

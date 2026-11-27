@@ -21,6 +21,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
     {
         public long EntryID { get; set; }          // VendRcvdDetail.EntryID (VRD_EntryID)
         public long VI_EntryID { get; set; }       // VendIssd.EntryID (Tag)
+        public long MainIssuanceEntryID { get; set; } // MainIssuanceEntryID from SP (TMasters)
         public long IssDetail_RefID { get; set; }  // VendIssdDetail.EntryID
         public string RcvReceiptID { get; set; } = string.Empty;
         public DateTime DT { get; set; }
@@ -45,8 +46,14 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public string InternalRefNo { get; set; } = string.Empty;
         public bool IsSelected { get; set; }
 
-        public decimal Value => RcvdValue != 0 ? RcvdValue : IssValue;
-        public decimal Qty => RcvdQty != 0 ? RcvdQty : IssQty;
+        public decimal Value => RcvdValue;
+        public decimal Qty => RcvdQty;
+    }
+
+    public class MakerLongTermLoanInfo
+    {
+        public decimal ActualDeductionAmount { get; set; }
+        public decimal RemainingBalance { get; set; }
     }
 
     public class MakerRepairItem
@@ -61,6 +68,8 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public decimal WastageAmt { get; set; }
         public string LotNo { get; set; } = string.Empty;
         public string Process { get; set; } = string.Empty;
+        public string WastageType { get; set; } = string.Empty;
+        public bool IsFromWastageToDeduct { get; set; } // false = VMakerRepair (MakerRepair), true = VMakerBilling_WastageToDeduct (MakerPostedBills_Wastage)
         public bool IsSelected { get; set; }
     }
 
@@ -125,6 +134,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
     public class PostMakerBillRequest
     {
         public int VendID { get; set; }
+        public string MakerAccNo { get; set; } = string.Empty;
         public string DebitHeadAccNo { get; set; } = string.Empty;
         public DateTime PostingDate { get; set; } = DateTime.Today;
         public DateTime DtFrom { get; set; }
@@ -138,6 +148,7 @@ namespace DataAccessLibrary.Models.ViewModels.Production
         public decimal ManualDeductionAmount { get; set; }
 
         public List<MakerBillingLotItem> SelectedLots { get; set; } = new List<MakerBillingLotItem>();
+        public List<MakerRepairItem> SelectedRepairItems { get; set; } = new List<MakerRepairItem>();
         public List<MakerMaterialDedItem> SelectedMaterialDeductions { get; set; } = new List<MakerMaterialDedItem>();
         public List<MakerManualDedItem> ManualDeductions { get; set; } = new List<MakerManualDedItem>();
 

@@ -322,7 +322,7 @@
                             {
                                 <tr>
                                     <td>
-                                        <select class="form-select form-select-sm" @bind="w.Wastage_RefID">
+                                        <select class="form-select form-select-sm" value="@w.Wastage_RefID" @onchange="@(e => OnWastageReasonChanged(w, e))">
                                             <option value="0">-- Select Wastage Type --</option>
                                             @foreach (var wt in AvailableWastageTypes)
                                             {
@@ -335,6 +335,7 @@
                                     </td>
                                     <td>
                                         <select class="form-select form-select-sm" @bind="w.WastageType">
+                                            <option value="0">0. No Charge (Company)</option>
                                             <option value="1">1. Charge to Vendor</option>
                                             <option value="2">2. Charge to Originator</option>
                                             <option value="3">3. Charge to Selection</option>
@@ -343,13 +344,37 @@
                                     <td>
                                         @if (w.WastageType == 3)
                                         {
-                                            <select class="form-select form-select-sm" @bind="w.VendID">
-                                                <option value="0">-- Select Vendor --</option>
-                                                @foreach (var m in AvailableMakers)
+                                            <select class="form-select form-select-sm" value="@GetWastageTargetKey(w)" @onchange="@(e => OnWastageTargetOptionChanged(w, e))">
+                                                <option value="">-- Select Process / Vendor / Employee --</option>
+                                                @if (CurrentLotHistory.Any())
                                                 {
-                                                    <option value="@m.VendID">@m.DisplayText</option>
+                                                    <optgroup label="Lot Process History (Recommended)">
+                                                        @foreach (var h in CurrentLotHistory)
+                                                        {
+                                                            <option value="@($"LOT:{h.EntryID}:{h.VendID}")">@h.DisplayText</option>
+                                                        }
+                                                    </optgroup>
                                                 }
+                                                <optgroup label="Other Makers / Vendors">
+                                                    @foreach (var m in AvailableMakers)
+                                                    {
+                                                        <option value="@($"MKR:{m.VendID}")">@m.DisplayText</option>
+                                                    }
+                                                </optgroup>
+                                                <optgroup label="Charge to Employee">
+                                                    @foreach (var emp in AvailableInspectors)
+                                                    {
+                                                        <option value="@($"EMP:{emp.EmpID}")">[@emp.EmpID] @emp.Name</option>
+                                                    }
+                                                </optgroup>
+                                                <optgroup label="Company">
+                                                    <option value="NONE">Company / Do Not Charge</option>
+                                                </optgroup>
                                             </select>
+                                        }
+                                        else if (w.WastageType == 0)
+                                        {
+                                            <span class="text-muted small">No Charge (Company)</span>
                                         }
                                         else
                                         {

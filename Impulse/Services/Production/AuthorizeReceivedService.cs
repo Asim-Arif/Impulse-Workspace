@@ -54,6 +54,11 @@ namespace Impulse.Services.Production
             return _dataAccess.GetMakersAsync();
         }
 
+        public Task<List<LotProcessHistoryItemModel>> GetLotProcessHistoryAsync(string lotNo, long upToVrdEntryId)
+        {
+            return _dataAccess.GetLotProcessHistoryAsync(lotNo, upToVrdEntryId);
+        }
+
         public async Task<bool> SaveAuthorizationAsync(List<PendingAuthorizeReceivedItemModel> items, string inspectorEmpId, string userName, string machineName, int userId)
         {
             bool success = await _dataAccess.SaveAuthorizationAsync(items, inspectorEmpId, userName, machineName, userId);

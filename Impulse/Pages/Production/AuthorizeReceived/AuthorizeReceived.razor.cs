@@ -53,6 +53,7 @@ namespace Impulse.Pages.Production.AuthorizeReceived
         public bool ShowWastageModal { get; set; } = false;
         public PendingAuthorizeReceivedItemModel? CurrentModalItem { get; set; }
         public List<WastageBreakdownItemModel> TempWastageList { get; set; } = new List<WastageBreakdownItemModel>();
+        public List<LotProcessHistoryItemModel> CurrentLotHistory { get; set; } = new List<LotProcessHistoryItemModel>();
 
         // Rework Modal State
         public bool ShowReWorkModal { get; set; } = false;
@@ -144,9 +145,11 @@ namespace Impulse.Pages.Production.AuthorizeReceived
         }
 
         // WASTAGE MODAL HANDLERS
-        public void OpenWastageModal(PendingAuthorizeReceivedItemModel item)
+        public async Task OpenWastageModal(PendingAuthorizeReceivedItemModel item)
         {
             CurrentModalItem = item;
+            CurrentLotHistory = await AuthorizeReceivedService.GetLotProcessHistoryAsync(item.LotNo, item.EntryID);
+
             TempWastageList = item.WastageBreakdowns.Select(w => new WastageBreakdownItemModel
             {
                 EntryID = w.EntryID,
@@ -155,6 +158,7 @@ namespace Impulse.Pages.Production.AuthorizeReceived
                 WastageTypeName = w.WastageTypeName,
                 Qty = w.Qty,
                 WastageType = w.WastageType,
+                SelectionTargetMode = w.SelectionTargetMode,
                 ReturnTo_VRD_RefID = w.ReturnTo_VRD_RefID,
                 VendID = w.VendID,
                 VendName = w.VendName,
@@ -164,12 +168,17 @@ namespace Impulse.Pages.Production.AuthorizeReceived
 
             if (!TempWastageList.Any())
             {
+                var defaultWt = AvailableWastageTypes.FirstOrDefault();
+                int defaultType = defaultWt?.WastageType ?? 1;
                 TempWastageList.Add(new WastageBreakdownItemModel
                 {
                     VRD_RefID = item.EntryID,
-                    Wastage_RefID = AvailableWastageTypes.FirstOrDefault()?.EntryID ?? 0,
+                    Wastage_RefID = defaultWt?.EntryID ?? 0,
+                    WastageTypeName = defaultWt?.Description ?? string.Empty,
                     Qty = item.Wastage > 0 ? item.Wastage : 1,
-                    WastageType = 1,
+                    WastageType = defaultType,
+                    SelectionTargetMode = 0,
+                    ReturnTo_VRD_RefID = defaultType == 3 ? item.EntryID : 0,
                     VendID = item.VendID
                 });
             }
@@ -180,14 +189,108 @@ namespace Impulse.Pages.Production.AuthorizeReceived
         public void AddWastageRow()
         {
             if (CurrentModalItem == null) return;
+            var defaultWt = AvailableWastageTypes.FirstOrDefault();
+            int defaultType = defaultWt?.WastageType ?? 1;
             TempWastageList.Add(new WastageBreakdownItemModel
             {
                 VRD_RefID = CurrentModalItem.EntryID,
-                Wastage_RefID = AvailableWastageTypes.FirstOrDefault()?.EntryID ?? 0,
+                Wastage_RefID = defaultWt?.EntryID ?? 0,
+                WastageTypeName = defaultWt?.Description ?? string.Empty,
                 Qty = 1,
-                WastageType = 1,
+                WastageType = defaultType,
+                SelectionTargetMode = 0,
+                ReturnTo_VRD_RefID = defaultType == 3 ? CurrentModalItem.EntryID : 0,
                 VendID = CurrentModalItem.VendID
             });
+        }
+
+        public void OnWastageReasonChanged(WastageBreakdownItemModel w, ChangeEventArgs e)
+        {
+            if (long.TryParse(e.Value?.ToString(), out long wtId))
+            {
+                w.Wastage_RefID = wtId;
+                var matched = AvailableWastageTypes.FirstOrDefault(x => x.EntryID == wtId);
+                if (matched != null)
+                {
+                    w.WastageTypeName = matched.Description;
+                    w.WastageType = matched.WastageType;
+                    if (matched.WastageType == 3 && CurrentModalItem != null && w.VendID == 0 && string.IsNullOrWhiteSpace(w.EmpID) && w.SelectionTargetMode == 0)
+                    {
+                        w.VendID = CurrentModalItem.VendID;
+                        w.ReturnTo_VRD_RefID = CurrentModalItem.EntryID;
+                    }
+                }
+            }
+            else
+            {
+                w.Wastage_RefID = 0;
+            }
+        }
+
+        public string GetWastageTargetKey(WastageBreakdownItemModel w)
+        {
+            if (w.SelectionTargetMode == 2) return "NONE";
+            if (w.SelectionTargetMode == 1 || (!string.IsNullOrWhiteSpace(w.EmpID) && w.VendID == 0))
+            {
+                return $"EMP:{w.EmpID}";
+            }
+            if (w.ReturnTo_VRD_RefID > 0 && CurrentLotHistory.Any(h => h.EntryID == w.ReturnTo_VRD_RefID))
+            {
+                return $"LOT:{w.ReturnTo_VRD_RefID}:{w.VendID}";
+            }
+            if (w.VendID > 0)
+            {
+                var matchedHist = CurrentLotHistory.FirstOrDefault(h => h.VendID == w.VendID);
+                if (matchedHist != null && w.ReturnTo_VRD_RefID == matchedHist.EntryID)
+                {
+                    return $"LOT:{matchedHist.EntryID}:{matchedHist.VendID}";
+                }
+                return $"MKR:{w.VendID}";
+            }
+            return string.Empty;
+        }
+
+        public void OnWastageTargetOptionChanged(WastageBreakdownItemModel w, ChangeEventArgs e)
+        {
+            string val = e.Value?.ToString() ?? string.Empty;
+            if (string.IsNullOrEmpty(val))
+            {
+                w.SelectionTargetMode = 0;
+                w.ReturnTo_VRD_RefID = 0;
+                w.VendID = 0;
+                w.EmpID = string.Empty;
+                return;
+            }
+
+            if (val == "NONE")
+            {
+                w.SelectionTargetMode = 2;
+                w.ReturnTo_VRD_RefID = 0;
+                w.VendID = 0;
+                w.EmpID = string.Empty;
+            }
+            else if (val.StartsWith("LOT:", StringComparison.Ordinal))
+            {
+                var parts = val.Split(':');
+                w.SelectionTargetMode = 0;
+                w.ReturnTo_VRD_RefID = parts.Length > 1 && long.TryParse(parts[1], out long vrdId) ? vrdId : 0;
+                w.VendID = parts.Length > 2 && long.TryParse(parts[2], out long vendId) ? vendId : 0;
+                w.EmpID = string.Empty;
+            }
+            else if (val.StartsWith("MKR:", StringComparison.Ordinal))
+            {
+                w.SelectionTargetMode = 0;
+                w.ReturnTo_VRD_RefID = 0;
+                w.VendID = long.TryParse(val.Substring(4), out long vendId) ? vendId : 0;
+                w.EmpID = string.Empty;
+            }
+            else if (val.StartsWith("EMP:", StringComparison.Ordinal))
+            {
+                w.SelectionTargetMode = 1;
+                w.ReturnTo_VRD_RefID = 0;
+                w.VendID = 0;
+                w.EmpID = val.Substring(4);
+            }
         }
 
         public void RemoveWastageRow(WastageBreakdownItemModel item)
@@ -388,7 +491,7 @@ namespace Impulse.Pages.Production.AuthorizeReceived
                     Detail = $"Lot [{itemNeedingWastage.LotNo}] has {itemNeedingWastage.Wastage} Wastage Qty. Please specify the wastage breakdown.",
                     Duration = 5000
                 });
-                OpenWastageModal(itemNeedingWastage);
+                await OpenWastageModal(itemNeedingWastage);
                 return;
             }
 
@@ -402,7 +505,7 @@ namespace Impulse.Pages.Production.AuthorizeReceived
                     Detail = $"Lot [{itemWastageMismatch.LotNo}] breakdown total ({itemWastageMismatch.WastageBreakdowns.Sum(w => w.Qty)}) does not match Wastage Qty ({itemWastageMismatch.Wastage}).",
                     Duration = 5000
                 });
-                OpenWastageModal(itemWastageMismatch);
+                await OpenWastageModal(itemWastageMismatch);
                 return;
             }
 

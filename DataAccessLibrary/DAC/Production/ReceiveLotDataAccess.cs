@@ -22,6 +22,13 @@ namespace DataAccessLibrary.DAC.Production
             _sequenceDataAccess = sequenceDataAccess;
         }
 
+        private sealed class VidReceivableState
+        {
+            public decimal IssQty { get; set; }
+            public decimal ExcessPct { get; set; }
+            public decimal TotalAlreadyRcvd { get; set; }
+        }
+
         private string ConnectionString => _config.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("DefaultConnection string is not configured.");
 
@@ -134,6 +141,34 @@ namespace DataAccessLibrary.DAC.Production
                 // 3. Process Lines
                 foreach (var line in lines)
                 {
+                    // Concurrency guard: lock VendIssdDetail and verify remaining receivable qty inside transaction
+                    if (line.VendIssdDetailEntryID > 0)
+                    {
+                        const string lockVidSql = @"
+                            SELECT CAST(ISNULL(VID.IssQty, 0) AS DECIMAL(18, 4)) AS IssQty,
+                                   CAST(ISNULL(VI.ExcessQtyPercentage, 0) AS DECIMAL(18, 4)) AS ExcessPct,
+                                   CAST((SELECT ISNULL(SUM(VRD.RcvdQty), 0)
+                                         FROM VendRcvdDetail VRD WITH (UPDLOCK, HOLDLOCK)
+                                         WHERE VRD.Issue_RefID = VID.EntryID) AS DECIMAL(18, 4)) AS TotalAlreadyRcvd
+                            FROM VendIssdDetail VID WITH (UPDLOCK, ROWLOCK)
+                            INNER JOIN VendIssued VI ON VI.EntryID = VID.RefID
+                            WHERE VID.EntryID = @IssueRefID";
+
+                        var vidState = await db.QueryFirstOrDefaultAsync<VidReceivableState>(
+                            lockVidSql, new { IssueRefID = line.VendIssdDetailEntryID }, trans);
+
+                        if (vidState != null)
+                        {
+                            decimal maxAllowedQty = vidState.IssQty + Math.Ceiling(vidState.IssQty * (vidState.ExcessPct / 100m));
+                            decimal remainingQty = maxAllowedQty - vidState.TotalAlreadyRcvd;
+                            if (line.RcvdQty > remainingQty)
+                            {
+                                throw new InvalidOperationException(
+                                    $"Cannot receive {line.RcvdQty:N0} pcs for Lot #{line.LotNo}: only {Math.Max(0m, remainingQty):N0} pcs remain receivable (Issued: {vidState.IssQty:N0}, Already Received: {vidState.TotalAlreadyRcvd:N0}). Please refresh.");
+                            }
+                        }
+                    }
+
                     string receivingReceiptId = await _sequenceDataAccess.GetNextReceivingReceiptIDAsync(header.DT);
 
                     // Calculate NextProcessID using legacy SP_GetNextProcID (supports RepairTypeProcesses)

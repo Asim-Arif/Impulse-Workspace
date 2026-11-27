@@ -21,17 +21,7 @@ namespace Impulse.Components.Production.MakerBilling
         [Parameter] public List<MakerBillingLotItem> Lots { get; set; } = new List<MakerBillingLotItem>();
         [Parameter] public bool IsLoading { get; set; } = false;
         [Parameter] public bool ShowPicture { get; set; } = false;
-        [Parameter] public bool RejectionRelaxation { get; set; } = false;
-
-        [Parameter] public decimal ShortTermDeduction { get; set; } = 0;
-        [Parameter] public EventCallback<decimal> ShortTermDeductionChanged { get; set; }
-
-        [Parameter] public decimal LongTermDeduction { get; set; } = 0;
-        [Parameter] public EventCallback<decimal> LongTermDeductionChanged { get; set; }
-
-        [Parameter] public decimal RepairAmount { get; set; } = 0;
-        [Parameter] public decimal MaterialDeductionAmount { get; set; } = 0;
-        [Parameter] public decimal ManualDeductionAmount { get; set; } = 0;
+        [Parameter] public bool CanEditRate { get; set; } = false;
 
         [Parameter] public EventCallback OnStateUpdated { get; set; }
         [Parameter] public EventCallback<MakerBillingLotItem> OnHideLot { get; set; }
@@ -55,19 +45,6 @@ namespace Impulse.Components.Production.MakerBilling
                               x.CustCode.Contains(SearchLotText, StringComparison.OrdinalIgnoreCase));
 
         public List<MakerBillingLotItem> SelectedLots => Lots.Where(x => x.IsSelected).ToList();
-        public int AuditedLotsCount => Lots.Count(x => x.Audited);
-        public decimal TotalSelectedQty => SelectedLots.Sum(x => x.Qty);
-        public decimal TotalSelectedValue => SelectedLots.Sum(x => x.Value);
-
-        public decimal RejectionRelaxAmount => RejectionRelaxation ? (TotalSelectedValue / 100m) * 2m : 0;
-        public decimal EffectiveRepairDeduction => Math.Max(0, RepairAmount - RejectionRelaxAmount);
-
-        public decimal NetPayableAmount => TotalSelectedValue
-            - ShortTermDeduction
-            - LongTermDeduction
-            - MaterialDeductionAmount
-            - ManualDeductionAmount
-            - EffectiveRepairDeduction;
 
         public void SelectAll()
         {
@@ -165,6 +142,18 @@ namespace Impulse.Components.Production.MakerBilling
 
         public void StartRateEdit(MakerBillingLotItem lot)
         {
+            if (!CanEditRate)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Permission Denied",
+                    Detail = "You do not have permission to edit rates in Maker Billing.",
+                    Duration = 3500
+                });
+                return;
+            }
+
             EditingLotId = lot.EntryID;
             EditingRate = lot.Rate;
             StateHasChanged();
@@ -177,6 +166,19 @@ namespace Impulse.Components.Production.MakerBilling
 
         public async Task SaveRate(MakerBillingLotItem lot)
         {
+            if (!CanEditRate)
+            {
+                EditingLotId = 0;
+                NotificationService.Notify(new Radzen.NotificationMessage
+                {
+                    Severity = Radzen.NotificationSeverity.Warning,
+                    Summary = "Permission Denied",
+                    Detail = "You do not have permission to edit rates in Maker Billing.",
+                    Duration = 3500
+                });
+                return;
+            }
+
             if (EditingRate <= 0)
             {
                 NotificationService.Notify(new Radzen.NotificationMessage
@@ -194,9 +196,8 @@ namespace Impulse.Components.Production.MakerBilling
                 await BillingService.UpdateLotRateAsync(lot.VI_EntryID, EditingRate);
                 lot.Rate = EditingRate;
 
-                // Update Rcvd. Value (BillingProcAmount in legacy is based on RcvdQty * Rate)
-                decimal effectiveQty = lot.RcvdQty != 0 ? lot.RcvdQty : lot.IssQty;
-                lot.RcvdValue = Math.Round(effectiveQty * EditingRate, 2);
+                // Recalculate strictly from actual RcvdQty (never fall back to IssQty on un-authorized rows)
+                lot.RcvdValue = Math.Round(lot.RcvdQty * EditingRate, 2);
                 lot.BalValue = Math.Round(lot.RcvdValue - lot.UnAuthValue - lot.RepairAmt, 2);
 
                 EditingLotId = 0;
@@ -233,13 +234,6 @@ namespace Impulse.Components.Production.MakerBilling
             {
                 CancelRateEdit();
             }
-        }
-
-        public async Task OnDeductionChanged()
-        {
-            await ShortTermDeductionChanged.InvokeAsync(ShortTermDeduction);
-            await LongTermDeductionChanged.InvokeAsync(LongTermDeduction);
-            await OnStateUpdated.InvokeAsync();
         }
 
         public async Task ShowImagePreview(string? itemCode)

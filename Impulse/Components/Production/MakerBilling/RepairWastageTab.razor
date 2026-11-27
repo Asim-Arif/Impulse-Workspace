@@ -2,7 +2,7 @@
 
 <div class="card border-0 shadow-none">
     <!-- Action Bar -->
-    <div class="d-flex align-items-center justify-content-between p-2 mb-2 bg-light rounded-3 border">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 p-2 mb-2 bg-light rounded-3 border">
         <div class="d-flex align-items-center gap-2">
             <button type="button" class="btn btn-sm btn-outline-primary fw-bold" @onclick="SelectAll">
                 <i class="fas fa-check-square me-1"></i> Select All
@@ -11,9 +11,25 @@
                 <i class="fas fa-square me-1"></i> Unselect All
             </button>
         </div>
-        <div class="d-flex align-items-center gap-2">
-            <span class="text-muted small fw-bold">Total Wastage Deduction:</span>
-            <span class="badge bg-danger fs-6 px-3 py-1 fw-bold">@TotalSelectedRepairAmount.ToString("N2")</span>
+        <div class="d-flex align-items-center gap-3">
+            <div class="input-group input-group-sm" style="width: 240px;">
+                <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                <input type="text"
+                       class="form-control"
+                       placeholder="Search Lot #, Item, Wastage..."
+                       @bind="SearchLotText"
+                       @bind:event="oninput" />
+                @if (!string.IsNullOrWhiteSpace(SearchLotText))
+                {
+                    <button type="button" class="btn btn-outline-secondary" @onclick="ClearSearch" title="Clear search">
+                        <i class="fas fa-times"></i>
+                    </button>
+                }
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-muted small fw-bold">Total Wastage Deduction:</span>
+                <span class="badge bg-danger fs-6 px-3 py-1 fw-bold">@TotalSelectedRepairAmount.ToString("N2")</span>
+            </div>
         </div>
     </div>
 
@@ -34,29 +50,39 @@
                     <th class="text-end" style="width: 120px;">Wastage Amt</th>
                     <th class="text-center" style="width: 100px;">Lot #</th>
                     <th>Process</th>
+                    <th>Wastage Type</th>
                 </tr>
             </thead>
             <tbody>
                 @if (IsLoading)
                 {
                     <tr>
-                        <td colspan="10" class="text-center py-4 text-muted">
+                        <td colspan="11" class="text-center py-4 text-muted">
                             <span class="spinner-border spinner-border-sm me-1" role="status"></span> Loading repair wastage details...
                         </td>
                     </tr>
                 }
-                else if (!Items.Any())
+                else if (!FilteredItems.Any())
                 {
                     <tr>
-                        <td colspan="10" class="text-center py-4 text-muted">
-                            <i class="fas fa-check-circle text-success me-1"></i> No unbilled repair or wastage deductions found for this maker.
+                        <td colspan="11" class="text-center py-4 text-muted">
+                            @if (string.IsNullOrWhiteSpace(SearchLotText))
+                            {
+                                <i class="fas fa-check-circle text-success me-1"></i>
+                                <span>No unbilled repair or wastage deductions found for this maker.</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-search me-1"></i>
+                                <span>No repair/wastage entries matching "@SearchLotText".</span>
+                            }
                         </td>
                     </tr>
                 }
                 else
                 {
                     int idx = 1;
-                    @foreach (var item in Items)
+                    @foreach (var item in FilteredItems)
                     {
                         <tr class="@(item.IsSelected ? "table-light" : "")">
                             <td class="text-center">
@@ -75,6 +101,7 @@
                                 </span>
                             </td>
                             <td><span class="badge bg-info text-dark">@item.Process</span></td>
+                            <td class="text-secondary small">@(string.IsNullOrWhiteSpace(item.WastageType) ? "-" : item.WastageType)</td>
                         </tr>
                     }
                 }
@@ -85,7 +112,7 @@
                     <td class="text-center text-dark">@Items.Where(x => x.IsSelected).Sum(x => x.Qty).ToString("N0")</td>
                     <td></td>
                     <td class="text-end text-danger fs-6">@TotalSelectedRepairAmount.ToString("N2")</td>
-                    <td colspan="2"></td>
+                    <td colspan="3"></td>
                 </tr>
             </tfoot>
         </table>

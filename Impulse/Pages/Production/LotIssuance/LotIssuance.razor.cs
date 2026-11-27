@@ -58,6 +58,7 @@ namespace Impulse.Pages.Production.LotIssuance
         private long _factoryMakerVendId = 0;
 
         public string SearchLotNo { get; set; } = string.Empty;
+        public DateTime IssuanceDate { get; set; } = DateTime.Today;
         public int SelectedProcessID { get; set; } = 0;
         public string BatchNo { get; set; } = string.Empty;
         public List<ProcessPOLookupModel> Processes { get; set; } = new List<ProcessPOLookupModel>();
@@ -441,6 +442,7 @@ namespace Impulse.Pages.Production.LotIssuance
         public void ClearForm()
         {
             SearchLotNo = string.Empty;
+            IssuanceDate = DateTime.Today;
             SelectedProcessID = 0;
             BatchNo = string.Empty;
             SelectedMaker = null;
@@ -547,7 +549,7 @@ namespace Impulse.Pages.Production.LotIssuance
                 {
                     VendID = SelectedMaker.VendID,
                     ProcessID = SelectedProcessID,
-                    DT = DateTime.Today,
+                    DT = IssuanceDate.Date,
                     SampleProvided = SampleProvided,
                     DrawingProvided = DrawingProvided,
                     ForgingProvided = ForgingProvided,

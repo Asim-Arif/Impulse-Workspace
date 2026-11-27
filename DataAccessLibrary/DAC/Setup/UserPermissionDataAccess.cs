@@ -139,6 +139,8 @@ namespace DataAccessLibrary.DAC.Setup
                         COALESCE(u.HelpMainLink, 0) AS HelpMainLink,
                         COALESCE(u.IntraOfficeMainLink, 0) AS IntraOfficeMainLink,
                         COALESCE(u.SetupMainLink, 0) AS SetupMainLink,
+                        COALESCE(u.PostMakerBill, 0) AS PostMakerBill,
+                        COALESCE(u.MakerBill_EditRate, 0) AS MakerBill_EditRate,
                         COALESCE(u.Show_Customer_Order_No, 0) AS Show_Customer_Order_No
                     FROM Users u
                     WHERE u.UserName = @UserName";

@@ -10520,6 +10520,7 @@ GO
 
 -- ============================================================================
 -- Maker Billing (Receiving-Wise): Configurable Include-Rejected-Qty Support
+-- & Per-Row TBillQtyDirect / Not_Available_For_Billing Accuracy Fixes
 -- Controlled per database via dbo.GeneralData (DataName = 'MakerBilling_IncludeRejectedQty')
 -- Default is 'False' (standard behavior: excludes rejected/wastage qty).
 -- Set DataValue = 'True' ONLY on client databases that include rejected qty in Maker Billing.
@@ -10528,6 +10529,14 @@ IF NOT EXISTS (SELECT 1 FROM dbo.GeneralData WHERE DataName = 'MakerBilling_Incl
 BEGIN
     INSERT INTO dbo.GeneralData (DataName, DataValue, PasswordEncrypted)
     VALUES ('MakerBilling_IncludeRejectedQty', 'False', 0);
+END
+GO
+
+IF COL_LENGTH('dbo.VendRcvdDetail', 'Not_Available_For_Billing') IS NULL
+BEGIN
+    ALTER TABLE dbo.VendRcvdDetail
+        ADD Not_Available_For_Billing BIT NULL
+        CONSTRAINT DF_VendRcvdDetail_NotAvailableForBilling DEFAULT (0);
 END
 GO
 
@@ -10590,25 +10599,46 @@ CatID,TabRcvd.MasterPONo,MasterRecieptID,MainIssuanceEntryID,LotClearDT
 FROM VendIssued
 LEFT OUTER JOIN VendIssdDetail TabIssd ON VendIssued.EntryID=TabIssd.RefID
 LEFT OUTER JOIN VendAssItems ON VendIssued.VendID=VendAssItems.VendID AND VendIssued.ProcessID=VendAssItems.ProcessID AND TabIssd.ItemCode=VendAssItems.ItemID
-LEFT OUTER JOIN (SELECT VVendRcvdDetail.EntryID,Issuance_RefID,Issue_RefID,OrderNo,0 AS Not_Available_For_Billing
-					--,CASE WHEN ReqAuth=0 THEN RcvdQty ELSE 0 END +ISNULL(SplitQtyForRcvdQty,0) AS RcvdQty
-					,CASE WHEN ReqAuth=0 THEN RcvdQty ELSE 0 END AS RcvdQty
-					,CASE WHEN ReqAuth=1 THEN RcvdQty ELSE 0 END AS RcvdQtyUnAuth,
-					CASE WHEN ReqAuth=0 THEN RcvdWeight ELSE 0 END AS RcvdWeight,CASE WHEN ReqAuth=1 THEN RcvdWeight ELSE 0 END AS RcvdWeightUnAuth,
-					CASE WHEN ReqAuth=0 THEN RcvdValue_For_Billing ELSE 0 END AS RcvdValue,CASE WHEN ReqAuth=1 THEN RcvdValue_For_Billing ELSE 0 END AS RcvdValueUnAuth,RepairAmt AS RepairAmt
-,Wastage,VVendRcvdDetail.LotNo,VVendRcvdDetail.RecieptID,ISNULL(BillQtyDirect,0)+ISNULL(BillQtyInDirect,0) AS BillingProcRcvdQty,(ISNULL(BillQtyDirect,0)+ISNULL(BillQtyInDirect,0))*IssRate AS BillingProcAmount,OnlyDT,VVendRcvdDetail.ProcessID,MasterPONo,TMasters.RecieptID AS MasterRecieptID,MainIssuanceEntryID,LotClearDT,DT AS RcvDT,ReWorkQty,Audited,BillQtyDirect,BillQtyInDirect
+LEFT OUTER JOIN (SELECT VVendRcvdDetail.EntryID,Issuance_RefID,VVendRcvdDetail.Issue_RefID,VVendRcvdDetail.OrderNo,ISNULL(VRD_Base.Not_Available_For_Billing, 0) AS Not_Available_For_Billing
+					--,CASE WHEN VVendRcvdDetail.ReqAuth=0 THEN VVendRcvdDetail.RcvdQty ELSE 0 END +ISNULL(SplitQtyForRcvdQty,0) AS RcvdQty
+					,CASE WHEN VVendRcvdDetail.ReqAuth=0 THEN VVendRcvdDetail.RcvdQty ELSE 0 END AS RcvdQty
+					,CASE WHEN VVendRcvdDetail.ReqAuth=1 THEN VVendRcvdDetail.RcvdQty ELSE 0 END AS RcvdQtyUnAuth,
+					CASE WHEN VVendRcvdDetail.ReqAuth=0 THEN VVendRcvdDetail.RcvdWeight ELSE 0 END AS RcvdWeight,CASE WHEN VVendRcvdDetail.ReqAuth=1 THEN VVendRcvdDetail.RcvdWeight ELSE 0 END AS RcvdWeightUnAuth,
+					CASE WHEN VVendRcvdDetail.ReqAuth=0 THEN RcvdValue_For_Billing ELSE 0 END AS RcvdValue,CASE WHEN VVendRcvdDetail.ReqAuth=1 THEN RcvdValue_For_Billing ELSE 0 END AS RcvdValueUnAuth,VVendRcvdDetail.RepairAmt AS RepairAmt
+,VVendRcvdDetail.Wastage,VVendRcvdDetail.LotNo,VVendRcvdDetail.RecieptID,ISNULL(CalcDirect.BillQtyDirect,0)+ISNULL(BillQtyInDirect,0) AS BillingProcRcvdQty,(ISNULL(CalcDirect.BillQtyDirect,0)+ISNULL(BillQtyInDirect,0))*IssRate AS BillingProcAmount,OnlyDT,VVendRcvdDetail.ProcessID,MasterPONo,TMasters.RecieptID AS MasterRecieptID,MainIssuanceEntryID,LotClearDT,VVendRcvdDetail.DT AS RcvDT,VVendRcvdDetail.ReWorkQty,VVendRcvdDetail.Audited,CalcDirect.BillQtyDirect,BillQtyInDirect
 FROM VVendRcvdDetail 
+INNER JOIN dbo.VendRcvdDetail VRD_Base ON VRD_Base.EntryID = VVendRcvdDetail.EntryID
 LEFT OUTER JOIN(SELECT VRD_From_RefID,SUM(SplitQty) AS SplitQtyForRcvdQty FROM LotTransferDetails GROUP BY VRD_From_RefID) TSplitQtyForRcvdQty ON VVendRcvdDetail.EntryID=TSplitQtyForRcvdQty.VRD_From_RefID
 
 INNER JOIN(
 	SELECT LotNo,
 	       VendRcvdDetail.ProcessID,
 	       MAX(DT) AS LotClearDT,
-	       SUM(RcvdQty - ISNULL(ReWorkQty,0) - CASE WHEN @IncludeRejected = 1 THEN 0 ELSE ISNULL(Wastage,0) END) AS BillQtyDirect
+	       SUM(CASE WHEN VendRcvdDetail.ReqAuth = 0
+	                THEN RcvdQty - ISNULL(ReWorkQty,0) - CASE WHEN @IncludeRejected = 1 THEN 0 ELSE ISNULL(Wastage,0) END
+	                ELSE 0 END) AS BillQtyDirect
 	FROM VendRcvdDetail
 	INNER JOIN VendReceived ON VendReceived.EntryID=VendRcvdDetail.RefID
 	GROUP BY LotNo,VendRcvdDetail.ProcessID
 ) TBillQtyDirect ON VVendRcvdDetail.LotNo=TBillQtyDirect.LotNo AND VVendRcvdDetail.BillingProcessID=TBillQtyDirect.ProcessID
+CROSS APPLY (
+	SELECT CASE
+	    WHEN (VVendRcvdDetail.RcvdQty - ISNULL(VVendRcvdDetail.ReWorkQty,0) - CASE WHEN @IncludeRejected = 1 THEN 0 ELSE ISNULL(VVendRcvdDetail.Wastage,0) END) > 0
+	         THEN (VVendRcvdDetail.RcvdQty - ISNULL(VVendRcvdDetail.ReWorkQty,0) - CASE WHEN @IncludeRejected = 1 THEN 0 ELSE ISNULL(VVendRcvdDetail.Wastage,0) END)
+	    ELSE 0
+	END AS OwnRowNetQty
+) OwnRow
+CROSS APPLY (
+	SELECT CASE
+	    WHEN VVendRcvdDetail.ProcessID = VVendRcvdDetail.BillingProcessID THEN
+	        CASE WHEN VVendRcvdDetail.ReqAuth = 0 THEN OwnRow.OwnRowNetQty ELSE 0 END
+	    ELSE
+	        CASE WHEN ISNULL(TBillQtyDirect.BillQtyDirect, 0) > OwnRow.OwnRowNetQty
+	             THEN OwnRow.OwnRowNetQty
+	             ELSE CASE WHEN ISNULL(TBillQtyDirect.BillQtyDirect, 0) < 0 THEN 0 ELSE ISNULL(TBillQtyDirect.BillQtyDirect, 0) END
+	        END
+	END AS BillQtyDirect
+) CalcDirect
 LEFT OUTER JOIN(SELECT VRD_From.LotNo,VRD_Lots.ProcessID,SNo,SUM(VRD_Lots.RcvdQty-ISNULL(VRD_Lots.ReWorkQty,0)) AS BillQtyInDirect FROM LotTransferDetails
 	INNER JOIN VendRcvdDetail VRD_From ON LotTransferDetails.VRD_From_RefID=VRD_From.EntryID
 	INNER JOIN VendRcvdDetail VRD_To ON LotTransferDetails.VRD_To_RefID=VRD_To.EntryID
@@ -10621,7 +10651,7 @@ LEFT OUTER JOIN (SELECT LotNo,MIN(EntryID) AS MinEntryID FROM VendRcvdDetail GRO
 LEFT OUTER JOIN (SELECT VendIssued.EntryID AS MainIssuanceEntryID,VendRcvdDetail.EntryID,MasterPONo,VendIssued.RecieptID FROM VendIssued INNER JOIN VendIssdDetail ON VendIssdDetail.RefID=VendIssued.EntryID INNER JOIN VendRcvdDetail ON VendRcvdDetail.Issue_RefID=VendIssdDetail.EntryID) TMasters
 	ON TMinLot.MinEntryID=TMasters.EntryID
 
-WHERE (VendID=@MakerID OR @MakerID=0) AND OnlyDT BETWEEN @DTFrom AND @DTTo  --AND ReWorkLot=0
+WHERE (VVendRcvdDetail.VendID=@MakerID OR @MakerID=0) AND OnlyDT BETWEEN @DTFrom AND @DTTo  --AND ReWorkLot=0
 			) TabRcvd ON VendIssued.EntryID=TabRcvd.Issuance_RefID AND TabIssd.EntryID=TabRcvd.Issue_RefID
 LEFT OUTER JOIN (SELECT Issuance_RefID,SUM(Amount) AS TempAdvance FROM MakerTemporaryLoans WHERE ISNULL(GroupID,0)=0 OR GroupID IN(SELECT EntryID FROM MakerTemporaryLoansGroup WHERE Active=1) 
 																	GROUP BY Issuance_RefID) TabTemp ON VendIssued.EntryID=TabTemp.Issuance_RefID

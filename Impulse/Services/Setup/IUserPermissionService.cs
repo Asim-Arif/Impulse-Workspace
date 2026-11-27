@@ -11,6 +11,8 @@ namespace Impulse.Services.Setup
         int CurrentUserId { get; }
         string CurrentUserName { get; }
         bool ShowCustomerOrderNo { get; }
+        bool CanPostMakerBill { get; }
+        bool CanEditMakerBillRate { get; }
         bool HasModuleAccess(string moduleName);
         bool IsModuleLicensed(string moduleName);
         bool HasOptionAccess(string optionId);

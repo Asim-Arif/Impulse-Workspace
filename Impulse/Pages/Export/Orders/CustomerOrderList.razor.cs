@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Components.Web;
 using BlazorContextMenu;
 using DataAccessLibrary.Models.ViewModels;
 using DataAccessLibrary.Models.ViewModels.Export;
+using Impulse.Configurations;
 using Impulse.Constants;
 using Impulse.Services;
 using Impulse.Services.Export;
@@ -28,6 +29,7 @@ namespace Impulse.Pages.Export.Orders
         [Inject] private IWorkflowTaskEngine WorkflowTaskEngine { get; set; } = null!;
         [Inject] private IUserRoleDataAccess UserRoleDataAccess { get; set; } = null!;
         [Inject] private IUserDataAccess UserDataAccess { get; set; } = null!;
+        [Inject] private AppSettings AppSettings { get; set; } = null!;
 
         [Parameter]
         [SupplyParameterFromQuery(Name = "viewType")]
@@ -43,6 +45,10 @@ namespace Impulse.Pages.Export.Orders
 
         protected bool IsProductionMode => 
             ForProductionParam == true || NavigationManager.Uri.Contains("/production/", StringComparison.OrdinalIgnoreCase);
+
+        protected bool ShowOrderNoColumn => !IsProductionMode || AppSettings.ShowOrderNoInProductionOrderList;
+
+        protected int TableColumnCount => 15 + (isDirector ? 1 : 0) + (ShowOrderNoColumn ? 1 : 0) + (!IsProductionMode ? 2 : 0);
 
         protected bool IsSampleMode => SampleParam == true;
 

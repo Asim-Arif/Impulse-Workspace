@@ -10,6 +10,7 @@ namespace Impulse.Services.Production
         Task<List<MakerBillingLotItem>> GetMakerBillingLotsAsync(MakerBillingFilter filter);
         Task<decimal> GetShortTermDeductionAsync(int vendId);
         Task<decimal> GetLongTermBalanceAsync(int vendId);
+        Task<MakerLongTermLoanInfo> GetLongTermLoanInfoAsync(int vendId);
         Task<List<MakerRepairItem>> GetRepairWastageItemsAsync(MakerBillingFilter filter);
         Task<List<MakerMaterialDedItem>> GetMaterialDeductionsAsync(int vendId, string masterPoNo);
         Task<List<MakerHiddenLotItem>> GetHiddenLotsAsync(int vendId);

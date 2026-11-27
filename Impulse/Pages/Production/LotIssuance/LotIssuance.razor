@@ -88,7 +88,7 @@
                     <div class="row g-3 align-items-center" style="position: relative !important; z-index: 1000 !important;">
                         
                         <!-- 1. Lot No Search Input (First Control) -->
-                        <div class="col-12 col-md-5">
+                        <div class="col-12 col-md-4">
                             <div class="d-flex align-items-center justify-content-between mb-1">
                                 <label class="form-label fw-bold text-primary mb-0" style="font-size:0.82rem;">
                                     <i class="fas fa-barcode me-1"></i>Enter Lot No. <span class="text-danger">*</span>
@@ -124,8 +124,16 @@
                             </div>
                         </div>
 
-                        <!-- 2. Target Process (Read-Only / Disabled) -->
-                        <div class="col-12 col-md-4">
+                        <!-- 2. Issuance Date -->
+                        <div class="col-12 col-md-2">
+                            <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
+                                <i class="fas fa-calendar-alt text-primary me-1"></i>Issuance Date <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" class="form-control form-control-sm fw-bold" @bind="IssuanceDate" />
+                        </div>
+
+                        <!-- 3. Target Process (Read-Only / Disabled) -->
+                        <div class="col-12 col-md-3">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
                                 Target Process
                             </label>
@@ -138,7 +146,7 @@
                             </select>
                         </div>
 
-                        <!-- 3. Batch No (Auto-populated) -->
+                        <!-- 4. Batch No (Auto-populated) -->
                         <div class="col-12 col-md-3">
                             <label class="form-label fw-bold text-secondary mb-1" style="font-size:0.8rem;">
                                 Batch No.

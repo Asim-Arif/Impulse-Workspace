@@ -7,5 +7,6 @@ namespace Impulse.Configurations
         public string UploadPath { get; set; }
         public bool EnableCustomerWiseMakerRates { get; set; } = false;
         public bool AutoGenerateProformaOnOrderSave { get; set; } = false;
+        public bool ShowOrderNoInProductionOrderList { get; set; } = false;
     }
 }
